@@ -851,11 +851,14 @@ class DataTable {
         return;
       }
 
-      // Add to appropriate data headers list
-      if (isNodeProperty) {
-        this.fileData.nodeDataHeaders.push({ subGroup: groupName, key: propertyName });
+      // Add to appropriate data headers list, inserting next to existing group members
+      const targetHeaders = isNodeProperty ? this.fileData.nodeDataHeaders : this.fileData.edgeDataHeaders;
+      const lastGroupIdx = targetHeaders.findLastIndex(h => h.subGroup === groupName);
+      const newHeader = { subGroup: groupName, key: propertyName };
+      if (lastGroupIdx !== -1) {
+        targetHeaders.splice(lastGroupIdx + 1, 0, newHeader);
       } else {
-        this.fileData.edgeDataHeaders.push({ subGroup: groupName, key: propertyName });
+        targetHeaders.push(newHeader);
       }
 
       // Reload tab data to rebuild headers with proper filtering

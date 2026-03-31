@@ -1506,7 +1506,13 @@ class IOManager {
         (h) => h.subGroup === elem.subGroup && h.key === elem.key,
       );
       if (!exists) {
-        targetList.push(elem);
+        // Insert next to existing group members to keep groups contiguous
+        const lastGroupIdx = targetList.findLastIndex(h => h.subGroup === subGroup);
+        if (lastGroupIdx !== -1) {
+          targetList.splice(lastGroupIdx + 1, 0, elem);
+        } else {
+          targetList.push(elem);
+        }
       }
     }
 
