@@ -182,7 +182,8 @@ const CFG = {
   HIDE_LABELS: false,
 
 // if network is greater than defined threshold, hover effects are disabled
-  MAX_NODES_BEFORE_DISABLING_HOVER_EFFECT: 300,
+  MAX_NODES_BEFORE_DISABLING_HOVER_EFFECT: 200,
+  MAX_EDGES_BEFORE_DISABLING_HOVER_EFFECT: 500,
   DISABLE_HOVER_EFFECT: false,
 
 // if network is greater than defined threshold, bubble groups may span across non-bubble group members

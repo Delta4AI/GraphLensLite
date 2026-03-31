@@ -472,6 +472,44 @@ class UIManager {
     await this.cache.graph.updatePlugin({key: 'tooltip', enable: lassoIsActive});
   }
 
+  async toggleHoverEffect(btn) {
+    const isCurrentlyEnabled = !this.cache.CFG.DISABLE_HOVER_EFFECT;
+
+    if (isCurrentlyEnabled) {
+      this.cache.CFG.DISABLE_HOVER_EFFECT = true;
+      btn.classList.remove("green", "highlight");
+      btn.classList.add("red");
+      btn.title = "Enable hover highlight effect";
+      const behaviors = await this.cache.graph.getBehaviors();
+      const filtered = behaviors.filter(b => b.type !== this.cache.gcm.BEHAVIOURS.HOVER_ACTIVATE.type);
+      await this.cache.graph.setBehaviors(filtered);
+      this.info("Hover highlight effect disabled");
+    } else {
+      this.cache.CFG.DISABLE_HOVER_EFFECT = false;
+      btn.classList.remove("red");
+      btn.classList.add("green", "highlight");
+      btn.title = "Disable hover highlight effect";
+      const behaviors = await this.cache.graph.getBehaviors();
+      behaviors.push(this.cache.gcm.BEHAVIOURS.HOVER_ACTIVATE);
+      await this.cache.graph.setBehaviors(behaviors);
+      this.info("Hover highlight effect enabled");
+    }
+  }
+
+  updateHoverToggleButton() {
+    const btn = document.getElementById("hoverToggleBtn");
+    if (!btn) return;
+    if (this.cache.CFG.DISABLE_HOVER_EFFECT) {
+      btn.classList.remove("green", "highlight");
+      btn.classList.add("red");
+      btn.title = "Enable hover highlight effect";
+    } else {
+      btn.classList.remove("red");
+      btn.classList.add("green", "highlight");
+      btn.title = "Disable hover highlight effect";
+    }
+  }
+
   handleEditModeUIChanges() {
     const editBtn = document.getElementById("editBtn");
     if (!editBtn) return;

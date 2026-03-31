@@ -1145,7 +1145,9 @@ class IOManager {
       fileData.nodes.length > this.cache.CFG.MAX_NODES_BEFORE_HIDING_LABELS;
     this.cache.CFG.DISABLE_HOVER_EFFECT =
       fileData.nodes.length >
-      this.cache.CFG.MAX_NODES_BEFORE_DISABLING_HOVER_EFFECT;
+      this.cache.CFG.MAX_NODES_BEFORE_DISABLING_HOVER_EFFECT ||
+      fileData.edges.length >
+      this.cache.CFG.MAX_EDGES_BEFORE_DISABLING_HOVER_EFFECT;
     this.cache.CFG.AVOID_MEMBERS_IN_BUBBLE_GROUPS =
       fileData.nodes.length >
       this.cache.CFG.MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS;
@@ -1703,6 +1705,7 @@ class IOManager {
         }
 
         this.cache.io.preProcessData(fileData);
+        this.cache.ui.updateHoverToggleButton();
         this.cache.buildDataTable(fileData);
         this.cache.ui.buildUI();
 
