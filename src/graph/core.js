@@ -249,15 +249,22 @@ class GraphCoreManager {
         plugins: plugins,
       });
 
-      this.cache.graph.on("node:dragend", async () => {
+      this.cache.graph.on("node:dragend", async (event) => {
         /**
          * Persist all positions on every drag event
+         * and reset zIndex elevated by G6's frontElement during drag
          */
         if (this.cache.EVENT_LOCKS.DRAG_END_RUNNING) return;
 
         this.cache.ui.debug("DRAG END");
         this.cache.EVENT_LOCKS.DRAG_END_RUNNING = true;
         await this.cache.lm.persistNodePositions();
+
+        const draggedId = event?.target?.id;
+        if (draggedId) {
+          await this.cache.graph.setElementZIndex(draggedId, 0);
+        }
+
         this.cache.EVENT_LOCKS.DRAG_END_RUNNING = false;
       });
 
