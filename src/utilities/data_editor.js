@@ -497,6 +497,8 @@ class DataTable {
       if (this.onChangeCallback) {
         this.onChangeCallback(-1, -1, 'row_deleted');
       }
+
+      this.notifyPendingChanges();
     }
   }
 
@@ -849,11 +851,14 @@ class DataTable {
         return;
       }
 
-      // Add to appropriate data headers list
-      if (isNodeProperty) {
-        this.fileData.nodeDataHeaders.push({ subGroup: groupName, key: propertyName });
+      // Add to appropriate data headers list, inserting next to existing group members
+      const targetHeaders = isNodeProperty ? this.fileData.nodeDataHeaders : this.fileData.edgeDataHeaders;
+      const lastGroupIdx = targetHeaders.findLastIndex(h => h.subGroup === groupName);
+      const newHeader = { subGroup: groupName, key: propertyName };
+      if (lastGroupIdx !== -1) {
+        targetHeaders.splice(lastGroupIdx + 1, 0, newHeader);
       } else {
-        this.fileData.edgeDataHeaders.push({ subGroup: groupName, key: propertyName });
+        targetHeaders.push(newHeader);
       }
 
       // Reload tab data to rebuild headers with proper filtering
@@ -1185,9 +1190,22 @@ class DataTable {
 
       const positions = this.cache.data.layouts[this.cache.data.selectedLayout]?.positions;
 
+      const propIdToExcelHeader = (propId) => {
+        const [, subGroup, key] = StaticUtilities.decodePropHashId(propId);
+        return subGroup === this.cache.CFG.EXCEL_UNCATEGORIZED_SUBHEADER
+          ? key
+          : `${key} [${subGroup}]`;
+      };
+
+      // Use filterDefaults key order (group-contiguous) instead of Set iteration order
+      const orderedNodeProps = [...this.cache.data.filterDefaults.keys()]
+        .filter(propId => this.cache.nodeExclusiveProps.has(propId));
+      const orderedEdgeProps = [...this.cache.data.filterDefaults.keys()]
+        .filter(propId => this.cache.edgeExclusiveProps.has(propId));
+
       if (nodesToExport.length > 0) {
         const nodesSheet = workbook.addWorksheet('nodes');
-        const nodesHeader = [...EXCEL_NODE_PROPERTIES.map(p => p.column), ...this.cache.nodeExclusiveProps];
+        const nodesHeader = [...EXCEL_NODE_PROPERTIES.map(p => p.column), ...orderedNodeProps.map(propIdToExcelHeader)];
         nodesSheet.addRow(nodesHeader);
 
         for (const node of nodesToExport) {
@@ -1202,7 +1220,7 @@ class DataTable {
             row.push(value);
           }
 
-          for (const customProp of this.cache.nodeExclusiveProps) {
+          for (const customProp of orderedNodeProps) {
             const [group, subGroup, prop] = StaticUtilities.decodePropHashId(customProp);
 
             const value = node.D4Data && node.D4Data[group] && node.D4Data[group][subGroup]
@@ -1217,7 +1235,7 @@ class DataTable {
 
       if (edgesToExport.length > 0) {
         const edgesSheet = workbook.addWorksheet('edges');
-        const edgesHeader = [...EXCEL_EDGE_PROPERTIES.map(p => p.column), ...this.cache.edgeExclusiveProps];
+        const edgesHeader = [...EXCEL_EDGE_PROPERTIES.map(p => p.column), ...orderedEdgeProps.map(propIdToExcelHeader)];
         edgesSheet.addRow(edgesHeader);
 
         for (const edge of edgesToExport) {
@@ -1228,7 +1246,7 @@ class DataTable {
             row.push(value);
           }
 
-          for (const customProp of this.cache.edgeExclusiveProps) {
+          for (const customProp of orderedEdgeProps) {
             const [group, subGroup, prop] = StaticUtilities.decodePropHashId(customProp);
 
             const value = edge.D4Data && edge.D4Data[group] && edge.D4Data[group][subGroup]
@@ -1249,7 +1267,8 @@ class DataTable {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `graph_data_export_${this.currentTab}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`;
+      const suffix = this.currentTab === 'entireGraph' ? '' : this.currentTab;
+      link.download = this.cache.io.buildExportFilename("xlsx", suffix);
 
       document.body.appendChild(link);
       link.click();

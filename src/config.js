@@ -1,7 +1,7 @@
 /**
  * Defaults for the graph, layouts and UI
  */
-const VERSION = "1.11.2";
+const VERSION = "1.12.0";
 
 const DEFAULTS = {
   NODE: {
@@ -48,12 +48,19 @@ const DEFAULTS = {
       stroke: '#C33D35',
       strokeOpacity: 1,
       virtualEdges: true,
+      label: true,
+      labelText: 'group one',
       labelFill: '#fff',
+      labelFontSize: 12,
       labelPadding: 2,
+      labelBackground: true,
       labelBackgroundFill: '#403C53',
       labelBackgroundRadius: 5,
-      label: true,
-      labelText: 'group one'
+      labelCloseToPath: true,
+      labelAutoRotate: true,
+      labelOffsetX: 0,
+      labelOffsetY: 0,
+      labelPlacement: 'bottom',
     },
     "groupTwo": {
       fill: '#c33d35',
@@ -61,12 +68,19 @@ const DEFAULTS = {
       stroke: '#403c53',
       strokeOpacity: 1,
       virtualEdges: true,
+      label: true,
+      labelText: 'group two',
       labelFill: '#fff',
+      labelFontSize: 12,
       labelPadding: 2,
+      labelBackground: true,
       labelBackgroundFill: '#c33d35',
       labelBackgroundRadius: 5,
-      label: true,
-      labelText: 'group two'
+      labelCloseToPath: true,
+      labelAutoRotate: true,
+      labelOffsetX: 0,
+      labelOffsetY: 0,
+      labelPlacement: 'bottom',
     },
     "groupThree": {
       fill: '#EFB0AA',
@@ -74,12 +88,19 @@ const DEFAULTS = {
       stroke: '#8CA6D9',
       strokeOpacity: 1,
       virtualEdges: true,
+      label: true,
+      labelText: 'group three',
       labelFill: '#fff',
+      labelFontSize: 12,
       labelPadding: 2,
+      labelBackground: true,
       labelBackgroundFill: '#EFB0AA',
       labelBackgroundRadius: 5,
-      label: true,
-      labelText: 'group three'
+      labelCloseToPath: true,
+      labelAutoRotate: true,
+      labelOffsetX: 0,
+      labelOffsetY: 0,
+      labelPlacement: 'bottom',
     },
     "groupFour": {
       fill: '#8CA6D9',
@@ -87,12 +108,19 @@ const DEFAULTS = {
       stroke: '#EFB0AA',
       strokeOpacity: 1,
       virtualEdges: true,
+      label: true,
+      labelText: 'group four',
       labelFill: '#fff',
+      labelFontSize: 12,
       labelPadding: 2,
+      labelBackground: true,
       labelBackgroundFill: '#8CA6D9',
       labelBackgroundRadius: 5,
-      label: true,
-      labelText: 'group four'
+      labelCloseToPath: true,
+      labelAutoRotate: true,
+      labelOffsetX: 0,
+      labelOffsetY: 0,
+      labelPlacement: 'bottom',
     },
   },
   BUBBLE_GROUP_QUADRANT_POSITIONS: {
@@ -182,7 +210,8 @@ const CFG = {
   HIDE_LABELS: false,
 
 // if network is greater than defined threshold, hover effects are disabled
-  MAX_NODES_BEFORE_DISABLING_HOVER_EFFECT: 300,
+  MAX_NODES_BEFORE_DISABLING_HOVER_EFFECT: 200,
+  MAX_EDGES_BEFORE_DISABLING_HOVER_EFFECT: 500,
   DISABLE_HOVER_EFFECT: false,
 
 // if network is greater than defined threshold, bubble groups may span across non-bubble group members

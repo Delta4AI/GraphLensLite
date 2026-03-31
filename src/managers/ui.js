@@ -10,6 +10,14 @@ class UIManager {
     this.bottomBarHeight = null;
   }
 
+  setDataSourceLabel(text) {
+    const label = document.getElementById('dataSourceLabel');
+    if (label) {
+      label.textContent = text;
+      label.title = text;
+    }
+  }
+
   async showLoading(header, text = "") {
     const overlay = document.getElementById('loadingOverlay');
     overlay.style.display = 'flex';
@@ -462,6 +470,61 @@ class UIManager {
 
     await this.cache.graph.setBehaviors([...behaviors, ...lassoIsActive ? clickAndDragBehaviors : lassoBehaviors]);
     await this.cache.graph.updatePlugin({key: 'tooltip', enable: lassoIsActive});
+  }
+
+  async toggleHoverEffect(btn) {
+    const isCurrentlyEnabled = !this.cache.CFG.DISABLE_HOVER_EFFECT;
+
+    if (isCurrentlyEnabled) {
+      this.cache.CFG.DISABLE_HOVER_EFFECT = true;
+      btn.classList.remove("green", "highlight");
+      btn.classList.add("red");
+      btn.title = "Enable hover highlight effect (H)";
+      const behaviors = await this.cache.graph.getBehaviors();
+      const filtered = behaviors.filter(b => b.type !== this.cache.gcm.BEHAVIOURS.HOVER_ACTIVATE.type);
+      await this.cache.graph.setBehaviors(filtered);
+
+      // Clear any lingering highlight/dim states from the hover behavior
+      const stateMap = {};
+      for (const node of this.cache.graph.getNodeData()) {
+        const states = await this.cache.graph.getElementState(node.id);
+        const cleaned = states.filter(s => s !== "highlight" && s !== "dim");
+        if (cleaned.length !== states.length) stateMap[node.id] = cleaned;
+      }
+      for (const edge of this.cache.graph.getEdgeData()) {
+        const states = await this.cache.graph.getElementState(edge.id);
+        const cleaned = states.filter(s => s !== "highlight" && s !== "dim");
+        if (cleaned.length !== states.length) stateMap[edge.id] = cleaned;
+      }
+      if (Object.keys(stateMap).length > 0) {
+        await this.cache.graph.setElementState(stateMap);
+      }
+
+      this.info("Hover highlight effect disabled");
+    } else {
+      this.cache.CFG.DISABLE_HOVER_EFFECT = false;
+      btn.classList.remove("red");
+      btn.classList.add("green", "highlight");
+      btn.title = "Disable hover highlight effect (H)";
+      const behaviors = await this.cache.graph.getBehaviors();
+      behaviors.push(this.cache.gcm.BEHAVIOURS.HOVER_ACTIVATE);
+      await this.cache.graph.setBehaviors(behaviors);
+      this.info("Hover highlight effect enabled");
+    }
+  }
+
+  updateHoverToggleButton() {
+    const btn = document.getElementById("hoverToggleBtn");
+    if (!btn) return;
+    if (this.cache.CFG.DISABLE_HOVER_EFFECT) {
+      btn.classList.remove("green", "highlight");
+      btn.classList.add("red");
+      btn.title = "Enable hover highlight effect (H)";
+    } else {
+      btn.classList.remove("red");
+      btn.classList.add("green", "highlight");
+      btn.title = "Disable hover highlight effect (H)";
+    }
   }
 
   handleEditModeUIChanges() {

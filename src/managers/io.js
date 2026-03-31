@@ -135,7 +135,7 @@ const EXCEL_NODE_PROPERTIES = [
       n.style.labelBackgroundFill = v;
     },
     get: (n) => {
-      return n.style.labelBackgroundFill;
+      return n.style.labelBackground ? n.style.labelBackgroundFill : undefined;
     },
   },
   {
@@ -313,7 +313,7 @@ const EXCEL_EDGE_PROPERTIES = [
       e.style.labelBackgroundFill = v;
     },
     get: (e) => {
-      return e.style.labelBackgroundFill;
+      return e.style.labelBackground ? e.style.labelBackgroundFill : undefined;
     },
   },
   {
@@ -384,7 +384,7 @@ const EXCEL_EDGE_PROPERTIES = [
       e.style.haloStroke = v;
     },
     get: (e) => {
-      return e.style.haloStroke;
+      return e.style.halo ? e.style.haloStroke : undefined;
     },
   },
   {
@@ -1145,7 +1145,9 @@ class IOManager {
       fileData.nodes.length > this.cache.CFG.MAX_NODES_BEFORE_HIDING_LABELS;
     this.cache.CFG.DISABLE_HOVER_EFFECT =
       fileData.nodes.length >
-      this.cache.CFG.MAX_NODES_BEFORE_DISABLING_HOVER_EFFECT;
+      this.cache.CFG.MAX_NODES_BEFORE_DISABLING_HOVER_EFFECT ||
+      fileData.edges.length >
+      this.cache.CFG.MAX_EDGES_BEFORE_DISABLING_HOVER_EFFECT;
     this.cache.CFG.AVOID_MEMBERS_IN_BUBBLE_GROUPS =
       fileData.nodes.length >
       this.cache.CFG.MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS;
@@ -1446,6 +1448,31 @@ class IOManager {
     }
   }
 
+  buildExportFilename(ext, suffix = '') {
+    const now = new Date();
+    const ts = now.getFullYear().toString()
+      + String(now.getMonth() + 1).padStart(2, '0')
+      + String(now.getDate()).padStart(2, '0')
+      + '-'
+      + String(now.getHours()).padStart(2, '0')
+      + String(now.getMinutes()).padStart(2, '0')
+      + String(now.getSeconds()).padStart(2, '0');
+
+    const label = document.getElementById('dataSourceLabel')?.textContent || '';
+    let basename = label
+      .replace(/\.[a-z0-9]+$/i, '')                // strip file extension
+      .replace(/^(\d{8}-\d{6}_GLL_)+/, '')          // strip stacked GLL prefixes
+      .replace(/[<>:"/\\|?*,]+/g, '_')              // replace unsafe chars
+      .replace(/\s+/g, '_')                         // spaces to underscores
+      .replace(/_+/g, '_')                          // collapse multiple underscores
+      .replace(/^_|_$/g, '');                        // trim leading/trailing underscores
+
+    if (!basename) basename = 'export';
+    if (suffix) basename += `_${suffix}`;
+
+    return `${ts}_GLL_${basename}.${ext}`;
+  }
+
   async exportGraphAsJSON() {
     if (this.cache.data === null) {
       this.cache.ui.error("No graph data to save.");
@@ -1479,7 +1506,13 @@ class IOManager {
         (h) => h.subGroup === elem.subGroup && h.key === elem.key,
       );
       if (!exists) {
-        targetList.push(elem);
+        // Insert next to existing group members to keep groups contiguous
+        const lastGroupIdx = targetList.findLastIndex(h => h.subGroup === subGroup);
+        if (lastGroupIdx !== -1) {
+          targetList.splice(lastGroupIdx + 1, 0, elem);
+        } else {
+          targetList.push(elem);
+        }
       }
     }
 
@@ -1531,7 +1564,7 @@ class IOManager {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "graph-export.json";
+    a.download = this.buildExportFilename("json");
     a.click();
     URL.revokeObjectURL(url);
     await this.cache.ui.hideLoading();
@@ -1580,9 +1613,16 @@ class IOManager {
           layout.edgeStyles instanceof Map
             ? layout.edgeStyles
             : new Map(Object.entries(layout.edgeStyles || {})),
-        bubbleSetStyle:
-          layout.bubbleSetStyle ||
-          structuredClone(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE),
+        bubbleSetStyle: (() => {
+          const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE;
+          const saved = layout.bubbleSetStyle;
+          if (!saved) return structuredClone(defaults);
+          const merged = {};
+          for (const group of Object.keys(defaults)) {
+            merged[group] = { ...defaults[group], ...(saved[group] || {}) };
+          }
+          return merged;
+        })(),
       };
 
       for (let group of this.cache.bs.traverseBubbleSets()) {
@@ -1654,6 +1694,8 @@ class IOManager {
     let file = event.target.files[0];
     if (!file) return;
 
+    this.cache.ui.setDataSourceLabel(file.name);
+
     await this.cache.ui.showLoading(
       "Loading",
       `Loading ${file.name} (${file.type} with ${StaticUtilities.humanFileSize(file.size)})`,
@@ -1676,6 +1718,7 @@ class IOManager {
         }
 
         this.cache.io.preProcessData(fileData);
+        this.cache.ui.updateHoverToggleButton();
         this.cache.buildDataTable(fileData);
         this.cache.ui.buildUI();
 
@@ -1729,7 +1772,7 @@ class IOManager {
 
       const link = document.createElement("a");
       link.href = imageData;
-      link.download = "graph-export.png";
+      link.download = this.buildExportFilename("png");
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

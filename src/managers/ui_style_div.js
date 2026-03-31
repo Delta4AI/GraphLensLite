@@ -259,6 +259,7 @@ function createStyleDiv(cache) {
 
     const container = document.createElement("div");
     container.className = "style-slider-container";
+    container.dataset.property = property;
     if (tooltip) container.title = tooltip;
 
     const slider = document.createElement("input");
@@ -362,6 +363,7 @@ function createStyleDiv(cache) {
     colorInput.type = "text";
     colorInput.value = defaultColor;
     colorInput.classList.add("style-input");
+    colorInput.dataset.property = property;
     colorInput.title = `Set ${property} of the selected elements to a color of choice (RGBA hex color code). Confirm with Enter`;
     colorInput.placeholder = `Enter Color`;
 
@@ -972,55 +974,155 @@ function createStyleDiv(cache) {
   }
 
   function createBubbleSetConfigCard() {
-    const bubbleDiv = createCard("Bubble Set Configuration", undefined, "bubble-set-config-card-header");
+    const bubbleDiv = createCard("Bubble Sets", undefined, "bubble-set-config-card-header");
     const optionalCSSClass = "bubbleSetOptionalLabelConfig";
 
-    let rowCount = 0;
+    // Tab bar
+    const tabBar = document.createElement("div");
+    tabBar.className = "bubble-set-tab-bar";
+    bubbleDiv.appendChild(tabBar);
+
+    const panels = [];
+    let tabIndex = 0;
+
     for (const group of cache.bs.traverseBubbleSets()) {
-      rowCount++;
+      tabIndex++;
+      const bs = cache.data.layouts[cache.data.selectedLayout].bubbleSetStyle[group];
 
-      const card = createCard(`Bubble Set ${rowCount}`, bubbleDiv);
-      card.id = `bubbleSetStyleCard${group}`;
+      // Create tab button with group color accent
+      const tab = document.createElement("button");
+      tab.className = `bubble-set-tab${tabIndex === 1 ? " active" : ""}`;
+      tab.textContent = `Bubble Set ${tabIndex}`;
+      tab.dataset.group = group;
+      tab.style.setProperty("--tab-color", bs.fill);
+      tab.style.setProperty("--tab-text-color", StaticUtilities.getReadableForegroundColor(bs.fill));
+      tabBar.appendChild(tab);
 
-      const rowOne = createNewRow(card);
-      appendLabel(rowOne, "Fill Color");
-      createColorControls(rowOne, `Bubble Set ${group} Fill Color`, cache.data.layouts[cache.data.selectedLayout].bubbleSetStyle[group].fill, [], false);
+      // Create tab panel
+      const panel = document.createElement("div");
+      panel.className = `bubble-set-tab-panel${tabIndex === 1 ? " active" : ""}`;
+      panel.id = `bubbleSetStyleCard${group}`;
+      bubbleDiv.appendChild(panel);
+      panels.push(panel);
 
-      const rowTwo = createNewRow(card);
-      appendLabel(rowTwo, "Fill Opacity");
-      createNumericalSlider(rowTwo, `Bubble Set ${group} Fill Opacity`, cache.data.layouts[cache.data.selectedLayout].bubbleSetStyle[group].fillOpacity,
-        {min: 0, max: 1, step: 0.01}, `Define the fill opacity of the bubble set ${group}.`, false);
+      tab.onclick = () => {
+        tabBar.querySelectorAll(".bubble-set-tab").forEach(t => t.classList.remove("active"));
+        panels.forEach(p => p.classList.remove("active"));
+        tab.classList.add("active");
+        panel.classList.add("active");
+      };
 
-      const rowThree = createNewRow(card);
-      appendLabel(rowThree, "Stroke Color");
-      createColorControls(rowThree, `Bubble Set ${group} Stroke Color`, cache.data.layouts[cache.data.selectedLayout].bubbleSetStyle[group].stroke, [], false);
+      // Fill Color
+      const rowFillColor = createNewRow(panel);
+      appendLabel(rowFillColor, "Fill Color");
+      createColorControls(rowFillColor, `Bubble Set ${group} Fill Color`, bs.fill, [], false);
 
-      const rowFour = createNewRow(card);
-      appendLabel(rowFour, "Stroke Opacity");
-      createNumericalSlider(rowFour, `Bubble Set ${group} Stroke Opacity`, cache.data.layouts[cache.data.selectedLayout].bubbleSetStyle[group].strokeOpacity,
-        {min: 0, max: 1, step: 0.01}, `Define the stroke opacity of the bubble set ${group}.`, false);
+      // Fill Opacity
+      const rowFillOpacity = createNewRow(panel);
+      appendLabel(rowFillOpacity, "Fill Opacity");
+      createNumericalSlider(rowFillOpacity, `Bubble Set ${group} Fill Opacity`, bs.fillOpacity,
+        {min: 0, max: 1, step: 0.01}, `Define the fill opacity of bubble set ${tabIndex}.`, false);
 
-      const rowFive = createNewRow(card);
-      appendLabel(rowFive, "Label Text");
+      // Stroke Color
+      const rowStrokeColor = createNewRow(panel);
+      appendLabel(rowStrokeColor, "Stroke Color");
+      createColorControls(rowStrokeColor, `Bubble Set ${group} Stroke Color`, bs.stroke, [], false);
+
+      // Stroke Opacity
+      const rowStrokeOpacity = createNewRow(panel);
+      appendLabel(rowStrokeOpacity, "Stroke Opacity");
+      createNumericalSlider(rowStrokeOpacity, `Bubble Set ${group} Stroke Opacity`, bs.strokeOpacity,
+        {min: 0, max: 1, step: 0.01}, `Define the stroke opacity of bubble set ${tabIndex}.`, false);
+
+      // Label (toggle + text input)
+      const rowLabel = createNewRow(panel);
+      appendLabel(rowLabel, "Label Text");
       const enableTextSwitch = createSwitch(async () => {
         await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label`, enableTextSwitch.isChecked());
-      }, undefined, cache.data.layouts[cache.data.selectedLayout].bubbleSetStyle[group].label);
-      rowFive.appendChild(enableTextSwitch);
-      const labelInput = createInput(120, `${group} label text`, `Enter the label text for the bubble set ${group}.`, cache.data.layouts[cache.data.selectedLayout].bubbleSetStyle[group].labelText, async () => {
-        const val = labelInput.value.trim();
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Text`, val);
+      }, undefined, bs.label);
+      rowLabel.appendChild(enableTextSwitch);
+      const labelInput = createInput(120, `${group} label text`,
+        `Enter the label text for bubble set ${tabIndex}.`, bs.labelText, async () => {
+        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Text`, labelInput.value.trim());
       });
       labelInput.classList.add(optionalCSSClass);
-      rowFive.appendChild(labelInput);
+      rowLabel.appendChild(labelInput);
 
-      const rowSix = createNewRow(card);
-      appendLabel(rowSix, "Label Background Color", undefined, undefined, optionalCSSClass);
+      // Label Background (toggle + color)
+      const rowLabelBg = createNewRow(panel);
+      appendLabel(rowLabelBg, "Label Background", undefined, undefined, optionalCSSClass);
       const enableBackgroundSwitch = createSwitch(async () => {
         await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Background`, enableBackgroundSwitch.isChecked());
-      }, undefined, cache.data.layouts[cache.data.selectedLayout].bubbleSetStyle[group].labelBackground || true);
+      }, undefined, bs.labelBackground);
       enableBackgroundSwitch.classList.add(optionalCSSClass);
-      rowSix.appendChild(enableBackgroundSwitch);
-      createColorControls(rowSix, `Bubble Set ${group} Label Background Color`, cache.data.layouts[cache.data.selectedLayout].bubbleSetStyle[group].labelBackgroundFill || cache.data.layouts[cache.data.selectedLayout].bubbleSetStyle[group].fill, [], false, optionalCSSClass);
+      rowLabelBg.appendChild(enableBackgroundSwitch);
+      createColorControls(rowLabelBg, `Bubble Set ${group} Label Background Color`,
+        bs.labelBackgroundFill || bs.fill, [], false, optionalCSSClass);
+
+      // Label Fill Color
+      const rowLabelFill = createNewRow(panel);
+      appendLabel(rowLabelFill, "Label Color", undefined, undefined, optionalCSSClass);
+      createColorControls(rowLabelFill, `Bubble Set ${group} Label Fill Color`, bs.labelFill, [], false, optionalCSSClass);
+
+      // Label Font Size
+      const rowFontSize = createNewRow(panel);
+      appendLabel(rowFontSize, "Label Font Size", undefined, undefined, optionalCSSClass);
+      createNumericalSlider(rowFontSize, `Bubble Set ${group} Label Font Size`, bs.labelFontSize,
+        {min: 6, max: 36, step: 1}, `Define the label font size for bubble set ${tabIndex}.`, false);
+      rowFontSize.lastChild.classList.add(optionalCSSClass);
+
+      // Label Placement
+      const rowPlacement = createNewRow(panel);
+      appendLabel(rowPlacement, "Label Placement", undefined, undefined, optionalCSSClass);
+      const placementDropdown = document.createElement("select");
+      placementDropdown.className = "style-inner-button";
+      placementDropdown.dataset.property = `Bubble Set ${group} Label Placement`;
+      placementDropdown.classList.add(optionalCSSClass);
+      ['left', 'right', 'top', 'bottom', 'center'].forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v;
+        opt.textContent = v;
+        placementDropdown.appendChild(opt);
+      });
+      placementDropdown.value = bs.labelPlacement;
+      placementDropdown.onchange = async () => {
+        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Placement`, placementDropdown.value);
+      };
+      rowPlacement.appendChild(placementDropdown);
+
+      // Label Close To Path
+      const rowClosePath = createNewRow(panel);
+      appendLabel(rowClosePath, "Close To Path", undefined, undefined, optionalCSSClass);
+      const closeToPathSwitch = createSwitch(async () => {
+        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Close To Path`, closeToPathSwitch.isChecked());
+      }, undefined, bs.labelCloseToPath);
+      closeToPathSwitch.classList.add(optionalCSSClass);
+      closeToPathSwitch.dataset.property = `Bubble Set ${group} Label Close To Path`;
+      rowClosePath.appendChild(closeToPathSwitch);
+
+      // Label Auto Rotate
+      const rowAutoRotate = createNewRow(panel);
+      appendLabel(rowAutoRotate, "Auto Rotate", undefined, undefined, optionalCSSClass);
+      const autoRotateSwitch = createSwitch(async () => {
+        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Auto Rotate`, autoRotateSwitch.isChecked());
+      }, undefined, bs.labelAutoRotate);
+      autoRotateSwitch.classList.add(optionalCSSClass);
+      autoRotateSwitch.dataset.property = `Bubble Set ${group} Label Auto Rotate`;
+      rowAutoRotate.appendChild(autoRotateSwitch);
+
+      // Label Offset X
+      const rowOffsetX = createNewRow(panel);
+      appendLabel(rowOffsetX, "Label Offset X", undefined, undefined, optionalCSSClass);
+      createNumericalSlider(rowOffsetX, `Bubble Set ${group} Label Offset X`, bs.labelOffsetX,
+        {min: -50, max: 50, step: 1}, `Define the label X offset for bubble set ${tabIndex}.`, false);
+      rowOffsetX.lastChild.classList.add(optionalCSSClass);
+
+      // Label Offset Y
+      const rowOffsetY = createNewRow(panel);
+      appendLabel(rowOffsetY, "Label Offset Y", undefined, undefined, optionalCSSClass);
+      createNumericalSlider(rowOffsetY, `Bubble Set ${group} Label Offset Y`, bs.labelOffsetY,
+        {min: -50, max: 50, step: 1}, `Define the label Y offset for bubble set ${tabIndex}.`, false);
+      rowOffsetY.lastChild.classList.add(optionalCSSClass);
     }
   }
 

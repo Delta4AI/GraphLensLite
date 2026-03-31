@@ -76,10 +76,13 @@
     <div class="sidebar-resize-handle"></div>
     <div id="sidebarContentContainer">
       <div class="header-row">
-        <h3 id="appHeader" class="disabled-header" onclick="cache.ui.reloadApp()">
-          <img inline src="delta-4-icon.png" alt="Delta4 Icon" style="height: 1em; vertical-align: middle; margin-right: 0.3em;">
-          Graph Lens Lite <span id="versionInfo" style="font-size: 0.6em; color: #666; font-weight: normal;"></span>
-        </h3>
+        <div class="header-title-group">
+          <h3 id="appHeader" class="disabled-header" onclick="cache.ui.reloadApp()">
+            <img inline src="delta-4-icon.png" alt="Delta4 Icon" style="height: 1em; vertical-align: middle; margin-right: 0.3em;">
+            Graph Lens Lite <span id="versionInfo" style="font-size: 0.6em; color: #666; font-weight: normal;"></span>
+          </h3>
+          <span id="dataSourceLabel" class="data-source-label"></span>
+        </div>
         <div class="showOnLoad button-group">
           <button id="metricsToggleBtn" class="showOnLoad medium-btn" title="Toggle network metrics panel (M)" onclick="cache.metrics.toggleUI()">📊</button>
           <button id="dataToggleBtn" class="showOnLoad medium-btn" title="Toggle data editor (D)" onclick="cache.ui.toggleDataEditor()">🔢</button>
@@ -110,6 +113,7 @@
           <div class="button-separator"></div>
           <button class="small-btn" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">⛶</button>
           <button id="hideDisconnectedBtn" class="small-btn red" title="Hide all nodes and edges that are not connected to any other node or edge" onclick="cache.gcm.toggleCleanUpDanglingElements(this)">🚫</button>
+          <button id="hoverToggleBtn" class="small-btn green highlight" title="Disable hover highlight effect (H)" onclick="cache.ui.toggleHoverEffect(this)">✨</button>
           <div id="debugDiv" class="inline"></div>
           <br>
           <h5 class="purple">Shown:
