@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.12.0
+
+### Features
+
+* Added toggle button for hover highlight effect with hotkey (H) and auto-clear of highlight/dim states on disable
+* Added fine-grained bubble-set label controls with tabbed UI
+* Show data source label in header and improve export filenames
+
+### Fixes
+
+* Fixed edges rendering on top of nodes after dragging a node and then hovering — reset zIndex elevated by G6's `frontElement` after drag ends
+* Fixed group-contiguous column order in Excel export
+* Fixed new columns being inserted at end instead of next to their group
+* Fixed apply button not enabling after row deletion in data editor
+
 ## 1.11.0
 
 ### Features
