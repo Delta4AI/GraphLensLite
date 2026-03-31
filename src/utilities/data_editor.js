@@ -1185,9 +1185,16 @@ class DataTable {
 
       const positions = this.cache.data.layouts[this.cache.data.selectedLayout]?.positions;
 
+      const propIdToExcelHeader = (propId) => {
+        const [, subGroup, key] = StaticUtilities.decodePropHashId(propId);
+        return subGroup === this.cache.CFG.EXCEL_UNCATEGORIZED_SUBHEADER
+          ? key
+          : `${key} [${subGroup}]`;
+      };
+
       if (nodesToExport.length > 0) {
         const nodesSheet = workbook.addWorksheet('nodes');
-        const nodesHeader = [...EXCEL_NODE_PROPERTIES.map(p => p.column), ...this.cache.nodeExclusiveProps];
+        const nodesHeader = [...EXCEL_NODE_PROPERTIES.map(p => p.column), ...[...this.cache.nodeExclusiveProps].map(propIdToExcelHeader)];
         nodesSheet.addRow(nodesHeader);
 
         for (const node of nodesToExport) {
@@ -1217,7 +1224,7 @@ class DataTable {
 
       if (edgesToExport.length > 0) {
         const edgesSheet = workbook.addWorksheet('edges');
-        const edgesHeader = [...EXCEL_EDGE_PROPERTIES.map(p => p.column), ...this.cache.edgeExclusiveProps];
+        const edgesHeader = [...EXCEL_EDGE_PROPERTIES.map(p => p.column), ...[...this.cache.edgeExclusiveProps].map(propIdToExcelHeader)];
         edgesSheet.addRow(edgesHeader);
 
         for (const edge of edgesToExport) {
@@ -1249,7 +1256,8 @@ class DataTable {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `graph_data_export_${this.currentTab}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`;
+      const suffix = this.currentTab === 'entireGraph' ? '' : this.currentTab;
+      link.download = this.cache.io.buildExportFilename("xlsx", suffix);
 
       document.body.appendChild(link);
       link.click();

@@ -10,6 +10,14 @@ class UIManager {
     this.bottomBarHeight = null;
   }
 
+  setDataSourceLabel(text) {
+    const label = document.getElementById('dataSourceLabel');
+    if (label) {
+      label.textContent = text;
+      label.title = text;
+    }
+  }
+
   async showLoading(header, text = "") {
     const overlay = document.getElementById('loadingOverlay');
     overlay.style.display = 'flex';

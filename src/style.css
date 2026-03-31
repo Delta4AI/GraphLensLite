@@ -1249,8 +1249,28 @@ hr {
     margin-bottom: 0.6em;
 }
 
+.header-title-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
 .header-row h3 {
     margin: 0;
+}
+
+.data-source-label {
+    font-size: 0.7em;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+    line-height: 1.2;
+}
+
+.data-source-label:empty {
+    display: none;
 }
 
 .button-group {

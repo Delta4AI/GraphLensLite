@@ -76,10 +76,13 @@
     <div class="sidebar-resize-handle"></div>
     <div id="sidebarContentContainer">
       <div class="header-row">
-        <h3 id="appHeader" class="disabled-header" onclick="cache.ui.reloadApp()">
-          <img inline src="delta-4-icon.png" alt="Delta4 Icon" style="height: 1em; vertical-align: middle; margin-right: 0.3em;">
-          Graph Lens Lite <span id="versionInfo" style="font-size: 0.6em; color: #666; font-weight: normal;"></span>
-        </h3>
+        <div class="header-title-group">
+          <h3 id="appHeader" class="disabled-header" onclick="cache.ui.reloadApp()">
+            <img inline src="delta-4-icon.png" alt="Delta4 Icon" style="height: 1em; vertical-align: middle; margin-right: 0.3em;">
+            Graph Lens Lite <span id="versionInfo" style="font-size: 0.6em; color: #666; font-weight: normal;"></span>
+          </h3>
+          <span id="dataSourceLabel" class="data-source-label"></span>
+        </div>
         <div class="showOnLoad button-group">
           <button id="metricsToggleBtn" class="showOnLoad medium-btn" title="Toggle network metrics panel (M)" onclick="cache.metrics.toggleUI()">📊</button>
           <button id="dataToggleBtn" class="showOnLoad medium-btn" title="Toggle data editor (D)" onclick="cache.ui.toggleDataEditor()">🔢</button>

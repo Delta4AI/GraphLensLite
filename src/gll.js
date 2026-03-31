@@ -392,6 +392,7 @@ async function loadDemoData() {
       const data = await stringDemoDataLoader.loadNetwork();
 
       if (data) {
+        cache.ui.setDataSourceLabel(`STRING: ${genes.join(', ')}`);
 
         await cache.gcm.destroyGraphAndRollBackUI();
         cache.gcm.resetEventLocks();
@@ -432,6 +433,7 @@ async function loadDemoData() {
 
 async function startTour() {
   const data = generateTourData();
+  cache.ui.setDataSourceLabel('Tour: Sample Gene Network');
 
   await cache.gcm.destroyGraphAndRollBackUI();
   cache.gcm.resetEventLocks();

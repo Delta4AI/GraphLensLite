@@ -135,7 +135,7 @@ const EXCEL_NODE_PROPERTIES = [
       n.style.labelBackgroundFill = v;
     },
     get: (n) => {
-      return n.style.labelBackgroundFill;
+      return n.style.labelBackground ? n.style.labelBackgroundFill : undefined;
     },
   },
   {
@@ -313,7 +313,7 @@ const EXCEL_EDGE_PROPERTIES = [
       e.style.labelBackgroundFill = v;
     },
     get: (e) => {
-      return e.style.labelBackgroundFill;
+      return e.style.labelBackground ? e.style.labelBackgroundFill : undefined;
     },
   },
   {
@@ -384,7 +384,7 @@ const EXCEL_EDGE_PROPERTIES = [
       e.style.haloStroke = v;
     },
     get: (e) => {
-      return e.style.haloStroke;
+      return e.style.halo ? e.style.haloStroke : undefined;
     },
   },
   {
@@ -1446,6 +1446,31 @@ class IOManager {
     }
   }
 
+  buildExportFilename(ext, suffix = '') {
+    const now = new Date();
+    const ts = now.getFullYear().toString()
+      + String(now.getMonth() + 1).padStart(2, '0')
+      + String(now.getDate()).padStart(2, '0')
+      + '-'
+      + String(now.getHours()).padStart(2, '0')
+      + String(now.getMinutes()).padStart(2, '0')
+      + String(now.getSeconds()).padStart(2, '0');
+
+    const label = document.getElementById('dataSourceLabel')?.textContent || '';
+    let basename = label
+      .replace(/\.[a-z0-9]+$/i, '')                // strip file extension
+      .replace(/^(\d{8}-\d{6}_GLL_)+/, '')          // strip stacked GLL prefixes
+      .replace(/[<>:"/\\|?*,]+/g, '_')              // replace unsafe chars
+      .replace(/\s+/g, '_')                         // spaces to underscores
+      .replace(/_+/g, '_')                          // collapse multiple underscores
+      .replace(/^_|_$/g, '');                        // trim leading/trailing underscores
+
+    if (!basename) basename = 'export';
+    if (suffix) basename += `_${suffix}`;
+
+    return `${ts}_GLL_${basename}.${ext}`;
+  }
+
   async exportGraphAsJSON() {
     if (this.cache.data === null) {
       this.cache.ui.error("No graph data to save.");
@@ -1531,7 +1556,7 @@ class IOManager {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "graph-export.json";
+    a.download = this.buildExportFilename("json");
     a.click();
     URL.revokeObjectURL(url);
     await this.cache.ui.hideLoading();
@@ -1654,6 +1679,8 @@ class IOManager {
     let file = event.target.files[0];
     if (!file) return;
 
+    this.cache.ui.setDataSourceLabel(file.name);
+
     await this.cache.ui.showLoading(
       "Loading",
       `Loading ${file.name} (${file.type} with ${StaticUtilities.humanFileSize(file.size)})`,
@@ -1729,7 +1756,7 @@ class IOManager {
 
       const link = document.createElement("a");
       link.href = imageData;
-      link.download = "graph-export.png";
+      link.download = this.buildExportFilename("png");
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
