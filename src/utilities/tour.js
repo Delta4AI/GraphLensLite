@@ -138,7 +138,7 @@ const TOUR_STEPS = [
            <br><br>
            Use the <strong class="tour-green">✚</strong> button to create a new workspace (clone or template-based), and the <strong class="tour-red">✗</strong> button to delete the current one.
            <br><br>
-           The <strong>⛶</strong> button fits the graph to the screen, and <strong>🚫</strong> hides disconnected nodes.`,
+           The <strong>⛶</strong> button fits the graph to the screen, <strong>🚫</strong> hides disconnected nodes, and <strong>✨</strong> toggles the hover highlight effect.`,
     target: "#workspaceContainer",
     position: "below",
   },
@@ -374,6 +374,7 @@ const TOUR_STEPS = [
     text: `That covers the main features. Here are some <strong>keyboard shortcuts</strong> to remember:
            <br><br>
            <strong>F</strong> — Fit graph to screen
+           <br><strong>H</strong> — Toggle hover highlight effect
            <br><strong>L</strong> — Toggle lasso selection
            <br><strong>Q</strong> — Toggle query editor
            <br><strong>D</strong> — Toggle data editor

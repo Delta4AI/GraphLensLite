@@ -1157,6 +1157,9 @@ class GraphCoreManager {
         case "l":
           await this.cache.ui.toggleLassoSelection();
           break;
+        case "h":
+          await this.cache.ui.toggleHoverEffect(document.getElementById("hoverToggleBtn"));
+          break;
         default:
           break;
       }
