@@ -497,6 +497,8 @@ class DataTable {
       if (this.onChangeCallback) {
         this.onChangeCallback(-1, -1, 'row_deleted');
       }
+
+      this.notifyPendingChanges();
     }
   }
 
