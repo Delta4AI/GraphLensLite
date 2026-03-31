@@ -62,20 +62,38 @@ class GraphBubbleSetManager {
         break;
       case "Label Background":
         bStyle.labelBackground = value;
-        if (!value) {
-          bStyle.labelFill = "#000000";
-        } else {
-          bStyle.labelFill = "#FFFFFF";
-        }
+        break;
+      case "Label Fill Color":
+        bStyle.labelFill = value;
+        break;
+      case "Label Font Size":
+        bStyle.labelFontSize = value;
+        break;
+      case "Label Close To Path":
+        bStyle.labelCloseToPath = value;
+        break;
+      case "Label Auto Rotate":
+        bStyle.labelAutoRotate = value;
+        break;
+      case "Label Offset X":
+        bStyle.labelOffsetX = value;
+        break;
+      case "Label Offset Y":
+        bStyle.labelOffsetY = value;
+        break;
+      case "Label Placement":
+        bStyle.labelPlacement = value;
         break;
       default:
         break;
     }
-    await this.cache.INSTANCES.BUBBLE_GROUPS[group].update(bStyle);
+    await this.cache.INSTANCES.BUBBLE_GROUPS[group].update({ ...bStyle });
     await this.cache.gcm.decideToRenderOrDraw(true);
+    this.refreshBubbleStyleElements();
   }
 
   refreshBubbleStyleElements() {
+    let anyGroupActive = false;
     for (const group of this.traverseBubbleSets()) {
       const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
       const bubbleStyle = currentLayout.bubbleSetStyle[group];
@@ -105,6 +123,7 @@ class GraphBubbleSetManager {
       }
 
       const hasActiveMembers = actualMembers.size > 0;
+      if (hasActiveMembers) anyGroupActive = true;
       const labelConfigShouldBeEnabled = bubbleStyle.label;
 
       // toggle entire cards based on bubble group members
@@ -117,25 +136,61 @@ class GraphBubbleSetManager {
         labelInput.value = bubbleStyle.labelText;
       }
 
-      // Update color pickers (fill, stroke, label background)
-      const fillColorInput = document.querySelector(`input[data-property="Bubble Set ${group} Fill Color"]`);
-      if (fillColorInput && bubbleStyle.fill) {
-        fillColorInput.value = bubbleStyle.fill;
-      }
+      // Sync color inputs by data-property attribute
+      const syncColorInput = (prop, val) => {
+        const el = card.querySelector(`input[data-property="Bubble Set ${group} ${prop}"]`);
+        if (el && val != null) el.value = val;
+      };
+      syncColorInput("Fill Color", bubbleStyle.fill);
+      syncColorInput("Stroke Color", bubbleStyle.stroke);
+      syncColorInput("Label Background Color", bubbleStyle.labelBackgroundFill);
+      syncColorInput("Label Fill Color", bubbleStyle.labelFill);
 
-      const strokeColorInput = document.querySelector(`input[data-property="Bubble Set ${group} Stroke Color"]`);
-      if (strokeColorInput && bubbleStyle.stroke) {
-        strokeColorInput.value = bubbleStyle.stroke;
-      }
+      // Sync slider inputs by data-property attribute
+      const syncSliderInput = (prop, val) => {
+        const container = card.querySelector(`[data-property="Bubble Set ${group} ${prop}"]`);
+        if (!container || val === undefined) return;
+        const slider = container.querySelector('input[type="range"]');
+        const numInput = container.querySelector('input[type="number"]');
+        if (slider) slider.value = val;
+        if (numInput) numInput.value = val;
+      };
+      syncSliderInput("Label Font Size", bubbleStyle.labelFontSize);
+      syncSliderInput("Label Offset X", bubbleStyle.labelOffsetX);
+      syncSliderInput("Label Offset Y", bubbleStyle.labelOffsetY);
+
+      // Sync switch inputs by data-property attribute
+      const syncSwitch = (prop, val) => {
+        const el = card.querySelector(`[data-property="Bubble Set ${group} ${prop}"]`);
+        if (el && el.setChecked) el.setChecked(!!val);
+      };
+      syncSwitch("Label Close To Path", bubbleStyle.labelCloseToPath);
+      syncSwitch("Label Auto Rotate", bubbleStyle.labelAutoRotate);
+
+      // Sync dropdown by data-property attribute
+      const placementDropdown = card.querySelector(`[data-property="Bubble Set ${group} Label Placement"]`);
+      if (placementDropdown && bubbleStyle.labelPlacement) placementDropdown.value = bubbleStyle.labelPlacement;
 
       // toggle label-related properties
       for (const elem of card.querySelectorAll(".bubbleSetOptionalLabelConfig")) {
         labelConfigShouldBeEnabled ? elem.classList.remove("disabled") : elem.classList.add("disabled");
       }
 
-      // override css properties to style round-button quadrants
+      // override css properties to style round-button quadrants and tabs
       const fillColor = bubbleStyle.fill || this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group].fill;
       document.documentElement.style.setProperty(`--${group}-color`, fillColor);
+
+      const tab = document.querySelector(`.bubble-set-tab[data-group="${group}"]`);
+      if (tab) {
+        tab.style.setProperty("--tab-color", fillColor);
+        tab.style.setProperty("--tab-text-color", StaticUtilities.getReadableForegroundColor(fillColor));
+      }
+    }
+
+    // Toggle the entire bubble sets card when no groups are active
+    const outerCard = document.querySelector(".bubble-set-config-card-header");
+    if (outerCard) {
+      anyGroupActive ? outerCard.classList.remove("disabled") : outerCard.classList.add("disabled");
     }
   }
 
@@ -198,18 +253,12 @@ class GraphBubbleSetManager {
     const bubbleStyle = this.cache.data.layouts[this.cache.data.selectedLayout].bubbleSetStyle[group];
 
     await this.cache.INSTANCES.BUBBLE_GROUPS[group].update({
+      ...bubbleStyle,
       members: empty ? [] : membersAsArray,
       avoidMembers: avoidMembers,
       fillOpacity: empty ? 0 : bubbleStyle.fillOpacity,
       strokeOpacity: empty ? 0 : bubbleStyle.strokeOpacity,
       label: empty ? false : bubbleStyle.label,
-      // Apply all style properties including label text
-      labelText: bubbleStyle.labelText,
-      fill: bubbleStyle.fill,
-      stroke: bubbleStyle.stroke,
-      labelBackgroundFill: bubbleStyle.labelBackgroundFill,
-      labelFill: bubbleStyle.labelFill,
-      labelBackground: bubbleStyle.labelBackground,
     });
     await this.cache.INSTANCES.BUBBLE_GROUPS[group].drawBubbleSets();
   }

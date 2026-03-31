@@ -658,6 +658,45 @@ h5 {
     font-size: 12px;
 }
 
+.bubble-set-tab-bar {
+    display: flex;
+    gap: 2px;
+}
+
+.bubble-set-tab {
+    flex: 1;
+    padding: 2px 4px;
+    background: #E4E3EA;
+    border: 1px solid #403C53;
+    border-bottom: 2px solid var(--tab-color, #403C53);
+    border-radius: 3px 3px 0 0;
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 14px;
+    color: #403C53;
+    transition: all 0.15s ease;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.bubble-set-tab:hover {
+    background: #d6d4df;
+}
+
+.bubble-set-tab.active {
+    background: var(--tab-color, #403C53);
+    color: var(--tab-text-color, #fff);
+    border-color: var(--tab-color, #403C53);
+}
+
+.bubble-set-tab-panel {
+    display: none;
+}
+
+.bubble-set-tab-panel.active {
+    display: block;
+}
+
 .alert-warning {
     background-color: #fff3cd;
     border-left: 4px solid #ffc107;

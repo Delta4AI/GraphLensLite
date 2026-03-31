@@ -1613,9 +1613,16 @@ class IOManager {
           layout.edgeStyles instanceof Map
             ? layout.edgeStyles
             : new Map(Object.entries(layout.edgeStyles || {})),
-        bubbleSetStyle:
-          layout.bubbleSetStyle ||
-          structuredClone(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE),
+        bubbleSetStyle: (() => {
+          const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE;
+          const saved = layout.bubbleSetStyle;
+          if (!saved) return structuredClone(defaults);
+          const merged = {};
+          for (const group of Object.keys(defaults)) {
+            merged[group] = { ...defaults[group], ...(saved[group] || {}) };
+          }
+          return merged;
+        })(),
       };
 
       for (let group of this.cache.bs.traverseBubbleSets()) {
