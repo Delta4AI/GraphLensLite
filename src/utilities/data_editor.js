@@ -1197,9 +1197,15 @@ class DataTable {
           : `${key} [${subGroup}]`;
       };
 
+      // Use filterDefaults key order (group-contiguous) instead of Set iteration order
+      const orderedNodeProps = [...this.cache.data.filterDefaults.keys()]
+        .filter(propId => this.cache.nodeExclusiveProps.has(propId));
+      const orderedEdgeProps = [...this.cache.data.filterDefaults.keys()]
+        .filter(propId => this.cache.edgeExclusiveProps.has(propId));
+
       if (nodesToExport.length > 0) {
         const nodesSheet = workbook.addWorksheet('nodes');
-        const nodesHeader = [...EXCEL_NODE_PROPERTIES.map(p => p.column), ...[...this.cache.nodeExclusiveProps].map(propIdToExcelHeader)];
+        const nodesHeader = [...EXCEL_NODE_PROPERTIES.map(p => p.column), ...orderedNodeProps.map(propIdToExcelHeader)];
         nodesSheet.addRow(nodesHeader);
 
         for (const node of nodesToExport) {
@@ -1214,7 +1220,7 @@ class DataTable {
             row.push(value);
           }
 
-          for (const customProp of this.cache.nodeExclusiveProps) {
+          for (const customProp of orderedNodeProps) {
             const [group, subGroup, prop] = StaticUtilities.decodePropHashId(customProp);
 
             const value = node.D4Data && node.D4Data[group] && node.D4Data[group][subGroup]
@@ -1229,7 +1235,7 @@ class DataTable {
 
       if (edgesToExport.length > 0) {
         const edgesSheet = workbook.addWorksheet('edges');
-        const edgesHeader = [...EXCEL_EDGE_PROPERTIES.map(p => p.column), ...[...this.cache.edgeExclusiveProps].map(propIdToExcelHeader)];
+        const edgesHeader = [...EXCEL_EDGE_PROPERTIES.map(p => p.column), ...orderedEdgeProps.map(propIdToExcelHeader)];
         edgesSheet.addRow(edgesHeader);
 
         for (const edge of edgesToExport) {
@@ -1240,7 +1246,7 @@ class DataTable {
             row.push(value);
           }
 
-          for (const customProp of this.cache.edgeExclusiveProps) {
+          for (const customProp of orderedEdgeProps) {
             const [group, subGroup, prop] = StaticUtilities.decodePropHashId(customProp);
 
             const value = edge.D4Data && edge.D4Data[group] && edge.D4Data[group][subGroup]
