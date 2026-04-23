@@ -941,6 +941,7 @@ h5 {
     box-sizing: border-box !important;
     transition: width 0.2s ease, height 0.2s ease !important;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
+    z-index: 1100 !important;
 }
 
 .tooltip.expanded {
