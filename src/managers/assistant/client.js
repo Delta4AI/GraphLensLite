@@ -3,12 +3,17 @@ class OllamaClient {
     this.endpoint = endpoint
     this.model = model
     this._abortController = null
+    this._structuredAbortController = null
   }
 
   abort() {
     if (this._abortController) {
       this._abortController.abort()
       this._abortController = null
+    }
+    if (this._structuredAbortController) {
+      this._structuredAbortController.abort()
+      this._structuredAbortController = null
     }
   }
 
@@ -59,6 +64,71 @@ class OllamaClient {
       }
     }
   }
+
+  // Non-streamed call that constrains the decoder to a JSON schema via
+  // Ollama's `format` parameter. Used by the second-phase query generator
+  // where we can't render half-formed JSON anyway, so streaming brings no
+  // benefit and schema-driven enforcement brings most of the value.
+  //
+  // Uses its own abort controller so cancelling a structured call does not
+  // disturb an in-flight streaming chat.
+  async generateJson(messages, schema, {signal} = {}) {
+    if (this._structuredAbortController) {
+      this._structuredAbortController.abort()
+    }
+    this._structuredAbortController = new AbortController()
+    const mergedSignal = signal
+      ? anySignal([signal, this._structuredAbortController.signal])
+      : this._structuredAbortController.signal
+
+    const res = await fetch(`${this.endpoint}/api/chat`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        model: this.model,
+        messages,
+        stream: false,
+        format: schema,
+        options: {temperature: 0},
+      }),
+      signal: mergedSignal,
+    })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`Ollama error ${res.status}: ${text}`)
+    }
+
+    const data = await res.json()
+    const content = data?.message?.content ?? ''
+    if (!content) throw new Error('Ollama returned an empty structured response')
+    // Ollama returns the model's JSON as a string. Parse once here; malformed
+    // JSON is a hard error (schema should have prevented it, but we don't
+    // trust the wire).
+    try {
+      return JSON.parse(content)
+    } catch (err) {
+      throw new Error(`Structured response was not valid JSON: ${err.message}`)
+    }
+  }
+}
+
+// Minimal AbortSignal.any polyfill so we keep browser compatibility while
+// merging an outer cancellation signal with the client's own controller.
+function anySignal(signals) {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') {
+    return AbortSignal.any(signals)
+  }
+  const controller = new AbortController()
+  for (const s of signals) {
+    if (!s) continue
+    if (s.aborted) {
+      controller.abort(s.reason)
+      return controller.signal
+    }
+    s.addEventListener('abort', () => controller.abort(s.reason), {once: true})
+  }
+  return controller.signal
 }
 
 export {OllamaClient}

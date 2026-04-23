@@ -47,15 +47,27 @@ for (const {from, to, pkg} of copies) {
   console.log(`[vendor-libs] ${path.relative(root, from)} -> ${path.relative(root, to)} (${pkg}@${ver} sha256:${hash.slice(0, 16)}…)`);
 }
 
-// Regenerate the assistant system prompt module from its markdown source so
-// the prompt stays human-readable in source control but loads as plain JS
+// Regenerate assistant prompt modules from their markdown sources so the
+// prompts stay human-readable in source control but load as plain JS
 // everywhere (serve, electron, bundle, tests).
-const promptMd = path.join(root, 'src', 'managers', 'assistant', 'system_prompt.md');
-const promptJs = path.join(root, 'src', 'managers', 'assistant', 'system_prompt.js');
-if (fs.existsSync(promptMd)) {
-  const body = fs.readFileSync(promptMd, 'utf8');
+const promptSources = [
+  {
+    md: path.join(root, 'src', 'managers', 'assistant', 'system_prompt.md'),
+    js: path.join(root, 'src', 'managers', 'assistant', 'system_prompt.js'),
+    exportName: 'SYSTEM_PROMPT',
+  },
+  {
+    md: path.join(root, 'src', 'managers', 'assistant', 'query_generator_prompt.md'),
+    js: path.join(root, 'src', 'managers', 'assistant', 'query_generator_prompt.js'),
+    exportName: 'GENERATOR_SYSTEM_PROMPT',
+  },
+];
+
+for (const {md, js, exportName} of promptSources) {
+  if (!fs.existsSync(md)) continue;
+  const body = fs.readFileSync(md, 'utf8');
   const escaped = body.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
-  const out = `// AUTO-GENERATED from system_prompt.md by src/package/vendor_libs.js.\n// Do not edit by hand — run \`npm run vendor-libs\`.\nexport const SYSTEM_PROMPT = \`${escaped}\`\n`;
-  fs.writeFileSync(promptJs, out);
-  console.log(`[vendor-libs] ${path.relative(root, promptMd)} -> ${path.relative(root, promptJs)} (${body.length} chars)`);
+  const out = `// AUTO-GENERATED from ${path.basename(md)} by src/package/vendor_libs.js.\n// Do not edit by hand — run \`npm run vendor-libs\`.\nexport const ${exportName} = \`${escaped}\`\n`;
+  fs.writeFileSync(js, out);
+  console.log(`[vendor-libs] ${path.relative(root, md)} -> ${path.relative(root, js)} (${body.length} chars)`);
 }

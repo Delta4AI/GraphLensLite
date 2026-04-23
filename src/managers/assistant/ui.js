@@ -144,6 +144,159 @@ export function appendWarningBubble(warnings, container) {
   return el
 }
 
+// Suggested-queries panel shown when the chat model emitted a
+// <<<QUERY_INTENT>>> sentinel. Returns the panel element so the caller can
+// later replace its body with the rendered queries (or an error).
+export function appendQueriesPanel(container) {
+  const el = document.createElement('div')
+  el.className = 'assistant-bubble assistant-bubble-queries'
+  el.innerHTML = `
+    <div class="assistant-queries-header">Suggested queries</div>
+    <div class="assistant-queries-body">
+      <div class="assistant-queries-placeholder">
+        <span class="assistant-queries-spinner" aria-hidden="true"></span>
+        <span>Generating query…</span>
+      </div>
+    </div>
+  `
+  container.appendChild(el)
+  container.scrollTop = container.scrollHeight
+  return el
+}
+
+// Render the list of rendered queries into a panel created above. Each entry
+// becomes a card with the query text and up to three actions: Copy
+// (clipboard), Select (run the select pipeline immediately without touching
+// the editor), and Open in query editor (for manual review / apply as
+// filter). Each action is optional via the corresponding callback.
+export function renderQueriesIntoPanel(panelEl, entries, {onOpen, onSelect}) {
+  const body = panelEl.querySelector('.assistant-queries-body')
+  if (!body) return
+  body.innerHTML = ''
+
+  const valid = entries.filter(e => e.text)
+  const invalid = entries.filter(e => !e.text)
+
+  if (!valid.length) {
+    const msg = document.createElement('div')
+    msg.className = 'assistant-queries-error'
+    msg.textContent = invalid.length
+      ? `Could not generate a valid query (${invalid[0].error || 'unknown error'}). Try rephrasing your request.`
+      : 'No queries were produced. Try rephrasing your request.'
+    body.appendChild(msg)
+    return
+  }
+
+  for (const entry of valid) {
+    const card = document.createElement('div')
+    card.className = 'assistant-query-card'
+
+    const titleRow = document.createElement('div')
+    titleRow.className = 'assistant-query-title'
+    titleRow.textContent = `${entry.title}${scopeLabel(entry.scope)}`
+    card.appendChild(titleRow)
+
+    const pre = document.createElement('pre')
+    pre.className = 'assistant-query-text'
+    const code = document.createElement('code')
+    code.textContent = entry.text
+    pre.appendChild(code)
+    card.appendChild(pre)
+
+    const actions = document.createElement('div')
+    actions.className = 'assistant-query-actions'
+
+    const copyBtn = document.createElement('button')
+    copyBtn.type = 'button'
+    copyBtn.className = 'assistant-query-btn assistant-query-copy'
+    copyBtn.innerHTML = '<span aria-hidden="true">📋</span><span>Copy</span>'
+    copyBtn.addEventListener('click', () => {
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(entry.text).then(
+          () => flashQueryBtn(copyBtn, 'Copied'),
+          () => flashQueryBtn(copyBtn, 'Failed', true),
+        )
+      }
+    })
+    actions.appendChild(copyBtn)
+
+    if (typeof onSelect === 'function') {
+      const selectBtn = document.createElement('button')
+      selectBtn.type = 'button'
+      selectBtn.className = 'assistant-query-btn assistant-query-select'
+      selectBtn.innerHTML = '<span aria-hidden="true">🎯</span><span>Select</span>'
+      selectBtn.addEventListener('click', async () => {
+        selectBtn.disabled = true
+        try {
+          await onSelect(entry)
+          flashQueryBtn(selectBtn, 'Selected')
+        } catch (err) {
+          console.error('[assistant] select from query failed', err)
+          flashQueryBtn(selectBtn, 'Failed', true)
+        } finally {
+          selectBtn.disabled = false
+        }
+      })
+      actions.appendChild(selectBtn)
+    }
+
+    if (typeof onOpen === 'function') {
+      const openBtn = document.createElement('button')
+      openBtn.type = 'button'
+      openBtn.className = 'assistant-query-btn assistant-query-open'
+      openBtn.innerHTML = '<span aria-hidden="true">📝</span><span>Open in query editor</span>'
+      openBtn.addEventListener('click', () => {
+        try {
+          onOpen(entry)
+          flashQueryBtn(openBtn, 'Opened')
+        } catch (err) {
+          console.error('[assistant] open query editor failed', err)
+          flashQueryBtn(openBtn, 'Failed', true)
+        }
+      })
+      actions.appendChild(openBtn)
+    }
+
+    card.appendChild(actions)
+    body.appendChild(card)
+  }
+
+  if (invalid.length) {
+    const note = document.createElement('div')
+    note.className = 'assistant-queries-note'
+    note.textContent = `${invalid.length} additional suggestion${invalid.length === 1 ? '' : 's'} could not be rendered and were dropped.`
+    body.appendChild(note)
+  }
+}
+
+export function renderQueriesError(panelEl, message) {
+  const body = panelEl.querySelector('.assistant-queries-body')
+  if (!body) return
+  body.innerHTML = ''
+  const msg = document.createElement('div')
+  msg.className = 'assistant-queries-error'
+  msg.textContent = message
+  body.appendChild(msg)
+}
+
+function scopeLabel(scope) {
+  if (scope === 'node') return ' (nodes)'
+  if (scope === 'edge') return ' (edges)'
+  if (scope === 'mixed') return ' (nodes + edges)'
+  return ''
+}
+
+function flashQueryBtn(btn, label, isError = false) {
+  const labelEl = btn.querySelector('span:last-child')
+  const prev = labelEl?.textContent
+  if (labelEl) labelEl.textContent = label
+  btn.classList.add(isError ? 'assistant-query-btn-failed' : 'assistant-query-btn-done')
+  setTimeout(() => {
+    if (labelEl && prev !== undefined) labelEl.textContent = prev
+    btn.classList.remove('assistant-query-btn-done', 'assistant-query-btn-failed')
+  }, COPY_FEEDBACK_MS)
+}
+
 // Scans model-produced code blocks for known GLL query-syntax mistakes so we
 // can flag them inline even if the LLM ignored the system prompt.
 export function checkQueryWarnings(response) {

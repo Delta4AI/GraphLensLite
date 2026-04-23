@@ -6,6 +6,9 @@ import {
   appendBubble,
   appendStreamingBubble,
   appendWarningBubble,
+  appendQueriesPanel,
+  renderQueriesIntoPanel,
+  renderQueriesError,
 } from "../src/managers/assistant/ui.js";
 
 describe("renderMarkdown", () => {
@@ -135,5 +138,123 @@ describe("bubble helpers", () => {
     expect(appendWarningBubble([], container)).toBeNull();
     const el = appendWarningBubble(["a", "b"], container);
     expect(el.textContent).toBe("a\nb");
+  });
+});
+
+describe("suggested queries panel", () => {
+  it("appendQueriesPanel starts with a Generating placeholder", () => {
+    const container = document.createElement("div");
+    const panel = appendQueriesPanel(container);
+    expect(panel.classList.contains("assistant-bubble-queries")).toBe(true);
+    expect(panel.querySelector(".assistant-queries-placeholder")).toBeTruthy();
+    expect(panel.textContent).toMatch(/Generating query/);
+  });
+
+  it("renderQueriesIntoPanel replaces the placeholder with cards per valid entry", () => {
+    const container = document.createElement("div");
+    const panel = appendQueriesPanel(container);
+    renderQueriesIntoPanel(panel, [
+      { title: "High-score nodes", scope: "node", text: "(Node filters::M::score BETWEEN 0.5 AND 1)" },
+      { title: "Strong edges", scope: "edge", text: "(Edge filters::M::weight BETWEEN 0.5 AND 1)" },
+      { title: "Anything relevant", scope: "mixed", text: "(Node filters::M::a IN [x]) OR (Edge filters::M::b IN [y])" },
+    ], { onOpen: () => {} });
+
+    expect(panel.querySelector(".assistant-queries-placeholder")).toBeNull();
+    const cards = panel.querySelectorAll(".assistant-query-card");
+    expect(cards.length).toBe(3);
+    expect(cards[0].querySelector(".assistant-query-title").textContent).toBe("High-score nodes (nodes)");
+    expect(cards[1].querySelector(".assistant-query-title").textContent).toBe("Strong edges (edges)");
+    expect(cards[2].querySelector(".assistant-query-title").textContent).toBe("Anything relevant (nodes + edges)");
+    expect(cards[0].querySelector(".assistant-query-text code").textContent)
+      .toBe("(Node filters::M::score BETWEEN 0.5 AND 1)");
+  });
+
+  it("renderQueriesIntoPanel fires onOpen with the entry text when clicked", () => {
+    const container = document.createElement("div");
+    const panel = appendQueriesPanel(container);
+    const opened = [];
+    renderQueriesIntoPanel(panel, [
+      { title: "t", scope: "node", text: "(X)" },
+    ], { onOpen: (entry) => opened.push(entry.text) });
+
+    const openBtn = panel.querySelector(".assistant-query-open");
+    openBtn.click();
+    expect(opened).toEqual(["(X)"]);
+  });
+
+  it("renderQueriesIntoPanel fires onSelect with the entry text when clicked", async () => {
+    const container = document.createElement("div");
+    const panel = appendQueriesPanel(container);
+    const selected = [];
+    renderQueriesIntoPanel(panel, [
+      { title: "t", scope: "node", text: "(Y)" },
+    ], { onSelect: (entry) => { selected.push(entry.text); } });
+
+    const selectBtn = panel.querySelector(".assistant-query-select");
+    expect(selectBtn).toBeTruthy();
+    selectBtn.click();
+    // click handler is async; drain the microtask queue
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(selected).toEqual(["(Y)"]);
+  });
+
+  it("renderQueriesIntoPanel omits optional buttons when callbacks are not supplied", () => {
+    const container = document.createElement("div");
+    const panel = appendQueriesPanel(container);
+    renderQueriesIntoPanel(panel, [
+      { title: "t", scope: "node", text: "(X)" },
+    ], {});
+    expect(panel.querySelector(".assistant-query-open")).toBeNull();
+    expect(panel.querySelector(".assistant-query-select")).toBeNull();
+    expect(panel.querySelector(".assistant-query-copy")).toBeTruthy();
+  });
+
+  it("renders Select and Open side-by-side when both callbacks are supplied", () => {
+    const container = document.createElement("div");
+    const panel = appendQueriesPanel(container);
+    renderQueriesIntoPanel(panel, [
+      { title: "t", scope: "node", text: "(X)" },
+    ], { onOpen: () => {}, onSelect: () => {} });
+    const card = panel.querySelector(".assistant-query-card");
+    const btns = card.querySelectorAll(".assistant-query-btn");
+    // Order: Copy, Select, Open
+    expect(btns.length).toBe(3);
+    expect(btns[0].classList.contains("assistant-query-copy")).toBe(true);
+    expect(btns[1].classList.contains("assistant-query-select")).toBe(true);
+    expect(btns[2].classList.contains("assistant-query-open")).toBe(true);
+  });
+
+  it("renderQueriesIntoPanel shows an error when every entry failed to render", () => {
+    const container = document.createElement("div");
+    const panel = appendQueriesPanel(container);
+    renderQueriesIntoPanel(panel, [
+      { title: "t", scope: "node", text: null, error: "something broke" },
+    ], { onOpen: () => {} });
+
+    expect(panel.querySelector(".assistant-query-card")).toBeNull();
+    const errEl = panel.querySelector(".assistant-queries-error");
+    expect(errEl.textContent).toMatch(/something broke/);
+  });
+
+  it("renderQueriesIntoPanel appends a note when some entries dropped alongside valid ones", () => {
+    const container = document.createElement("div");
+    const panel = appendQueriesPanel(container);
+    renderQueriesIntoPanel(panel, [
+      { title: "ok", scope: "node", text: "(X)" },
+      { title: "bad", scope: "node", text: null, error: "nope" },
+    ], { onOpen: () => {} });
+    expect(panel.querySelector(".assistant-query-card")).toBeTruthy();
+    expect(panel.querySelector(".assistant-queries-note")).toBeTruthy();
+    expect(panel.querySelector(".assistant-queries-note").textContent).toMatch(/1 additional suggestion/);
+  });
+
+  it("renderQueriesError replaces the panel body with the error message", () => {
+    const container = document.createElement("div");
+    const panel = appendQueriesPanel(container);
+    renderQueriesError(panel, "Backend unreachable.");
+    expect(panel.querySelector(".assistant-queries-placeholder")).toBeNull();
+    expect(panel.querySelector(".assistant-queries-error").textContent)
+      .toBe("Backend unreachable.");
   });
 });

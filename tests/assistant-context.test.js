@@ -18,6 +18,22 @@ function makeCache(overrides = {}) {
           query: null,
         },
       },
+      filterDefaults: new Map([
+        ["Node filters::G::a", {
+          isCategory: true,
+          categories: new Set(["x", "y"]),
+          lowerThreshold: Infinity,
+          upperThreshold: -Infinity,
+          hasFloatValues: false,
+        }],
+        ["Node filters::G::b", {
+          isCategory: false,
+          categories: new Set(),
+          lowerThreshold: 0,
+          upperThreshold: 1.3,
+          hasFloatValues: true,
+        }],
+      ]),
     },
     nodeRef: new Map([
       ["n1", { label: "Alpha" }],
@@ -58,9 +74,73 @@ describe("buildContextSnapshot", () => {
     expect(snap.filters.activeFilterProps).toEqual(["Node filters::G::a"]);
   });
 
-  it("serializes property hierarchy as plain arrays", () => {
+  it("annotates categorical properties with their values", () => {
     const snap = buildContextSnapshot(makeCache(), { readActions: () => [] });
-    expect(snap.properties.hierarchy["Node filters"].G).toEqual(["a", "b"]);
+    const a = snap.properties.hierarchy["Node filters"].G.a;
+    expect(a.type).toBe("categorical");
+    expect(a.values.sort()).toEqual(["x", "y"]);
+    expect(a.truncated).toBeUndefined();
+  });
+
+  it("annotates numeric properties with min/max and integer flag", () => {
+    const snap = buildContextSnapshot(makeCache(), { readActions: () => [] });
+    const b = snap.properties.hierarchy["Node filters"].G.b;
+    expect(b).toEqual({ type: "numeric", min: 0, max: 1.3, integer: false });
+  });
+
+  it("caps categorical values at 50 and marks truncation", () => {
+    const big = Array.from({ length: 120 }, (_, i) => `v${i}`);
+    const cache = makeCache({
+      data: {
+        selectedLayout: "main",
+        layouts: { main: { filters: new Map(), hideDisconnectedNodes: false, query: null } },
+        filterDefaults: new Map([
+          ["Node filters::G::a", {
+            isCategory: true,
+            categories: new Set(big),
+            lowerThreshold: Infinity,
+            upperThreshold: -Infinity,
+            hasFloatValues: false,
+          }],
+          ["Node filters::G::b", {
+            isCategory: false,
+            categories: new Set(),
+            lowerThreshold: 0,
+            upperThreshold: 1,
+            hasFloatValues: false,
+          }],
+        ]),
+      },
+    });
+    const snap = buildContextSnapshot(cache, { readActions: () => [] });
+    const a = snap.properties.hierarchy["Node filters"].G.a;
+    expect(a.values).toHaveLength(50);
+    expect(a.truncated).toBe(true);
+    expect(a.totalValues).toBe(120);
+  });
+
+  it("falls back to type:'unknown' when filterDefaults has no entry", () => {
+    const cache = makeCache({
+      data: {
+        selectedLayout: "main",
+        layouts: { main: { filters: new Map(), hideDisconnectedNodes: false, query: null } },
+        filterDefaults: new Map(),
+      },
+    });
+    const snap = buildContextSnapshot(cache, { readActions: () => [] });
+    expect(snap.properties.hierarchy["Node filters"].G.a).toEqual({ type: "unknown" });
+    expect(snap.properties.hierarchy["Node filters"].G.b).toEqual({ type: "unknown" });
+  });
+
+  it("tolerates a missing filterDefaults entirely", () => {
+    const cache = makeCache({
+      data: {
+        selectedLayout: "main",
+        layouts: { main: { filters: new Map(), hideDisconnectedNodes: false, query: null } },
+      },
+    });
+    const snap = buildContextSnapshot(cache, { readActions: () => [] });
+    expect(snap.properties.hierarchy["Node filters"].G.a).toEqual({ type: "unknown" });
   });
 
   it("injects recentActions from the read-actions callback", () => {

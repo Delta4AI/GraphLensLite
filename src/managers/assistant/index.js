@@ -1,11 +1,16 @@
 import {OllamaClient} from './client.js'
 import {SYSTEM_PROMPT} from './system_prompt.js'
 import {buildContextSnapshot, serializeSnapshot} from './context.js'
+import {stripSentinelForDisplay, parseIntent} from './intent.js'
+import {generateQueries} from './query_generator.js'
 import {
   renderMarkdown,
   appendBubble,
   appendStreamingBubble,
   appendWarningBubble,
+  appendQueriesPanel,
+  renderQueriesIntoPanel,
+  renderQueriesError,
   checkQueryWarnings,
   handleCopyClick,
 } from './ui.js'
@@ -41,6 +46,10 @@ class AssistantManager {
     this._history = []
     this._streaming = false
     this._panelOpen = false
+    // Holds the last successful query-generation output so a follow-up turn
+    // ("make it stricter", "same but swap X for Y") can reference it. Only
+    // fully-valid entries are kept; errored ones are useless to the model.
+    this._lastGeneratedQueries = []
     const {endpoint, model} = loadSettings(cache.CFG.ASSISTANT)
     this._endpoint = endpoint
     this._model = model
@@ -142,17 +151,31 @@ class AssistantManager {
           }
         }
         fullResponse += token
-        bubble.innerHTML = renderMarkdown(fullResponse)
+        // Strip the <<<QUERY_INTENT>>> sentinel (including partial opening
+        // markers during streaming) so the marker never flickers into the
+        // visible bubble.
+        bubble.innerHTML = renderMarkdown(stripSentinelForDisplay(fullResponse))
         container.scrollTop = container.scrollHeight
       })
       bubble.classList.remove('assistant-bubble-streaming')
-      bubble.innerHTML = renderMarkdown(fullResponse)
+      const displayText = stripSentinelForDisplay(fullResponse)
+      bubble.innerHTML = renderMarkdown(displayText)
+
+      // History stores the cleaned-up assistant reply so future turns don't
+      // see the sentinel block (which would just confuse the model).
       this._history.push({role: 'user', content: userText})
-      this._history.push({role: 'assistant', content: fullResponse})
-      // Cap in-memory history so it can't grow unbounded across a long session.
+      this._history.push({role: 'assistant', content: displayText})
       const cap = this.cache.CFG.ASSISTANT.MAX_HISTORY_MESSAGES * 2
       if (this._history.length > cap) this._history = this._history.slice(-cap)
-      appendWarningBubble(checkQueryWarnings(fullResponse), container)
+      appendWarningBubble(checkQueryWarnings(displayText), container)
+
+      // Second phase: if the model signalled query intent, fire a structured
+      // JSON call constrained by the response schema. Failures here must not
+      // break the chat turn itself — the prose reply has already landed.
+      const intent = parseIntent(fullResponse)
+      if (intent) {
+        await this._runQueryGeneration({intent, graphJson, userText, container})
+      }
     } catch (err) {
       if (err.name === 'AbortError') {
         bubble.classList.remove('assistant-bubble-streaming')
@@ -174,11 +197,85 @@ class AssistantManager {
     }
   }
 
+  async _runQueryGeneration({intent, graphJson, userText, container}) {
+    const panel = appendQueriesPanel(container)
+    try {
+      const entries = await generateQueries({
+        client: this._client,
+        graphJson,
+        userQuestion: userText,
+        intent,
+        previousQueries: this._lastGeneratedQueries,
+      })
+      renderQueriesIntoPanel(panel, entries, {
+        onOpen: (entry) => this._openQueryInEditor(entry.text),
+        onSelect: (entry) => this._selectQueryMatches(entry.text),
+      })
+      // Cache the valid entries so the next turn can treat them as the
+      // baseline for refinement. If nothing rendered, leave the previous
+      // cache intact — the user's next message may still want to refine
+      // the last good output.
+      const validEntries = entries.filter(e => e?.text && !e.error)
+      if (validEntries.length) this._lastGeneratedQueries = validEntries
+    } catch (err) {
+      console.error('[assistant] query generation failed', err)
+      if (err?.name === 'AbortError') {
+        renderQueriesError(panel, 'Query generation was cancelled.')
+      } else {
+        renderQueriesError(panel, 'Could not generate a query from this request. Try rephrasing or check the assistant backend.')
+      }
+    } finally {
+      container.scrollTop = container.scrollHeight
+    }
+  }
+
+  // Push a generated query into the Query Editor: open the editor if it's
+  // not already visible, clear the existing query, fill in the new one, and
+  // let the user decide whether to Filter or Select. This mirrors the
+  // "📝 Add to query" affordance from the side-panel filter UI.
+  _openQueryInEditor(queryText) {
+    if (!queryText || !this.cache?.qm) return
+    const queryBtn = document.getElementById('queryToggleBtn')
+    const isOpen = queryBtn?.classList.contains('highlight')
+    if (!isOpen && this.cache.ui?.toggleQueryEditor) {
+      this.cache.ui.toggleQueryEditor()
+    }
+    this.cache.qm.clearQuery()
+    this.cache.query.text.textContent = queryText
+    this.cache.qm.handleQueryValidationEvent(true)
+    this.cache.qm.moveCaretToEnd()
+  }
+
+  // Run the select action for a generated query WITHOUT opening or
+  // modifying the Query Editor. The query editor's DOM elements are always
+  // present (visibility toggled via CSS), so we can temporarily swap in the
+  // generated query, let the existing select pipeline decode it, and then
+  // restore the editor's previous contents. This keeps any in-progress
+  // manual editing intact.
+  async _selectQueryMatches(queryText) {
+    if (!queryText || !this.cache?.qm) return
+    const textEl = this.cache.query?.text
+    if (!textEl) return
+    const prevText = textEl.textContent
+    try {
+      textEl.textContent = queryText
+      this.cache.qm.handleQueryValidationEvent(true)
+      await this.cache.qm.handleQuerySelectEvent()
+    } finally {
+      // Restore editor state whether the select succeeded or threw. The
+      // validation re-run pushes the old text (and its derived query-cache
+      // flag) back into the per-layout store.
+      textEl.textContent = prevText
+      this.cache.qm.handleQueryValidationEvent(true)
+    }
+  }
+
   clearHistory() {
     // Clearing is an explicit "stop and reset" signal — kill any in-flight
     // stream so tokens don't keep landing on a detached bubble.
     this._client.abort()
     this._history = []
+    this._lastGeneratedQueries = []
     const container = document.getElementById('assistantMessages')
     if (container) container.innerHTML = ''
   }
