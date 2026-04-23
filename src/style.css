@@ -3670,3 +3670,151 @@ input:checked + .slider:before {
 #landingPage.hidden {
     display: none;
 }
+
+/* ── AI Assistant sidebar ─────────────────────────────────────── */
+
+#assistantSidebar {
+    min-width: 0;
+    width: 0;
+    background-color: #f4f4f4;
+    overflow: hidden;
+    transition: width 0.3s ease-in-out, min-width 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    border-left: 0 solid #ccc;
+    position: relative;
+}
+
+#assistantSidebar.active {
+    min-width: 380px;
+    width: 380px;
+    border-left: 1px solid #ccc;
+}
+
+#assistantSidebar .panel-header {
+    background-color: #403C53;
+    color: white;
+}
+
+#assistantMessages {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+#assistantSidebar.active #assistantMessages {
+    opacity: 1;
+}
+
+.assistant-bubble {
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-width: 92%;
+}
+
+.assistant-bubble-user {
+    background-color: #403C53;
+    color: #fff;
+    align-self: flex-end;
+    border-bottom-right-radius: 2px;
+}
+
+.assistant-bubble-assistant {
+    background-color: #e8e6f0;
+    color: #222;
+    align-self: flex-start;
+    border-bottom-left-radius: 2px;
+}
+
+.assistant-bubble-streaming::after {
+    content: '▋';
+    animation: blink 0.8s step-start infinite;
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}
+
+.assistant-bubble-error {
+    background-color: #fde8e8;
+    color: #9b1c1c;
+    align-self: flex-start;
+    font-style: italic;
+}
+
+.assistant-bubble-warning {
+    background-color: #fff8e1;
+    color: #7c5a00;
+    border-left: 3px solid #f0a500;
+    align-self: stretch;
+    font-size: 0.78rem;
+}
+
+.assistant-bubble-aborted {
+    opacity: 0.6;
+    font-style: italic;
+}
+
+#assistantInputRow {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+    border-top: 1px solid #ccc;
+    background-color: #f4f4f4;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    flex-shrink: 0;
+}
+
+#assistantSidebar.active #assistantInputRow {
+    opacity: 1;
+}
+
+#assistantInput {
+    width: 100%;
+    resize: none;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    box-sizing: border-box;
+    background-color: #fff;
+}
+
+#assistantInput:focus {
+    outline: none;
+    border-color: #403C53;
+}
+
+#assistantSendBtn {
+    align-self: flex-end;
+    background-color: #403C53;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 14px;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+#assistantSendBtn:hover {
+    background-color: #C33D35;
+}
+
+#assistantSendBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

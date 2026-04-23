@@ -89,6 +89,7 @@
           <button id="queryToggleBtn" class="showOnLoad medium-btn" title="Toggle query editor (Q)" onclick="cache.ui.toggleQueryEditor()">📝</button>
           <button id="exportImage" class="showOnLoad medium-btn" onclick="cache.io.exportPNG()" title="Save Image (P)">📷️</button>
           <button id="exportModel" class="showOnLoad medium-btn" onclick="cache.io.exportGraphAsJSON()" title="Save Model (S)">💾</button>
+          <button id="assistantToggleBtn" class="medium-btn" title="Toggle AI assistant (A)" onclick="cache.assistant.togglePanel()">🤖</button>
         </div>
       </div>
       <div class="hideOnLoad">
@@ -176,6 +177,21 @@
       <div id="stylingPanelContent">
         <!-- Styling controls will be populated here -->
       </div>
+    </div>
+  </div>
+  <div id="assistantSidebar">
+    <div class="panel-header panel-header-full-width">
+      <span class="panel-header-text">AI Assistant <span style="font-size:0.7em;opacity:0.75;font-weight:normal;">(beta)</span></span>
+      <div style="display:flex;gap:4px;margin-left:auto;">
+        <button class="panel-header-btn" title="Settings" onclick="cache.assistant.openSettings()">⚙</button>
+        <button class="panel-header-btn" title="Clear conversation" onclick="cache.assistant.clearHistory()">🗑</button>
+        <button class="panel-header-btn" title="Close" onclick="cache.assistant.togglePanel()">×</button>
+      </div>
+    </div>
+    <div id="assistantMessages"></div>
+    <div id="assistantInputRow">
+      <textarea id="assistantInput" rows="3" placeholder="Ask about your graph..."></textarea>
+      <button id="assistantSendBtn" onclick="cache.assistant.sendFromInput()">Send</button>
     </div>
   </div>
 </div>

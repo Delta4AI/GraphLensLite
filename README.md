@@ -1,71 +1,166 @@
-<p align="center">
-  <img src="./static/logo.png" alt="Graph Lens Lite Logo" width="420">
-</p>
+# Graph Lens Lite — AI Assistant Fork
 
-<h3 align="center">
-   Visualise and navigate property graphs through a sleek, ultra-lightweight interface.<br>
-   Works in any modern browser, with native Electron desktops for Windows, macOS, and Linux.
-</h3>
+This is a fork of [GraphLensLite](https://github.com/Delta4AI/GraphLensLite) with an integrated AI chat assistant powered by a local [Ollama](https://ollama.ai) model.
 
-<p align="center">
-  <a href="https://delta4ai.github.io/GraphLensLite/">🔗 Live Demo</a> · <a href="https://github.com/Delta4AI/GraphLensLite/releases/latest">📦 Latest Release</a>
-</p>
+---
 
-## Quickstart
+## What Was Added
 
-Download the [latest release](https://github.com/Delta4AI/GraphLensLite/releases/latest) for your platform:
+A fully local, context-aware AI assistant embedded in the GLL sidebar. No cloud API calls — the LLM runs on-device via Ollama.
 
-| Platform | Recommended download | Notes |
-|----------|---------------------|-------|
-| **Web** | `graph-lens-lite_inline_X.Y.Z.html` | Just open in a browser — no install needed |
-| **Windows** | `Graph.Lens.Lite.X.Y.Z.exe` | Portable — run directly, nothing to install |
-| **macOS** | `Graph.Lens.Lite-X.Y.Z-<arch>.dmg` | Disk image |
-| **Linux** | `Graph.Lens.Lite-X.Y.Z.AppImage` | Portable — `chmod +x` and run |
+### New Files
 
-> Other formats are also available: Windows installer (`.Setup.X.Y.Z.exe`), `.deb`, `.snap`, `.zip`.
+| File | Purpose |
+|---|---|
+| `src/managers/assistant.js` | Core assistant logic: panel, messaging, context snapshot, settings |
+| `src/managers/assistant_client.js` | Ollama HTTP client (streaming chat + model listing) |
+| `ASSISTANT_QUESTIONS.md` | Example questions users can ask the assistant |
 
-Then:
-1. (Optional) Download a [template](templates/simple-template.xlsx) and add your data
-2. Launch Graph Lens Lite and load a demo or your file
+### Modified Files
 
-## Features
+| File | Change |
+|---|---|
+| `src/config.js` | Added `CFG.ASSISTANT` block (endpoint, model, limits) |
+| `src/gll.js` | Instantiated `AssistantManager`; wired Enter key on input |
+| `src/graph/core.js` | Exposed graph state properties used by context snapshot |
+| `src/graph_lens_lite.html` | Added assistant sidebar panel + toggle button markup |
+| `src/style.css` | Styled assistant panel, chat bubbles, streaming state, warnings |
 
-|                            <img src="./static/screenshots/launch_screen.png" alt="Launch screen" width="100%">                            |                                 <img src="./static/screenshots/query_editor.png" alt="Query editor" width="100%">                                  |      <img src="./static/screenshots/selection_panel_and_active_clusters.png" alt="Selection tools and bubble sets" width="100%">       |
-|:-----------------------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------:|
-|          Open Excel or JSON files, explore demo networks, or take a tour; zero install with portable versions          |                 Write expressive queries with boolean logic, nested conditions, and range operators to filter your graph                  | Lasso select elements, undo and redo, focus and expand neighborhoods, and group nodes visually |
-|                  <img src="./static/screenshots/main_view_with_popup.png" alt="Graph canvas with filters" width="100%">                   |              <img src="./static/screenshots/network_metrics_and_data_editor.png" alt="Network metrics and data editor" width="100%">               |                           <img src="./static/screenshots/rich_styling.png" alt="Styling panel" width="100%">                           |
-| Filter by any property using range sliders and dropdown checklists, inspect node and edge metadata via tooltips, and navigate large graphs with a minimap | Compute centrality metrics like degree, betweenness, closeness, eigenvector, and PageRank, and edit your graph data live in a built-in spreadsheet |                 Customize shapes, sizes, colors, labels, halos, badges, arrows, and bubble set appearance per element                  |
-|                     <img src="./static/screenshots/workspace_management.png" alt="Workspace management" width="100%">                     |             <img src="./static/screenshots/property_based_categorical_color_mapping.png" alt="Categorical color mapping" width="100%">             |         <img src="./static/screenshots/property_based_numerical_color_mapping.png" alt="Numerical color mapping" width="100%">         |
-|                    Create independent workspaces, each preserving their own node positions, styles, filters, and bubble set groups                     |                              Assign distinct colors to property categories like pathways, processes, or localizations                              |         Map numeric properties to continuous color gradients with configurable stops, and export graphs as JSON, PNG, or Excel         |
+---
 
-## Development
+## Architecture
 
-```bash
-npm install              # install dependencies
-npm run bundle:serve     # dev server with watch + sourcemaps
-npm run serve            # static http-server on :8000
-npm start                # electron app
-npm run dist-linux       # Linux build
-npm run dist-windows     # Windows build
+```
+User types message
+        │
+        ▼
+AssistantManager.send()
+        │
+        ├─► buildContextSnapshot()   ← reads live graph state from cache
+        │         returns: workspace, counts, selection,
+        │                  filters, property hierarchy,
+        │                  bubble groups, metrics, recent actions
+        │
+        ├─► builds messages array:
+        │     [ {role: system, content: SYSTEM_PROMPT},
+        │       ...trimmed history (last N),
+        │       {role: user, content: "[GRAPH STATE]\n...\n[USER QUESTION]\n..."} ]
+        │
+        ├─► OllamaClient.chat(messages, onToken)
+        │         streams tokens via /api/chat (NDJSON)
+        │         AbortController allows mid-stream cancel
+        │
+        └─► _checkQueryWarnings(response)
+                  post-processes LLM output for invalid GLL query syntax
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full list of npm scripts, version management, code style, and commit guidelines.
+---
 
-## Contributing
+## How the AI Assistant Was Built
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before filing issues or submitting pull requests.
+### 1. Ollama Client (`assistant_client.js`)
 
-## License
+Thin wrapper around the Ollama REST API. Two methods:
 
-MIT — see [LICENSE](LICENSE) for details.
+- **`listModels()`** — `GET /api/tags` → returns model name list for the settings dropdown.
+- **`chat(messages, onToken)`** — `POST /api/chat` with `stream: true`. Reads NDJSON line-by-line from the response body using `ReadableStream` + `TextDecoder`. Each parsed line yields a token via the `onToken` callback. Supports abort via `AbortController`.
 
-## Known Issues
+No dependencies. Plain `fetch`.
 
-1. Deselection by clicking on empty spaces in the canvas takes a long time on large graphs (see [GitHub issue](https://github.com/antvis/G6/issues/7195))
-2. The Query Editor cursor tends to change position on multiline queries
+### 2. Context Snapshot (`buildContextSnapshot()`)
 
-## Disclaimer
+Every user message is prefixed with a live JSON snapshot of the current graph state. This gives the LLM real situational awareness without any persistent memory:
 
-- Uses the [STRING](https://string-db.org/) database for demo purposes ([citation](https://doi.org/10.1093/nar/gkac1000))
-- No guarantees on the accuracy of the results
-- This project includes third-party software — see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) for details
+```js
+{
+  app: { version },
+  workspace: { current, all, hideDisconnected, hasCustomQuery },
+  counts: { totalNodes, totalEdges, visibleNodes, visibleEdges,
+            selectedNodes, selectedEdges, hiddenDangling },
+  selection: { nodes: [{id, label}, ...], edges: [{id, label, source, target}, ...] },
+  filters: { activeFilterProps: [...], query: { text, valid } },
+  properties: { hierarchy: { "Node filters": { Group: [propName, ...] } } },
+  bubbleGroups: { groupOne: count, ... },
+  metrics: { selected, cached: [...] },
+  recentActions: [...]
+}
+```
+
+Snapshot reads directly from `cache` (the shared GLL state object). No async calls — zero latency overhead.
+
+### 3. System Prompt (`SYSTEM_PROMPT` in `assistant.js`)
+
+Hardcoded string injected as `role: system` on every request. It covers:
+
+- **Role definition**: explain and teach only, never perform actions.
+- **GLL feature reference**: all major UI panels and controls with their button emojis and keyboard shortcuts.
+- **Query syntax — strict rules**: the three allowed filter operators (`BETWEEN`, `LOWER THAN ... OR GREATER THAN`, `IN [...]`), logical operators, and the node/edge separation rule (mixing both in one query always returns zero results).
+- **Forbidden operators list**: explicitly bans `=`, `==`, `CONTAINS`, `LIKE`, unary `NOT`, etc.
+- **Correct examples**: concrete query strings the LLM can pattern-match.
+
+The prompt is long by design — GLL's query language is non-standard, so the LLM needs extensive guardrails to avoid hallucinating SQL/Cypher syntax.
+
+### 4. Conversation History
+
+Trimmed sliding window: last `MAX_HISTORY_MESSAGES - 2` turns kept. The context snapshot is injected fresh on each user message — it is **not** stored in history (history stores the plain user text only). This keeps token usage bounded while ensuring the LLM always has current graph state.
+
+### 5. Post-Processing: Query Warnings (`_checkQueryWarnings()`)
+
+After every LLM response, the assistant scans code blocks for known error patterns using regex:
+
+| Pattern | Warning shown |
+|---|---|
+| Code block contains both `Node filters::` and `Edge filters::` | Mixed node/edge query → zero results |
+| `IN ['value']` or `IN ["value"]` | Quoted values in IN list (invalid) |
+| `=`, `==`, `!=`, `<`, `>` operators | Unsupported comparison operator |
+
+Warnings appear as a separate styled bubble below the assistant response.
+
+### 6. Settings Persistence
+
+Endpoint and model saved to `localStorage` under key `gll.assistant.settings`. On load, stored values override `CFG.ASSISTANT` defaults. Settings UI (⚙ button) fetches available models live from `/api/tags` and populates a dropdown, with a free-text input fallback.
+
+### 7. UI Integration
+
+- Sidebar panel (`#assistantSidebar`) toggled by button in the top toolbar.
+- `Enter` sends, `Shift+Enter` inserts newline.
+- Streaming tokens update bubble `textContent` in real time; `scrollTop` follows.
+- Panel toggle triggers `graph.resize()` after CSS transition (300 ms) to refit the canvas.
+- Abort on panel close cancels in-flight stream.
+
+---
+
+## Configuration
+
+In `src/config.js`:
+
+```js
+ASSISTANT: {
+  ENABLED: true,
+  ENDPOINT: 'http://your-ollama-host:11434',
+  MODEL: 'llama3.1:8b',
+  MAX_CONTEXT_NODES: 25,       // max nodes/edges included in selection sample
+  MAX_STATUS_LOG_LINES: 10,    // recent action lines sent to LLM
+  MAX_HISTORY_MESSAGES: 12,    // sliding conversation window
+}
+```
+
+Override at runtime via the ⚙ Settings button in the assistant panel.
+
+---
+
+## Running Ollama
+
+```bash
+# Install: https://ollama.ai
+ollama pull llama3.1:8b
+
+# If running GLL in a browser (not Electron), allow CORS:
+OLLAMA_ORIGINS="*" ollama serve
+```
+
+---
+
+## Base Project
+
+[GraphLensLite](https://github.com/Delta4AI/GraphLensLite) — graph visualisation and analysis tool built on G6.

@@ -1167,6 +1167,9 @@ class GraphCoreManager {
         case "h":
           await this.cache.ui.toggleHoverEffect(document.getElementById("hoverToggleBtn"));
           break;
+        case "a":
+          this.cache.assistant.togglePanel();
+          break;
         default:
           break;
       }

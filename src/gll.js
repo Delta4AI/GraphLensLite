@@ -27,6 +27,8 @@ import {QueryManager} from './managers/query.js';
 import {UIManager} from './managers/ui.js';
 import {UIComponentManager} from './managers/ui_components.js';
 
+import {AssistantManager} from './managers/assistant.js';
+
 import {ColorScalePicker} from './utilities/color_scale_picker.js';
 import {NumericScalePicker} from './utilities/numeric_scale_picker.js';
 import {DataTable, buildDataTable} from "./utilities/data_editor.js";
@@ -110,6 +112,7 @@ class Cache {
     this.numericPicker = new NumericScalePicker(this);
     this.dataTable = new DataTable(this);
     this.metrics = new NetworkMetrics(this);
+    this.assistant = new AssistantManager(this);
     this.buildDataTable = buildDataTable;
   }
 
@@ -546,4 +549,15 @@ window.addEventListener("DOMContentLoaded", () => {
       shadowBar = null;
     }
   });
+
+  // Assistant: Enter to send, Shift+Enter for newline
+  const assistantInput = document.getElementById('assistantInput');
+  if (assistantInput) {
+    assistantInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        cache.assistant.sendFromInput();
+      }
+    });
+  }
 })
