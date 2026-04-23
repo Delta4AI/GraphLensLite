@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stripSentinelForDisplay, parseIntent } from "../src/managers/assistant/intent.js";
+import { stripSentinelForDisplay, parseIntent, detectProtocolDrift } from "../src/managers/assistant/intent.js";
 
 describe("stripSentinelForDisplay", () => {
   it("returns the text unchanged when no sentinel is present", () => {
@@ -44,6 +44,54 @@ describe("stripSentinelForDisplay", () => {
     const stripped = stripSentinelForDisplay(input);
     expect(stripped).not.toContain("<<<QUERY_INTENT>>>");
     expect(stripped).toContain("more");
+  });
+});
+
+describe("detectProtocolDrift", () => {
+  it("returns false when the reply contains a sentinel", () => {
+    const input = 'I will do that.\n<<<QUERY_INTENT>>>{"summary":"x"}<<<END>>>';
+    expect(detectProtocolDrift(input)).toBe(false);
+  });
+
+  it("returns false for a plain conversational reply", () => {
+    expect(detectProtocolDrift("Here is how the degree metric works. It counts ..."))
+      .toBe(false);
+  });
+
+  it("detects a fabricated JSON filter envelope", () => {
+    const input = 'Here you go:\n```\n{\n  "filters": ["Node filters::X::Y"]\n}\n```';
+    expect(detectProtocolDrift(input)).toBe(true);
+  });
+
+  it("detects a JSON query block", () => {
+    const input = 'Try this:\n```json\n{\n  "query": { "keywords": ["CAKUT"] }\n}\n```';
+    expect(detectProtocolDrift(input)).toBe(true);
+  });
+
+  it("detects Mongo-style operator keys", () => {
+    const input = '```\n{ "score": { "$gte": 0.5 } }\n```';
+    expect(detectProtocolDrift(input)).toBe(true);
+  });
+
+  it("detects bare operator keys (gte/lte) as JSON fields", () => {
+    const input = '```\n{ "CAKUT": { "gte": 10, "lte": 500 } }\n```';
+    expect(detectProtocolDrift(input)).toBe(true);
+  });
+
+  it("detects Cytoscape selectors", () => {
+    const input = 'Use this:\n```\ncy.nodes(":matches[Pathway:CAKUT]")\n```';
+    expect(detectProtocolDrift(input)).toBe(true);
+  });
+
+  it("detects SQL-like WHERE clauses against GLL namespaces", () => {
+    const input = '```sql\nSELECT * FROM nodes WHERE Node filters::X = 1\n```';
+    expect(detectProtocolDrift(input)).toBe(true);
+  });
+
+  it("returns false for non-string input", () => {
+    expect(detectProtocolDrift(null)).toBe(false);
+    expect(detectProtocolDrift(undefined)).toBe(false);
+    expect(detectProtocolDrift(123)).toBe(false);
   });
 });
 

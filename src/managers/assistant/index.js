@@ -1,8 +1,14 @@
 import {OllamaClient} from './client.js'
 import {SYSTEM_PROMPT} from './system_prompt.js'
 import {buildContextSnapshot, serializeSnapshot} from './context.js'
-import {stripSentinelForDisplay, parseIntent} from './intent.js'
+import {stripSentinelForDisplay, parseIntent, detectProtocolDrift} from './intent.js'
 import {generateQueries} from './query_generator.js'
+import {updateBudgetMeter} from './budget_meter.js'
+
+// Matches the num_ctx passed in client.js. Kept here so the budget meter
+// has the same ceiling the runtime does. If num_ctx ever becomes settings-
+// driven, thread it through the manager instead.
+const ASSISTANT_NUM_CTX = 16384
 import {
   renderMarkdown,
   appendBubble,
@@ -56,6 +62,56 @@ class AssistantManager {
     this._client = new OllamaClient(endpoint, model)
     this._updateStatusStrip()
     this._wireCopyDelegation()
+    this._wireBudgetMeter()
+    this._refreshBudgetMeter()
+  }
+
+  _wireBudgetMeter() {
+    const input = document.getElementById('assistantInput')
+    if (!input || input.dataset.budgetWired === 'true') return
+    // Debounced recompute on every keystroke so the pill tracks the draft
+    // in real time without thrashing. Also recompute on focus so the user
+    // sees a fresh snapshot after changing selection/graph while the box
+    // was inactive.
+    let timer = 0
+    const schedule = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => this._refreshBudgetMeter(), 120)
+    }
+    input.addEventListener('input', schedule)
+    input.addEventListener('focus', () => this._refreshBudgetMeter())
+    input.dataset.budgetWired = 'true'
+  }
+
+  _refreshBudgetMeter() {
+    const input = document.getElementById('assistantInput')
+    const userChars = input?.value?.length ?? 0
+
+    let graphChars = 0
+    let nodesSel = 0
+    let edgesSel = 0
+    try {
+      const snapshot = buildContextSnapshot(this.cache)
+      graphChars = serializeSnapshot(snapshot).length
+      nodesSel = this.cache?.selectedNodes?.size ?? 0
+      edgesSel = this.cache?.selectedEdges?.size ?? 0
+    } catch {
+      // Pre-init or transient cache state — meter just shows baseline.
+    }
+
+    const maxHist = this.cache?.CFG?.ASSISTANT?.MAX_HISTORY_MESSAGES ?? 12
+    const trimmedHistory = this._history.slice(-(maxHist - 2))
+    const historyChars = trimmedHistory.reduce((n, m) => n + (m?.content?.length ?? 0), 0)
+
+    updateBudgetMeter({
+      systemChars: SYSTEM_PROMPT.length,
+      historyChars,
+      historyCount: trimmedHistory.length,
+      graphChars,
+      userChars,
+      numCtx: ASSISTANT_NUM_CTX,
+      selection: {nodes: nodesSel, edges: edgesSel},
+    })
   }
 
   _wireCopyDelegation() {
@@ -80,6 +136,7 @@ class AssistantManager {
       // detached bubble and will be visible again when the panel reopens.
     }
     setTimeout(() => { if (this.cache.graph) this.cache.graph.resize() }, 300)
+    if (this._panelOpen) this._refreshBudgetMeter()
   }
 
   // Dual-purpose handler for the Send/Stop button. Idle → send; streaming →
@@ -108,9 +165,22 @@ class AssistantManager {
     const graphJson = serializeSnapshot(snapshot)
     // Explicit delimitation so the model treats graph data as data, not as
     // instructions. See system_prompt.md "Untrusted data boundaries".
+    //
+    // The <protocol_reminder> block sits at the very end, immediately before
+    // the model generates. Small models (8B-class) drift off the sentinel
+    // protocol when the system prompt is far from the generation point; a
+    // last-mile reminder right next to the user question cuts the drift
+    // rate dramatically.
     const contextMsg = {
       role: 'user',
-      content: `<graph_state>\n${graphJson}\n</graph_state>\n\n<user_question>\n${userText}\n</user_question>`,
+      content:
+        `<graph_state>\n${graphJson}\n</graph_state>\n\n` +
+        `<user_question>\n${userText}\n</user_question>\n\n` +
+        `<protocol_reminder>\n` +
+        `If <user_question> asks you to filter, select, or find graph elements, end your reply with EXACTLY ONE sentinel block on its own lines:\n` +
+        `<<<QUERY_INTENT>>>{"summary":"…","scope":"node|edge|mixed"}<<<END>>>\n` +
+        `Do NOT emit JSON filter objects, Cytoscape selectors (cy.nodes / :matches[…]), SQL WHERE clauses, or GLL query strings in prose or code blocks. The query generator is a separate pass — your only query-related job here is the sentinel.\n` +
+        `</protocol_reminder>`,
     }
 
     const trimmedHistory = this._history.slice(-(this.cache.CFG.ASSISTANT.MAX_HISTORY_MESSAGES - 2))
@@ -120,36 +190,32 @@ class AssistantManager {
       contextMsg,
     ]
 
+    // Diagnostic: with a big graph the context message can dwarf the system
+    // prompt, causing the chat model to drift off the sentinel protocol.
+    // Print sizes so the user can see this in devtools without digging.
+    const historyChars = trimmedHistory.reduce((n, m) => n + (m?.content?.length ?? 0), 0)
+    const totalChars = SYSTEM_PROMPT.length + historyChars + contextMsg.content.length
+    console.info('[assistant] prompt sizes (chars):',
+      `system=${SYSTEM_PROMPT.length}`,
+      `history=${historyChars} (${trimmedHistory.length} msgs)`,
+      `graph_state=${graphJson.length}`,
+      `user=${userText.length}`,
+      `total=${totalChars}`)
+
     const bubble = appendStreamingBubble(container)
     const sendBtn = document.getElementById('assistantSendBtn')
     this._streaming = true
     if (sendBtn) { sendBtn.textContent = 'Stop'; sendBtn.classList.add('assistant-send-btn-stop') }
 
-    // Ollama unloads models after ~5 minutes idle; the first request after
-    // that (or the first after app launch) can take 5–20 s to load weights
-    // into VRAM before the first token arrives. Show a dedicated "warming
-    // up" placeholder so the user doesn't stare at a blank bubble wondering
-    // if the stream is broken.
+    // Ollama may take 5–20 s to page the model weights into VRAM before the
+    // first token arrives. We rely on the streaming bubble's blinking
+    // caret (.assistant-bubble-streaming::after) as the loading indicator —
+    // no text placeholder — so the bubble doesn't flash extra copy in and
+    // out on short warmups.
     let fullResponse = ''
-    let firstTokenReceived = false
-    const warmupTimer = setTimeout(() => {
-      if (firstTokenReceived) return
-      bubble.classList.add('assistant-bubble-warming')
-      bubble.classList.remove('assistant-bubble-markdown')
-      bubble.textContent = 'Loading model…'
-    }, 1500)
 
     try {
       await this._client.chat(messages, (token) => {
-        if (!firstTokenReceived) {
-          firstTokenReceived = true
-          clearTimeout(warmupTimer)
-          if (bubble.classList.contains('assistant-bubble-warming')) {
-            bubble.classList.remove('assistant-bubble-warming')
-            bubble.classList.add('assistant-bubble-markdown')
-            bubble.textContent = ''
-          }
-        }
         fullResponse += token
         // Strip the <<<QUERY_INTENT>>> sentinel (including partial opening
         // markers during streaming) so the marker never flickers into the
@@ -175,6 +241,20 @@ class AssistantManager {
       const intent = parseIntent(fullResponse)
       if (intent) {
         await this._runQueryGeneration({intent, graphJson, userText, container})
+      } else if (detectProtocolDrift(fullResponse)) {
+        // Model bypassed the sentinel protocol but clearly *meant* to emit a
+        // query (JSON filter object, Cytoscape selector, etc.). Recover by
+        // firing call 2 with the user's own question as the intent summary.
+        appendWarningBubble(
+          ['⚠️ Chat model bypassed the query protocol. Recovering with a fallback query generation based on your question.'],
+          container,
+        )
+        await this._runQueryGeneration({
+          intent: {summary: userText, scope: null},
+          graphJson,
+          userText,
+          container,
+        })
       }
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -191,9 +271,9 @@ class AssistantManager {
         console.error('[assistant]', err)
       }
     } finally {
-      clearTimeout(warmupTimer)
       this._streaming = false
       if (sendBtn) { sendBtn.textContent = 'Send'; sendBtn.classList.remove('assistant-send-btn-stop') }
+      this._refreshBudgetMeter()
     }
   }
 
@@ -222,7 +302,12 @@ class AssistantManager {
       if (err?.name === 'AbortError') {
         renderQueriesError(panel, 'Query generation was cancelled.')
       } else {
-        renderQueriesError(panel, 'Could not generate a query from this request. Try rephrasing or check the assistant backend.')
+        // Surface the backend's own error string when we have one so the
+        // user can tell timeouts from 404s from JSON-parse failures. We
+        // already retry once inside generateQueries, so reaching this
+        // branch means both attempts failed.
+        const detail = err?.message ? ` (${err.message})` : ''
+        renderQueriesError(panel, `Could not generate a query from this request${detail}. Try rephrasing or resending — this is often a transient model glitch.`)
       }
     } finally {
       container.scrollTop = container.scrollHeight
@@ -252,6 +337,10 @@ class AssistantManager {
   // generated query, let the existing select pipeline decode it, and then
   // restore the editor's previous contents. This keeps any in-progress
   // manual editing intact.
+  //
+  // After selection, fit the viewport to the newly selected nodes — users
+  // clicking Select from the assistant panel expect to actually *see* the
+  // match, not just trust that a highlight happened somewhere offscreen.
   async _selectQueryMatches(queryText) {
     if (!queryText || !this.cache?.qm) return
     const textEl = this.cache.query?.text
@@ -261,6 +350,7 @@ class AssistantManager {
       textEl.textContent = queryText
       this.cache.qm.handleQueryValidationEvent(true)
       await this.cache.qm.handleQuerySelectEvent()
+      await this._fitViewToCurrentSelection()
     } finally {
       // Restore editor state whether the select succeeded or threw. The
       // validation re-run pushes the old text (and its derived query-cache
@@ -270,14 +360,41 @@ class AssistantManager {
     }
   }
 
+  // Best-effort pan+zoom to whatever nodes (and the source/target nodes of
+  // any selected edges) are currently in the selection. No-ops if the graph
+  // manager isn't available yet — e.g. during init or if the cache is in
+  // an odd state mid-transition.
+  async _fitViewToCurrentSelection() {
+    const gcm = this.cache?.gcm
+    if (typeof gcm?.fitViewToNodes !== 'function') return
+    const nodeIds = new Set(this.cache.selectedNodes ?? [])
+    // Edges have no position of their own — seed the bbox from their
+    // endpoints so an edge-only selection still frames itself sensibly.
+    for (const edgeId of this.cache.selectedEdges ?? []) {
+      const edge = this.cache.edgeRef?.get(edgeId)
+      if (edge?.source) nodeIds.add(edge.source)
+      if (edge?.target) nodeIds.add(edge.target)
+    }
+    if (!nodeIds.size) return
+    try {
+      await gcm.fitViewToNodes([...nodeIds])
+    } catch (err) {
+      console.warn('[assistant] fitViewToNodes failed', err)
+    }
+  }
+
   clearHistory() {
     // Clearing is an explicit "stop and reset" signal — kill any in-flight
-    // stream so tokens don't keep landing on a detached bubble.
+    // stream so tokens don't keep landing on a detached bubble. Ollama's
+    // /api/chat is stateless (we replay the full history each request), so
+    // clearing the local buffer is the only meaningful "reset" — the next
+    // request will carry only system + graph_state + user.
     this._client.abort()
     this._history = []
     this._lastGeneratedQueries = []
     const container = document.getElementById('assistantMessages')
     if (container) container.innerHTML = ''
+    this._refreshBudgetMeter()
   }
 
   _friendlyError(err) {

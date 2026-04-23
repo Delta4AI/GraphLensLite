@@ -36,11 +36,27 @@ function makeCache(overrides = {}) {
       ]),
     },
     nodeRef: new Map([
-      ["n1", { label: "Alpha" }],
-      ["n2", { label: "Beta" }],
+      ["n1", {
+        label: "Alpha",
+        D4Data: {
+          "Node filters": {
+            G: { a: "x", b: 0.75 },
+            Meta: { tag: null, note: "" },
+          },
+        },
+      }],
+      ["n2", {
+        label: "Beta",
+        D4Data: { "Node filters": { G: { a: "y", b: 0.2 } } },
+      }],
     ]),
     edgeRef: new Map([
-      ["e1", { label: "link", source: "n1", target: "n2" }],
+      ["e1", {
+        label: "link",
+        source: "n1",
+        target: "n2",
+        D4Data: { "Edge filters": { Interaction: { Score: 0.9 } } },
+      }],
     ]),
     nodeIDsToBeShown: new Set(["n1", "n2"]),
     edgeIDsToBeShown: new Set(["e1"]),
@@ -141,6 +157,50 @@ describe("buildContextSnapshot", () => {
     });
     const snap = buildContextSnapshot(cache, { readActions: () => [] });
     expect(snap.properties.hierarchy["Node filters"].G.a).toEqual({ type: "unknown" });
+  });
+
+  it("flattens D4Data properties onto each selected node", () => {
+    const snap = buildContextSnapshot(makeCache(), { readActions: () => [] });
+    const alpha = snap.selection.nodes.find(n => n.id === "n1");
+    expect(alpha.properties).toEqual({
+      "Node filters::G::a": "x",
+      "Node filters::G::b": 0.75,
+    });
+    // Null / empty-string props are dropped.
+    expect(alpha.properties["Node filters::Meta::tag"]).toBeUndefined();
+    expect(alpha.properties["Node filters::Meta::note"]).toBeUndefined();
+  });
+
+  it("attaches properties to selected edges when budget allows", () => {
+    const snap = buildContextSnapshot(makeCache(), { readActions: () => [] });
+    const link = snap.selection.edges.find(e => e.id === "e1");
+    expect(link.properties).toEqual({
+      "Edge filters::Interaction::Score": 0.9,
+    });
+  });
+
+  it("marks oversize entries as truncated but still admits smaller ones that fit", () => {
+    // n1 alone blows the 6000-char budget; n2 has tiny props and should
+    // still land because the loop only consumes budget on successful attach.
+    const bigBlob = "x".repeat(7000);
+    const cache = makeCache({
+      data: {
+        selectedLayout: "main",
+        layouts: { main: { filters: new Map(), hideDisconnectedNodes: false, query: null } },
+        filterDefaults: new Map(),
+      },
+      nodeRef: new Map([
+        ["n1", { label: "Big", D4Data: { "Node filters": { G: { a: bigBlob } } } }],
+        ["n2", { label: "Next", D4Data: { "Node filters": { G: { a: "y" } } } }],
+      ]),
+      selectedNodes: new Set(["n1", "n2"]),
+    });
+    const snap = buildContextSnapshot(cache, { readActions: () => [] });
+    const byId = Object.fromEntries(snap.selection.nodes.map(n => [n.id, n]));
+    expect(byId.n1.truncated).toBe(true);
+    expect(byId.n1.properties).toBeUndefined();
+    expect(byId.n2.properties).toEqual({ "Node filters::G::a": "y" });
+    expect(byId.n2.truncated).toBeUndefined();
   });
 
   it("injects recentActions from the read-actions callback", () => {

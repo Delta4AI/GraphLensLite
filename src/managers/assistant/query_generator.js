@@ -49,6 +49,20 @@ function escapeAttr(s) {
   return String(s).replace(/"/g, '&quot;').replace(/\n/g, ' ')
 }
 
+// One-shot retry around `generateJson` so a transient Ollama failure —
+// timeout, malformed JSON, 5xx — doesn't bubble up and kill the whole
+// generation. Small local models at temp=0 sometimes produce unparseable
+// output on the first try; retrying costs a second but usually succeeds.
+async function generateJsonWithRetry(client, messages, schema) {
+  try {
+    return await client.generateJson(messages, schema)
+  } catch (err) {
+    if (err?.name === 'AbortError') throw err
+    console.warn('[assistant] query generation transient error, retrying once:', err?.message ?? err)
+    return await client.generateJson(messages, schema)
+  }
+}
+
 // Core generator. Returns an array of rendered queries (see renderQueries).
 // Each entry has {title, scope, text, error?}. Caller decides how to present
 // invalid entries vs valid ones.
@@ -74,7 +88,7 @@ export async function generateQueries({
     },
   ]
 
-  const firstResponse = await client.generateJson(makeMessages(), QUERY_RESPONSE_SCHEMA)
+  const firstResponse = await generateJsonWithRetry(client, makeMessages(), QUERY_RESPONSE_SCHEMA)
   const firstRendered = renderQueries(firstResponse)
 
   // If every query rendered cleanly, we're done.
@@ -87,7 +101,7 @@ export async function generateQueries({
     .join('\n')
   const repairHint = `The previous response had structural errors:\n${errors}`
 
-  const retryResponse = await client.generateJson(makeMessages(repairHint), QUERY_RESPONSE_SCHEMA)
+  const retryResponse = await generateJsonWithRetry(client, makeMessages(repairHint), QUERY_RESPONSE_SCHEMA)
   const retryRendered = renderQueries(retryResponse)
   // Prefer the retry if it's strictly better; otherwise surface the first so
   // partial successes aren't lost.

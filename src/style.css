@@ -4084,6 +4084,63 @@ input:checked + .slider:before {
     font-style: italic;
 }
 
+#assistantInputSide {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.assistant-budget {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    border: 1px solid transparent;
+    user-select: none;
+    cursor: help;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.assistant-budget-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.assistant-budget.assistant-budget-ok {
+    background-color: #e6f1e7;
+    border-color: #bcd9bc;
+    color: #2d6a3a;
+}
+.assistant-budget.assistant-budget-ok .assistant-budget-dot {
+    background-color: #3f9255;
+}
+
+.assistant-budget.assistant-budget-warn {
+    background-color: #fdf3dc;
+    border-color: #e6c98d;
+    color: #7a5a00;
+}
+.assistant-budget.assistant-budget-warn .assistant-budget-dot {
+    background-color: #d19400;
+}
+
+.assistant-budget.assistant-budget-danger {
+    background-color: #f7e0e0;
+    border-color: #c38a8a;
+    color: #8a2d2d;
+}
+.assistant-budget.assistant-budget-danger .assistant-budget-dot {
+    background-color: #c33d35;
+}
+
 .assistant-bubble-aborted {
     opacity: 0.6;
     font-style: italic;
@@ -4146,17 +4203,6 @@ input:checked + .slider:before {
     background-color: #a93226;
 }
 
-.assistant-bubble-warming {
-    font-style: italic;
-    color: #777;
-    animation: assistantWarmingPulse 1.4s ease-in-out infinite;
-}
-
-@keyframes assistantWarmingPulse {
-    0%, 100% { opacity: 0.55; }
-    50% { opacity: 1; }
-}
-
 #assistantInputRow {
     display: flex;
     flex-direction: column;
@@ -4191,7 +4237,6 @@ input:checked + .slider:before {
 }
 
 #assistantSendBtn {
-    align-self: flex-end;
     background-color: #403C53;
     color: #fff;
     border: none;

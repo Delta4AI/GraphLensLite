@@ -605,8 +605,15 @@ class GraphCoreManager {
     const visibleNodeIDs = [...this.cache.nodeIDsToBeShown].filter(
       (id) => !this.cache.hiddenDanglingNodeIDs.has(id),
     );
+    await this.fitViewToNodes(visibleNodeIDs);
+  }
 
-    if (visibleNodeIDs.length === 0) {
+  // Centre and scale the viewport so the given set of nodes fills it with
+  // padding. Handles the G6 zoom/translate quirk where translateTo at
+  // non-1 zoom misbehaves (antvis/G6#6373).
+  async fitViewToNodes(nodeIDs) {
+    const ids = [...nodeIDs];
+    if (ids.length === 0) {
       await this.cache.graph.fitView();
       return;
     }
@@ -616,8 +623,10 @@ class GraphCoreManager {
       maxX = -Infinity,
       maxY = -Infinity;
 
-    for (const id of visibleNodeIDs) {
-      const [x, y] = this.cache.graph.getElementPosition(id);
+    for (const id of ids) {
+      const pos = this.cache.graph.getElementPosition(id);
+      if (!pos) continue;
+      const [x, y] = pos;
       if (x < minX) minX = x;
       if (x > maxX) maxX = x;
       if (y < minY) minY = y;
@@ -640,10 +649,13 @@ class GraphCoreManager {
 
     const [viewportWidth, viewportHeight] = this.cache.graph.getSize();
     const padding = 80;
-    const zoom = Math.min(
+    // Clamp zoom so a tiny selection (e.g. a single node) doesn't punch
+    // the viewport to 100× and turn a clean UX into a jarring jump.
+    const zoomRaw = Math.min(
       (viewportWidth - padding * 2) / bboxWidth,
       (viewportHeight - padding * 2) / bboxHeight,
     );
+    const zoom = Math.min(zoomRaw, 4);
 
     // translateTo at zoom 1, then restore target zoom (G6 bug workaround)
     const viewportCenter = [viewportWidth / 2, viewportHeight / 2];

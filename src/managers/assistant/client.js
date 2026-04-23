@@ -32,7 +32,18 @@ class OllamaClient {
     const res = await fetch(`${this.endpoint}/api/chat`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({model: this.model, messages, stream: true}),
+      // num_ctx overrides Ollama's 2048-token default. Without it, a typical
+      // graph snapshot (~5–9k tokens on mid-size networks) gets truncated
+      // server-side — the system prompt silently drops out of attention and
+      // the model falls back to training-prior output (JSON filter objects,
+      // Cytoscape selectors, etc.). 16384 covers every realistic GLL graph
+      // with headroom for chat history.
+      body: JSON.stringify({
+        model: this.model,
+        messages,
+        stream: true,
+        options: {num_ctx: 16384},
+      }),
       signal: this._abortController.signal,
     })
 
@@ -89,7 +100,9 @@ class OllamaClient {
         messages,
         stream: false,
         format: schema,
-        options: {temperature: 0},
+        // See chat() — same rationale. The structured call carries the
+        // graph snapshot too, so it needs the same headroom.
+        options: {temperature: 0, num_ctx: 16384},
       }),
       signal: mergedSignal,
     })

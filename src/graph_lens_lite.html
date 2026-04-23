@@ -196,7 +196,13 @@
     </div>
     <div id="assistantInputRow">
       <textarea id="assistantInput" rows="3" placeholder="Ask about your graph..."></textarea>
-      <button id="assistantSendBtn" onclick="cache.assistant.sendOrStop()">Send</button>
+      <div id="assistantInputSide">
+        <div id="assistantBudget" class="assistant-budget" role="status" aria-live="polite">
+          <span class="assistant-budget-dot" aria-hidden="true"></span>
+          <span class="assistant-budget-text">— / —</span>
+        </div>
+        <button id="assistantSendBtn" onclick="cache.assistant.sendOrStop()">Send</button>
+      </div>
     </div>
   </div>
 </div>

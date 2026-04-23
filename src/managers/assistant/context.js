@@ -7,6 +7,55 @@ const MAX_SNAPSHOT_CHARS = 32000
 // distinct values would blow the snapshot budget. 50 is enough to anchor the
 // model on the naming convention without shipping an encyclopedia.
 const MAX_CATEGORY_VALUES_PER_PROP = 50
+// Safety cap on total chars devoted to the selection sample's per-element
+// property dump. With a wide schema (50+ properties per element) a 25-node
+// sample could otherwise swell well past 20 kB. Early entries keep their
+// full property set; later entries drop properties and/or get dropped
+// entirely once the budget is spent.
+const SELECTION_DETAILS_BUDGET_CHARS = 6000
+
+// Flatten the element's nested D4Data property store into a flat
+// Section::Sub::Prop → value map, dropping empty/null values so the assistant
+// isn't distracted by them. See query.js #readValue for the source shape.
+function flattenElementProperties(element) {
+  const out = {}
+  const d4 = element?.D4Data
+  if (!d4 || typeof d4 !== 'object') return out
+  for (const [section, subs] of Object.entries(d4)) {
+    if (!subs || typeof subs !== 'object') continue
+    for (const [sub, props] of Object.entries(subs)) {
+      if (!props || typeof props !== 'object') continue
+      for (const [prop, value] of Object.entries(props)) {
+        if (value === null || value === undefined || value === '') continue
+        out[`${section}::${sub}::${prop}`] = value
+      }
+    }
+  }
+  return out
+}
+
+// Attach per-element property dumps to the selection samples with a shared
+// char budget so a wide schema cannot blow up the snapshot. Entries past
+// the budget keep their identity (id, label, endpoints) but lose the
+// property dump, and a `truncated: true` flag lands on each dropped entry
+// so the model knows it's working with an incomplete sample.
+function decorateSelectionWithProperties(sample, refMap, budget) {
+  let used = 0
+  for (const entry of sample) {
+    const element = refMap.get(entry.id)
+    if (!element) continue
+    const props = flattenElementProperties(element)
+    if (!Object.keys(props).length) continue
+    const cost = JSON.stringify(props).length
+    if (used + cost > budget) {
+      entry.truncated = true
+      continue
+    }
+    entry.properties = props
+    used += cost
+  }
+  return sample
+}
 
 function readRecentActions(maxLines) {
   const container = typeof document !== 'undefined'
@@ -63,6 +112,16 @@ export function buildContextSnapshot(cache, {readActions = readRecentActions} = 
     const e = cache.edgeRef.get(id)
     return {id, label: e?.label ?? null, source: e?.source, target: e?.target}
   })
+  // Attach per-element property values so the assistant can reason about
+  // what's actually in the current selection, not just node IDs. Nodes and
+  // edges share a single char budget — nodes get first pick because they
+  // carry more interesting property content in typical GLL graphs.
+  decorateSelectionWithProperties(selectedNodeSample, cache.nodeRef, SELECTION_DETAILS_BUDGET_CHARS)
+  const nodeBytes = selectedNodeSample.reduce(
+    (n, s) => n + (s.properties ? JSON.stringify(s.properties).length : 0),
+    0,
+  )
+  decorateSelectionWithProperties(selectedEdgeSample, cache.edgeRef, Math.max(0, SELECTION_DETAILS_BUDGET_CHARS - nodeBytes))
 
   const activeFilters = []
   if (layout?.filters) {

@@ -41,6 +41,16 @@ Same-scope (Node AND Node, Edge AND Edge, Node NOT Node, Edge NOT Edge) is alway
 - "above X" with numeric max available → BETWEEN X AND `<max>`. "below X" → BETWEEN `<min>` AND X.
 - Never emit `=`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `CONTAINS`, `LIKE`, `MATCHES` — they do not exist in GLL.
 
+## Similarity to the current selection
+
+When the user's intent refers to the current selection — "find nodes similar to my selection", "other nodes like these", "more of the same" — inspect `<graph_state>.selection.nodes[*].properties` (and/or `selection.edges[*].properties`). Each entry is a `"Section::Group::Name" → value` map for one selected element.
+
+From that:
+- **Categorical fields**: collect the set of values that appear across the selection and emit an `IN` query against that field. If a property is uniform across all selected elements, that's a strong signal; use only those values. If it varies, include the union — but prefer the 1–3 most informative fields, not every property.
+- **Numeric fields**: take the observed `min` and `max` across the selection and emit `BETWEEN min AND max`. Widen slightly (10–20%) if the user says "similar" rather than "exactly like these".
+- **Skip fields that are empty or the same across the whole graph** — those don't discriminate.
+- Exclude the selected elements themselves from the result is NOT possible via the query DSL; the match will include them. Acknowledge that in the title (e.g. "Nodes similar to selection — includes originals").
+
 ## Examples
 
 Intent: "show nodes where score is between 0.8 and 1.0"
@@ -61,6 +71,11 @@ Intent: "nodes with degree outside the middle range — below 5 or above 50"
 Intent: "high-score nodes whose mechanism is angiogenesis" (combine two conditions, same scope)
 \`\`\`json
 {"queries":[{"title":"High-score angiogenesis nodes","expr":{"kind":"binary","bop":"AND","left":{"kind":"condition","field":"Node filters::Biology::mechanism","op":"IN","values":["angiogenesis"]},"right":{"kind":"condition","field":"Node filters::Metrics::score","op":"BETWEEN","min":0.8,"max":1}}}]}
+\`\`\`
+
+Intent: "find nodes similar to my selection" (selection: 3 nodes all with `Node filters::Biology::mechanism`="angiogenesis", and `Node filters::Metrics::score` values 0.62, 0.77, 0.89 → range 0.62–0.89)
+\`\`\`json
+{"queries":[{"title":"Nodes similar to selection — includes originals","expr":{"kind":"binary","bop":"AND","left":{"kind":"condition","field":"Node filters::Biology::mechanism","op":"IN","values":["angiogenesis"]},"right":{"kind":"condition","field":"Node filters::Metrics::score","op":"BETWEEN","min":0.62,"max":0.89}}}]}
 \`\`\`
 
 Intent: "angiogenesis nodes but exclude those that are inhibitory" (binary NOT, same scope)

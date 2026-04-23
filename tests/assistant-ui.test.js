@@ -237,6 +237,20 @@ describe("suggested queries panel", () => {
     expect(errEl.textContent).toMatch(/something broke/);
   });
 
+  it("renderQueriesIntoPanel removes the panel entirely when the generator returned zero entries", () => {
+    // This happens when the chat model wrongly emitted a sentinel on a
+    // descriptive follow-up ("tell me more about them") — call 2 correctly
+    // returns {queries: []}, and we don't want a noisy "No queries produced"
+    // bubble hanging around.
+    const container = document.createElement("div");
+    const panel = appendQueriesPanel(container);
+    expect(container.contains(panel)).toBe(true);
+
+    renderQueriesIntoPanel(panel, [], { onOpen: () => {} });
+
+    expect(container.contains(panel)).toBe(false);
+  });
+
   it("renderQueriesIntoPanel appends a note when some entries dropped alongside valid ones", () => {
     const container = document.createElement("div");
     const panel = appendQueriesPanel(container);

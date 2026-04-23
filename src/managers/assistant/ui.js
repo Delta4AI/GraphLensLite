@@ -174,15 +174,24 @@ export function renderQueriesIntoPanel(panelEl, entries, {onOpen, onSelect}) {
   if (!body) return
   body.innerHTML = ''
 
+  // Zero entries = the generator produced an empty `queries` array. That
+  // happens when the chat model emitted a sentinel but the user's turn
+  // wasn't actually a filter request (e.g. "tell me about my selection").
+  // Silently drop the panel instead of showing a misleading error.
+  if (!entries.length) {
+    panelEl.remove()
+    return
+  }
+
   const valid = entries.filter(e => e.text)
   const invalid = entries.filter(e => !e.text)
 
   if (!valid.length) {
+    // Entries exist but every one failed to render. That's a genuine
+    // generator failure worth surfacing so the user knows to rephrase.
     const msg = document.createElement('div')
     msg.className = 'assistant-queries-error'
-    msg.textContent = invalid.length
-      ? `Could not generate a valid query (${invalid[0].error || 'unknown error'}). Try rephrasing your request.`
-      : 'No queries were produced. Try rephrasing your request.'
+    msg.textContent = `Could not generate a valid query (${invalid[0].error || 'unknown error'}). Try rephrasing your request.`
     body.appendChild(msg)
     return
   }

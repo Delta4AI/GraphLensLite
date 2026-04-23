@@ -15,6 +15,22 @@ function makeClient(responses) {
   };
 }
 
+function validResponse() {
+  return {
+    queries: [
+      {
+        title: "t",
+        expr: {
+          kind: "condition",
+          field: "Node filters::M::a",
+          op: "IN",
+          values: ["x"],
+        },
+      },
+    ],
+  };
+}
+
 const baseArgs = {
   graphJson: '{"some":"context"}',
   userQuestion: "show me strong nodes",
@@ -214,6 +230,30 @@ describe("generateQueries", () => {
     const content = client.calls[0].messages[1].content;
     expect(content).toMatch(/ok/);
     expect(content).not.toMatch(/errored/);
+  });
+
+  it("retries once silently when the first call throws a transient error", async () => {
+    const transient = new Error("Ollama error 502: bad gateway");
+    const client = makeClient([transient, validResponse()]);
+    const out = await generateQueries({ client, ...baseArgs });
+    expect(client.calls).toHaveLength(2);
+    expect(out[0].text).toBe("(Node filters::M::a IN [x])");
+  });
+
+  it("propagates AbortError without retrying", async () => {
+    const abort = Object.assign(new Error("aborted"), { name: "AbortError" });
+    const client = makeClient([abort, validResponse()]);
+    await expect(generateQueries({ client, ...baseArgs })).rejects.toThrow(/aborted/);
+    expect(client.calls).toHaveLength(1);
+  });
+
+  it("bubbles the second error when both attempts throw", async () => {
+    const client = makeClient([
+      new Error("boom 1"),
+      new Error("boom 2"),
+    ]);
+    await expect(generateQueries({ client, ...baseArgs })).rejects.toThrow(/boom 2/);
+    expect(client.calls).toHaveLength(2);
   });
 
   it("passes the schema and system prompt on every call", async () => {
