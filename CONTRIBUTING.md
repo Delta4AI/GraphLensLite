@@ -22,6 +22,9 @@ dnf install libxcrypt-compat wine   # only needed for cross-platform builds
 | `npm start` | Electron app (injects version automatically) |
 | `npm run bundle` | One-off bundle (no minify) |
 | `npm run bundle:prod` | Production bundle (minified) |
+| `npm test` | Run the vitest unit test suite |
+| `npm run test:watch` | vitest in watch mode |
+| `npm run vendor-libs` | Copy `marked` / `dompurify` into `src/lib/` and regenerate `src/managers/assistant/system_prompt.js` from its `.md` source |
 | `npm run dist-linux` | Build Linux packages (AppImage, deb, snap) |
 | `npm run dist-windows` | Build Windows packages (nsis, portable) |
 | `npm run dist-mac` | Build macOS packages (dmg, zip) |
@@ -85,6 +88,17 @@ Takes screenshots of the running app via a Chromium instance. Three quality pres
    to capture. Type `quit` to exit.
 
 Screenshots are saved to `static/screenshots/`.
+
+## Testing
+
+Unit tests run under [vitest](https://vitest.dev/). A few use jsdom — opt in per-file with `// @vitest-environment jsdom` at the top.
+
+```bash
+npm test            # run the full suite once
+npm run test:watch  # re-run on file changes
+```
+
+Tests live in `tests/` as `*.test.js`. Assistant-specific tests (`tests/assistant-*.test.js`) cover settings/endpoint validation, the context snapshot, markdown rendering + sanitization, and the query-warning linter.
 
 ## Code Style
 

@@ -250,7 +250,7 @@ const CFG = {
 
   ASSISTANT: {
     ENABLED: true,
-    ENDPOINT: 'http://exploration-big:11434',
+    ENDPOINT: 'http://localhost:11434',
     MODEL: 'llama3.1:8b',
     MAX_CONTEXT_NODES: 25,
     MAX_STATUS_LOG_LINES: 10,

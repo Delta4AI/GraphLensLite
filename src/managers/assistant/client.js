@@ -13,7 +13,8 @@ class OllamaClient {
   }
 
   async listModels() {
-    const res = await fetch(`${this.endpoint}/api/tags`)
+    const signal = AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined
+    const res = await fetch(`${this.endpoint}/api/tags`, signal ? {signal} : undefined)
     if (!res.ok) throw new Error(`Ollama /api/tags returned ${res.status}`)
     const data = await res.json()
     return (data.models || []).map(m => m.name)

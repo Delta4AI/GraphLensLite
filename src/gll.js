@@ -27,7 +27,7 @@ import {QueryManager} from './managers/query.js';
 import {UIManager} from './managers/ui.js';
 import {UIComponentManager} from './managers/ui_components.js';
 
-import {AssistantManager} from './managers/assistant.js';
+import {AssistantManager} from './managers/assistant/index.js';
 
 import {ColorScalePicker} from './utilities/color_scale_picker.js';
 import {NumericScalePicker} from './utilities/numeric_scale_picker.js';

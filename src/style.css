@@ -3794,6 +3794,94 @@ input:checked + .slider:before {
     margin: 0.4em 0;
 }
 
+.assistant-code-block {
+    position: relative;
+    margin: 0.4em 0;
+}
+
+.assistant-code-block > pre {
+    margin: 0;
+}
+
+.assistant-copy-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 5px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.1;
+    color: #e8e6f0;
+    background-color: #2f2f45;
+    border: 1px solid #4a4a65;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.75;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Icon-only at rest; the label reveals itself on state change so the button
+   stays compact unless it's actively reporting feedback. */
+.assistant-copy-btn .assistant-copy-btn-label {
+    display: none;
+}
+
+.assistant-copy-btn.assistant-copy-btn-copied .assistant-copy-btn-label,
+.assistant-copy-btn.assistant-copy-btn-failed .assistant-copy-btn-label {
+    display: inline;
+}
+
+.assistant-code-block:hover .assistant-copy-btn,
+.assistant-copy-btn:focus-visible {
+    opacity: 1;
+}
+
+.assistant-copy-btn:hover {
+    background-color: #3d3d58;
+    border-color: #6b6b87;
+}
+
+.assistant-copy-btn:active {
+    background-color: #272738;
+}
+
+.assistant-copy-btn-icon {
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.assistant-copy-btn.assistant-copy-btn-copied {
+    opacity: 1;
+    color: #b9f5b2;
+    background-color: #2d4a30;
+    border-color: #4c8c4c;
+}
+
+.assistant-copy-btn.assistant-copy-btn-failed {
+    opacity: 1;
+    color: #ffc2bb;
+    background-color: #4a2d2d;
+    border-color: #8c4c4c;
+}
+
+.assistant-inline-copy {
+    cursor: pointer;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.assistant-inline-copy:hover {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15) inset;
+}
+
+.assistant-inline-copy.assistant-inline-copied {
+    background-color: #d6f5d6 !important;
+    box-shadow: 0 0 0 1px #4c8c4c inset;
+}
+
 .assistant-bubble-markdown pre code {
     background: none;
     padding: 0;
@@ -3862,6 +3950,74 @@ input:checked + .slider:before {
 .assistant-bubble-aborted {
     opacity: 0.6;
     font-style: italic;
+}
+
+#assistantStatusStrip {
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    color: #777;
+    background-color: #ececec;
+    border-bottom: 1px solid #ddd;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+}
+
+#assistantStatusStrip.assistant-status-warn {
+    color: #8a6400;
+    background-color: #fdf5e3;
+}
+
+#assistantEmptyState {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 24px 20px;
+    color: #888;
+    gap: 8px;
+}
+
+/* The empty-state is shown when there are no message bubbles. Using :has()
+   keeps this purely CSS-driven — no JS tracking of "did we already greet". */
+#assistantSidebar:has(#assistantMessages:empty) #assistantEmptyState {
+    display: flex;
+}
+
+.assistant-empty-state-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #555;
+}
+
+.assistant-empty-state-body {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    max-width: 280px;
+}
+
+#assistantSendBtn.assistant-send-btn-stop {
+    background-color: #c0392b;
+    color: #fff;
+    border-color: #a93226;
+}
+
+#assistantSendBtn.assistant-send-btn-stop:hover {
+    background-color: #a93226;
+}
+
+.assistant-bubble-warming {
+    font-style: italic;
+    color: #777;
+    animation: assistantWarmingPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes assistantWarmingPulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
 }
 
 #assistantInputRow {
