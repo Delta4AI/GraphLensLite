@@ -3737,6 +3737,104 @@ input:checked + .slider:before {
     border-bottom-left-radius: 2px;
 }
 
+.assistant-bubble-markdown {
+    white-space: normal;
+}
+
+.assistant-bubble-markdown > *:first-child {
+    margin-top: 0;
+}
+
+.assistant-bubble-markdown > *:last-child {
+    margin-bottom: 0;
+}
+
+.assistant-bubble-markdown p {
+    margin: 0 0 0.5em 0;
+}
+
+.assistant-bubble-markdown ul,
+.assistant-bubble-markdown ol {
+    margin: 0.25em 0 0.5em 0;
+    padding-left: 1.3em;
+}
+
+.assistant-bubble-markdown li {
+    margin: 0.1em 0;
+}
+
+.assistant-bubble-markdown h1,
+.assistant-bubble-markdown h2,
+.assistant-bubble-markdown h3,
+.assistant-bubble-markdown h4 {
+    margin: 0.6em 0 0.3em 0;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.assistant-bubble-markdown h1 { font-size: 1.1rem; }
+.assistant-bubble-markdown h2 { font-size: 1.0rem; }
+.assistant-bubble-markdown h3 { font-size: 0.95rem; }
+.assistant-bubble-markdown h4 { font-size: 0.9rem; }
+
+.assistant-bubble-markdown code {
+    background-color: rgba(0, 0, 0, 0.08);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+}
+
+.assistant-bubble-markdown pre {
+    background-color: #1e1e2e;
+    color: #e8e6f0;
+    padding: 8px 10px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 0.4em 0;
+}
+
+.assistant-bubble-markdown pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    white-space: pre;
+}
+
+.assistant-bubble-markdown blockquote {
+    margin: 0.3em 0;
+    padding: 0.2em 0.6em;
+    border-left: 3px solid #8b86a8;
+    color: #555;
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.assistant-bubble-markdown a {
+    color: #4a3fb8;
+    text-decoration: underline;
+}
+
+.assistant-bubble-markdown table {
+    border-collapse: collapse;
+    margin: 0.4em 0;
+    font-size: 0.82em;
+}
+
+.assistant-bubble-markdown th,
+.assistant-bubble-markdown td {
+    border: 1px solid #c8c3d8;
+    padding: 3px 6px;
+    text-align: left;
+}
+
+.assistant-bubble-markdown hr {
+    border: none;
+    border-top: 1px solid #c8c3d8;
+    margin: 0.6em 0;
+}
+
 .assistant-bubble-streaming::after {
     content: '▋';
     animation: blink 0.8s step-start infinite;

@@ -1,5 +1,13 @@
 import {OllamaClient} from './assistant_client.js'
 import {Popup} from '../utilities/popup.js'
+import {marked} from '../lib/marked.esm.js'
+import DOMPurify from '../lib/purify.esm.mjs'
+
+marked.setOptions({gfm: true, breaks: true})
+
+function renderMarkdown(text) {
+  return DOMPurify.sanitize(marked.parse(text || ''))
+}
 
 const SETTINGS_KEY = 'gll.assistant.settings'
 
@@ -257,7 +265,7 @@ class AssistantManager {
 
   _appendStreamingBubble(container) {
     const el = document.createElement('div')
-    el.className = 'assistant-bubble assistant-bubble-assistant assistant-bubble-streaming'
+    el.className = 'assistant-bubble assistant-bubble-assistant assistant-bubble-markdown assistant-bubble-streaming'
     const c = this._getMessages(container)
     c.appendChild(el)
     c.scrollTop = c.scrollHeight
@@ -302,10 +310,11 @@ class AssistantManager {
     try {
       await this._client.chat(messages, (token) => {
         fullResponse += token
-        bubble.textContent = fullResponse
+        bubble.innerHTML = renderMarkdown(fullResponse)
         container.scrollTop = container.scrollHeight
       })
       bubble.classList.remove('assistant-bubble-streaming')
+      bubble.innerHTML = renderMarkdown(fullResponse)
       this._history.push({role: 'user', content: userText})
       this._history.push({role: 'assistant', content: fullResponse})
       this._checkQueryWarnings(fullResponse, container)
@@ -313,9 +322,12 @@ class AssistantManager {
       if (err.name === 'AbortError') {
         bubble.classList.remove('assistant-bubble-streaming')
         bubble.classList.add('assistant-bubble-aborted')
-        if (!fullResponse) bubble.textContent = '(cancelled)'
+        if (!fullResponse) {
+          bubble.classList.remove('assistant-bubble-markdown')
+          bubble.textContent = '(cancelled)'
+        }
       } else {
-        bubble.classList.remove('assistant-bubble-streaming')
+        bubble.classList.remove('assistant-bubble-streaming', 'assistant-bubble-markdown')
         bubble.classList.add('assistant-bubble-error')
         bubble.textContent = this._friendlyError(err)
       }
