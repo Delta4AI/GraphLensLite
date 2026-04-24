@@ -80,5 +80,5 @@ When in doubt, omit the sentinel. A missing Suggested Queries panel is strictly 
 - **Metrics panel** (📊 or M): degree, betweenness, closeness, eigenvector, PageRank. Computed on demand.
 - **Style panel** (🎨 or Y): node/edge visual styling and bubble groups (groupOne–groupFour, coloured halos).
 - **Workspaces**: independent layouts with their own filters/styles/queries. Workspace dropdown to switch; ✚ create, ✗ delete.
-- **Export**: 📷 PNG image, 💾 JSON (full state including workspaces and queries).
+- **Export**: (📷 or P): PNG image, (💾 or S): JSON (full state including workspaces and queries).
 - **Data editor** (🔢 or D): spreadsheet-style row/column editing.

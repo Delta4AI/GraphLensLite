@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   renderMarkdown,
   ensureTableSeparators,
@@ -11,6 +11,8 @@ import {
   renderQueriesIntoPanel,
   renderQueriesError,
   formatInvalidQueryError,
+  handleActionClick,
+  ACTION_GLYPHS,
 } from "../src/managers/assistant/ui.js";
 
 describe("renderMarkdown", () => {
@@ -355,5 +357,102 @@ describe("ensureTableSeparators", () => {
     expect(ensureTableSeparators("")).toBe("");
     expect(ensureTableSeparators(null)).toBe(null);
     expect(ensureTableSeparators(undefined)).toBe(undefined);
+  });
+});
+
+describe("action glyph decoration", () => {
+  const parse = (html) => {
+    const holder = document.createElement("div");
+    holder.innerHTML = html;
+    return holder;
+  };
+
+  it("replaces known glyphs with a button carrying the action key", () => {
+    const holder = parse(renderMarkdown("Open the query editor (📝 or Q)."));
+    const btns = holder.querySelectorAll(".assistant-action-btn");
+    expect(btns.length).toBe(1);
+    expect(btns[0].dataset.action).toBe("query-editor");
+    expect(btns[0].textContent).toBe("📝");
+    expect(btns[0].getAttribute("aria-label")).toBe("Toggle query editor");
+  });
+
+  it("decorates each allowlisted glyph in a single message", () => {
+    const holder = parse(renderMarkdown("lasso ➰ metrics 📊 style 🎨 data 🔢 undo ↩ redo ↪"));
+    const actions = [...holder.querySelectorAll(".assistant-action-btn")].map(b => b.dataset.action);
+    expect(actions).toEqual(["lasso", "metrics", "style", "data-editor", "undo", "redo"]);
+  });
+
+  it("tolerates the U+FE0F emoji variation selector", () => {
+    const holder = parse(renderMarkdown("save 📷️ or 💾"));
+    const actions = [...holder.querySelectorAll(".assistant-action-btn")].map(b => b.dataset.action);
+    expect(actions).toEqual(["export-png", "export-json"]);
+  });
+
+  it("does not decorate glyphs inside inline code or fenced blocks", () => {
+    const holder = parse(renderMarkdown("use `📝` here\n\n```\n📝 in a code block\n```"));
+    expect(holder.querySelectorAll(".assistant-action-btn").length).toBe(0);
+  });
+
+  it("ignores glyphs outside the allowlist", () => {
+    const holder = parse(renderMarkdown("🎯 is select, 🔍 is filter"));
+    expect(holder.querySelectorAll(".assistant-action-btn").length).toBe(0);
+  });
+
+  it("covers every entry in ACTION_GLYPHS", () => {
+    for (const glyph of Object.keys(ACTION_GLYPHS)) {
+      const holder = parse(renderMarkdown(`see ${glyph} here`));
+      const btn = holder.querySelector(".assistant-action-btn");
+      expect(btn, `glyph ${glyph} not decorated`).toBeTruthy();
+      expect(btn.dataset.action).toBe(ACTION_GLYPHS[glyph].action);
+    }
+  });
+});
+
+describe("handleActionClick", () => {
+  const makeClick = (target) => ({ target });
+
+  it("dispatches the handler matching data-action", () => {
+    const btn = document.createElement("button");
+    btn.className = "assistant-action-btn";
+    btn.dataset.action = "lasso";
+    const lasso = vi.fn();
+    handleActionClick(makeClick(btn), { lasso });
+    expect(lasso).toHaveBeenCalledOnce();
+  });
+
+  it("walks up to .assistant-action-btn from an inner target", () => {
+    const btn = document.createElement("button");
+    btn.className = "assistant-action-btn";
+    btn.dataset.action = "metrics";
+    const inner = document.createElement("span");
+    btn.appendChild(inner);
+    const metrics = vi.fn();
+    handleActionClick(makeClick(inner), { metrics });
+    expect(metrics).toHaveBeenCalledOnce();
+  });
+
+  it("is a no-op when the click is outside any action button", () => {
+    const other = document.createElement("div");
+    const dispatch = { lasso: vi.fn() };
+    expect(() => handleActionClick(makeClick(other), dispatch)).not.toThrow();
+    expect(dispatch.lasso).not.toHaveBeenCalled();
+  });
+
+  it("is a no-op when the action has no registered handler", () => {
+    const btn = document.createElement("button");
+    btn.className = "assistant-action-btn";
+    btn.dataset.action = "ghost-action";
+    expect(() => handleActionClick(makeClick(btn), {})).not.toThrow();
+  });
+
+  it("swallows handler exceptions so the delegated listener stays alive", () => {
+    const btn = document.createElement("button");
+    btn.className = "assistant-action-btn";
+    btn.dataset.action = "undo";
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const undo = vi.fn(() => { throw new Error("boom"); });
+    expect(() => handleActionClick(makeClick(btn), { undo })).not.toThrow();
+    expect(undo).toHaveBeenCalledOnce();
+    spy.mockRestore();
   });
 });

@@ -77,7 +77,7 @@ describe("updateBudgetMeter", () => {
     expect(el.classList.contains("assistant-budget-danger")).toBe(true);
   });
 
-  it("writes a detailed breakdown into the tooltip with selection counts", () => {
+  it("sets a short click-for-breakdown tooltip when under budget", () => {
     const el = mountMeterDom();
     updateBudgetMeter({
       systemChars: 6283,
@@ -88,25 +88,22 @@ describe("updateBudgetMeter", () => {
       numCtx: 16384,
       selection: { nodes: 3, edges: 1 },
     });
-    expect(el.title).toMatch(/system\s+1,?57[0-9]/);
-    expect(el.title).toMatch(/graph_state/);
-    expect(el.title).toMatch(/sel: 3 nodes, 1 edge/);
-    expect(el.title).toMatch(/total/);
-    expect(el.title).toMatch(/16,384/);
+    expect(el.title).toBe("Click for context-budget breakdown");
   });
 
-  it("omits the selection part of the tooltip when nothing is selected", () => {
+  it("flags the tooltip as over-budget when total exceeds num_ctx", () => {
     const el = mountMeterDom();
     updateBudgetMeter({
-      systemChars: 6283,
+      systemChars: 80000,
       historyChars: 0,
       historyCount: 0,
-      graphChars: 8322,
-      userChars: 43,
+      graphChars: 0,
+      userChars: 0,
       numCtx: 16384,
       selection: { nodes: 0, edges: 0 },
     });
-    expect(el.title).not.toMatch(/sel:/);
+    expect(el.title).toMatch(/Over budget/i);
+    expect(el.title).toMatch(/breakdown/);
   });
 
   it("is a no-op when the meter element is absent", () => {

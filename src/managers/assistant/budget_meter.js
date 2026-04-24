@@ -77,20 +77,10 @@ export function updateBudgetMeter({systemChars, historyChars, historyCount, grap
   )
   el.classList.add(tierClass(b.ratio))
 
-  const nodesSel = selection?.nodes ?? 0
-  const edgesSel = selection?.edges ?? 0
-  const selPart = (nodesSel || edgesSel) ? ` (sel: ${nodesSel} node${nodesSel === 1 ? '' : 's'}, ${edgesSel} edge${edgesSel === 1 ? '' : 's'})` : ''
-
-  // Tooltip carries the full breakdown so the compact pill doesn't need to.
-  el.title =
-    `Context budget (tokens, approx):\n` +
-    `  system        ${b.system.toLocaleString()}\n` +
-    `  history       ${b.history.toLocaleString()} (${historyCount} msg${historyCount === 1 ? '' : 's'})\n` +
-    `  graph_state   ${b.graph.toLocaleString()}${selPart}\n` +
-    `  your input    ${b.user.toLocaleString()}\n` +
-    `  ─────────────────────\n` +
-    `  total         ${b.total.toLocaleString()} / ${b.numCtx.toLocaleString()} (${Math.round(b.ratio * 100)}%)\n\n` +
-    (b.overBudget
-      ? `Over budget — Ollama will drop tokens from the start of the prompt, likely derailing the reply.`
-      : `Reflects current selection + current input. Send to include in the next request.`)
+  // Tooltip: a single affordance line. The full breakdown now lives in the
+  // click-to-open details modal (budget_details_modal.js) so long tooltip
+  // dumps don't clutter the surface.
+  el.title = b.overBudget
+    ? 'Over budget — click for breakdown'
+    : 'Click for context-budget breakdown'
 }

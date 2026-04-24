@@ -189,7 +189,6 @@
         <button class="panel-header-btn" title="Close" onclick="cache.assistant.togglePanel()">×</button>
       </div>
     </div>
-    <div id="assistantStatusStrip"></div>
     <div id="assistantMessages"></div>
     <div id="assistantEmptyState">
       <div class="assistant-empty-state-title">Graph Lens Lite assistant</div>
@@ -206,10 +205,14 @@
     <div id="assistantInputRow">
       <textarea id="assistantInput" rows="3" placeholder="Ask about your graph..."></textarea>
       <div id="assistantInputSide">
-        <div id="assistantBudget" class="assistant-budget" role="status" aria-live="polite">
+        <button id="assistantStatusBadge" type="button" class="assistant-status-badge" onclick="cache.assistant.openSettings()" aria-label="Assistant status — click to open settings">
+          <span class="assistant-status-badge-dot" aria-hidden="true"></span>
+          <span class="assistant-status-badge-text">…</span>
+        </button>
+        <button id="assistantBudget" type="button" class="assistant-budget" onclick="cache.assistant.openBudgetDetails()" aria-label="Context budget — click for breakdown">
           <span class="assistant-budget-dot" aria-hidden="true"></span>
-          <span class="assistant-budget-text">— / —</span>
-        </div>
+          <span class="assistant-budget-text" role="status" aria-live="polite">— / —</span>
+        </button>
         <button id="assistantSendBtn" onclick="cache.assistant.sendOrStop()">Send</button>
       </div>
     </div>

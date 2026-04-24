@@ -103,7 +103,85 @@ export function renderMarkdown(text) {
     code.classList.add('assistant-inline-copy')
     code.setAttribute('title', 'Click to copy')
   }
+  decorateActionGlyphs(wrapper)
   return wrapper.innerHTML
+}
+
+// Parameterless GLL actions the assistant is allowed to reference as
+// clickable buttons. Keyed by the glyph the system prompt uses; each entry
+// carries the data-action tag the delegated click handler in index.js
+// dispatches on, and the ARIA/title label.
+export const ACTION_GLYPHS = Object.freeze({
+  '📝': {action: 'query-editor', label: 'Toggle query editor'},
+  '➰': {action: 'lasso', label: 'Toggle lasso selection'},
+  '📊': {action: 'metrics', label: 'Toggle metrics panel'},
+  '🎨': {action: 'style', label: 'Toggle styling panel'},
+  '🔢': {action: 'data-editor', label: 'Toggle data editor'},
+  '↩': {action: 'undo', label: 'Undo selection'},
+  '↪': {action: 'redo', label: 'Redo selection'},
+  '📷': {action: 'export-png', label: 'Export PNG'},
+  '💾': {action: 'export-json', label: 'Export JSON'},
+})
+
+// Swap recognized glyphs in rendered markdown for real buttons. We walk
+// text nodes (not the HTML string) so the match doesn't cross element
+// boundaries, skip anything already inside <pre>/<code>/<button>, and
+// tolerate the ️ emoji presentation selector that some models emit.
+function decorateActionGlyphs(wrapper) {
+  const glyphs = Object.keys(ACTION_GLYPHS)
+  if (!glyphs.length) return
+  const pattern = new RegExp('(' + glyphs.map(escapeRegex).join('|') + ')\\uFE0F?', 'gu')
+  const walker = wrapper.ownerDocument.createTreeWalker(wrapper, NodeFilter.SHOW_TEXT)
+  const targets = []
+  let node
+  while ((node = walker.nextNode())) {
+    if (node.parentElement?.closest('pre, code, button')) continue
+    pattern.lastIndex = 0
+    if (pattern.test(node.nodeValue)) targets.push(node)
+  }
+  for (const textNode of targets) {
+    const raw = textNode.nodeValue
+    const frag = textNode.ownerDocument.createDocumentFragment()
+    let lastIndex = 0
+    pattern.lastIndex = 0
+    let match
+    while ((match = pattern.exec(raw)) !== null) {
+      if (match.index > lastIndex) frag.appendChild(textNode.ownerDocument.createTextNode(raw.slice(lastIndex, match.index)))
+      const glyph = match[1]
+      const {action, label} = ACTION_GLYPHS[glyph]
+      const btn = textNode.ownerDocument.createElement('button')
+      btn.type = 'button'
+      btn.className = 'assistant-action-btn'
+      btn.dataset.action = action
+      btn.setAttribute('aria-label', label)
+      btn.setAttribute('title', label)
+      btn.textContent = glyph
+      frag.appendChild(btn)
+      lastIndex = match.index + match[0].length
+    }
+    if (lastIndex < raw.length) frag.appendChild(textNode.ownerDocument.createTextNode(raw.slice(lastIndex)))
+    textNode.parentNode.replaceChild(frag, textNode)
+  }
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Delegated click handler for the action buttons inserted above. The caller
+// provides a dispatch map that resolves data-action keys to the actual
+// cache.* methods (which live outside this module).
+export function handleActionClick(event, dispatch) {
+  const btn = event.target.closest('.assistant-action-btn')
+  if (!btn) return
+  const action = btn.dataset.action
+  const handler = dispatch?.[action]
+  if (typeof handler !== 'function') return
+  try {
+    handler()
+  } catch (err) {
+    console.error('[assistant] action failed', action, err)
+  }
 }
 
 const COPY_FEEDBACK_MS = 1200

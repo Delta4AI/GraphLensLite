@@ -4,6 +4,7 @@ import {buildContextSnapshot, serializeSnapshot} from './context.js'
 import {stripSentinelForDisplay, parseIntent, detectProtocolDrift} from './intent.js'
 import {generateQueries} from './query_generator.js'
 import {updateBudgetMeter, computeBudget} from './budget_meter.js'
+import {openBudgetDetailsModal} from './budget_details_modal.js'
 import {openBudgetModal} from './budget_modal.js'
 
 // Status log lines folded into graph_state.recentActions. Small and cheap
@@ -43,6 +44,7 @@ import {
   renderQueriesError,
   checkQueryWarnings,
   handleCopyClick,
+  handleActionClick,
 } from './ui.js'
 import {
   loadSettings,
@@ -82,8 +84,9 @@ class AssistantManager {
     // fully-valid entries are kept; errored ones are useless to the model.
     this._lastGeneratedQueries = []
     this._applySettings(loadSettings())
-    this._updateStatusStrip()
+    this._updateStatusBadge()
     this._wireCopyDelegation()
+    this._wireActionDelegation()
     this._wireBudgetMeter()
     this._refreshBudgetMeter()
   }
@@ -124,7 +127,10 @@ class AssistantManager {
     input.dataset.budgetWired = 'true'
   }
 
-  _refreshBudgetMeter() {
+  // Gather the char counts that feed both the live meter and the details
+  // modal. Extracted so the two surfaces share an input shape and can't
+  // drift out of sync.
+  _collectBudgetInputs() {
     const input = document.getElementById('assistantInput')
     const userChars = input?.value?.length ?? 0
 
@@ -144,7 +150,7 @@ class AssistantManager {
 
     const historyChars = this._history.reduce((n, m) => n + (m?.content?.length ?? 0), 0)
 
-    updateBudgetMeter({
+    return {
       systemChars: SYSTEM_PROMPT.length,
       historyChars,
       historyCount: this._history.length,
@@ -152,15 +158,32 @@ class AssistantManager {
       userChars,
       numCtx: this._settings.numCtx,
       selection: {nodes: nodesSel, edges: edgesSel},
-    })
+    }
+  }
+
+  _refreshBudgetMeter() {
+    const inputs = this._collectBudgetInputs()
+    updateBudgetMeter(inputs)
     // Empty-state chips: toggle the `has-selection` class so CSS can swap
     // "How do I select nodes?" for the selection-gated chips. This piggybacks
     // on the existing dirty-key poll — no separate observer needed.
     const empty = document.getElementById('assistantEmptyState')
-    if (empty) empty.classList.toggle('has-selection', (nodesSel + edgesSel) > 0)
+    const hasSelection = (inputs.selection.nodes + inputs.selection.edges) > 0
+    if (empty) empty.classList.toggle('has-selection', hasSelection)
     // Bookkeeping for the auto-refresh timer: any manual refresh implicitly
     // resets the baseline so the timer doesn't re-fire on this same change.
     this._budgetDirtyKey = this._computeBudgetDirtyKey()
+  }
+
+  openBudgetDetails() {
+    const inputs = this._collectBudgetInputs()
+    const budget = computeBudget(inputs)
+    openBudgetDetailsModal({
+      budget,
+      selectionInfo: inputs.selection,
+      historyCount: inputs.historyCount,
+      numCtx: inputs.numCtx,
+    })
   }
 
   _wireCopyDelegation() {
@@ -168,6 +191,32 @@ class AssistantManager {
     if (!container || container.dataset.copyWired === 'true') return
     container.addEventListener('click', handleCopyClick)
     container.dataset.copyWired = 'true'
+  }
+
+  // Dispatch map for assistant-action buttons injected by renderMarkdown.
+  // Keys must match the `data-action` values in ui.js ACTION_GLYPHS. Each
+  // value is a thunk that no-ops if the underlying cache module isn't ready
+  // yet — safer than crashing in the delegated click handler.
+  _actionDispatch() {
+    const c = this.cache
+    return {
+      'query-editor': () => c.ui?.toggleQueryEditor?.(),
+      'lasso': () => c.ui?.toggleLassoSelection?.(),
+      'metrics': () => c.metrics?.toggleUI?.(),
+      'style': () => c.ui?.toggleStylingPanel?.(),
+      'data-editor': () => c.ui?.toggleDataEditor?.(),
+      'undo': () => c.sm?.undoSelection?.(),
+      'redo': () => c.sm?.redoSelection?.(),
+      'export-png': () => c.io?.exportPNG?.(),
+      'export-json': () => c.io?.exportGraphAsJSON?.(),
+    }
+  }
+
+  _wireActionDelegation() {
+    const container = document.getElementById('assistantMessages')
+    if (!container || container.dataset.actionWired === 'true') return
+    container.addEventListener('click', (e) => handleActionClick(e, this._actionDispatch()))
+    container.dataset.actionWired = 'true'
   }
 
   togglePanel() {
@@ -667,7 +716,7 @@ class AssistantManager {
       onSave: (next) => {
         this._applySettings(next)
         saveSettings(next)
-        this._updateStatusStrip()
+        this._updateStatusBadge()
         // Budget meter depends on numCtx; refresh so the pill reflects the
         // new ceiling immediately rather than waiting for the next keystroke.
         this._refreshBudgetMeter()
@@ -685,22 +734,28 @@ class AssistantManager {
     })
   }
 
-  _updateStatusStrip() {
-    const el = document.getElementById('assistantStatusStrip')
-    if (!el) return
+  _updateStatusBadge() {
+    const badge = document.getElementById('assistantStatusBadge')
+    if (!badge) return
+    const textEl = badge.querySelector('.assistant-status-badge-text')
+    const setVariant = (variant) => {
+      badge.classList.remove('assistant-status-badge-ok', 'assistant-status-badge-warn', 'assistant-status-badge-muted')
+      badge.classList.add(`assistant-status-badge-${variant}`)
+    }
     if (!this._isConfigured()) {
-      el.textContent = 'Not configured — click ⚙ to set up'
-      el.title = 'Set the Ollama endpoint and model before sending a message.'
-      el.classList.add('assistant-status-warn')
+      if (textEl) textEl.textContent = 'Setup'
+      badge.title = 'Click to configure the Ollama endpoint and model'
+      setVariant('muted')
       return
     }
     const host = hostLabel(this._endpoint)
     const validation = validateEndpoint(this._endpoint)
-    el.textContent = `${host} · ${this._model}`
-    el.title = validation.ok && validation.isLocal
-      ? `Sending to ${host} (local) · model: ${this._model}`
-      : `Sending every message to ${host} — not a local address · model: ${this._model}`
-    el.classList.toggle('assistant-status-warn', !(validation.ok && validation.isLocal))
+    const isLocal = validation.ok && validation.isLocal
+    if (textEl) textEl.textContent = this._model
+    badge.title = isLocal
+      ? `${host} · ${this._model}`
+      : `Remote endpoint ${host} — not a local address · model: ${this._model}`
+    setVariant(isLocal ? 'ok' : 'warn')
   }
 }
 
