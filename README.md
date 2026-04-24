@@ -19,6 +19,14 @@ The assistant is split into a dedicated feature folder with one module per conce
 | `src/managers/assistant/context.js` | Read-only graph snapshot + 32 KB-capped JSON serializer |
 | `src/managers/assistant/ui.js` | Sanitized markdown render, bubble helpers, query-warning linter |
 | `src/managers/assistant/settings.js` | Load/save, endpoint validation, settings popup with async model probe |
+| `src/managers/assistant/intent.js` | `<<<QUERY_INTENT>>>` sentinel parser — detects and strips the query handoff block from streamed replies |
+| `src/managers/assistant/query_generator.js` | Second-phase structured-output call that turns an intent summary into a validated query AST |
+| `src/managers/assistant/query_schema.js` | JSON Schema + AST → GLL-query-string renderer used to constrain Ollama `format` output |
+| `src/managers/assistant/query_generator_prompt.md` | Few-shot prompt source for the query generator (hand-edited markdown) |
+| `src/managers/assistant/query_generator_prompt.js` | **Auto-generated** from `query_generator_prompt.md` by `npm run vendor-libs` |
+| `src/managers/assistant/budget_meter.js` | Compact `num_ctx` pill next to Send + the pure `computeBudget` estimator |
+| `src/managers/assistant/budget_modal.js` | Pre-send over-budget intercept modal with remediation choices |
+| `src/managers/assistant/budget_details_modal.js` | Read-only budget breakdown modal opened by clicking the budget pill |
 | `src/managers/assistant/system_prompt.md` | Prompt source of truth (hand-edited markdown) |
 | `src/managers/assistant/system_prompt.js` | **Auto-generated** from `system_prompt.md` by `npm run vendor-libs` |
 | `src/lib/marked.esm.js` | Vendored markdown parser (`marked`, pinned + hash-logged) |
@@ -26,6 +34,12 @@ The assistant is split into a dedicated feature folder with one module per conce
 | `tests/assistant-context.test.js` | Snapshot shape + truncation tests |
 | `tests/assistant-settings.test.js` | Endpoint validation + settings-popup behavior (jsdom) |
 | `tests/assistant-ui.test.js` | Sanitization + query-warning regex tests (jsdom) |
+| `tests/assistant-intent.test.js` | Sentinel-block detection + reply-text stripping tests |
+| `tests/assistant-query-generator.test.js` | Structured-output call wiring and retry-on-invalid-AST tests |
+| `tests/assistant-query-schema.test.js` | AST → query-string renderer + schema-validation tests |
+| `tests/assistant-budget-meter.test.js` | `computeBudget` math + pill-render behavior tests |
+| `tests/assistant-budget-modal.test.js` | Over-budget modal remediation flow tests |
+| `tests/assistant-budget-details-modal.test.js` | Read-only budget breakdown modal tests |
 | `ASSISTANT_QUESTIONS.md` | Example questions users can ask the assistant |
 
 ### Modified Files
@@ -37,7 +51,7 @@ The assistant is split into a dedicated feature folder with one module per conce
 | `src/graph/core.js` | Exposed graph state properties used by context snapshot |
 | `src/graph_lens_lite.html` | Added assistant sidebar panel, toggle button, host indicator, empty-state block |
 | `src/style.css` | Styled panel, chat bubbles, streaming/warming/aborted/error states, host indicator, Stop button, empty state |
-| `src/package/vendor_libs.js` | Also regenerates `system_prompt.js` from the `.md` and logs `sha256` for vendored libs |
+| `src/package/vendor_libs.js` | Also regenerates `system_prompt.js` and `query_generator_prompt.js` from their `.md` sources and logs `sha256` for vendored libs |
 
 ---
 
