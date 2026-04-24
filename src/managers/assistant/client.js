@@ -1,7 +1,11 @@
 class OllamaClient {
-  constructor(endpoint, model) {
+  constructor(endpoint, model, {numCtx = 16384} = {}) {
     this.endpoint = endpoint
     this.model = model
+    // Ollama's `num_ctx` default (2048) is far too small for graph snapshots;
+    // callers should pass the user-configured value. We keep 16384 as the
+    // fallback only so the zero-arg test/dev path doesn't break.
+    this.numCtx = numCtx
     this._abortController = null
     this._structuredAbortController = null
   }
@@ -36,13 +40,12 @@ class OllamaClient {
       // graph snapshot (~5–9k tokens on mid-size networks) gets truncated
       // server-side — the system prompt silently drops out of attention and
       // the model falls back to training-prior output (JSON filter objects,
-      // Cytoscape selectors, etc.). 16384 covers every realistic GLL graph
-      // with headroom for chat history.
+      // Cytoscape selectors, etc.). User-configurable — see settings.js.
       body: JSON.stringify({
         model: this.model,
         messages,
         stream: true,
-        options: {num_ctx: 16384},
+        options: {num_ctx: this.numCtx},
       }),
       signal: this._abortController.signal,
     })
@@ -102,7 +105,7 @@ class OllamaClient {
         format: schema,
         // See chat() — same rationale. The structured call carries the
         // graph snapshot too, so it needs the same headroom.
-        options: {temperature: 0, num_ctx: 16384},
+        options: {temperature: 0, num_ctx: this.numCtx},
       }),
       signal: mergedSignal,
     })

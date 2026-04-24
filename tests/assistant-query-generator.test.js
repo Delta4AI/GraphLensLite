@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { generateQueries } from "../src/managers/assistant/query_generator.js";
+import {
+  generateQueries,
+  extractPropertyTokens,
+  findUnknownProperties,
+} from "../src/managers/assistant/query_generator.js";
 
 function makeClient(responses) {
   const calls = [];
@@ -281,5 +285,180 @@ describe("generateQueries", () => {
     expect(call.messages[0].content).toMatch(/Query language/i);
     // Intent summary flows through into the user message.
     expect(call.messages[1].content).toMatch(/nodes with high score/);
+  });
+});
+
+describe("extractPropertyTokens", () => {
+  it("finds every Node filters / Edge filters Section::Sub::Name token", () => {
+    const text = "(Node filters::Biology::mechanism IN [angiogenesis]) AND (Edge filters::Interaction::Score BETWEEN 0.5 AND 1)";
+    const tokens = extractPropertyTokens(text);
+    expect(tokens.map(t => t.full)).toEqual([
+      "Node filters::Biology::mechanism",
+      "Edge filters::Interaction::Score",
+    ]);
+    expect(tokens[0]).toMatchObject({ section: "Node filters", sub: "Biology", name: "mechanism" });
+  });
+
+  it("deduplicates repeated tokens", () => {
+    const text = "(Node filters::M::a IN [x]) OR (Node filters::M::a IN [y])";
+    expect(extractPropertyTokens(text)).toHaveLength(1);
+  });
+
+  it("does not match anything else that happens to contain :: — prefix is locked", () => {
+    const text = "Some::Bare::Thing and Other::Thing::Here are not filters";
+    expect(extractPropertyTokens(text)).toHaveLength(0);
+  });
+
+  it("handles empty / nullish input", () => {
+    expect(extractPropertyTokens("")).toEqual([]);
+    expect(extractPropertyTokens(null)).toEqual([]);
+    expect(extractPropertyTokens(undefined)).toEqual([]);
+  });
+});
+
+describe("findUnknownProperties", () => {
+  const hierarchy = {
+    "Node filters": {
+      M: { a: { type: "categorical" }, b: { type: "numeric" } },
+      Lit: { CAKUT: { type: "numeric" } },
+    },
+    "Edge filters": {
+      Interaction: { Score: { type: "numeric" } },
+    },
+  };
+
+  it("returns nothing when every token is in the hierarchy", () => {
+    const text = "(Node filters::M::a IN [x]) AND (Edge filters::Interaction::Score BETWEEN 0 AND 1)";
+    expect(findUnknownProperties(text, hierarchy)).toEqual([]);
+  });
+
+  it("flags each token that isn't in the hierarchy", () => {
+    const text = "(Node filters::Biology::mechanism IN [ang]) AND (Node filters::Metrics::score BETWEEN 0.62 AND 0.89)";
+    const unknown = findUnknownProperties(text, hierarchy);
+    expect(unknown).toEqual([
+      "Node filters::Biology::mechanism",
+      "Node filters::Metrics::score",
+    ]);
+  });
+
+  it("returns empty when hierarchy is missing — validation disabled", () => {
+    const text = "(Node filters::Biology::mechanism IN [ang])";
+    expect(findUnknownProperties(text, null)).toEqual([]);
+    expect(findUnknownProperties(text, undefined)).toEqual([]);
+  });
+});
+
+describe("generateQueries hierarchy validation", () => {
+  const graphJson = JSON.stringify({
+    properties: {
+      hierarchy: {
+        "Node filters": {
+          M: { a: { type: "categorical" } },
+        },
+      },
+    },
+  });
+
+  it("errors entries that reference properties outside the hierarchy", async () => {
+    const phantomResponse = {
+      queries: [
+        {
+          title: "Phantom",
+          expr: {
+            kind: "condition",
+            field: "Node filters::Biology::mechanism",
+            op: "IN",
+            values: ["angiogenesis"],
+          },
+        },
+      ],
+    };
+    // Retry stays phantom so we observe the error surfacing.
+    const client = makeClient([phantomResponse, phantomResponse]);
+
+    const out = await generateQueries({
+      client,
+      graphJson,
+      userQuestion: "describe selection",
+      intent: { summary: "describe selection", scope: "node" },
+    });
+
+    expect(out).toHaveLength(1);
+    expect(out[0].text).toBeNull();
+    expect(out[0].error).toMatch(/referenced unknown property/);
+    expect(out[0].error).toMatch(/Node filters::Biology::mechanism/);
+    // Validator error stays terse — the user-facing copy is built by the
+    // UI layer from this fact. Policy advisories are not mixed in here.
+    expect(out[0].error).not.toMatch(/graph_state\.properties/);
+  });
+
+  it("sends a targeted repair hint when unknown properties are detected", async () => {
+    const phantomResponse = {
+      queries: [
+        {
+          title: "Phantom",
+          expr: {
+            kind: "condition",
+            field: "Node filters::Biology::mechanism",
+            op: "IN",
+            values: ["x"],
+          },
+        },
+      ],
+    };
+    const cleanResponse = {
+      queries: [
+        {
+          title: "Clean",
+          expr: {
+            kind: "condition",
+            field: "Node filters::M::a",
+            op: "IN",
+            values: ["x"],
+          },
+        },
+      ],
+    };
+    const client = makeClient([phantomResponse, cleanResponse]);
+
+    const out = await generateQueries({
+      client,
+      graphJson,
+      userQuestion: "describe selection",
+      intent: { summary: "describe selection", scope: "node" },
+    });
+
+    expect(client.calls).toHaveLength(2);
+    const repairCall = client.calls[1].messages[1].content;
+    expect(repairCall).toMatch(/repair_hint/);
+    expect(repairCall).toMatch(/referenced unknown property/);
+    expect(repairCall).toMatch(/REMINDER/);
+    expect(out[0].text).toBe("(Node filters::M::a IN [x])");
+  });
+
+  it("lets queries through untouched when the graph_state has no hierarchy yet", async () => {
+    const phantomResponse = {
+      queries: [
+        {
+          title: "Unverified",
+          expr: {
+            kind: "condition",
+            field: "Node filters::Whatever::field",
+            op: "IN",
+            values: ["x"],
+          },
+        },
+      ],
+    };
+    const client = makeClient([phantomResponse]);
+    const out = await generateQueries({
+      client,
+      graphJson: '{"no":"hierarchy"}',
+      userQuestion: "q",
+      intent: { summary: "q", scope: "node" },
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].text).toBe("(Node filters::Whatever::field IN [x])");
+    expect(out[0].error).toBeUndefined();
   });
 });

@@ -1,18 +1,30 @@
 // Builds a read-only snapshot of the current app state for the AI assistant.
 // Contains no DOM writes; only reads from `cache` and one scoped DOM text query
 // for the status log.
+//
+// Payload sizing is the caller's responsibility: pass `maxStatusLogLines`
+// into buildContextSnapshot and `maxChars` into serializeSnapshot. The hard
+// ceilings that used to live here (MAX_CONTEXT_NODES, MAX_SNAPSHOT_CHARS,
+// SELECTION_DETAILS_BUDGET_CHARS) have moved into user-configurable settings
+// or been removed entirely — the one exception is MAX_CATEGORY_VALUES_PER_PROP
+// below, which is a structural defense against a single property with
+// thousands of distinct categorical values ballooning the hierarchy dump.
 
-const MAX_SNAPSHOT_CHARS = 32000
 // Category cap per property — a single categorical field with thousands of
 // distinct values would blow the snapshot budget. 50 is enough to anchor the
 // model on the naming convention without shipping an encyclopedia.
 const MAX_CATEGORY_VALUES_PER_PROP = 50
-// Safety cap on total chars devoted to the selection sample's per-element
-// property dump. With a wide schema (50+ properties per element) a 25-node
-// sample could otherwise swell well past 20 kB. Early entries keep their
-// full property set; later entries drop properties and/or get dropped
-// entirely once the budget is spent.
-const SELECTION_DETAILS_BUDGET_CHARS = 6000
+
+// cache.selectedNodes / selectedEdges are *documented* as Sets but a number
+// of code paths (undo/redo, metrics "add to selection", reselect-after-graph-
+// update) replace them with plain Arrays. Reading `.size` on an Array yields
+// undefined, which silently dropped selection counts out of graph_state.
+function sizeOf(container) {
+  if (!container) return 0
+  if (typeof container.size === 'number') return container.size
+  if (typeof container.length === 'number') return container.length
+  return 0
+}
 
 // Flatten the element's nested D4Data property store into a flat
 // Section::Sub::Prop → value map, dropping empty/null values so the assistant
@@ -34,25 +46,15 @@ function flattenElementProperties(element) {
   return out
 }
 
-// Attach per-element property dumps to the selection samples with a shared
-// char budget so a wide schema cannot blow up the snapshot. Entries past
-// the budget keep their identity (id, label, endpoints) but lose the
-// property dump, and a `truncated: true` flag lands on each dropped entry
-// so the model knows it's working with an incomplete sample.
-function decorateSelectionWithProperties(sample, refMap, budget) {
-  let used = 0
+// Attach per-element property dumps to each selection sample entry. There
+// is no budget — the serializeSnapshot() caller is the single point where
+// the final payload gets sliced if it's oversize.
+function decorateSelectionWithProperties(sample, refMap) {
   for (const entry of sample) {
     const element = refMap.get(entry.id)
     if (!element) continue
     const props = flattenElementProperties(element)
-    if (!Object.keys(props).length) continue
-    const cost = JSON.stringify(props).length
-    if (used + cost > budget) {
-      entry.truncated = true
-      continue
-    }
-    entry.properties = props
-    used += cost
+    if (Object.keys(props).length) entry.properties = props
   }
   return sample
 }
@@ -97,31 +99,42 @@ function describeProperty(filterDefaults, propID) {
   }
 }
 
-export function buildContextSnapshot(cache, {readActions = readRecentActions} = {}) {
+export function buildContextSnapshot(cache, {
+  readActions = readRecentActions,
+  maxStatusLogLines = 20,
+  minimalSelection = false,
+} = {}) {
   if (!cache.initialized) return {state: 'no graph loaded'}
 
-  const cfg = cache.CFG.ASSISTANT
   const layout = cache.data.layouts?.[cache.data.selectedLayout]
   const filterDefaults = cache.data?.filterDefaults
 
-  const selectedNodeSample = [...cache.selectedNodes].slice(0, cfg.MAX_CONTEXT_NODES).map(id => {
-    const n = cache.nodeRef.get(id)
-    return {id, label: n?.label ?? null}
-  })
-  const selectedEdgeSample = [...cache.selectedEdges].slice(0, cfg.MAX_CONTEXT_NODES).map(id => {
-    const e = cache.edgeRef.get(id)
-    return {id, label: e?.label ?? null, source: e?.source, target: e?.target}
-  })
-  // Attach per-element property values so the assistant can reason about
-  // what's actually in the current selection, not just node IDs. Nodes and
-  // edges share a single char budget — nodes get first pick because they
-  // carry more interesting property content in typical GLL graphs.
-  decorateSelectionWithProperties(selectedNodeSample, cache.nodeRef, SELECTION_DETAILS_BUDGET_CHARS)
-  const nodeBytes = selectedNodeSample.reduce(
-    (n, s) => n + (s.properties ? JSON.stringify(s.properties).length : 0),
-    0,
-  )
-  decorateSelectionWithProperties(selectedEdgeSample, cache.edgeRef, Math.max(0, SELECTION_DETAILS_BUDGET_CHARS - nodeBytes))
+  const totalSelectedNodes = sizeOf(cache.selectedNodes)
+  const totalSelectedEdges = sizeOf(cache.selectedEdges)
+
+  // minimalSelection: drop the per-element samples entirely. counts +
+  // properties.hierarchy still flow through, so the model knows totals and
+  // what fields exist, but cannot enumerate individual elements. Used by
+  // the over-budget modal as a one-shot token-reduction option.
+  let selectedNodeSample
+  let selectedEdgeSample
+  if (minimalSelection) {
+    selectedNodeSample = []
+    selectedEdgeSample = []
+  } else {
+    selectedNodeSample = [...cache.selectedNodes].map(id => {
+      const n = cache.nodeRef.get(id)
+      return {id, label: n?.label ?? null}
+    })
+    selectedEdgeSample = [...cache.selectedEdges].map(id => {
+      const e = cache.edgeRef.get(id)
+      return {id, label: e?.label ?? null, source: e?.source, target: e?.target}
+    })
+    // Attach per-element property values so the assistant can reason about
+    // what's actually in the current selection, not just IDs.
+    decorateSelectionWithProperties(selectedNodeSample, cache.nodeRef)
+    decorateSelectionWithProperties(selectedEdgeSample, cache.edgeRef)
+  }
 
   const activeFilters = []
   if (layout?.filters) {
@@ -159,15 +172,21 @@ export function buildContextSnapshot(cache, {readActions = readRecentActions} = 
       hasCustomQuery: !!(layout?.query),
     },
     counts: {
-      totalNodes: cache.nodeRef?.size ?? 0,
-      totalEdges: cache.edgeRef?.size ?? 0,
-      visibleNodes: cache.nodeIDsToBeShown.size,
-      visibleEdges: cache.edgeIDsToBeShown.size,
-      selectedNodes: cache.selectedNodes.size,
-      selectedEdges: cache.selectedEdges.size,
-      hiddenDangling: cache.hiddenDanglingNodeIDs.size,
+      totalNodes: sizeOf(cache.nodeRef),
+      totalEdges: sizeOf(cache.edgeRef),
+      visibleNodes: sizeOf(cache.nodeIDsToBeShown),
+      visibleEdges: sizeOf(cache.edgeIDsToBeShown),
+      selectedNodes: totalSelectedNodes,
+      selectedEdges: totalSelectedEdges,
+      hiddenDangling: sizeOf(cache.hiddenDanglingNodeIDs),
     },
-    selection: {nodes: selectedNodeSample, edges: selectedEdgeSample},
+    selection: minimalSelection
+      ? {
+          note: 'selection samples omitted to fit context budget — counts.selectedNodes / selectedEdges still reflect the real totals',
+          nodesOmitted: totalSelectedNodes,
+          edgesOmitted: totalSelectedEdges,
+        }
+      : {nodes: selectedNodeSample, edges: selectedEdgeSample},
     filters: {
       activeFilterProps: activeFilters,
       query: {text: cache.query.text, valid: cache.query.valid},
@@ -178,14 +197,14 @@ export function buildContextSnapshot(cache, {readActions = readRecentActions} = 
       selected: cache.metrics?.selected ?? null,
       cached: cache.metrics?.metricValueCache ? [...cache.metrics.metricValueCache.keys()] : [],
     },
-    recentActions: readActions(cfg.MAX_STATUS_LOG_LINES),
+    recentActions: readActions(maxStatusLogLines),
   }
 }
 
-// Serializes the snapshot and enforces a hard character ceiling so a huge
-// graph cannot produce a multi-MB payload on every turn.
-export function serializeSnapshot(snapshot, maxChars = MAX_SNAPSHOT_CHARS) {
-  const json = JSON.stringify(snapshot, null, 2)
-  if (json.length <= maxChars) return json
-  return json.slice(0, maxChars) + `\n…[truncated: snapshot exceeded ${maxChars} chars]`
+// Serializes the snapshot to JSON. No trimming or truncation — the
+// over-budget modal in AssistantManager is now the single policy layer for
+// "this payload is too big". Callers that want a shrunken payload rebuild
+// the snapshot with `minimalSelection: true`.
+export function serializeSnapshot(snapshot) {
+  return JSON.stringify(snapshot, null, 2)
 }

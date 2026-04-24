@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
   renderMarkdown,
+  ensureTableSeparators,
   checkQueryWarnings,
   appendBubble,
   appendStreamingBubble,
@@ -9,6 +10,7 @@ import {
   appendQueriesPanel,
   renderQueriesIntoPanel,
   renderQueriesError,
+  formatInvalidQueryError,
 } from "../src/managers/assistant/ui.js";
 
 describe("renderMarkdown", () => {
@@ -270,5 +272,88 @@ describe("suggested queries panel", () => {
     expect(panel.querySelector(".assistant-queries-placeholder")).toBeNull();
     expect(panel.querySelector(".assistant-queries-error").textContent)
       .toBe("Backend unreachable.");
+  });
+});
+
+describe("formatInvalidQueryError", () => {
+  it("singular hallucinated property — names it and points to the sidebar", () => {
+    const out = formatInvalidQueryError("referenced unknown property: Node filters::Biology::mechanism");
+    expect(out).toMatch(/invented a property name/i);
+    expect(out).toMatch(/Node filters::Biology::mechanism/);
+    expect(out).toMatch(/sidebar|Query Editor/);
+    // Does not leak model-facing policy jargon.
+    expect(out).not.toMatch(/graph_state\.properties/);
+  });
+
+  it("plural hallucinated properties — pluralises noun and keeps all names", () => {
+    const out = formatInvalidQueryError(
+      "referenced unknown properties: Node filters::Biology::mechanism, Node filters::Metrics::score"
+    );
+    expect(out).toMatch(/invented property names/i);
+    expect(out).toMatch(/Node filters::Biology::mechanism/);
+    expect(out).toMatch(/Node filters::Metrics::score/);
+  });
+
+  it("non-hallucination errors fall back to a friendly wrapper that keeps the fact", () => {
+    const out = formatInvalidQueryError("cross-scope AND is forbidden (returns zero results)");
+    expect(out).toMatch(/Couldn’t generate a valid query/);
+    expect(out).toMatch(/cross-scope AND is forbidden/);
+    expect(out).toMatch(/rephrasing/);
+  });
+
+  it("empty / missing error yields a generic but actionable message", () => {
+    for (const v of [null, undefined, "", "   "]) {
+      const out = formatInvalidQueryError(v);
+      expect(out).toMatch(/Couldn’t generate a valid query/);
+      expect(out).toMatch(/rephrasing/);
+    }
+  });
+});
+
+describe("ensureTableSeparators", () => {
+  it("inserts a separator row when the model forgot it", () => {
+    const input = [
+      "| Node | Score |",
+      "| IL6 | 350 |",
+      "| PAX2 | 25 |",
+    ].join("\n");
+    const out = ensureTableSeparators(input);
+    const lines = out.split("\n");
+    expect(lines[0]).toBe("| Node | Score |");
+    expect(lines[1]).toMatch(/^\|\s*-{3,}\s*\|\s*-{3,}\s*\|$/);
+    expect(lines[2]).toBe("| IL6 | 350 |");
+  });
+
+  it("leaves well-formed tables untouched", () => {
+    const input = [
+      "| Node | Score |",
+      "| ---- | ----- |",
+      "| IL6  | 350   |",
+    ].join("\n");
+    expect(ensureTableSeparators(input)).toBe(input);
+  });
+
+  it("end-to-end: missing-separator tables render as <table> after patch", () => {
+    const html = renderMarkdown("| Node | Score |\n| IL6 | 350 |\n| PAX2 | 25 |");
+    expect(html).toMatch(/<table/i);
+    expect(html).toMatch(/<th[^>]*>\s*Node\s*<\/th>/i);
+    expect(html).toMatch(/<td[^>]*>\s*IL6\s*<\/td>/i);
+  });
+
+  it("doesn't inject a separator into prose that happens to contain pipes", () => {
+    const input = "Use `a | b` to denote alternatives.\nNext sentence here.";
+    expect(ensureTableSeparators(input)).toBe(input);
+  });
+
+  it("handles a single blank line between header and body", () => {
+    const input = "| Node | Score |\n\n| IL6 | 350 |";
+    const out = ensureTableSeparators(input);
+    expect(out.split("\n").some(l => /^\|\s*-{3,}\s*\|\s*-{3,}\s*\|$/.test(l))).toBe(true);
+  });
+
+  it("is a no-op for empty or nullish input", () => {
+    expect(ensureTableSeparators("")).toBe("");
+    expect(ensureTableSeparators(null)).toBe(null);
+    expect(ensureTableSeparators(undefined)).toBe(undefined);
   });
 });

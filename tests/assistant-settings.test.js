@@ -1,6 +1,15 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
-import { validateEndpoint, hostLabel, openSettingsPopup } from "../src/managers/assistant/settings.js";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  validateEndpoint,
+  hostLabel,
+  isConfigured,
+  loadSettings,
+  saveSettings,
+  SETTINGS_KEY,
+  DEFAULTS,
+  openSettingsPopup,
+} from "../src/managers/assistant/settings.js";
 
 describe("validateEndpoint", () => {
   it("accepts http URLs and flags localhost as local", () => {
@@ -54,143 +63,296 @@ describe("hostLabel", () => {
   });
 });
 
+describe("isConfigured", () => {
+  it("is false when endpoint or model is empty", () => {
+    expect(isConfigured({ endpoint: "", model: "" })).toBe(false);
+    expect(isConfigured({ endpoint: "http://localhost:11434", model: "" })).toBe(false);
+    expect(isConfigured({ endpoint: "", model: "llama3" })).toBe(false);
+  });
+
+  it("is false when endpoint is not a valid http(s) URL", () => {
+    expect(isConfigured({ endpoint: "not a url", model: "llama3" })).toBe(false);
+    expect(isConfigured({ endpoint: "file:///x", model: "llama3" })).toBe(false);
+  });
+
+  it("is true when both are present and endpoint is a valid URL", () => {
+    expect(isConfigured({ endpoint: "http://localhost:11434", model: "llama3" })).toBe(true);
+  });
+});
+
+describe("loadSettings / saveSettings", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("returns the DEFAULTS object when nothing is stored", () => {
+    expect(loadSettings()).toEqual({ ...DEFAULTS });
+  });
+
+  it("round-trips endpoint/model/numCtx through localStorage", () => {
+    saveSettings({
+      endpoint: "http://example.com",
+      model: "llama3",
+      numCtx: 8192,
+    });
+    expect(loadSettings()).toEqual({
+      endpoint: "http://example.com",
+      model: "llama3",
+      numCtx: 8192,
+    });
+  });
+
+  it("ignores malformed JSON and returns the DEFAULTS object", () => {
+    localStorage.setItem(SETTINGS_KEY, "{not-json");
+    expect(loadSettings()).toEqual({ ...DEFAULTS });
+  });
+
+  it("drops legacy fields like maxSnapshotChars silently", () => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      endpoint: "http://example.com",
+      model: "llama3",
+      numCtx: 4096,
+      maxSnapshotChars: 9999,
+      maxHistoryMessages: 50,
+      maxStatusLogLines: 99,
+    }));
+    const s = loadSettings();
+    expect(s).toEqual({ endpoint: "http://example.com", model: "llama3", numCtx: 4096 });
+    expect(s.maxSnapshotChars).toBeUndefined();
+    expect(s.maxHistoryMessages).toBeUndefined();
+    expect(s.maxStatusLogLines).toBeUndefined();
+  });
+
+  it("falls back to defaults for missing or invalid numCtx", () => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      endpoint: "http://example.com",
+      model: "llama3",
+      numCtx: "not a number",
+    }));
+    const s = loadSettings();
+    expect(s.numCtx).toBe(DEFAULTS.numCtx);
+  });
+
+  it("coerces a stringified positive integer for numCtx on save", () => {
+    saveSettings({
+      endpoint: "http://example.com",
+      model: "llama3",
+      numCtx: "4096",
+    });
+    expect(loadSettings().numCtx).toBe(4096);
+  });
+});
+
 describe("openSettingsPopup", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    localStorage.clear();
+  });
+
   function findButton(label) {
     return [...document.querySelectorAll("button")].find(b => b.textContent === label);
   }
-
-  function findEndpointInput() {
-    return [...document.querySelectorAll("input[type=text]")][0];
+  function saveButton() {
+    // Works in both 'setup' and 'edit' modes.
+    return findButton("Finish setup") || findButton("Save");
   }
-
-  function findEndpointHint() {
-    return document.querySelector("small");
+  function endpointInput() {
+    return document.querySelectorAll("input[type=text]")[0];
   }
-
+  function modelInput() {
+    return document.querySelectorAll("input[type=text]")[1];
+  }
+  function statusEl() {
+    return document.querySelector(".assistant-settings-status");
+  }
+  function listbox() {
+    return document.querySelector("select");
+  }
   async function flush() {
     await new Promise(r => setTimeout(r, 0));
   }
 
-  function openFreshPopup(probe, { onSave = vi.fn(), onCancel = vi.fn() } = {}) {
-    document.body.innerHTML = "";
-    openSettingsPopup({
-      endpoint: "http://localhost:11434",
-      model: "llama3",
-      probe,
-      onSave,
-      onCancel,
-    });
+  function open({ endpoint = "http://localhost:11434", model = "llama3", mode = "edit", probe, onSave = vi.fn(), onCancel = vi.fn() } = {}) {
+    openSettingsPopup({ endpoint, model, mode, probe, onSave, onCancel });
     return { onSave, onCancel };
   }
 
-  it("renders immediately even when probe is pending", () => {
+  it("renders immediately even when the initial probe is pending", () => {
     const probe = vi.fn(() => new Promise(() => {})); // never resolves
-    openFreshPopup(probe);
-    // Save / Cancel are reachable synchronously — the modal didn't block.
-    expect(findButton("Save")).toBeTruthy();
+    open({ probe });
+    expect(saveButton()).toBeTruthy();
     expect(findButton("Cancel")).toBeTruthy();
-    // Filter input + scrollable listbox with size > 1; hint shows loading state.
-    const filterInput = [...document.querySelectorAll("input[type=text]")][1];
-    expect(filterInput).toBeTruthy();
-    const listbox = document.querySelector("select");
-    expect(listbox.size).toBeGreaterThan(1);
-    const hints = [...document.querySelectorAll('small')].map(s => s.textContent);
-    expect(hints).toContain('Loading models…');
+    expect(findButton("Verify")).toBeTruthy();
+    expect(listbox()).toBeTruthy();
+    // Save is disabled until we have both a green verification AND a model.
+    expect(saveButton().disabled).toBe(true);
   });
 
-  it("calls onSave with normalized endpoint when probe succeeds", async () => {
+  it("unlocks model picker and enables Save after a successful initial probe", async () => {
     const probe = vi.fn(async () => ({ ok: true, models: ["llama3", "qwen"] }));
-    const { onSave } = openFreshPopup(probe);
+    open({ probe });
     await flush();
 
-    findButton("Save").click();
+    expect(statusEl().dataset.kind).toBe("ok");
+    expect(statusEl().textContent).toMatch(/Connected to localhost:11434/);
+    expect(modelInput().disabled).toBe(false);
+    expect(listbox().disabled).toBe(false);
+    const values = [...listbox().options].map(o => o.value);
+    expect(values).toEqual(["llama3", "qwen"]);
+    // Pre-filled model + green probe → Save is ready.
+    expect(saveButton().disabled).toBe(false);
+  });
+
+  it("shows error state and keeps model picker disabled when initial probe fails", async () => {
+    const probe = vi.fn(async () => ({ ok: false, error: "refused" }));
+    open({ probe });
+    await flush();
+
+    expect(statusEl().dataset.kind).toBe("error");
+    expect(statusEl().textContent).toMatch(/Cannot reach/);
+    expect(statusEl().textContent).toMatch(/refused/);
+    expect(modelInput().disabled).toBe(true);
+    expect(listbox().disabled).toBe(true);
+    expect(saveButton().disabled).toBe(true);
+  });
+
+  it("onSave receives the normalized endpoint, model, and default numCtx when untouched", async () => {
+    const probe = vi.fn(async () => ({ ok: true, models: ["llama3"] }));
+    const { onSave } = open({ endpoint: "http://localhost:11434/", probe });
+    await flush();
+
+    saveButton().click();
+    await flush();
+
+    expect(onSave).toHaveBeenCalledWith({
+      endpoint: "http://localhost:11434",
+      model: "llama3",
+      numCtx: DEFAULTS.numCtx,
+    });
+  });
+
+  it("onSave carries an edited numCtx", async () => {
+    const probe = vi.fn(async () => ({ ok: true, models: ["llama3"] }));
+    const { onSave } = open({ probe });
+    await flush();
+
+    const numInputs = [...document.querySelectorAll('input[type="number"]')];
+    expect(numInputs).toHaveLength(1);
+    numInputs[0].value = "8192";
+
+    saveButton().click();
     await flush();
 
     expect(onSave).toHaveBeenCalledTimes(1);
-    expect(onSave).toHaveBeenCalledWith({ endpoint: "http://localhost:11434", model: "llama3" });
+    expect(onSave.mock.calls[0][0].numCtx).toBe(8192);
   });
 
-  it("keeps modal open and shows inline error when probe fails on save", async () => {
-    // First probe (initial population) succeeds; Save-time probe fails.
+  it("onSave silently normalises an invalid numCtx back to the default", async () => {
+    const probe = vi.fn(async () => ({ ok: true, models: ["llama3"] }));
+    const { onSave } = open({ probe });
+    await flush();
+
+    const numInputs = [...document.querySelectorAll('input[type="number"]')];
+    numInputs[0].value = "-5";
+
+    saveButton().click();
+    await flush();
+
+    expect(onSave.mock.calls[0][0].numCtx).toBe(DEFAULTS.numCtx);
+  });
+
+  it("editing the URL invalidates the verification and disables Save", async () => {
+    const probe = vi.fn(async () => ({ ok: true, models: ["llama3"] }));
+    open({ probe });
+    await flush();
+    expect(saveButton().disabled).toBe(false);
+
+    endpointInput().value = "http://other:1234";
+    endpointInput().dispatchEvent(new Event("input"));
+
+    expect(saveButton().disabled).toBe(true);
+    expect(modelInput().disabled).toBe(true);
+  });
+
+  it("explicit Verify click re-probes and re-enables the model picker on success", async () => {
     const probe = vi.fn()
-      .mockResolvedValueOnce({ ok: true, models: ["llama3"] })
-      .mockResolvedValueOnce({ ok: false, error: "timed out" });
-    const { onSave } = openFreshPopup(probe);
+      .mockResolvedValueOnce({ ok: false, error: "refused" })
+      .mockResolvedValueOnce({ ok: true, models: ["llama3"] });
+    open({ probe });
+    await flush();
+    expect(modelInput().disabled).toBe(true);
+
+    findButton("Verify").click();
     await flush();
 
-    findButton("Save").click();
-    await flush();
-
-    expect(onSave).not.toHaveBeenCalled();
-    expect(findEndpointHint().textContent).toMatch(/Cannot reach/);
-    expect(findEndpointHint().textContent).toMatch(/timed out/);
-    // Save button is restored so the user can retry after editing.
-    expect(findButton("Save").disabled).toBe(false);
+    expect(modelInput().disabled).toBe(false);
+    expect(statusEl().dataset.kind).toBe("ok");
   });
 
-  it("rejects garbage URLs without calling probe", async () => {
+  it("flags a syntactically invalid URL without calling probe", async () => {
     const probe = vi.fn(async () => ({ ok: true, models: [] }));
-    const { onSave } = openFreshPopup(probe);
+    open({ probe });
     await flush();
-
-    findEndpointInput().value = "not a url";
-    // Reset the call counter so we only observe the Save-time calls.
     probe.mockClear();
-    findButton("Save").click();
+
+    endpointInput().value = "not a url";
+    endpointInput().dispatchEvent(new Event("input"));
+    findButton("Verify").click();
     await flush();
 
     expect(probe).not.toHaveBeenCalled();
-    expect(onSave).not.toHaveBeenCalled();
-    expect(findEndpointHint().textContent).toMatch(/valid URL/);
+    expect(statusEl().dataset.kind).toBe("error");
+    expect(statusEl().textContent).toMatch(/valid URL/);
+    expect(saveButton().disabled).toBe(true);
   });
 
-  it("shows 'unreachable' hint and empty listbox when initial probe fails", async () => {
-    const probe = vi.fn(async () => ({ ok: false, error: "refused" }));
-    openFreshPopup(probe);
-    await flush();
-
-    const listbox = document.querySelector("select");
-    expect(listbox.options.length).toBe(0);
-    const hints = [...document.querySelectorAll('small')].map(s => s.textContent);
-    expect(hints.some(t => /unreachable/i.test(t))).toBe(true);
-  });
-
-  it("populates the listbox from successful probe", async () => {
-    const probe = vi.fn(async () => ({ ok: true, models: ["llama3", "qwen", "mistral"] }));
-    openFreshPopup(probe);
-    await flush();
-
-    const listbox = document.querySelector("select");
-    const values = [...listbox.options].map(o => o.value);
-    expect(values).toEqual(["llama3", "qwen", "mistral"]);
-    const hints = [...document.querySelectorAll('small')].map(s => s.textContent);
-    expect(hints.some(t => /3 models available/.test(t))).toBe(true);
-  });
-
-  it("filters the listbox as the user types in the input", async () => {
+  it("filters the listbox as the user types in the model input", async () => {
     const probe = vi.fn(async () => ({ ok: true, models: ["llama3", "qwen", "llama-guard"] }));
-    openFreshPopup(probe);
+    open({ probe });
     await flush();
 
-    const filterInput = [...document.querySelectorAll("input[type=text]")][1];
-    filterInput.value = "llama";
-    filterInput.dispatchEvent(new Event("input"));
+    modelInput().value = "llama";
+    modelInput().dispatchEvent(new Event("input"));
 
-    const listbox = document.querySelector("select");
-    const values = [...listbox.options].map(o => o.value);
+    const values = [...listbox().options].map(o => o.value);
     expect(values).toEqual(["llama3", "llama-guard"]);
   });
 
-  it("copies listbox selection into the input on change", async () => {
+  it("copies listbox selection into the model input on change", async () => {
     const probe = vi.fn(async () => ({ ok: true, models: ["llama3", "qwen"] }));
-    openFreshPopup(probe);
+    open({ probe });
     await flush();
 
-    const listbox = document.querySelector("select");
-    listbox.value = "qwen";
-    listbox.dispatchEvent(new Event("change"));
+    listbox().value = "qwen";
+    listbox().dispatchEvent(new Event("change"));
 
-    const filterInput = [...document.querySelectorAll("input[type=text]")][1];
-    expect(filterInput.value).toBe("qwen");
+    expect(modelInput().value).toBe("qwen");
+    expect(saveButton().disabled).toBe(false);
+  });
+
+  it("setup mode shows intro copy and a distinct primary label", async () => {
+    const probe = vi.fn(() => new Promise(() => {}));
+    open({ endpoint: "", model: "", mode: "setup", probe });
+    expect(document.querySelector(".assistant-settings-intro")).toBeTruthy();
+    expect(findButton("Finish setup")).toBeTruthy();
+    expect(findButton("Save")).toBeFalsy();
+  });
+
+  it("edit mode has no intro copy and uses the default Save label", async () => {
+    const probe = vi.fn(() => new Promise(() => {}));
+    open({ mode: "edit", probe });
+    expect(document.querySelector(".assistant-settings-intro")).toBeFalsy();
+    expect(findButton("Save")).toBeTruthy();
+    expect(findButton("Finish setup")).toBeFalsy();
+  });
+
+  it("Cancel invokes onCancel and does not call onSave", async () => {
+    const probe = vi.fn(async () => ({ ok: true, models: ["llama3"] }));
+    const { onSave, onCancel } = open({ probe });
+    await flush();
+
+    findButton("Cancel").click();
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

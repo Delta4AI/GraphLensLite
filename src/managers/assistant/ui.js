@@ -29,8 +29,53 @@ DOMPurify.addHook('afterSanitizeAttributes', node => {
   }
 })
 
+// GFM tables require a `| --- |` separator row between the header and the
+// body. 8B-class chat models routinely forget it and emit two consecutive
+// pipe-delimited rows with no separator — marked then renders the block as
+// two paragraphs full of literal pipes. We patch the output before it hits
+// the markdown parser: wherever two pipe-row lines sit adjacent with no
+// separator between them, we inject one.
+//
+// Heuristics (deliberately narrow to avoid false positives in prose):
+//   - Header candidate: the line trims to one that starts and ends with `|`
+//     and contains at least one additional `|` (>=2 cells).
+//   - Body candidate: same shape, immediately following (within 1 blank
+//     line max). Real prose with embedded pipes rarely matches both.
+//   - Skip when the line right after the header is already a separator.
+//
+// The injected separator reuses the header's column count so marked gets a
+// well-formed block and the column alignment stays default (no `:`).
+export function ensureTableSeparators(text) {
+  if (!text || typeof text !== 'string') return text
+  const lines = text.split('\n')
+  const out = []
+  const isPipeRow = (s) => /^\s*\|.*\|\s*$/.test(s) && (s.match(/\|/g) || []).length >= 2
+  const isSeparatorRow = (s) => /^\s*\|(\s*:?-{3,}:?\s*\|)+\s*$/.test(s)
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    out.push(line)
+    if (!isPipeRow(line)) continue
+    // Find the next non-blank line (tolerate one blank line between rows,
+    // which some models insert by habit).
+    let j = i + 1
+    while (j < lines.length && lines[j].trim() === '') j++
+    const next = lines[j]
+    if (next === undefined) continue
+    if (isSeparatorRow(next)) continue
+    if (!isPipeRow(next)) continue
+    // Previous line inside a table run? Skip — only inject once per run.
+    if (i > 0 && isPipeRow(lines[i - 1])) continue
+    // Build a separator with the same number of columns as the header.
+    const cells = line.trim().slice(1, -1).split('|').length
+    const separator = '|' + ' --- |'.repeat(cells)
+    out.push(separator)
+  }
+  return out.join('\n')
+}
+
 export function renderMarkdown(text) {
-  const sanitized = DOMPurify.sanitize(marked.parse(text || ''), PURIFY_CONFIG)
+  const prepared = ensureTableSeparators(text)
+  const sanitized = DOMPurify.sanitize(marked.parse(prepared || ''), PURIFY_CONFIG)
   // Post-sanitization: decorate code for copy affordance. Fenced blocks get a
   // button in their top-right; inline <code> becomes click-to-copy. The
   // decorations are built with trusted DOM APIs rather than through DOMPurify
@@ -191,7 +236,7 @@ export function renderQueriesIntoPanel(panelEl, entries, {onOpen, onSelect}) {
     // generator failure worth surfacing so the user knows to rephrase.
     const msg = document.createElement('div')
     msg.className = 'assistant-queries-error'
-    msg.textContent = `Could not generate a valid query (${invalid[0].error || 'unknown error'}). Try rephrasing your request.`
+    msg.textContent = formatInvalidQueryError(invalid[0]?.error)
     body.appendChild(msg)
     return
   }
@@ -286,6 +331,37 @@ export function renderQueriesError(panelEl, message) {
   msg.className = 'assistant-queries-error'
   msg.textContent = message
   body.appendChild(msg)
+}
+
+// Map a generator-side error string to user-facing copy. The generator
+// emits terse, fact-oriented errors (e.g. "referenced unknown property:
+// Node filters::Biology::mechanism") — we keep the specific fact (which
+// property was hallucinated, which scope rule was violated) and wrap it
+// in actionable advice.
+export function formatInvalidQueryError(err) {
+  const raw = typeof err === 'string' && err.trim() ? err.trim() : null
+  if (!raw) {
+    return 'Couldn’t generate a valid query. Try rephrasing your request with a different property or value.'
+  }
+  // Hallucinated property names — by far the most common failure on 8B-class
+  // models. Name the bogus property(ies) and point the user at the real
+  // property list in the UI.
+  const unknownMatch = /^referenced unknown (?:property|properties): (.+)$/i.exec(raw)
+  if (unknownMatch) {
+    const names = unknownMatch[1]
+    const many = names.split(',').filter(s => s.trim()).length > 1
+    const clause = many
+      ? 'invented property names that don’t exist'
+      : 'invented a property name that doesn’t exist'
+    return (
+      `The model ${clause} in your graph (${names}). ` +
+      `Try rephrasing using a real property from the left sidebar filters or the Query Editor’s property list.`
+    )
+  }
+  // Everything else (schema errors, cross-scope AND, malformed AST, …) —
+  // surface the underlying reason verbatim so power users have something
+  // to work with, just wrapped in friendlier framing.
+  return `Couldn’t generate a valid query — ${raw}. Try rephrasing your request.`
 }
 
 function scopeLabel(scope) {

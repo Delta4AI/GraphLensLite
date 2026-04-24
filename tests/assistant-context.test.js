@@ -5,7 +5,6 @@ function makeCache(overrides = {}) {
   const base = {
     initialized: true,
     VERSION: "1.12.0",
-    CFG: { ASSISTANT: { MAX_CONTEXT_NODES: 3, MAX_STATUS_LOG_LINES: 5 } },
     data: {
       selectedLayout: "main",
       layouts: {
@@ -79,9 +78,9 @@ describe("buildContextSnapshot", () => {
     expect(snap).toEqual({ state: "no graph loaded" });
   });
 
-  it("caps selection samples at MAX_CONTEXT_NODES", () => {
+  it("includes every selected id without capping (cap lives in serializeSnapshot now)", () => {
     const snap = buildContextSnapshot(makeCache(), { readActions: () => [] });
-    expect(snap.selection.nodes).toHaveLength(3);
+    expect(snap.selection.nodes).toHaveLength(4);
     expect(snap.counts.selectedNodes).toBe(4);
   });
 
@@ -171,7 +170,7 @@ describe("buildContextSnapshot", () => {
     expect(alpha.properties["Node filters::Meta::note"]).toBeUndefined();
   });
 
-  it("attaches properties to selected edges when budget allows", () => {
+  it("attaches properties to every selected edge (no per-element budget)", () => {
     const snap = buildContextSnapshot(makeCache(), { readActions: () => [] });
     const link = snap.selection.edges.find(e => e.id === "e1");
     expect(link.properties).toEqual({
@@ -179,9 +178,10 @@ describe("buildContextSnapshot", () => {
     });
   });
 
-  it("marks oversize entries as truncated but still admits smaller ones that fit", () => {
-    // n1 alone blows the 6000-char budget; n2 has tiny props and should
-    // still land because the loop only consumes budget on successful attach.
+  it("attaches properties unconditionally — large payloads are the caller's problem", () => {
+    // Under the old SELECTION_DETAILS_BUDGET_CHARS rule n1 would have been
+    // marked truncated. Now the decorator is budget-free; serializeSnapshot
+    // is the sole place that slices.
     const bigBlob = "x".repeat(7000);
     const cache = makeCache({
       data: {
@@ -197,10 +197,27 @@ describe("buildContextSnapshot", () => {
     });
     const snap = buildContextSnapshot(cache, { readActions: () => [] });
     const byId = Object.fromEntries(snap.selection.nodes.map(n => [n.id, n]));
-    expect(byId.n1.truncated).toBe(true);
-    expect(byId.n1.properties).toBeUndefined();
+    expect(byId.n1.properties).toEqual({ "Node filters::G::a": bigBlob });
+    expect(byId.n1.truncated).toBeUndefined();
     expect(byId.n2.properties).toEqual({ "Node filters::G::a": "y" });
-    expect(byId.n2.truncated).toBeUndefined();
+  });
+
+  it("honors maxStatusLogLines when reading recent actions", () => {
+    const spy = (n) => {
+      spy.calls.push(n);
+      return Array.from({ length: n }, (_, i) => `a${i}`);
+    };
+    spy.calls = [];
+    buildContextSnapshot(makeCache(), { readActions: spy, maxStatusLogLines: 7 });
+    expect(spy.calls).toEqual([7]);
+  });
+
+  it("defaults maxStatusLogLines to a sensible value when omitted", () => {
+    const seen = [];
+    buildContextSnapshot(makeCache(), { readActions: (n) => { seen.push(n); return []; } });
+    expect(seen).toHaveLength(1);
+    expect(Number.isInteger(seen[0])).toBe(true);
+    expect(seen[0]).toBeGreaterThan(0);
   });
 
   it("injects recentActions from the read-actions callback", () => {
@@ -210,15 +227,69 @@ describe("buildContextSnapshot", () => {
 });
 
 describe("serializeSnapshot", () => {
-  it("returns the full JSON when under the cap", () => {
-    const out = serializeSnapshot({ a: 1 }, 1000);
-    expect(JSON.parse(out)).toEqual({ a: 1 });
+  it("returns a valid JSON string for any input", () => {
+    const out = serializeSnapshot({ a: 1, nested: { b: [1, 2, 3] } });
+    expect(typeof out).toBe("string");
+    expect(JSON.parse(out)).toEqual({ a: 1, nested: { b: [1, 2, 3] } });
   });
 
-  it("truncates oversize payloads with a marker", () => {
-    const big = { data: "x".repeat(2000) };
-    const out = serializeSnapshot(big, 200);
-    expect(out.length).toBeLessThan(300);
-    expect(out).toMatch(/truncated: snapshot exceeded 200 chars/);
+  it("is pretty-printed with 2-space indent", () => {
+    expect(serializeSnapshot({ a: 1 })).toBe("{\n  \"a\": 1\n}");
+  });
+
+  it("does not truncate large payloads — the over-budget modal is the policy layer", () => {
+    const big = { data: "x".repeat(10000) };
+    const out = serializeSnapshot(big);
+    expect(out.length).toBeGreaterThan(10000);
+    expect(out).not.toMatch(/truncated/);
+  });
+});
+
+describe("buildContextSnapshot with Array-shaped selection", () => {
+  it("reports truthful counts when selectedNodes / selectedEdges are Arrays, not Sets", () => {
+    // metrics.js, selection.js undo/redo, and a few other paths replace
+    // cache.selectedNodes with a plain Array. Reading `.size` on an Array
+    // yields undefined, which silently dropped counts out of graph_state.
+    const cache = makeCache({
+      selectedNodes: ["n1", "n2", "n3", "n4"],
+      selectedEdges: ["e1"],
+    });
+    const snap = buildContextSnapshot(cache, { readActions: () => [] });
+    expect(snap.counts.selectedNodes).toBe(4);
+    expect(snap.counts.selectedEdges).toBe(1);
+    expect(snap.selection.nodes).toHaveLength(4);
+  });
+
+  it("honours minimalSelection omission counters with Array input too", () => {
+    const cache = makeCache({
+      selectedNodes: ["n1", "n2", "n3"],
+      selectedEdges: ["e1", "e2"],
+    });
+    const snap = buildContextSnapshot(cache, {
+      readActions: () => [],
+      minimalSelection: true,
+    });
+    expect(snap.selection.nodesOmitted).toBe(3);
+    expect(snap.selection.edgesOmitted).toBe(2);
+  });
+});
+
+describe("buildContextSnapshot with minimalSelection", () => {
+  it("replaces selection samples with omission counters when minimalSelection is true", () => {
+    const snap = buildContextSnapshot(makeCache(), {
+      readActions: () => [],
+      minimalSelection: true,
+    });
+    expect(snap.selection.nodes).toBeUndefined();
+    expect(snap.selection.edges).toBeUndefined();
+    expect(snap.selection.nodesOmitted).toBe(4);
+    expect(snap.selection.edgesOmitted).toBe(1);
+    expect(snap.selection.note).toMatch(/selection samples omitted/i);
+    // Counts stay truthful regardless of minimalSelection.
+    expect(snap.counts.selectedNodes).toBe(4);
+    expect(snap.counts.selectedEdges).toBe(1);
+    // properties.hierarchy still flows through so the model knows what
+    // fields exist.
+    expect(snap.properties.hierarchy["Node filters"].G.a.type).toBe("categorical");
   });
 });

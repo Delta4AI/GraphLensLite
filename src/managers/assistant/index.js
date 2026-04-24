@@ -3,12 +3,36 @@ import {SYSTEM_PROMPT} from './system_prompt.js'
 import {buildContextSnapshot, serializeSnapshot} from './context.js'
 import {stripSentinelForDisplay, parseIntent, detectProtocolDrift} from './intent.js'
 import {generateQueries} from './query_generator.js'
-import {updateBudgetMeter} from './budget_meter.js'
+import {updateBudgetMeter, computeBudget} from './budget_meter.js'
+import {openBudgetModal} from './budget_modal.js'
 
-// Matches the num_ctx passed in client.js. Kept here so the budget meter
-// has the same ceiling the runtime does. If num_ctx ever becomes settings-
-// driven, thread it through the manager instead.
-const ASSISTANT_NUM_CTX = 16384
+// Status log lines folded into graph_state.recentActions. Small and cheap
+// (≈20 × 80 chars ≈ 400 chars ≈ 100 tokens), so we hardcode a generous cap
+// rather than exposing a user knob.
+const STATUS_LOG_LINES_CAP = 20
+// Hard cap on the in-memory chat buffer (visible bubbles are NOT trimmed —
+// they stay in the DOM). Bounded so long sessions don't grow the array
+// unboundedly. What's *sent* to the model is the entire buffer unless the
+// user picks "Send without chat history" in the over-budget modal.
+const HISTORY_MEMORY_CAP = 40
+// Polling cadence for the live budget pill while the assistant panel is
+// open. Each tick runs a cheap cache-size dirty check; the expensive
+// snapshot rebuild only happens when something actually changed. 400ms
+// gives near-instant visual feedback while keeping the timer wakeups
+// inconsequential.
+const BUDGET_POLL_MS = 400
+
+// cache.selectedNodes / selectedEdges are *documented* as Sets but a number
+// of code paths (undo/redo, metrics "add to selection", reselect-after-graph-
+// update) replace them with plain Arrays. Reading `.size` on an Array yields
+// undefined, which silently broke the dirty-key check and made counts.* in
+// graph_state drop out. Treat either container as "has N items".
+function sizeOf(container) {
+  if (!container) return 0
+  if (typeof container.size === 'number') return container.size
+  if (typeof container.length === 'number') return container.length
+  return 0
+}
 import {
   renderMarkdown,
   appendBubble,
@@ -25,6 +49,7 @@ import {
   saveSettings,
   validateEndpoint,
   hostLabel,
+  isConfigured,
   openSettingsPopup,
 } from './settings.js'
 
@@ -56,14 +81,30 @@ class AssistantManager {
     // ("make it stricter", "same but swap X for Y") can reference it. Only
     // fully-valid entries are kept; errored ones are useless to the model.
     this._lastGeneratedQueries = []
-    const {endpoint, model} = loadSettings(cache.CFG.ASSISTANT)
-    this._endpoint = endpoint
-    this._model = model
-    this._client = new OllamaClient(endpoint, model)
+    this._applySettings(loadSettings())
     this._updateStatusStrip()
     this._wireCopyDelegation()
     this._wireBudgetMeter()
     this._refreshBudgetMeter()
+  }
+
+  // Split out so the onSave handler can reuse it without duplicating the
+  // endpoint/model/client wiring. Stores the full settings object plus
+  // per-field shortcuts so the hot path doesn't re-read localStorage.
+  _applySettings(settings) {
+    this._settings = settings
+    this._endpoint = settings.endpoint
+    this._model = settings.model
+    // Client is only constructed once we have a configured endpoint+model.
+    // Call sites that reach the network must gate on _isConfigured() first
+    // (or use optional chaining for idempotent operations like abort()).
+    this._client = isConfigured(settings)
+      ? new OllamaClient(settings.endpoint, settings.model, {numCtx: settings.numCtx})
+      : null
+  }
+
+  _isConfigured() {
+    return isConfigured({endpoint: this._endpoint, model: this._model})
   }
 
   _wireBudgetMeter() {
@@ -91,27 +132,30 @@ class AssistantManager {
     let nodesSel = 0
     let edgesSel = 0
     try {
-      const snapshot = buildContextSnapshot(this.cache)
+      const snapshot = buildContextSnapshot(this.cache, {
+        maxStatusLogLines: STATUS_LOG_LINES_CAP,
+      })
       graphChars = serializeSnapshot(snapshot).length
-      nodesSel = this.cache?.selectedNodes?.size ?? 0
-      edgesSel = this.cache?.selectedEdges?.size ?? 0
+      nodesSel = sizeOf(this.cache?.selectedNodes)
+      edgesSel = sizeOf(this.cache?.selectedEdges)
     } catch {
       // Pre-init or transient cache state — meter just shows baseline.
     }
 
-    const maxHist = this.cache?.CFG?.ASSISTANT?.MAX_HISTORY_MESSAGES ?? 12
-    const trimmedHistory = this._history.slice(-(maxHist - 2))
-    const historyChars = trimmedHistory.reduce((n, m) => n + (m?.content?.length ?? 0), 0)
+    const historyChars = this._history.reduce((n, m) => n + (m?.content?.length ?? 0), 0)
 
     updateBudgetMeter({
       systemChars: SYSTEM_PROMPT.length,
       historyChars,
-      historyCount: trimmedHistory.length,
+      historyCount: this._history.length,
       graphChars,
       userChars,
-      numCtx: ASSISTANT_NUM_CTX,
+      numCtx: this._settings.numCtx,
       selection: {nodes: nodesSel, edges: edgesSel},
     })
+    // Bookkeeping for the auto-refresh timer: any manual refresh implicitly
+    // resets the baseline so the timer doesn't re-fire on this same change.
+    this._budgetDirtyKey = this._computeBudgetDirtyKey()
   }
 
   _wireCopyDelegation() {
@@ -136,13 +180,74 @@ class AssistantManager {
       // detached bubble and will be visible again when the panel reopens.
     }
     setTimeout(() => { if (this.cache.graph) this.cache.graph.resize() }, 300)
-    if (this._panelOpen) this._refreshBudgetMeter()
+    if (this._panelOpen) {
+      this._refreshBudgetMeter()
+      this._startBudgetAutoRefresh()
+      // First-run: walk the user through endpoint + model selection before
+      // they can send anything. Opening the panel is the earliest natural
+      // moment to prompt for this — doing it later (on Send) would mean the
+      // user types a full question first and then gets interrupted.
+      if (!this._isConfigured()) this._openSetup()
+    } else {
+      this._stopBudgetAutoRefresh()
+    }
+  }
+
+  // Live-update the budget pill while the user works in the app (selects
+  // nodes, applies filters, switches workspace, etc.) — otherwise the pill
+  // only moves on input/focus, which makes the projected token count feel
+  // stale the moment the user looks at it.
+  //
+  // Strategy: while the panel is open, poll at BUDGET_POLL_MS and call
+  // _refreshBudgetMeter only when a cheap "dirty key" derived from the
+  // cache differs from the last one we rendered. That avoids the O(n)
+  // snapshot build on every tick, so polling is effectively free when the
+  // graph is idle but reacts within one tick when the user changes
+  // selection or filters. The timer is torn down when the panel closes so
+  // there's zero cost while the assistant isn't visible.
+  _startBudgetAutoRefresh() {
+    this._stopBudgetAutoRefresh()
+    this._budgetTimer = setInterval(() => {
+      const key = this._computeBudgetDirtyKey()
+      if (key !== this._budgetDirtyKey) this._refreshBudgetMeter()
+    }, BUDGET_POLL_MS)
+  }
+
+  _stopBudgetAutoRefresh() {
+    if (this._budgetTimer) {
+      clearInterval(this._budgetTimer)
+      this._budgetTimer = 0
+    }
+  }
+
+  // Cheap scalar that changes iff the snapshot's *shape* changed. Reads
+  // only `.size` / `.length` / the current query text — no array traversal.
+  // Property value edits won't tick the key, which is correct: the budget
+  // cares about structure, not values.
+  _computeBudgetDirtyKey() {
+    const c = this.cache
+    const query = c?.query?.text
+    const queryLen = typeof query === 'string'
+      ? query.length
+      : (query?.textContent?.length ?? 0)
+    return [
+      sizeOf(c?.selectedNodes),
+      sizeOf(c?.selectedEdges),
+      sizeOf(c?.nodeRef),
+      sizeOf(c?.edgeRef),
+      sizeOf(c?.nodeIDsToBeShown),
+      sizeOf(c?.edgeIDsToBeShown),
+      sizeOf(c?.hiddenDanglingNodeIDs),
+      c?.data?.selectedLayout ?? '',
+      queryLen,
+      this._history.length,
+    ].join('|')
   }
 
   // Dual-purpose handler for the Send/Stop button. Idle → send; streaming →
   // abort. Keeps the explicit cancel UX in one obvious place.
   sendOrStop() {
-    if (this._streaming) this._client.abort()
+    if (this._streaming) this._client?.abort()
     else this.sendFromInput()
   }
 
@@ -150,19 +255,77 @@ class AssistantManager {
     const input = document.getElementById('assistantInput')
     const text = input?.value?.trim()
     if (!text || this._streaming) return
+    // Guard: if the user hasn't finished setup yet, route them to the setup
+    // modal instead of failing a send against a null client.
+    if (!this._isConfigured()) {
+      this._openSetup()
+      return
+    }
     input.value = ''
     await this.send(text)
   }
 
-  async send(userText) {
+  async send(userText, options = {}) {
     if (this._streaming) return
     const container = document.getElementById('assistantMessages')
     if (!container) return
 
-    appendBubble('user', userText, container)
+    const {
+      excludeHistory = false,
+      minimalSelection = false,
+      overrideBudget = false,
+      suppressUserBubble = false,
+    } = options
 
-    const snapshot = buildContextSnapshot(this.cache)
+    // We render the user's message once per user-triggered send. Retries
+    // routed through the over-budget modal re-enter send() with
+    // suppressUserBubble:true so the bubble isn't duplicated.
+    if (!suppressUserBubble) appendBubble('user', userText, container)
+
+    // Build the full-fat snapshot. Minimal variant is only used when the
+    // user picks "Send without selection details" from the budget modal.
+    const snapshot = buildContextSnapshot(this.cache, {
+      maxStatusLogLines: STATUS_LOG_LINES_CAP,
+      minimalSelection,
+    })
     const graphJson = serializeSnapshot(snapshot)
+
+    // Pre-send budget check. If the total projected request exceeds numCtx
+    // AND the user hasn't already explicitly chosen to override, open the
+    // modal. The modal resolves with the remediation the user picked; we
+    // route that back through send() by re-calling ourselves with the flag.
+    if (!overrideBudget) {
+      const historyChars = excludeHistory
+        ? 0
+        : this._history.reduce((n, m) => n + (m?.content?.length ?? 0), 0)
+      const userChars = userText.length + 500 // rough pad for the <protocol_reminder> block
+      const budget = computeBudget({
+        systemChars: SYSTEM_PROMPT.length,
+        historyChars,
+        graphChars: graphJson.length,
+        userChars,
+        numCtx: this._settings.numCtx,
+      })
+      if (budget.overBudget) {
+        const remediation = await this._resolveOverBudget({
+          budget, historyChars, userChars, graphChars: graphJson.length,
+        })
+        if (!remediation) return // cancelled
+        if (remediation.openSettings) {
+          this.openSettings()
+          return
+        }
+        // Re-enter with the chosen remediation. The user bubble is already
+        // on screen; suppress the duplicate.
+        return this.send(userText, {
+          excludeHistory: excludeHistory || !!remediation.excludeHistory,
+          minimalSelection: minimalSelection || !!remediation.minimalSelection,
+          overrideBudget: !!remediation.overrideBudget,
+          suppressUserBubble: true,
+        })
+      }
+    }
+
     // Explicit delimitation so the model treats graph data as data, not as
     // instructions. See system_prompt.md "Untrusted data boundaries".
     //
@@ -183,22 +346,24 @@ class AssistantManager {
         `</protocol_reminder>`,
     }
 
-    const trimmedHistory = this._history.slice(-(this.cache.CFG.ASSISTANT.MAX_HISTORY_MESSAGES - 2))
+    // Send all of history unless the user explicitly picked
+    // "Send without chat history" from the budget modal.
+    const wireHistory = excludeHistory ? [] : [...this._history]
     const messages = [
       {role: 'system', content: SYSTEM_PROMPT},
-      ...trimmedHistory,
+      ...wireHistory,
       contextMsg,
     ]
 
     // Diagnostic: with a big graph the context message can dwarf the system
     // prompt, causing the chat model to drift off the sentinel protocol.
     // Print sizes so the user can see this in devtools without digging.
-    const historyChars = trimmedHistory.reduce((n, m) => n + (m?.content?.length ?? 0), 0)
+    const historyChars = wireHistory.reduce((n, m) => n + (m?.content?.length ?? 0), 0)
     const totalChars = SYSTEM_PROMPT.length + historyChars + contextMsg.content.length
     console.info('[assistant] prompt sizes (chars):',
       `system=${SYSTEM_PROMPT.length}`,
-      `history=${historyChars} (${trimmedHistory.length} msgs)`,
-      `graph_state=${graphJson.length}`,
+      `history=${historyChars} (${wireHistory.length} msgs${excludeHistory ? ', excluded by user' : ''})`,
+      `graph_state=${graphJson.length}${minimalSelection ? ' (minimal)' : ''}`,
       `user=${userText.length}`,
       `total=${totalChars}`)
 
@@ -231,8 +396,15 @@ class AssistantManager {
       // see the sentinel block (which would just confuse the model).
       this._history.push({role: 'user', content: userText})
       this._history.push({role: 'assistant', content: displayText})
-      const cap = this.cache.CFG.ASSISTANT.MAX_HISTORY_MESSAGES * 2
-      if (this._history.length > cap) this._history = this._history.slice(-cap)
+      // Cap the in-memory buffer so long sessions don't grow the array
+      // unboundedly. Visible bubbles in the DOM are NOT trimmed — this is
+      // only about what's replayed on the wire. If the user wants to drop
+      // history from a single request, the over-budget modal offers
+      // "Send without chat history" per-turn; to clear permanently, the 🗑
+      // button in the header wipes both this buffer and the DOM.
+      if (this._history.length > HISTORY_MEMORY_CAP) {
+        this._history = this._history.slice(-HISTORY_MEMORY_CAP)
+      }
       appendWarningBubble(checkQueryWarnings(displayText), container)
 
       // Second phase: if the model signalled query intent, fire a structured
@@ -277,6 +449,51 @@ class AssistantManager {
     }
   }
 
+  // Open the over-budget modal and return the remediation the user picked
+  // (or null on Cancel). The caller re-enters send() with the chosen flags.
+  //
+  // We precompute the "after" totals for each remediation here so the modal
+  // can show them inline — the user sees up front whether "send without
+  // history" alone would fit, or whether they need "minimal graph state"
+  // instead. Keeps the modal dumb-render.
+  async _resolveOverBudget({budget, historyChars, userChars, graphChars}) {
+    // "Send without history": same snapshot, zero history chars.
+    const excludeHistoryTotal = computeBudget({
+      systemChars: SYSTEM_PROMPT.length,
+      historyChars: 0,
+      graphChars,
+      userChars,
+      numCtx: this._settings.numCtx,
+    }).total
+    // "Send without selection details": rebuild the minimal snapshot and
+    // measure its actual size rather than estimating.
+    let minimalGraphChars = 0
+    try {
+      const minimal = buildContextSnapshot(this.cache, {
+        maxStatusLogLines: STATUS_LOG_LINES_CAP,
+        minimalSelection: true,
+      })
+      minimalGraphChars = serializeSnapshot(minimal).length
+    } catch { /* pre-init cache — leave at 0 */ }
+    const minimalSelectionTotal = computeBudget({
+      systemChars: SYSTEM_PROMPT.length,
+      historyChars,
+      graphChars: minimalGraphChars,
+      userChars,
+      numCtx: this._settings.numCtx,
+    }).total
+
+    return openBudgetModal({
+      budget,
+      numCtx: this._settings.numCtx,
+      selectionInfo: {
+        nodes: sizeOf(this.cache?.selectedNodes),
+        edges: sizeOf(this.cache?.selectedEdges),
+      },
+      estimates: {excludeHistoryTotal, minimalSelectionTotal},
+    })
+  }
+
   async _runQueryGeneration({intent, graphJson, userText, container}) {
     const panel = appendQueriesPanel(container)
     try {
@@ -307,7 +524,7 @@ class AssistantManager {
         // already retry once inside generateQueries, so reaching this
         // branch means both attempts failed.
         const detail = err?.message ? ` (${err.message})` : ''
-        renderQueriesError(panel, `Could not generate a query from this request${detail}. Try rephrasing or resending — this is often a transient model glitch.`)
+        renderQueriesError(panel, `Couldn’t generate a query${detail}. Try rephrasing or resending — the local model occasionally stumbles on the first pass.`)
       }
     } finally {
       container.scrollTop = container.scrollHeight
@@ -389,7 +606,7 @@ class AssistantManager {
     // /api/chat is stateless (we replay the full history each request), so
     // clearing the local buffer is the only meaningful "reset" — the next
     // request will carry only system + graph_state + user.
-    this._client.abort()
+    this._client?.abort()
     this._history = []
     this._lastGeneratedQueries = []
     const container = document.getElementById('assistantMessages')
@@ -411,17 +628,38 @@ class AssistantManager {
   }
 
   openSettings() {
+    this._openSettingsPopup({mode: this._isConfigured() ? 'edit' : 'setup'})
+  }
+
+  // Internal: first-run entry point. Always opens in setup mode.
+  _openSetup() {
+    this._openSettingsPopup({mode: 'setup'})
+  }
+
+  _openSettingsPopup({mode}) {
     openSettingsPopup({
       endpoint: this._endpoint,
       model: this._model,
+      numCtx: this._settings.numCtx,
+      mode,
       probe: probeEndpoint,
-      onSave: ({endpoint, model}) => {
-        this._endpoint = endpoint
-        this._model = model
-        this._client = new OllamaClient(endpoint, model)
-        saveSettings({endpoint, model})
+      onSave: (next) => {
+        this._applySettings(next)
+        saveSettings(next)
         this._updateStatusStrip()
-        this.cache.ui?.info?.(`Assistant: endpoint=${endpoint}, model=${model}`)
+        // Budget meter depends on numCtx; refresh so the pill reflects the
+        // new ceiling immediately rather than waiting for the next keystroke.
+        this._refreshBudgetMeter()
+        this.cache.ui?.info?.(`Assistant: endpoint=${next.endpoint}, model=${next.model}`)
+      },
+      onCancel: () => {
+        // In setup mode, a cancel without a working config would leave the
+        // panel sitting in a non-functional state. Close the panel so the
+        // user isn't looking at a disabled surface — they can reopen any
+        // time via the 🤖 button, which will re-prompt.
+        if (mode === 'setup' && !this._isConfigured() && this._panelOpen) {
+          this.togglePanel()
+        }
       },
     })
   }
@@ -429,6 +667,12 @@ class AssistantManager {
   _updateStatusStrip() {
     const el = document.getElementById('assistantStatusStrip')
     if (!el) return
+    if (!this._isConfigured()) {
+      el.textContent = 'Not configured — click ⚙ to set up'
+      el.title = 'Set the Ollama endpoint and model before sending a message.'
+      el.classList.add('assistant-status-warn')
+      return
+    }
     const host = hostLabel(this._endpoint)
     const validation = validateEndpoint(this._endpoint)
     el.textContent = `${host} · ${this._model}`
