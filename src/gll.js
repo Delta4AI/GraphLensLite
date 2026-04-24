@@ -550,6 +550,65 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Setup assistant sidebar resize functionality (mirrors the left sidebar but
+  // drags from the left edge of the right-docked panel).
+  const assistantSidebar = document.getElementById('assistantSidebar');
+  const assistantResizeHandle = assistantSidebar?.querySelector('.assistant-resize-handle');
+  const ASSISTANT_MIN_WIDTH = 300;
+  const ASSISTANT_MAX_WIDTH = 900;
+  let isAssistantResizing = false;
+  let assistantStartX = 0;
+  let assistantStartWidth = 0;
+  let assistantShadowBar = null;
+
+  const clampAssistantWidth = (w) => Math.max(ASSISTANT_MIN_WIDTH, Math.min(ASSISTANT_MAX_WIDTH, w));
+
+  assistantResizeHandle?.addEventListener('mousedown', (e) => {
+    if (!assistantSidebar.classList.contains('active')) return;
+    isAssistantResizing = true;
+    assistantStartX = e.clientX;
+    assistantStartWidth = assistantSidebar.offsetWidth;
+
+    assistantShadowBar = document.createElement('div');
+    assistantShadowBar.className = 'sidebar-resize-shadow';
+    assistantShadowBar.style.left = `${window.innerWidth - assistantStartWidth}px`;
+    assistantShadowBar.style.width = '4px';
+    assistantShadowBar.style.display = 'block';
+    document.body.appendChild(assistantShadowBar);
+
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isAssistantResizing) return;
+    const deltaX = e.clientX - assistantStartX;
+    const newWidth = clampAssistantWidth(assistantStartWidth - deltaX);
+    if (assistantShadowBar) {
+      assistantShadowBar.style.left = `${window.innerWidth - newWidth}px`;
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!isAssistantResizing) return;
+
+    if (assistantShadowBar) {
+      const rect = assistantShadowBar.getBoundingClientRect();
+      const newWidth = clampAssistantWidth(window.innerWidth - rect.left);
+      assistantSidebar.style.setProperty('--assistant-width', `${newWidth}px`);
+      assistantShadowBar.remove();
+      assistantShadowBar = null;
+    }
+
+    isAssistantResizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+
+    if (cache.graph) cache.graph.resize();
+  });
+
   // Assistant: Enter to send, Shift+Enter for newline
   const assistantInput = document.getElementById('assistantInput');
   if (assistantInput) {

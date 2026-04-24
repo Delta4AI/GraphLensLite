@@ -59,6 +59,30 @@ function decorateSelectionWithProperties(sample, refMap) {
   return sample
 }
 
+// Attach pre-computed network-metric values to selection entries for any
+// metric the user has already calculated (the default centrality is
+// auto-computed on graph load; the others compute on explicit selection in
+// the metrics panel). This lets the assistant answer questions like
+// "which of these has the highest centrality?" directly from values in
+// graph_state, instead of hallucinating or hedging.
+//
+// `metricCache` shape: Map<metricId, {label, valueLabel, values: Map<nodeId, number>}>
+// Output shape per entry: entry.metrics = {centrality: 0.37, pagerank: 0.012, …}
+function decorateSelectionWithMetrics(sample, metricCache) {
+  if (!metricCache || typeof metricCache.entries !== 'function') return sample
+  for (const entry of sample) {
+    const metrics = {}
+    for (const [metricId, cached] of metricCache.entries()) {
+      const v = cached?.values?.get?.(entry.id)
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        metrics[metricId] = v
+      }
+    }
+    if (Object.keys(metrics).length) entry.metrics = metrics
+  }
+  return sample
+}
+
 function readRecentActions(maxLines) {
   const container = typeof document !== 'undefined'
     ? document.getElementById('sidebarStatusContainer')
@@ -134,6 +158,10 @@ export function buildContextSnapshot(cache, {
     // what's actually in the current selection, not just IDs.
     decorateSelectionWithProperties(selectedNodeSample, cache.nodeRef)
     decorateSelectionWithProperties(selectedEdgeSample, cache.edgeRef)
+    // Attach pre-computed metric values (centrality etc.) where available —
+    // node-only in GLL. The model now sees concrete scores instead of just
+    // knowing "centrality exists".
+    decorateSelectionWithMetrics(selectedNodeSample, cache.metrics?.metricValueCache)
   }
 
   const activeFilters = []

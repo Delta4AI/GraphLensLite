@@ -245,6 +245,78 @@ describe("serializeSnapshot", () => {
   });
 });
 
+describe("buildContextSnapshot — metric decoration on selection", () => {
+  function cacheWithMetrics(overrides = {}) {
+    return makeCache({
+      metrics: {
+        selected: "centrality",
+        metricValueCache: new Map([
+          ["centrality", {
+            label: "Degree Centrality",
+            valueLabel: "Centrality",
+            values: new Map([
+              ["n1", 0.75],
+              ["n2", 0.21],
+            ]),
+          }],
+          ["pagerank", {
+            label: "PageRank",
+            valueLabel: "Score",
+            values: new Map([
+              ["n1", 0.012],
+            ]),
+          }],
+        ]),
+      },
+      ...overrides,
+    });
+  }
+
+  it("attaches cached metric values to each selected node entry", () => {
+    const snap = buildContextSnapshot(cacheWithMetrics({
+      selectedNodes: new Set(["n1", "n2"]),
+      selectedEdges: new Set([]),
+    }), { readActions: () => [] });
+    const byId = Object.fromEntries(snap.selection.nodes.map(n => [n.id, n]));
+    expect(byId.n1.metrics).toEqual({ centrality: 0.75, pagerank: 0.012 });
+    expect(byId.n2.metrics).toEqual({ centrality: 0.21 });
+  });
+
+  it("does not attach a metrics key when the node has no cached metric values", () => {
+    const snap = buildContextSnapshot(cacheWithMetrics({
+      selectedNodes: new Set(["n3"]),
+      selectedEdges: new Set([]),
+    }), { readActions: () => [] });
+    const n3 = snap.selection.nodes.find(n => n.id === "n3");
+    expect(n3.metrics).toBeUndefined();
+  });
+
+  it("does not attach metrics to edges (per-node in GLL)", () => {
+    const snap = buildContextSnapshot(cacheWithMetrics(), { readActions: () => [] });
+    for (const e of snap.selection.edges) {
+      expect(e.metrics).toBeUndefined();
+    }
+  });
+
+  it("is a no-op when the metric cache is empty", () => {
+    const snap = buildContextSnapshot(makeCache({
+      metrics: { selected: "centrality", metricValueCache: new Map() },
+    }), { readActions: () => [] });
+    for (const n of snap.selection.nodes) {
+      expect(n.metrics).toBeUndefined();
+    }
+  });
+
+  it("skips decoration entirely in minimalSelection mode", () => {
+    const snap = buildContextSnapshot(cacheWithMetrics(), {
+      readActions: () => [],
+      minimalSelection: true,
+    });
+    expect(snap.selection.nodes).toBeUndefined();
+    expect(snap.selection.nodesOmitted).toBeGreaterThan(0);
+  });
+});
+
 describe("buildContextSnapshot with Array-shaped selection", () => {
   it("reports truthful counts when selectedNodes / selectedEdges are Arrays, not Sets", () => {
     // metrics.js, selection.js undo/redo, and a few other paths replace

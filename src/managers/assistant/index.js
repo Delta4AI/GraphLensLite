@@ -153,6 +153,11 @@ class AssistantManager {
       numCtx: this._settings.numCtx,
       selection: {nodes: nodesSel, edges: edgesSel},
     })
+    // Empty-state chips: toggle the `has-selection` class so CSS can swap
+    // "How do I select nodes?" for the selection-gated chips. This piggybacks
+    // on the existing dirty-key poll — no separate observer needed.
+    const empty = document.getElementById('assistantEmptyState')
+    if (empty) empty.classList.toggle('has-selection', (nodesSel + edgesSel) > 0)
     // Bookkeeping for the auto-refresh timer: any manual refresh implicitly
     // resets the baseline so the timer doesn't re-fire on this same change.
     this._budgetDirtyKey = this._computeBudgetDirtyKey()
@@ -263,6 +268,22 @@ class AssistantManager {
     }
     input.value = ''
     await this.send(text)
+  }
+
+  // Starter chips in the empty state fill the textarea rather than sending
+  // immediately — the user often wants to tweak wording (add specifics,
+  // change the "Top 5" to "Top 10", etc.) before firing. Focusing the input
+  // also lets them hit Enter to send without reaching for the Send button.
+  fillFromChip(btn) {
+    const input = document.getElementById('assistantInput')
+    if (!input || !btn) return
+    input.value = btn.textContent.trim()
+    input.focus()
+    // Park the caret at the end so typing extends rather than overwrites.
+    const end = input.value.length
+    try { input.setSelectionRange(end, end) } catch { /* non-text inputs */ }
+    // Budget meter reflects the new draft length immediately.
+    this._refreshBudgetMeter()
   }
 
   async send(userText, options = {}) {
