@@ -252,9 +252,84 @@ export function appendBubble(role, text, container) {
 export function appendStreamingBubble(container) {
   const el = document.createElement('div')
   el.className = 'assistant-bubble assistant-bubble-assistant assistant-bubble-markdown assistant-bubble-streaming'
+  // The bubble owns up to two children: an optional thinking accordion (only
+  // present for reasoning models) and a content wrapper for the rendered
+  // markdown. Wrapping content in its own node lets us swap markdown HTML
+  // without nuking the sibling thinking block.
+  const content = document.createElement('div')
+  content.className = 'assistant-bubble-content'
+  el.appendChild(content)
   container.appendChild(el)
   container.scrollTop = container.scrollHeight
   return el
+}
+
+// Replace the bubble's rendered content. Use this instead of bubble.innerHTML
+// — the latter would also wipe the thinking accordion sibling.
+export function setBubbleContent(bubble, html) {
+  let content = bubble.querySelector(':scope > .assistant-bubble-content')
+  if (!content) {
+    content = document.createElement('div')
+    content.className = 'assistant-bubble-content'
+    bubble.appendChild(content)
+  }
+  content.innerHTML = html
+}
+
+// Append a chunk of reasoning text to the bubble's thinking accordion,
+// creating it lazily on the first chunk. The accordion is collapsed by
+// default; the summary updates live with the token count so the user has
+// visible progress without expanded noise drowning out the eventual reply.
+export function appendThinkingChunk(bubble, text) {
+  if (!text) return
+  let block = bubble.querySelector(':scope > .assistant-thinking')
+  if (!block) {
+    block = createThinkingBlock()
+    bubble.insertBefore(block, bubble.firstChild)
+  }
+  const body = block.querySelector('.assistant-thinking-body')
+  body.textContent += text
+  const meta = block.querySelector('.assistant-thinking-meta')
+  const next = (parseInt(meta.dataset.tokens, 10) || 0) + 1
+  meta.dataset.tokens = String(next)
+  meta.textContent = `${next} token${next === 1 ? '' : 's'}`
+}
+
+// Flip the thinking accordion from "Thinking… (N tokens)" to the terminal
+// "Thought for Xs · N tokens" state. Called once when content begins (the
+// model has finished reasoning) or when the turn ends without content.
+export function finalizeThinking(bubble, elapsedMs) {
+  const block = bubble.querySelector(':scope > .assistant-thinking')
+  if (!block || block.classList.contains('assistant-thinking-done')) return
+  const label = block.querySelector('.assistant-thinking-label')
+  const meta = block.querySelector('.assistant-thinking-meta')
+  const seconds = Math.max(1, Math.round((elapsedMs || 0) / 1000))
+  label.textContent = `Thought for ${seconds}s`
+  const tokens = parseInt(meta.dataset.tokens, 10) || 0
+  meta.textContent = tokens ? `· ${tokens} tokens` : ''
+  block.classList.add('assistant-thinking-done')
+}
+
+function createThinkingBlock() {
+  const details = document.createElement('details')
+  details.className = 'assistant-thinking'
+  const summary = document.createElement('summary')
+  summary.className = 'assistant-thinking-summary'
+  const icon = document.createElement('span')
+  icon.className = 'assistant-thinking-icon'
+  icon.setAttribute('aria-hidden', 'true')
+  icon.textContent = '💭'
+  const label = document.createElement('span')
+  label.className = 'assistant-thinking-label'
+  label.textContent = 'Thinking…'
+  const meta = document.createElement('span')
+  meta.className = 'assistant-thinking-meta'
+  meta.dataset.tokens = '0'
+  summary.append(icon, label, meta)
+  const body = document.createElement('pre')
+  body.className = 'assistant-thinking-body'
+  details.append(summary, body)
+  return details
 }
 
 export function appendWarningBubble(warnings, container) {

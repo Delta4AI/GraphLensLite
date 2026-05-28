@@ -45,6 +45,9 @@ import {
   checkQueryWarnings,
   handleCopyClick,
   handleActionClick,
+  setBubbleContent,
+  appendThinkingChunk,
+  finalizeThinking,
 } from './ui.js'
 import {
   loadSettings,
@@ -448,19 +451,40 @@ class AssistantManager {
     // no text placeholder — so the bubble doesn't flash extra copy in and
     // out on short warmups.
     let fullResponse = ''
+    // Track reasoning-phase timing so the thinking accordion can switch to
+    // its terminal "Thought for Xs" label the moment content begins.
+    const turnStart = Date.now()
+    let thinkingEndedAt = 0
 
     try {
-      await this._client.chat(messages, (token) => {
-        fullResponse += token
-        // Strip the <<<QUERY_INTENT>>> sentinel (including partial opening
-        // markers during streaming) so the marker never flickers into the
-        // visible bubble.
-        bubble.innerHTML = renderMarkdown(stripSentinelForDisplay(fullResponse))
-        container.scrollTop = container.scrollHeight
+      await this._client.chat(messages, ({content, thinking}) => {
+        if (thinking) {
+          appendThinkingChunk(bubble, thinking)
+          container.scrollTop = container.scrollHeight
+        }
+        if (content) {
+          // First content token = reasoning is done. Freeze the accordion's
+          // label before we touch the rendered content so the user sees the
+          // hand-off in a single paint.
+          if (!fullResponse && !thinkingEndedAt) {
+            thinkingEndedAt = Date.now()
+            finalizeThinking(bubble, thinkingEndedAt - turnStart)
+          }
+          fullResponse += content
+          // Strip the <<<QUERY_INTENT>>> sentinel (including partial opening
+          // markers during streaming) so the marker never flickers into the
+          // visible bubble.
+          setBubbleContent(bubble, renderMarkdown(stripSentinelForDisplay(fullResponse)))
+          container.scrollTop = container.scrollHeight
+        }
       })
+      // Some turns are pure reasoning with no visible reply (rare, but
+      // possible if a model thinks itself into emitting nothing). Finalize
+      // the accordion so it doesn't sit forever at "Thinking…".
+      if (!thinkingEndedAt) finalizeThinking(bubble, Date.now() - turnStart)
       bubble.classList.remove('assistant-bubble-streaming')
       const displayText = stripSentinelForDisplay(fullResponse)
-      bubble.innerHTML = renderMarkdown(displayText)
+      setBubbleContent(bubble, renderMarkdown(displayText))
 
       // History stores the cleaned-up assistant reply so future turns don't
       // see the sentinel block (which would just confuse the model).
@@ -499,17 +523,36 @@ class AssistantManager {
         })
       }
     } catch (err) {
+      // Whichever branch we take, the thinking accordion (if any) must be
+      // finalized so it stops sitting at "Thinking…" forever.
+      if (!thinkingEndedAt) finalizeThinking(bubble, Date.now() - turnStart)
+      const hasThinking = bubble.querySelector(':scope > .assistant-thinking') != null
       if (err.name === 'AbortError') {
         bubble.classList.remove('assistant-bubble-streaming')
         bubble.classList.add('assistant-bubble-aborted')
         if (!fullResponse) {
-          bubble.classList.remove('assistant-bubble-markdown')
-          bubble.textContent = '(cancelled)'
+          if (hasThinking) {
+            // Preserve the trace; surface "(cancelled)" inside the content
+            // wrapper so the user keeps any reasoning that did arrive.
+            setBubbleContent(bubble, '<em>(cancelled)</em>')
+          } else {
+            bubble.classList.remove('assistant-bubble-markdown')
+            bubble.textContent = '(cancelled)'
+          }
         }
       } else {
-        bubble.classList.remove('assistant-bubble-streaming', 'assistant-bubble-markdown')
+        bubble.classList.remove('assistant-bubble-streaming')
         bubble.classList.add('assistant-bubble-error')
-        bubble.textContent = this._friendlyError(err)
+        if (hasThinking) {
+          // Same reasoning as the cancel branch — keep the trace, put the
+          // error text in the content slot.
+          setBubbleContent(bubble, '')
+          const content = bubble.querySelector(':scope > .assistant-bubble-content')
+          if (content) content.textContent = this._friendlyError(err)
+        } else {
+          bubble.classList.remove('assistant-bubble-markdown')
+          bubble.textContent = this._friendlyError(err)
+        }
         console.error('[assistant]', err)
       }
     } finally {

@@ -3968,13 +3968,86 @@ input:checked + .slider:before {
     margin: 0.6em 0;
 }
 
-.assistant-bubble-streaming::after {
+.assistant-bubble-streaming > .assistant-bubble-content:last-child::after {
     content: '▋';
     animation: blink 0.8s step-start infinite;
 }
 
 @keyframes blink {
     50% { opacity: 0; }
+}
+
+/* Thinking accordion: reasoning traces from Qwen3 / DeepSeek-R1 / etc.
+   Collapsed by default — the live token count in the summary is the
+   feedback channel; the body is opt-in. Monospace + pre-wrap because the
+   trace is stream-of-consciousness with broken syntax that markdown would
+   mangle. */
+.assistant-thinking {
+    margin: 0 0 6px 0;
+    font-size: 0.78rem;
+    border-left: 2px solid rgba(64, 60, 83, 0.18);
+    padding: 0 0 0 8px;
+}
+
+.assistant-thinking-summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #6b6680;
+    user-select: none;
+    padding: 1px 0;
+}
+
+.assistant-thinking-summary::-webkit-details-marker { display: none; }
+.assistant-thinking-summary::marker { content: ''; }
+
+.assistant-thinking-summary::before {
+    content: '▸';
+    display: inline-block;
+    font-size: 0.7em;
+    color: #8a8499;
+    width: 0.7em;
+    flex-shrink: 0;
+}
+
+.assistant-thinking[open] > .assistant-thinking-summary::before {
+    content: '▾';
+}
+
+.assistant-thinking-icon {
+    font-size: 0.9em;
+    opacity: 0.7;
+}
+
+.assistant-thinking-label {
+    font-weight: 500;
+}
+
+.assistant-thinking:not(.assistant-thinking-done) .assistant-thinking-label {
+    color: #5a5470;
+}
+
+.assistant-thinking-meta {
+    color: #8a8499;
+    font-size: 0.92em;
+    font-variant-numeric: tabular-nums;
+}
+
+.assistant-thinking-body {
+    margin: 6px 0 4px 0;
+    padding: 6px 8px;
+    background-color: rgba(0, 0, 0, 0.04);
+    border-radius: 4px;
+    color: #555;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.74rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 240px;
+    overflow-y: auto;
 }
 
 .assistant-bubble-error {

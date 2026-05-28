@@ -29,7 +29,12 @@ class OllamaClient {
     return (data.models || []).map(m => m.name)
   }
 
-  async chat(messages, onToken) {
+  // `onChunk` receives {content, thinking} per stream frame. Either field may
+  // be empty; thinking is only populated by reasoning-capable models (Qwen3,
+  // DeepSeek-R1, etc.) which Ollama exposes via a separate `message.thinking`
+  // field. We keep them split here so the caller can render them in different
+  // surfaces without re-parsing the stream.
+  async chat(messages, onChunk) {
     this.abort()
     this._abortController = new AbortController()
 
@@ -45,6 +50,10 @@ class OllamaClient {
         model: this.model,
         messages,
         stream: true,
+        // think:true asks Ollama to emit reasoning into message.thinking
+        // rather than inlining <think>…</think> in content. Models without
+        // reasoning support ignore this; the field just stays empty.
+        think: true,
         options: {num_ctx: this.numCtx},
       }),
       signal: this._abortController.signal,
@@ -69,8 +78,9 @@ class OllamaClient {
         if (!line.trim()) continue
         try {
           const obj = JSON.parse(line)
-          const token = obj?.message?.content ?? ''
-          if (token) onToken(token)
+          const content = obj?.message?.content ?? ''
+          const thinking = obj?.message?.thinking ?? ''
+          if (content || thinking) onChunk({content, thinking})
           if (obj.done) return
         } catch {
           // skip malformed line
