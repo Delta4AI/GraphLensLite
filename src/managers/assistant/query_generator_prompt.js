@@ -66,51 +66,51 @@ From that:
 
 ## Examples
 
-**The property names in these examples (\`Metrics::score\`, \`Biology::mechanism\`, \`Annotation::Pathway\`, etc.) are ILLUSTRATIVE placeholders showing the shape of valid ASTs. Never copy them into a real query unless they literally appear in \`<graph_state>.properties.hierarchy\` for the current request. Substitute real hierarchy paths from the graph state.**
+**The property names and categorical values in these examples (\`PlaceholderSection::placeholder_numeric_a\`, \`placeholder_category_value_a\`, etc.) are SYNTHETIC placeholders showing the shape of valid ASTs. They are guaranteed NOT to exist in any real graph. You MUST replace every placeholder field with a path that literally appears in \`<graph_state>.properties.hierarchy\`, and every placeholder value with a real categorical value from that field's declared values list.**
 
-Intent: "show nodes where score is between 0.8 and 1.0"
+Intent: "show nodes where a numeric property is between 0.8 and 1.0"
 \\\`\\\`\\\`json
-{"queries":[{"title":"High-score nodes","expr":{"kind":"condition","field":"Node filters::Metrics::score","op":"BETWEEN","min":0.8,"max":1}}]}
+{"queries":[{"title":"High numeric placeholder","expr":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_numeric_a","op":"BETWEEN","min":0.8,"max":1}}]}
 \\\`\\\`\\\`
 
-Intent: "find nodes whose mechanism is angiogenesis or fibrosis"
+Intent: "find nodes whose categorical property equals value A or value B"
 \\\`\\\`\\\`json
-{"queries":[{"title":"Angiogenesis / fibrosis nodes","expr":{"kind":"condition","field":"Node filters::Biology::mechanism","op":"IN","values":["angiogenesis","fibrosis"]}}]}
+{"queries":[{"title":"Category A or B nodes","expr":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_categorical_a","op":"IN","values":["placeholder_category_value_a","placeholder_category_value_b"]}}]}
 \\\`\\\`\\\`
 
-Intent: "nodes with degree outside the middle range — below 5 or above 50"
+Intent: "nodes with a numeric property outside the middle range — below 5 or above 50"
 \\\`\\\`\\\`json
-{"queries":[{"title":"Extreme-degree nodes","expr":{"kind":"condition","field":"Node filters::Metrics::degree","op":"LT_OR_GT","lt":5,"gt":50}}]}
+{"queries":[{"title":"Extreme-value nodes","expr":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_numeric_b","op":"LT_OR_GT","lt":5,"gt":50}}]}
 \\\`\\\`\\\`
 
-Intent: "high-score nodes whose mechanism is angiogenesis" (combine two conditions, same scope)
+Intent: "high-numeric nodes whose categorical property is value A" (combine two conditions, same scope)
 \\\`\\\`\\\`json
-{"queries":[{"title":"High-score angiogenesis nodes","expr":{"kind":"binary","bop":"AND","left":{"kind":"condition","field":"Node filters::Biology::mechanism","op":"IN","values":["angiogenesis"]},"right":{"kind":"condition","field":"Node filters::Metrics::score","op":"BETWEEN","min":0.8,"max":1}}}]}
+{"queries":[{"title":"High numeric + category A","expr":{"kind":"binary","bop":"AND","left":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_categorical_a","op":"IN","values":["placeholder_category_value_a"]},"right":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_numeric_a","op":"BETWEEN","min":0.8,"max":1}}}]}
 \\\`\\\`\\\`
 
-Intent: "find nodes similar to my selection" (selection: 3 nodes all with \`Node filters::Biology::mechanism\`="angiogenesis", and \`Node filters::Metrics::score\` values 0.62, 0.77, 0.89 → range 0.62–0.89)
+Intent: "find nodes similar to my selection" (selection: 3 nodes all with \`Node filters::PlaceholderSection::placeholder_categorical_a\`="placeholder_category_value_a", and \`Node filters::PlaceholderSection::placeholder_numeric_a\` values 0.62, 0.77, 0.89 → range 0.62–0.89)
 \\\`\\\`\\\`json
-{"queries":[{"title":"Nodes similar to selection — includes originals","expr":{"kind":"binary","bop":"AND","left":{"kind":"condition","field":"Node filters::Biology::mechanism","op":"IN","values":["angiogenesis"]},"right":{"kind":"condition","field":"Node filters::Metrics::score","op":"BETWEEN","min":0.62,"max":0.89}}}]}
+{"queries":[{"title":"Nodes similar to selection — includes originals","expr":{"kind":"binary","bop":"AND","left":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_categorical_a","op":"IN","values":["placeholder_category_value_a"]},"right":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_numeric_a","op":"BETWEEN","min":0.62,"max":0.89}}}]}
 \\\`\\\`\\\`
 
-Intent: "angiogenesis nodes but exclude those that are inhibitory" (binary NOT, same scope)
+Intent: "category A nodes but exclude those that are also category C" (binary NOT, same scope)
 \\\`\\\`\\\`json
-{"queries":[{"title":"Non-inhibitory angiogenesis nodes","expr":{"kind":"binary","bop":"NOT","left":{"kind":"condition","field":"Node filters::Biology::mechanism","op":"IN","values":["angiogenesis"]},"right":{"kind":"condition","field":"Node filters::Biology::modulation","op":"IN","values":["inhibitory"]}}}]}
+{"queries":[{"title":"Category A nodes excluding C","expr":{"kind":"binary","bop":"NOT","left":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_categorical_a","op":"IN","values":["placeholder_category_value_a"]},"right":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_categorical_b","op":"IN","values":["placeholder_category_value_c"]}}}]}
 \\\`\\\`\\\`
 
-Intent: "filter by Apoptosis pathway in nodes OR by high-score interaction edges" (cross-scope OR — allowed)
+Intent: "filter by category D in nodes OR by high-numeric edges" (cross-scope OR — allowed)
 \\\`\\\`\\\`json
-{"queries":[{"title":"Apoptosis nodes or strong edges","expr":{"kind":"binary","bop":"OR","left":{"kind":"condition","field":"Node filters::Annotation::Pathway","op":"IN","values":["Apoptosis"]},"right":{"kind":"condition","field":"Edge filters::Interaction::Score","op":"BETWEEN","min":0.5,"max":1}}}]}
+{"queries":[{"title":"Category D nodes or strong edges","expr":{"kind":"binary","bop":"OR","left":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_categorical_a","op":"IN","values":["placeholder_category_value_d"]},"right":{"kind":"condition","field":"Edge filters::PlaceholderSection::placeholder_numeric_c","op":"BETWEEN","min":0.5,"max":1}}}]}
 \\\`\\\`\\\`
 
-Intent: "highlight anything relevant — receptor/kinase/enzyme nodes in specific pathways plus binding/activation edges" (broad cross-scope OR)
+Intent: "highlight anything relevant — three node categories plus two edge categories" (broad cross-scope OR)
 \\\`\\\`\\\`json
-{"queries":[{"title":"Relevant nodes and edges","expr":{"kind":"binary","bop":"OR","left":{"kind":"binary","bop":"OR","left":{"kind":"condition","field":"Node filters::Classification::Type","op":"IN","values":["Receptor","Kinase","Enzyme"]},"right":{"kind":"condition","field":"Node filters::Annotation::Pathway","op":"IN","values":["Apoptosis","MAPK signaling"]}},"right":{"kind":"condition","field":"Edge filters::Interaction::Type","op":"IN","values":["binding","activation"]}}}]}
+{"queries":[{"title":"Relevant nodes and edges","expr":{"kind":"binary","bop":"OR","left":{"kind":"binary","bop":"OR","left":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_categorical_a","op":"IN","values":["placeholder_category_value_x","placeholder_category_value_y","placeholder_category_value_z"]},"right":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_categorical_b","op":"IN","values":["placeholder_category_value_d","placeholder_category_value_e"]}},"right":{"kind":"condition","field":"Edge filters::PlaceholderSection::placeholder_categorical_c","op":"IN","values":["placeholder_category_value_f","placeholder_category_value_g"]}}}]}
 \\\`\\\`\\\`
 
 Intent: "strong nodes AND strong edges" (cross-scope AND is forbidden — split into two queries instead)
 \\\`\\\`\\\`json
-{"queries":[{"title":"Strong nodes","expr":{"kind":"condition","field":"Node filters::Metrics::score","op":"BETWEEN","min":0.8,"max":1}},{"title":"Strong edges","expr":{"kind":"condition","field":"Edge filters::Metrics::weight","op":"BETWEEN","min":0.8,"max":1}}]}
+{"queries":[{"title":"Strong nodes","expr":{"kind":"condition","field":"Node filters::PlaceholderSection::placeholder_numeric_a","op":"BETWEEN","min":0.8,"max":1}},{"title":"Strong edges","expr":{"kind":"condition","field":"Edge filters::PlaceholderSection::placeholder_numeric_c","op":"BETWEEN","min":0.8,"max":1}}]}
 \\\`\\\`\\\`
 
 ## Follow-ups — using \`<previous_queries>\`

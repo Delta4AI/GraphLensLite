@@ -3,6 +3,7 @@ import {
   generateQueries,
   extractPropertyTokens,
   findUnknownProperties,
+  closestPaths,
 } from "../src/managers/assistant/query_generator.js";
 
 function makeClient(responses) {
@@ -348,6 +349,41 @@ describe("findUnknownProperties", () => {
   });
 });
 
+describe("closestPaths", () => {
+  const validPaths = [
+    "Node filters::Annotation::Expression level",
+    "Node filters::Annotation::Confidence",
+    "Node filters::Metrics::degree",
+    "Edge filters::Interaction::Score",
+  ];
+
+  it("ranks the closest real path first when the model drops a word", () => {
+    const close = closestPaths(
+      "Node filters::Annotation::Expression",
+      validPaths,
+      3
+    );
+    expect(close[0]).toBe("Node filters::Annotation::Expression level");
+  });
+
+  it("ignores casing when comparing", () => {
+    const close = closestPaths(
+      "node filters::annotation::confidence",
+      validPaths,
+      1
+    );
+    expect(close[0]).toBe("Node filters::Annotation::Confidence");
+  });
+
+  it("caps the result to k entries", () => {
+    expect(closestPaths("anything", validPaths, 2)).toHaveLength(2);
+  });
+
+  it("returns [] when there are no candidates", () => {
+    expect(closestPaths("anything", [], 5)).toEqual([]);
+  });
+});
+
 describe("generateQueries hierarchy validation", () => {
   const graphJson = JSON.stringify({
     properties: {
@@ -433,7 +469,91 @@ describe("generateQueries hierarchy validation", () => {
     expect(repairCall).toMatch(/repair_hint/);
     expect(repairCall).toMatch(/referenced unknown property/);
     expect(repairCall).toMatch(/REMINDER/);
+    // Closest real path from the hierarchy must be surfaced so the retry has
+    // something concrete to land on, not just a generic policy reminder.
+    expect(repairCall).toMatch(/closest real paths.*Node filters::M::a/);
     expect(out[0].text).toBe("(Node filters::M::a IN [x])");
+  });
+
+  it("passes the hierarchy-derived enum schema when the graph has loaded properties", async () => {
+    const hierarchyGraph = JSON.stringify({
+      properties: {
+        hierarchy: {
+          "Node filters": {
+            Annotation: { "Expression level": {}, Confidence: {} },
+          },
+        },
+      },
+    });
+    const client = makeClient([
+      {
+        queries: [
+          {
+            title: "Real path",
+            expr: {
+              kind: "condition",
+              field: "Node filters::Annotation::Expression level",
+              op: "BETWEEN",
+              min: 70,
+              max: 100,
+            },
+          },
+        ],
+      },
+    ]);
+    await generateQueries({
+      client,
+      graphJson: hierarchyGraph,
+      userQuestion: "high expression level",
+      intent: { summary: "high expression level", scope: "node" },
+    });
+    const sentSchema = client.calls[0].schema;
+    const fieldSchema = sentSchema.$defs.Expr.properties.field;
+    expect(fieldSchema.enum).toEqual([
+      "Node filters::Annotation::Expression level",
+      "Node filters::Annotation::Confidence",
+    ]);
+    expect(fieldSchema.pattern).toBeUndefined();
+  });
+
+  it("validates property names that contain whitespace via the AST, not the rendered string", async () => {
+    // Real-world regression: "Expression level" contains a space, so the
+    // old text-based regex split it at the space and treated "Annotation::
+    // Expression" as a phantom property. Validating from the AST eliminates
+    // that whole class of false positive.
+    const graph = JSON.stringify({
+      properties: {
+        hierarchy: {
+          "Node filters": {
+            Annotation: { "Expression level": {}, Confidence: {} },
+          },
+        },
+      },
+    });
+    const response = {
+      queries: [
+        {
+          title: "High expression",
+          expr: {
+            kind: "condition",
+            field: "Node filters::Annotation::Expression level",
+            op: "BETWEEN",
+            min: 70,
+            max: 100,
+          },
+        },
+      ],
+    };
+    const client = makeClient([response]);
+    const out = await generateQueries({
+      client,
+      graphJson: graph,
+      userQuestion: "high expression level",
+      intent: { summary: "high expression level", scope: "node" },
+    });
+    expect(client.calls).toHaveLength(1);
+    expect(out[0].error).toBeUndefined();
+    expect(out[0].text).toBe("(Node filters::Annotation::Expression level BETWEEN 70 AND 100)");
   });
 
   it("lets queries through untouched when the graph_state has no hierarchy yet", async () => {

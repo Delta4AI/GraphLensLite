@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   QUERY_RESPONSE_SCHEMA,
+  buildQuerySchema,
+  flattenHierarchy,
   renderAst,
   renderQueries,
   QueryShapeError,
@@ -298,5 +300,67 @@ describe("renderQueries — envelope", () => {
   it("throws when the envelope is missing queries array", () => {
     expect(() => renderQueries({})).toThrow(QueryShapeError);
     expect(() => renderQueries(null)).toThrow(QueryShapeError);
+  });
+});
+
+describe("flattenHierarchy", () => {
+  it("returns Section::Group::Name paths in encounter order", () => {
+    const hierarchy = {
+      "Node filters": {
+        Annotation: { "Expression level": {}, Confidence: {} },
+        Metrics: { degree: {} },
+      },
+      "Edge filters": {
+        Interaction: { Score: {} },
+      },
+    };
+    expect(flattenHierarchy(hierarchy)).toEqual([
+      "Node filters::Annotation::Expression level",
+      "Node filters::Annotation::Confidence",
+      "Node filters::Metrics::degree",
+      "Edge filters::Interaction::Score",
+    ]);
+  });
+
+  it("ignores unknown top-level sections", () => {
+    expect(
+      flattenHierarchy({
+        "Node filters": { G: { a: {} } },
+        Bogus: { Other: { b: {} } },
+      })
+    ).toEqual(["Node filters::G::a"]);
+  });
+
+  it("returns [] for missing or empty hierarchy", () => {
+    expect(flattenHierarchy(null)).toEqual([]);
+    expect(flattenHierarchy(undefined)).toEqual([]);
+    expect(flattenHierarchy({})).toEqual([]);
+  });
+});
+
+describe("buildQuerySchema", () => {
+  it("constrains field to an enum of real hierarchy paths when given a hierarchy", () => {
+    const schema = buildQuerySchema({
+      "Node filters": { Annotation: { "Expression level": {}, Confidence: {} } },
+      "Edge filters": { Interaction: { Score: {} } },
+    });
+    const field = schema.$defs.Expr.properties.field;
+    expect(field.pattern).toBeUndefined();
+    expect(field.enum).toEqual([
+      "Node filters::Annotation::Expression level",
+      "Node filters::Annotation::Confidence",
+      "Edge filters::Interaction::Score",
+    ]);
+  });
+
+  it("falls back to the static pattern-only schema when the hierarchy is missing or empty", () => {
+    expect(buildQuerySchema(null)).toBe(QUERY_RESPONSE_SCHEMA);
+    expect(buildQuerySchema({})).toBe(QUERY_RESPONSE_SCHEMA);
+  });
+
+  it("does not mutate the static schema", () => {
+    const before = JSON.stringify(QUERY_RESPONSE_SCHEMA);
+    buildQuerySchema({ "Node filters": { G: { a: {} } } });
+    expect(JSON.stringify(QUERY_RESPONSE_SCHEMA)).toBe(before);
   });
 });

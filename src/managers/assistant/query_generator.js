@@ -9,8 +9,42 @@
 //   4. Retries once if the renderer rejects the AST (schema enforcement is
 //      strong but not perfect; one repair pass mops up edge cases).
 
-import {QUERY_RESPONSE_SCHEMA, renderQueries} from './query_schema.js'
+import {QUERY_RESPONSE_SCHEMA, buildQuerySchema, flattenHierarchy, renderQueries} from './query_schema.js'
 import {GENERATOR_SYSTEM_PROMPT} from './query_generator_prompt.js'
+
+// Levenshtein distance — small, allocation-light implementation. Used only
+// to rank candidate property paths when the model emits an invented name,
+// so the cost is bounded by `validPaths.length × invented_name.length` and
+// runs at most twice per query batch (once per retry pass).
+function levenshtein(a, b) {
+  if (a === b) return 0
+  if (!a.length) return b.length
+  if (!b.length) return a.length
+  let prev = new Array(b.length + 1)
+  let curr = new Array(b.length + 1)
+  for (let j = 0; j <= b.length; j++) prev[j] = j
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost)
+    }
+    [prev, curr] = [curr, prev]
+  }
+  return prev[b.length]
+}
+
+// Pick the top-k closest real paths to an invented one. Case-insensitive so
+// "Expression" finds "Expression level" without a casing penalty. Hard limit
+// k=5: enough to anchor the retry, small enough to keep the repair hint
+// readable to the model.
+export function closestPaths(invented, validPaths, k = 5) {
+  if (!validPaths.length) return []
+  const target = invented.toLowerCase()
+  const scored = validPaths.map(p => ({path: p, d: levenshtein(target, p.toLowerCase())}))
+  scored.sort((a, b) => a.d - b.d || a.path.localeCompare(b.path))
+  return scored.slice(0, k).map(s => s.path)
+}
 
 // Hierarchy-grounded property validator.
 //
@@ -55,14 +89,60 @@ export function findUnknownProperties(queryText, hierarchy) {
   return unknown
 }
 
+// Walk an expression AST and collect every leaf `field` value. We validate
+// fields against the AST instead of the rendered text because property
+// names can contain characters (e.g. spaces in "Expression level") that
+// don't survive a regex-based re-parse of the query string.
+export function collectFieldsFromAst(expr) {
+  const out = []
+  const stack = [expr]
+  while (stack.length) {
+    const node = stack.pop()
+    if (!node || typeof node !== 'object') continue
+    if (node.kind === 'condition') {
+      if (typeof node.field === 'string') out.push(node.field)
+      continue
+    }
+    if (node.kind === 'binary') {
+      if (node.right) stack.push(node.right)
+      if (node.left) stack.push(node.left)
+    }
+  }
+  return out
+}
+
+// Returns the AST field strings that are NOT present in the hierarchy.
+// A null/missing hierarchy disables validation.
+function findUnknownFieldsInAst(expr, hierarchy) {
+  if (!hierarchy || typeof hierarchy !== 'object') return []
+  const unknown = []
+  const seen = new Set()
+  for (const field of collectFieldsFromAst(expr)) {
+    if (seen.has(field)) continue
+    seen.add(field)
+    const parts = field.split('::')
+    if (parts.length !== 3) {
+      unknown.push(field)
+      continue
+    }
+    const [section, sub, name] = parts
+    if (hierarchy[section]?.[sub]?.[name] === undefined) {
+      unknown.push(field)
+    }
+  }
+  return unknown
+}
+
 // Apply the hierarchy check across a batch of rendered query entries.
-// Valid entries are returned unchanged; invalid ones are rewritten to the
-// standard {title, scope, text: null, error: ...} shape that the retry
-// loop recognises.
-function applyHierarchyValidation(entries, hierarchy) {
-  return entries.map(entry => {
+// `response.queries[i].expr` is paired with `entries[i]` so we can validate
+// against the structured AST rather than the rendered string. Valid entries
+// are returned unchanged; invalid ones are rewritten to the standard
+// {title, scope, text: null, error: ...} shape that the retry loop recognises.
+function applyHierarchyValidation(entries, response, hierarchy) {
+  const queries = Array.isArray(response?.queries) ? response.queries : []
+  return entries.map((entry, i) => {
     if (!entry?.text || entry.error) return entry
-    const unknown = findUnknownProperties(entry.text, hierarchy)
+    const unknown = findUnknownFieldsInAst(queries[i]?.expr, hierarchy)
     if (!unknown.length) return entry
     const plural = unknown.length === 1 ? 'property' : 'properties'
     // Error message is deliberately terse — it flows into both the retry
@@ -148,6 +228,13 @@ export async function generateQueries({
     hierarchy = JSON.parse(graphJson)?.properties?.hierarchy ?? null
   } catch { /* leave hierarchy null — validator becomes a no-op */ }
 
+  // Build a schema whose `field` is enum-constrained to the actual hierarchy
+  // paths. With Ollama's `format` parameter the decoder cannot then sample
+  // a non-existent property — the harness's strongest guard. Falls back to
+  // the static pattern-only schema when the hierarchy is missing.
+  const schema = buildQuerySchema(hierarchy)
+  const validPaths = flattenHierarchy(hierarchy)
+
   const makeMessages = (repairHint) => [
     {role: 'system', content: GENERATOR_SYSTEM_PROMPT},
     {
@@ -163,8 +250,8 @@ export async function generateQueries({
     },
   ]
 
-  const firstResponse = await generateJsonWithRetry(client, makeMessages(), QUERY_RESPONSE_SCHEMA)
-  const firstRendered = applyHierarchyValidation(renderQueries(firstResponse), hierarchy)
+  const firstResponse = await generateJsonWithRetry(client, makeMessages(), schema)
+  const firstRendered = applyHierarchyValidation(renderQueries(firstResponse), firstResponse, hierarchy)
 
   // If every query rendered cleanly AND passed hierarchy validation, we're done.
   if (firstRendered.every(q => q.text && !q.error)) return firstRendered
@@ -178,13 +265,31 @@ export async function generateQueries({
     .map((q, i) => `Query ${i + 1} (${q.title}): ${q.error}`)
     .join('\n')
   const hasUnknownProps = firstRendered.some(q => /referenced unknown propert/.test(q.error || ''))
-  const extraGuidance = hasUnknownProps
-    ? `\n\nREMINDER: Every "field" must match a real path in graph_state.properties.hierarchy (Section::Group::PropertyName). The example property names in the system prompt are illustrative — do not reuse them unless they literally appear in THIS graph's hierarchy. If no real property fits the user's intent, return {"queries": []}.`
-    : ''
+  let extraGuidance = ''
+  if (hasUnknownProps) {
+    // Collect the invented paths and pair each with its closest real
+    // matches from the hierarchy. Surfacing concrete candidates is far more
+    // useful to the retry than a generic "use a real property" advisory —
+    // small local models will land on a valid path roughly every time when
+    // the answer is already in the prompt.
+    const invented = new Set()
+    for (const q of firstRendered) {
+      const m = q.error?.match(/referenced unknown propert(?:y|ies): (.+)$/)
+      if (!m) continue
+      for (const p of m[1].split(', ')) invented.add(p.trim())
+    }
+    const suggestionLines = [...invented].map(p => {
+      const close = closestPaths(p, validPaths, 5)
+      if (!close.length) return `  "${p}" → no candidates (hierarchy unavailable)`
+      return `  "${p}" → closest real paths: ${close.map(c => `"${c}"`).join(', ')}`
+    })
+    extraGuidance =
+      `\n\nREMINDER: Every "field" must literally match a path in graph_state.properties.hierarchy (Section::Group::PropertyName). The example property names in the system prompt are illustrative placeholders, never real fields. Invented paths and the closest real alternatives:\n${suggestionLines.join('\n')}\nIf one of the suggested real paths matches the user's intent, use it. If none fit, return {"queries": []}.`
+  }
   const repairHint = `The previous response had structural errors:\n${errors}${extraGuidance}`
 
-  const retryResponse = await generateJsonWithRetry(client, makeMessages(repairHint), QUERY_RESPONSE_SCHEMA)
-  const retryRendered = applyHierarchyValidation(renderQueries(retryResponse), hierarchy)
+  const retryResponse = await generateJsonWithRetry(client, makeMessages(repairHint), schema)
+  const retryRendered = applyHierarchyValidation(renderQueries(retryResponse), retryResponse, hierarchy)
   // Prefer the retry if it's strictly better; otherwise surface the first so
   // partial successes aren't lost.
   const firstOk = firstRendered.filter(q => q.text && !q.error).length

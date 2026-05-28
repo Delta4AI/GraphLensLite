@@ -19,9 +19,34 @@
 
 const FIELD_PATTERN = '^(Node filters|Edge filters)::[^:]+::[^:]+$'
 
+// Flatten the 3-level hierarchy into a list of fully-qualified field paths.
+// Anything outside the two known sections is dropped — the schema's `field`
+// is constrained to those two prefixes and the renderer rejects others.
+export function flattenHierarchy(hierarchy) {
+  if (!hierarchy || typeof hierarchy !== 'object') return []
+  const paths = []
+  for (const section of ['Node filters', 'Edge filters']) {
+    const subs = hierarchy[section]
+    if (!subs || typeof subs !== 'object') continue
+    for (const [sub, props] of Object.entries(subs)) {
+      if (!props || typeof props !== 'object') continue
+      for (const prop of Object.keys(props)) {
+        paths.push(`${section}::${sub}::${prop}`)
+      }
+    }
+  }
+  return paths
+}
+
 // Schema object handed to Ollama via the `format` parameter. Scope is NOT a
 // top-level field — field prefixes are authoritative. A `title` still helps
 // the UI label each suggestion.
+//
+// This static schema is the safe fallback: it constrains `field` to the
+// Section::Group::Name SHAPE via a regex pattern. The real harness uses
+// `buildQuerySchema(hierarchy)` instead, which swaps the pattern for an
+// `enum` of the actual valid paths so the decoder physically cannot emit a
+// property that doesn't exist in the current graph.
 export const QUERY_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
@@ -44,6 +69,8 @@ export const QUERY_RESPONSE_SCHEMA = {
       properties: {
         kind: {enum: ['condition', 'binary']},
         field: {type: 'string', pattern: FIELD_PATTERN},
+        // ↑ shape only. `buildQuerySchema` replaces this with an `enum` of
+        // real paths drawn from the current graph's hierarchy.
         op: {enum: ['BETWEEN', 'LT_OR_GT', 'IN']},
         min: {type: 'number'},
         max: {type: 'number'},
@@ -216,6 +243,24 @@ export function renderQueries(response) {
 // Kept public for tests.
 export function renderAst(query) {
   return renderSingleQuery(query)
+}
+
+// Build a schema variant whose `field` is constrained to an `enum` of the
+// real Section::Group::Name paths in the current graph. When passed via
+// Ollama's `format` parameter, the decoder cannot sample any field path
+// outside this list — the "model invented a property name" failure becomes
+// structurally impossible.
+//
+// Falls back to the static (pattern-only) schema when the hierarchy is
+// missing or empty, so a pre-init graph state doesn't block generation.
+export function buildQuerySchema(hierarchy) {
+  const paths = flattenHierarchy(hierarchy)
+  if (paths.length === 0) return QUERY_RESPONSE_SCHEMA
+  const schema = JSON.parse(JSON.stringify(QUERY_RESPONSE_SCHEMA))
+  const fieldSchema = schema.$defs.Expr.properties.field
+  delete fieldSchema.pattern
+  fieldSchema.enum = paths
+  return schema
 }
 
 export {QueryShapeError, scopesOf, effectiveScope}
