@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.13.0
+
+### Features
+
+#### Graph Assistant (new)
+
+Local Ollama-powered chat panel with a live context snapshot of your graph, selection, and metric values.
+
+* Safe, structured query generation — produces guaranteed-valid GLL queries grounded in your real property hierarchy, so the assistant can't invent property names or emit broken syntax
+* Suggested Queries panel with Copy / Select / Open-in-editor; Select pans and zooms to matches
+* Live budget meter next to Send with per-section breakdown and a pre-send modal when you'd exceed the context window
+* First-run setup and settings modal with model picker, endpoint probing, and `http(s)`-only validation with local/private-IP detection
+* Reasoning-trace visualization for thinking models with a live token counter
+* Empty-state starter chips, resizable sidebar, and clickable in-reply action glyphs
+* GFM markdown rendering with DOMPurify sanitization and per-code-block copy buttons
+* Guided tour step covering query suggestions, setup, and the budget pill
+
+### Fixes
+
+* Fixed tooltip `z-index` rendering below overlay UI
+* Fixed guided-tour teardown where `Popup.close()` could tear down open panels mid-transition
+
+### UI
+
+* Replaced lasso SVG mask with curly-loop glyph
+
 ## 1.12.0
 
 ### Features
