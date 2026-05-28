@@ -550,6 +550,17 @@ class GraphLayoutManager {
 
     await layoutActions[action]();
     await this.persistNodePositions();
+
+    // Push new positions to G6 — without this, mutated node.style.x/y on cached
+    // refs don't reach the graph's internal data store, so the layout only
+    // becomes visible once the selection state changes and forces a re-read.
+    const movedNodes = await cache.sm.getSelectedNodes();
+    if (movedNodes.length > 0) {
+      this.cache.graph.updateNodeData(
+        movedNodes.map(n => ({id: n.id, style: {x: n.style.x, y: n.style.y}}))
+      );
+    }
+
     await this.handleLayoutChangeLoadingEvent(action, eventLabels[action]);
   }
 

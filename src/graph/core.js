@@ -126,6 +126,11 @@ class GraphCoreManager {
         this.cache.layoutChanged ||
         forceRender
       ) {
+        // NOTE: only `styleChanged` re-syncs cached-ref mutations to G6 here.
+        // `layoutChanged` does NOT trigger updateData — callers that flip it
+        // while mutating node.style.x/y on cache.nodeRef refs must push their
+        // own updateNodeData payload, or the change won't reach G6 until the
+        // next selection-state change. See layoutSelectedNodes in layout.js.
         if (this.cache.styleChanged) {
           await this.cache.ui.showLoading("Loading", "Updating graph ..");
           await new Promise((resolve) => requestAnimationFrame(resolve));
