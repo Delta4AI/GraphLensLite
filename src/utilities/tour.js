@@ -293,6 +293,23 @@ const TOUR_STEPS = [
     action: "openQueryEditor",
   },
   {
+    title: "Graph Assistant 🤖",
+    text: `Ask natural-language questions about your graph and get answers grounded in the current workspace. The assistant can also suggest queries you run with one click:
+           <br>• <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">🎯 Select</span> applies the query immediately
+           <br>• <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">📝 Open in query editor</span> drops it into the editor for review
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Setup &amp; privacy</strong>
+           <br>The assistant talks to an <strong>Ollama</strong> server you control, local by default. Every message ships a snapshot of the current graph state, so use a local endpoint for sensitive data. Click <strong>⚙</strong> in the panel header to configure the endpoint and pick a model. Results vary by model. Tested with <code>qwen3.5:9b</code>.
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           The <strong>budget pill</strong> at the bottom shows how much of the model's context window the next request will consume. Click it for a per-section breakdown.`,
+    targets: [
+      {selector: "#assistantSidebar"},
+      {selector: "#assistantToggleBtn"},
+    ],
+    position: "left",
+    action: "openAssistantPanel",
+  },
+  {
     title: "Selection Panel",
     text: `The selection panel sits above the graph canvas.
            <br><br>
@@ -380,6 +397,7 @@ const TOUR_STEPS = [
            <br><strong>D</strong> — Toggle data editor
            <br><strong>M</strong> — Toggle metrics panel
            <br><strong>Y</strong> — Toggle styling panel
+           <br><strong>A</strong> — Toggle Graph Assistant
            <br><strong>E</strong> — Toggle edit mode
            <br><strong>P</strong> — Export as PNG
            <br><strong>S</strong> — Save as JSON
@@ -492,6 +510,11 @@ class GuidedTour {
       showFullscreenButton: false,
       closeOnClickOutside: false,
       onClose: () => {
+        // Popup.close() fires onClose unconditionally — including when we
+        // programmatically close mid-transition. cleanup() sets this flag
+        // for the duration of its own close call so the user's × / Esc
+        // close still ends the tour, but a Next-click does not.
+        if (this._suppressOnClose) return
         this.cleanup()
         this.finish()
       }
@@ -695,6 +718,28 @@ class GuidedTour {
         await this.sleep(350)
         break
       }
+      case "openAssistantPanel": {
+        // Bottom-bar editors compete visually with the right sidebar, so
+        // close them first to give the assistant panel a clean stage.
+        const queryBtn = document.getElementById("queryToggleBtn")
+        if (queryBtn && queryBtn.classList.contains("highlight")) {
+          this.cache.ui.toggleQueryEditor()
+          await this.sleep(350)
+        }
+        const dataBtn = document.getElementById("dataToggleBtn")
+        if (dataBtn && dataBtn.classList.contains("highlight")) {
+          await this.cache.ui.toggleDataEditor()
+          await this.sleep(350)
+        }
+        const panel = document.getElementById("assistantSidebar")
+        if (panel && !panel.classList.contains("active")) {
+          // suppressSetup avoids firing the first-run modal mid-tour — users
+          // who skipped setup still get to see the panel UI here.
+          this.cache.assistant.togglePanel({suppressSetup: true})
+        }
+        await this.sleep(350)
+        break
+      }
       case "expandSelectionEditor": {
         const container = document.getElementById("selectedElementsContainer")
         if (container && !container.classList.contains("expanded")) {
@@ -714,6 +759,13 @@ class GuidedTour {
         const dataBtn = document.getElementById("dataToggleBtn")
         if (dataBtn && dataBtn.classList.contains("highlight")) {
           await this.cache.ui.toggleDataEditor()
+          await this.sleep(350)
+        }
+        // close assistant panel — both panels compete for the right sidebar
+        // real estate; only one should be visible at a time.
+        const assistantBtn = document.getElementById("assistantToggleBtn")
+        if (assistantBtn && assistantBtn.classList.contains("highlight")) {
+          this.cache.assistant.togglePanel({suppressSetup: true})
           await this.sleep(350)
         }
         const styleBtn = document.getElementById("styleToggleBtn")
@@ -743,7 +795,15 @@ class GuidedTour {
     if (this.popup) {
       const p = this.popup
       this.popup = null
-      p.close()
+      // Suppress the popup's onClose-driven finish() for this programmatic
+      // close — the tour is advancing to the next step, not ending. Without
+      // this, every Next-click was tearing down all open panels mid-flight.
+      this._suppressOnClose = true
+      try {
+        p.close()
+      } finally {
+        this._suppressOnClose = false
+      }
     }
   }
 
@@ -770,6 +830,10 @@ class GuidedTour {
     const selContainer = document.getElementById("selectedElementsContainer")
     if (selContainer && selContainer.classList.contains("expanded")) {
       this.cache.ui.toggleSelectionEditor()
+    }
+    const assistantBtn = document.getElementById("assistantToggleBtn")
+    if (assistantBtn && assistantBtn.classList.contains("highlight")) {
+      this.cache.assistant.togglePanel({suppressSetup: true})
     }
   }
 }

@@ -127,7 +127,7 @@ export function openSettingsPopup({
     intro.className = 'assistant-settings-intro'
     const p1 = document.createElement('p')
     p1.textContent =
-      'The AI assistant talks to an Ollama-compatible server you control. ' +
+      'The Graph Assistant talks to an Ollama-compatible server you control. ' +
       'Point it at a running Ollama instance and pick a model.'
     const p2 = document.createElement('p')
     p2.textContent =
@@ -291,7 +291,7 @@ export function openSettingsPopup({
   content.appendChild(footer)
 
   const popup = new Popup(content, {
-    title: isSetup ? 'Connect the AI assistant' : 'AI Assistant Settings',
+    title: isSetup ? 'Connect the Graph Assistant' : 'Graph Assistant settings',
     width: '440px',
     showFullscreenButton: false,
     closeOnClickOutside: false,

@@ -222,7 +222,11 @@ class AssistantManager {
     container.dataset.actionWired = 'true'
   }
 
-  togglePanel() {
+  // `suppressSetup` lets callers (currently: the guided tour) open the panel
+  // without triggering the first-run setup modal. The setup modal steals
+  // focus from the tour overlay, so the tour wants to *show* the panel UI
+  // without forcing configuration mid-walkthrough.
+  togglePanel({suppressSetup = false} = {}) {
     const panel = document.getElementById('assistantSidebar')
     const btn = document.getElementById('assistantToggleBtn')
     this._panelOpen = !this._panelOpen
@@ -244,7 +248,7 @@ class AssistantManager {
       // they can send anything. Opening the panel is the earliest natural
       // moment to prompt for this — doing it later (on Send) would mean the
       // user types a full question first and then gets interrupted.
-      if (!this._isConfigured()) this._openSetup()
+      if (!suppressSetup && !this._isConfigured()) this._openSetup()
     } else {
       this._stopBudgetAutoRefresh()
     }
@@ -322,20 +326,18 @@ class AssistantManager {
     await this.send(text)
   }
 
-  // Starter chips in the empty state fill the textarea rather than sending
-  // immediately — the user often wants to tweak wording (add specifics,
-  // change the "Top 5" to "Top 10", etc.) before firing. Focusing the input
-  // also lets them hit Enter to send without reaching for the Send button.
-  fillFromChip(btn) {
-    const input = document.getElementById('assistantInput')
-    if (!input || !btn) return
-    input.value = btn.textContent.trim()
-    input.focus()
-    // Park the caret at the end so typing extends rather than overwrites.
-    const end = input.value.length
-    try { input.setSelectionRange(end, end) } catch { /* non-text inputs */ }
-    // Budget meter reflects the new draft length immediately.
-    this._refreshBudgetMeter()
+  // Starter chips in the empty state send immediately — they're presented
+  // as ready-to-use prompts, not editable drafts. If the user wants to
+  // tweak wording, they can retype in the input box; the chip is for the
+  // common case of "just answer this exact question".
+  sendFromChip(btn) {
+    const text = btn?.textContent?.trim()
+    if (!text || this._streaming) return
+    if (!this._isConfigured()) {
+      this._openSetup()
+      return
+    }
+    this.send(text)
   }
 
   async send(userText, options = {}) {

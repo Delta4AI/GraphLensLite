@@ -89,7 +89,7 @@
           <button id="queryToggleBtn" class="showOnLoad medium-btn" title="Toggle query editor (Q)" onclick="cache.ui.toggleQueryEditor()">📝</button>
           <button id="exportImage" class="showOnLoad medium-btn" onclick="cache.io.exportPNG()" title="Save Image (P)">📷️</button>
           <button id="exportModel" class="showOnLoad medium-btn" onclick="cache.io.exportGraphAsJSON()" title="Save Model (S)">💾</button>
-          <button id="assistantToggleBtn" class="medium-btn" title="Toggle AI assistant (A)" onclick="cache.assistant.togglePanel()">🤖</button>
+          <button id="assistantToggleBtn" class="medium-btn" title="Toggle Graph Assistant (A)" onclick="cache.assistant.togglePanel()">🤖</button>
         </div>
       </div>
       <div class="hideOnLoad">
@@ -182,7 +182,7 @@
   <div id="assistantSidebar">
     <div class="assistant-resize-handle"></div>
     <div class="panel-header panel-header-full-width">
-      <span class="panel-header-text">AI Assistant <span style="font-size:0.7em;opacity:0.75;font-weight:normal;">(beta)</span></span>
+      <span class="panel-header-text">Graph Assistant</span>
       <div class="panel-header-buttons">
         <button class="panel-header-btn" title="Settings" onclick="cache.assistant.openSettings()">⚙</button>
         <button class="panel-header-btn" title="Clear conversation" onclick="cache.assistant.clearHistory()">🗑</button>
@@ -191,15 +191,15 @@
     </div>
     <div id="assistantMessages"></div>
     <div id="assistantEmptyState">
-      <div class="assistant-empty-state-title">Graph Lens Lite assistant</div>
+      <div class="assistant-empty-state-title">Graph Assistant</div>
       <div class="assistant-empty-state-body">Ask about navigating, filtering, querying, styling, or analysing your graph. I can see the current workspace state when you send a message.</div>
       <div class="assistant-chips" role="list">
-        <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.fillFromChip(this)">How can I visually group and style elements?</button>
-        <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.fillFromChip(this)">How does the query editor work?</button>
-        <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.fillFromChip(this)">Figure out a strategy to select elements of high importance.</button>
-        <button type="button" class="assistant-chip" data-when="selection" onclick="cache.assistant.fillFromChip(this)">Tell me something about the selected elements.</button>
-        <button type="button" class="assistant-chip" data-when="selection" onclick="cache.assistant.fillFromChip(this)">Which of my selected nodes have the highest degree centrality?</button>
-        <button type="button" class="assistant-chip" data-when="no-selection" onclick="cache.assistant.fillFromChip(this)">How do I select nodes?</button>
+        <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">How can I visually group and style elements?</button>
+        <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">How does the query editor work?</button>
+        <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">Figure out a strategy to select elements of high importance.</button>
+        <button type="button" class="assistant-chip" data-when="selection" onclick="cache.assistant.sendFromChip(this)">Tell me something about the selected elements.</button>
+        <button type="button" class="assistant-chip" data-when="selection" onclick="cache.assistant.sendFromChip(this)">Which of my selected nodes have the highest degree centrality?</button>
+        <button type="button" class="assistant-chip" data-when="no-selection" onclick="cache.assistant.sendFromChip(this)">How do I select nodes?</button>
       </div>
     </div>
     <div id="assistantInputRow">
