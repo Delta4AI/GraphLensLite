@@ -410,7 +410,10 @@ describe("Excel export: edge properties", () => {
     expect(edgeCol(row, "Line Width")).toBe(DEFAULTS.EDGE.LINE_WIDTH);
     expect(edgeCol(row, "Line Dash")).toBe(DEFAULTS.EDGE.LINE_DASH);
     expect(edgeCol(row, "Color")).toBe(DEFAULTS.EDGE.COLOR);
-    expect(edgeCol(row, "Halo Color")).toBe(DEFAULTS.EDGE.HALO.COLOR);
+    // Halo Color is gated on e.style.halo (src/managers/io.js — see 6bc4e4a):
+    // minimal edges have halo disabled, so the column is intentionally empty
+    // to prevent re-import from silently activating the halo.
+    expect(edgeCol(row, "Halo Color")).toBeUndefined();
     expect(edgeCol(row, "Halo Width")).toBe(DEFAULTS.EDGE.HALO.WIDTH);
   });
 

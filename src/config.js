@@ -1,7 +1,7 @@
 /**
  * Defaults for the graph, layouts and UI
  */
-const VERSION = "1.12.0";
+const VERSION = "1.13.0";
 
 const DEFAULTS = {
   NODE: {
@@ -248,14 +248,10 @@ const CFG = {
 
   INVISIBLE_CHAR: "\u200B",
 
-  ASSISTANT: {
-    ENABLED: true,
-    ENDPOINT: 'http://exploration-big:11434',
-    MODEL: 'llama3.1:8b',
-    MAX_CONTEXT_NODES: 25,
-    MAX_STATUS_LOG_LINES: 10,
-    MAX_HISTORY_MESSAGES: 12,
-  },
+  // AI Assistant configuration lives entirely in localStorage (key
+  // `gll.assistant.settings`). Defaults live in
+  // src/managers/assistant/settings.js and are surfaced through the
+  // setup/settings modal — nothing to keep in sync here.
 }
 
 export {VERSION, DEFAULTS, CFG}

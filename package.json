@@ -1,6 +1,6 @@
 {
   "name": "graph-lens-lite",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "main": "src/package/electron_app.js",
   "description": "Visualise and explore property graphs in a lightweight desktop app.",
   "homepage": "https://github.com/Delta4AI/GraphLensLite",
@@ -9,13 +9,14 @@
     "email": "matthias.ley@delta4.ai"
   },
   "scripts": {
-    "start": "npm run inject-version && electron .",
+    "start": "npm run vendor-libs && npm run inject-version && electron .",
     "pack": "electron-builder --dir",
     "clean:linux": "rm -rf dist && mkdir -p dist",
-    "bundle": "esbuild src/gll.js --bundle --outfile=src/gll.bundle.js",
-    "bundle:prod": "esbuild src/gll.js --bundle --minify --target=es2020 --drop:debugger --legal-comments=none --outfile=src/gll.bundle.js",
-    "bundle:watch": "esbuild src/gll.js --bundle --outfile=src/gll.bundle.js --watch --sourcemap",
-    "bundle:serve": "esbuild src/gll.js --bundle --outfile=src/gll.bundle.js --watch --sourcemap --servedir=src",
+    "vendor-libs": "node src/package/vendor_libs.js",
+    "bundle": "npm run vendor-libs && esbuild src/gll.js --bundle --outfile=src/gll.bundle.js",
+    "bundle:prod": "npm run vendor-libs && esbuild src/gll.js --bundle --minify --target=es2020 --drop:debugger --legal-comments=none --outfile=src/gll.bundle.js",
+    "bundle:watch": "npm run vendor-libs && esbuild src/gll.js --bundle --outfile=src/gll.bundle.js --watch --sourcemap",
+    "bundle:serve": "npm run vendor-libs && esbuild src/gll.js --bundle --outfile=src/gll.bundle.js --watch --sourcemap --servedir=src",
     "create-inline-html": "node src/package/inline_html.mjs src/graph_lens_lite.html dist/graph-lens-lite_inline_${npm_package_version}.html",
     "inject-version": "node src/package/inject_version.js",
     "inject-excel-template": "node src/package/inject_excel_template.mjs",
@@ -26,7 +27,7 @@
     "dist-linux": "npm run dist:prep:linux && electron-builder --linux --publish=never && npm run substitute-gll end",
     "dist-mac": "npm run dist:prep && electron-builder --mac --publish=never && npm run substitute-gll end",
     "dist": "npm run dist-linux && npm run dist-windows",
-    "serve": "npx http-server src -p 8000 --cors -o /graph_lens_lite.html ",
+    "serve": "npm run vendor-libs && npx http-server src -p 8000 --cors -o /graph_lens_lite.html ",
     "version": "npm run inject-version && git add src/config.js",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -69,7 +70,12 @@
     "exceljs": "^4.4.0",
     "inline-source": "^8.0.3",
     "inline-source-cli": "^1.2.0",
+    "jsdom": "^29.0.2",
     "rimraf": "^6.0.1",
     "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.1",
+    "marked": "^18.0.2"
   }
 }
