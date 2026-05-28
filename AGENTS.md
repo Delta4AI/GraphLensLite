@@ -76,7 +76,7 @@ src/
 ├── style.css               # all CSS
 ├── lib/                    # vendored libs (g6.min.js, exceljs.min.js)
 ├── graph/                  # graph managers (6 files)
-├── managers/               # business logic managers (6 files)
+├── managers/               # business logic managers (6 files + assistant/ subfolder)
 ├── utilities/              # helpers (7 files)
 └── package/                # electron + build scripts
 templates/                  # Excel input templates

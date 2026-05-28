@@ -1,7 +1,7 @@
 /**
  * Defaults for the graph, layouts and UI
  */
-const VERSION = "1.12.0";
+const VERSION = "1.13.0";
 
 const DEFAULTS = {
   NODE: {
@@ -247,6 +247,11 @@ const CFG = {
   },
 
   INVISIBLE_CHAR: "\u200B",
+
+  // AI Assistant configuration lives entirely in localStorage (key
+  // `gll.assistant.settings`). Defaults live in
+  // src/managers/assistant/settings.js and are surfaced through the
+  // setup/settings modal — nothing to keep in sync here.
 }
 
 export {VERSION, DEFAULTS, CFG}
