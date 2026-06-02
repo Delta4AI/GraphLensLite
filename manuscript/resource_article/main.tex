@@ -1,0 +1,86 @@
+%%
+%% Cell Press -- Patterns (Resource Article)
+%% Based on the Cell Press LaTeX template v1.10.
+%%
+\documentclass[12pt,letterpaper]{article}
+
+% ── Page geometry & fonts (per Cell Press template) ──────────────────────────
+\usepackage[a4paper, total={7in, 10in}]{geometry}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{helvet}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+% ── Common packages ──────────────────────────────────────────────────────────
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\usepackage{authblk}
+\usepackage{orcidlink}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage[super,comma,sort&compress]{natbib}
+\bibliographystyle{numbered}
+\usepackage[right]{lineno}
+\linenumbers
+
+\graphicspath{{../shared/Fig/}}
+
+% Cell Press: do not number sections or subsections.
+\setcounter{secnumdepth}{-2}
+
+% Cell-Press flush-left title block (template default).
+\makeatletter
+\renewcommand{\maketitle}{\bgroup\setlength{\parindent}{0pt}
+\begin{flushleft}
+  \textbf{\@title}\par\medskip
+  \@author
+\end{flushleft}\egroup}
+\makeatother
+
+% ── Title ────────────────────────────────────────────────────────────────────
+% AI-DRAFTED -- REVIEW
+% Current title is ~153 characters; Cell Press limit is 145 (incl. spaces).
+% Suggested trim ideas (pick / rewrite):
+%   "Graph Lens Lite: an interactive browser-based viewer for disease
+%    pathobiology and drug mechanism networks" (~106 chars)
+%   "Graph Lens Lite: interactive visualization of disease pathobiology and
+%    drug mechanism networks in the browser" (~108 chars)
+\title{Graph Lens Lite: An interactive biological network viewer for displaying, exploring, and sharing disease pathobiology and drug mechanism of action models}
+\date{}
+
+% ── Authors & affiliations ───────────────────────────────────────────────────
+\author[1,2,4,*,\orcidlink{0000-0001-6853-8542}]{Matthias Ley}
+\author[1,\orcidlink{0000-0002-4329-1499}]{Kinga K\k{e}ska-Izworska}
+\author[1,\orcidlink{0000-0001-5341-8097}]{Lucas Fillinger}
+\author[1,\orcidlink{0000-0002-6868-5654}]{Samuel M Walter}
+\author[1,\orcidlink{0009-0000-0243-2673}]{Fabio Baumg\"{a}rtel}
+\author[1,2,\orcidlink{0009-0007-7272-5034}]{Enrico Bono}
+\author[1,2,\orcidlink{0009-0008-5176-2802}]{Louiza Galou}
+\author[1,\orcidlink{0009-0003-3492-4017}]{Peter Andorfer}
+\author[3]{Pirmin Hauser}
+\author[3,\orcidlink{0000-0002-7884-9827}]{Johannes Leierer}
+\author[1,2,5,**,\orcidlink{0000-0003-0803-614X}]{Klaus Kratochwill}
+\author[1,3,5,\orcidlink{0000-0003-2087-5691}]{Paul Perco}
+
+\affil[1]{Delta4 GmbH, Alser Stra\ss{}e 23/30, 1080 Vienna, Austria}
+\affil[2]{Division of Pediatric Nephrology and Gastroenterology, Department of Pediatrics and Adolescent Medicine, Comprehensive Center for Pediatrics, Medical University Vienna, Waehringer Guertel 18-20, 1090 Vienna, Austria}
+\affil[3]{Department of Internal Medicine IV, Medical University Innsbruck, Anichstrasse 35, 6020 Innsbruck, Austria}
+\affil[4]{Lead contact}
+\affil[5]{These authors contributed equally}
+\affil[*]{Correspondence: matthias.ley@delta4.ai}
+\affil[**]{Correspondence: klaus.kratochwill@delta4.ai}
+
+\begin{document}
+
+\maketitle
+
+% ── Shared body (SUMMARY through SUPPLEMENTAL INFORMATION INDEX) ─────────────
+\input{../shared/content}
+
+% ── Bibliography ─────────────────────────────────────────────────────────────
+\bibliography{../shared/reference}
+
+\end{document}
