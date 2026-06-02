@@ -68,6 +68,7 @@ manuscript/**
 
 !manuscript/**/*.bst
 !manuscript/**/*.cls
+!manuscript/**/*.sty
 !manuscript/**/*.md
 !manuscript/**/
 

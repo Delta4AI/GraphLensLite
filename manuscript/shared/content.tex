@@ -1,94 +1,631 @@
-% shared/content.tex - Body sections shared across all venue flavors.
-% Include this from each venue's main.tex after \maketitle.
+% shared/content.tex - Body sections shared across both venue flavors
+% (bioRxiv preprint and Cell Press Patterns Resource Article).
 %
-% Convention: venue-specific tweaks use \ifbiorxiv (defined in each main.tex).
+% Both flavors use the SAME section structure. Drivers differ only in
+% preamble (document class, citation style, line numbering, fonts). Include
+% this file from each driver's main.tex after \maketitle.
 
-\section{Introduction}
+% =============================================================================
+% AI-DRAFTED (revision) — EXPANSION PLAN for Cell Press Patterns "Resource"
+% Target: 5,000-7,500 words; aim for the lower end (~5,000).
+% Current body prose (this file, comments excluded): ~3,500 words.
+% Gap to ~5,000: ~1,500 words. Planned second use case contributes ~750.
+% Remaining ~750 should come from the THIN sections below -- not from padding
+% Summary/Introduction, which are already at the right density.
+%
+% Where the words should go (ranked by value-for-a-Resource-article and by how
+% under-written the section currently is). Word figures are net additions.
+%
+%   1. METHODS (~+350-500). Biggest, most legitimate gap: every Methods
+%      subsection is a TODO stub. A Resource article is judged on reproducibility
+%      and technical clarity, so this is "clear and concise," not blabber.
+%      Ground-truth facts to draw from are filled into each subsection's comment
+%      below (stack, engine, metrics, assistant, packaging, tests).
+%   2. DISCUSSION (~+250). Currently one paragraph + TODO. Needs significance,
+%      design philosophy (portability/offline as deliberate trade-offs), and an
+%      honest "what GLL does NOT do" relative to Cytoscape/Gephi/STRING/OmicsNet.
+%   3. LIMITATIONS (~+120-150). Currently bullet stubs; must be prose anyway.
+%      Grounded angles (verified in code) listed in that section's comment.
+%   4. RESULTS -- second use case (~+750). New subsection mirroring the ADPKD
+%      one (see the marker comment in RESULTS). Keep parallel structure:
+%      construction (1 para) -> exploration/findings (1-2 paras) -> what it
+%      demonstrates that ADPKD did not.
+%   5. RESULTS -- small strength notes (~+80, optional). The metrics prose can
+%      note these are CUSTOM in-browser implementations (not a black-box lib)
+%      with graph-level Freeman centralization statistics -- a rigor signal. See
+%      "Exploring the network".
+%
+% Net: ~3,500 + ~750 (use case) + ~750 (thin sections) ~= 5,000. Lower-end hit.
+%
+% DO NOT pad: Summary (~190 w, correct length), Keywords, Introduction (~340 w,
+% already covers the gap + competitor landscape well), Resource Availability,
+% Acknowledgments. Adding there reads as filler to a Patterns editor.
+% =============================================================================
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{SUMMARY}
+Biological network visualization together with graph-based analyses are key techniques in systems biology and network medicine to detect patterns and generate hypotheses regarding disease pathobiology, drug target identification, biomarker prioritization, and digital drug discovery. Network representations provide an intuitive way to communicate and share research findings. We have developed Graph Lens Lite, a browser-based tool that combines rich visualization with a streamlined interface for exploring and sharing biological networks. It offers an expressive query language, topological network analysis, GUI-based filtering, visual grouping, customizable layouts, a data editor, fine-grained property-based styling, and a context-aware locally powered AI assistant particularly suited for molecular models of disease pathobiology or drug mechanism of action. We demonstrate its utility on a curated network model of autosomal dominant polycystic kidney disease. Graph Lens Lite is open source and available at \url{https://github.com/Delta4AI/GraphLensLite}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{KEYWORDS}
+network visualization, graph exploration, biological networks, disease pathobiology, drug mechanism of action, web application, ADPKD, systems biology
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{INTRODUCTION}
 Visualization of biological networks is a core technique in systems biology for representation and analysis of complex, often heterogeneous, data. Network visualization combined with quantitative graph analysis such as detection of network modules, hub or bottleneck nodes, or cross-talk between networks can lead to novel hypothesis generation or detection of relevant patterns in biomedical data \citep{ehlersIntroductionSurveyBiological2025}. Biological networks are of particular relevance in digital drug discovery and drug target prioritization and are used in modeling disease pathobiology as well as drug mechanism of action on a molecular level. Biological networks also represent an intuitive way of communicating and sharing research findings with collaborators or disseminating them to the broader scientific community.
 
 Cytoscape and Gephi are considered gold standards for interactive network visualization with an exhaustive plugin ecosystem and rich layout capabilities, but are desktop-focused and lack portability or modern web-app features \citep{shannonCytoscapeSoftwareEnvironment2003,bastianGephiOpenSource2009}. Other tools such as STRING or OmicsNet 2.0 prioritize data integration, enrichment analysis, and access to extensive biological databases over visualization and customization, integrating the network viewer as a helper and not as the focus of the application \citep{szklarczykSTRINGDatabase20252025,zhouOmicsNet20Webbased2022}. Several web-based alternatives have emerged to address portability concerns. Cytoscape Web extends the Cytoscape ecosystem with collaborative workflows for network visualization, though focusing on core functionalities with basic filtering and styling \citep{onoCytoscapeWebBringing2025}. Gephi Lite uses sigma.js for efficient WebGL-based rendering, though it compromises customization, filtering, and advanced styling. Similarly, Graphia provides both a desktop and web client with a powerful 2D/3D rendering engine, but focuses less on user-friendly styling, highlighting, grouping and filtering, prioritizing efficiency, enrichment and layout.
 
 We have developed Graph Lens Lite (GLL) to address the need for a browser-based tool that combines visualization power with an intuitive, streamlined interface, enabling researchers to rapidly explore and evaluate complex networks without requiring expertise in specialized software. GLL offers an expressive query language alongside graphical user interface (GUI)-based filtering, visual grouping, and fine-grained styling controls. Users can compute network metrics, apply customizable layouts, and map data attributes to visual scales. GLL exports networks as portable JSON files that capture the full application state for seamless collaboration, or as data tables for downstream analysis.
 
-\section{Materials and methods}
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{RESULTS}
 
 \begin{figure*}[!t]
     \centering
     \includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{main-figure.png}
-    \caption{The graphical user interface of Graph Lens Lite. (1) Main network view, (2) File import, (3) Workspace management, (4) Data editor, (5) Query editor, (6) Network and image export, (7) Node and edge filtering, (8) Node and edge tooltip, (9) Network metrics, (10) Selection panel, (11) Style panel, (12) Edit mode.}
+    \caption{The graphical user interface of Graph Lens Lite. (1) Main network view, (2) File import, (3) Workspace management, (4) Data editor, (5) Query editor, (6) Network and image export, (7) Node and edge filtering, (8) Node and edge tooltip, (9) Network metrics, (10) Selection panel, (11) Style panel, (12) Edit mode, (13) Graph assistant.}
     \label{fig:main-figure}
 \end{figure*}
 
-\subsection{Installation}
 GLL is a free, open-source web application for visualization and exploration of networks. It is written using HTML, CSS, and JavaScript and runs on any modern browser without requiring additional installations. GLL is distributed under the MIT license and its source code is publicly available on GitHub.
 
-\subsection{Data input}
-GLL accepts spreadsheets containing node and edge tables, or a JSON format preserving the application state. Input data require an `ID' column for nodes and `Source ID/Target ID' columns for edges. Optional columns may specify visual attributes such as labels, shapes, sizes, colors, or coordinates. Custom properties containing user data can be added as new columns, with optional group labels in square brackets. A template with column specifications, example values, and supported data types is available on GitHub and can also be generated from within the application. Additionally, a demo loader enables direct fetching of protein-protein interaction networks from the STRING database \citep{szklarczykSTRINGDatabase20252025}, with plans to extend support to further sources. The application includes an interactive guided tour that walks users through the interface and its core functionalities.
+\subsection*{Data input}
+GLL accepts spreadsheets containing node and edge tables, or a JSON format preserving the application state. Input data require an `ID' column for nodes and `Source ID/Target ID' columns for edges. Optional columns may specify visual attributes such as labels, shapes, sizes, colors, or coordinates. Custom properties containing user data can be added as new columns, with optional group labels in square brackets. A template with column specifications, example values, and supported data types is available on GitHub and can also be generated from within the application. Additionally, a demo loader enables direct fetching of protein-protein interaction networks from the STRING database \citep{szklarczykSTRINGDatabase20252025}.
 
-\subsection{The graphical user interface}
+\subsection*{Guided Tour}
+On application launch, users can start an interactive guided tour that loads a small example protein network and walks step-by-step through the applications core components. At each step the tour highlights relevant icons, opens panels, and explains the usage with live interface components, lowering the barrier to entry for new users.
+
+\subsection*{The graphical user interface}
 The main GUI elements are shown in Figure 1.
 
 \noindent
-\textbf{(1) Main network view:} The central window for displaying and interactively exploring the loaded network. \\
-\textbf{(2) File import:} Load files in spreadsheet or GLL JSON format. \\
-\textbf{(3) Workspace management:} Save and switch workspaces, reset layout, fit graph to view, and hide disconnected nodes. \\
-\textbf{(4) Data editor:} Interactive table for modifying (adding, deleting, editing) nodes and edges and their properties as well as exporting currently filtered nodes and edges. \\
-\textbf{(5) Query editor:} Custom query language for nested graph filtering supporting Boolean (AND/OR/NOT), comparison (>=,<=,..), and set-membership (IN [..]) operators. \\
-\textbf{(6) Network and image export:} Save the application state to a portable GLL JSON file or export the current view as PNG. \\
-\textbf{(7) Node and edge filtering:} GUI-based filtering and visual grouping, synchronized with the query language. \\
-\textbf{(8) Node and edge tooltip:} Displays metadata for the selected node or edge elements on click. \\
-\textbf{(9) Network metrics:} Controls for computing and applying network metrics to filter and select graph elements. \\
-\textbf{(10) Selection panel:} Shows current selection status, lasso selection, and navigation history. An expandable section provides additional focus, search, and layout controls. \\
-\textbf{(11) Style panel:} Edit node and edge styles, map parameters and network metrics to visual scales (continuous and discrete color scales, numeric size scales), and customize bubble sets. \\
-\textbf{(12) Edit mode:} Fine-grained controls for GUI-based filtering. \\
+\textbf{(1) Main network view:} The central window for displaying and interactively exploring the loaded network through panning, zooming, node dragging, hovering over elements to highlight adjacent elements, and an overview minimap. \\
+\textbf{(2) File import:} Open the launch screen to load network data from spreadsheets (node and edge tables) or portable GLL JSON files, or fetch protein-protein interaction data from the STRING database. \\
+\textbf{(3) Workspace management:} Create and switch between independent workspaces, each preserving its own layout, filters, queries, groupings, and styles. Reset the layout, fit the graph to view, hide disconnected nodes, or toggle highlight effects. \\
+\textbf{(4) Data editor:} Spreadsheet-style interactive table for adding, deleting, and editing nodes, edges, and their properties, defining new custom property columns, and export the entire network, nodes, edges, or filtered sub-networks. \\
+\textbf{(5) Query editor:} Editor for nested graph filtering and selection using a custom query language, supporting Boolean (AND/OR/NOT), comparison (>=, <=, ..), and set-membership (IN [..]) operators. Synchronizes with the GUI filtering panel. \\
+\textbf{(6) Network and image export:} Save the complete application state (data, layout, filters, and styling) to a portable GLL JSON file for session restoration and sharing, or export the current view as high-resolution PNG. \\
+\textbf{(7) Node and edge filtering:} GUI-based selection and visual grouping, filtering via range sliders for numeric properties and category checklists for categorical values, synchronized with the query language. \\
+\textbf{(8) Node and edge tooltip:} Displays metadata for the selected node or edge element on click. \\
+\textbf{(9) Network metrics:} Compute topological centrality measures (degree, betweenness, closeness, eigenvector, PageRank) to rank, filter, and select graph elements, with graph-level statistics and illustrative documentation for each method. \\
+\textbf{(10) Selection panel:} Shows current node and edge selection counts with lasso selection and undo/redo history. An expandable section provides additional focus, search, neighbor/edge expansion, and per-selection sub-layout controls. \\
+\textbf{(11) Style panel:} Edit node, edge, and bubble-group styles, and map data properties or computed network metrics onto visual scales (continuous and discrete color scales, numeric size scales). \\
+\textbf{(12) Edit mode:} Toggles fine-grained configuration for GUI-based filtering via precise numeric thresholds. \\
+\textbf{(13) Graph assistant:} Optional, context-aware AI assistant that answers natural-language questions about the network, translates them into runnable queries, and summarizes the current selection. \\
 
-\subsection{Usage}
-\subsubsection{Loading data}
+\subsection*{Application usage}
+\subsubsection*{Loading data}
 GLL starts by loading network data from spreadsheet files containing node and edge tables (Figure 1.2) or from JSON files. User-supplied properties (coordinates, styling options) are applied where specified. Users can further decide to fetch demo data from the STRING database. The workspace management panel (Figure 1.3) allows switching between independent environments, each preserving its own aesthetics, layouts, filters, and queries.
 
-\subsubsection{Exploring the network}
-Once loaded, users can explore the network structure through multiple approaches. The selection panel (Figure 1.10) enables element search, selection, and expansion to connected neighbors. Metadata for selected node and edge elements appear in specific tooltips (Figure 1.8). For deeper analysis, GLL computes topological metrics (e.g., node centrality measures including degree, betweenness, or PageRank) to identify key nodes within the network (Figure 1.9). Users can select a metric and examine one or more highly ranked nodes, with graph-level statistics displayed in the metric panel. In-app documentation describes each metric's methodology and provides references to relevant literature.
+\subsubsection*{Exploring the network}
+Once loaded, users can explore the network structure through multiple approaches. The selection panel (Figure 1.10) enables element search, selection, and expansion to connected neighbors. Metadata for selected node and edge elements appear in specific tooltips (Figure 1.8). For deeper analysis, GLL computes five node-centrality measures (degree \citep{freemanSetMeasuresCentrality1977a}, betweenness \citep{freemanSetMeasuresCentrality1977a}, closeness \citep{bavelasCommunicationPatternsTaskOriented1950a}, eigenvector \citep{newmanMathematicsNetworks2018a} and PageRank \citep{ brinAnatomyLargescaleHypertextual1998a}) together with graph-level statistics including network density and centralization, to identify key nodes (Figure 1.9). Users can select a metric and examine one or more highly ranked nodes, with graph-level statistics displayed in the metric panel. In-app documentation describes each metric's methodology and provides references to relevant literature.
 
-\subsubsection{Filtering the network}
-GLL supports network filtering through graphical controls (Figure 1.7), with an edit mode for precise input (Figure 1.12), or a query editor for complex operations (Figure 1.5). Node and edge properties can be used for filtering and selecting through either interface. The query editor uses a left-to-right syntax and ssupports Boolean operators (AND, OR, NOT), comparison (>=,<=), and set membership (IN) operators, as well as nested conditions using parentheses. Contextual help is accessible via an adjacent icon.
+\subsubsection*{Querying the network via graph assistant}
+GLL integrates an optional, locally hosted, context-aware AI assistant (Figure 1.13), lowering the barrier to exploration by translating user questions into instructions, queries and summaries. Each request embeds a snapshot of the current workspace, including node and edge counts, the property hierarchy with data types, active filters, the current query, and the currently selected nodes and edges including their property values and computed network metrics. Responses are grounded in the live graph state. When asked for a query, the assistant constructs a schema-constrained structured query representation based on the loaded graph's properties rather than unchecked query text. Generated queries are therefore structurally guaranteed to be valid, referencing real properties with supported operators, rather than checking only after the fact. Results can be directly applied to select elements or loaded into the query editor for further refinements.
 
-\subsubsection{Styling the network}
+The assistant communicates with an Ollama server and is local by default, with configuration handled in the panel's settings. Enabling it requires a running Ollama installation and a downloaded instruction-following model capable of reliably creating structured JSON output. Response quality depends on the chosen model. In our testing, \texttt{qwen3.5:9b} produced strong results while running efficiently on consumer-grade GPUs \citep{teamQwen35OmniTechnicalReport2026}. Running a local endpoint prevents transmission of potentially sensitive network data to third-party services. A context-budget indicator reports how much of the selected model's context window the next request will consume and warns users when a request would exceed the threshold and be truncated.
+
+\subsubsection*{Filtering the network}
+GLL supports network filtering through graphical controls (Figure 1.7), an edit mode for precise numeric input (Figure 1.12), and a query editor for complex, nested operations (Figure 1.5). All interfaces act on the same node and edge properties and are synchronized. The query language is a small, purpose-built domain-specific language (DSL) rather than a free-text search. The query editor uses a left-to-right syntax and supports Boolean operators (AND, OR, NOT), comparison (``LOWER THAN x OR GREATER THAN y''), and set membership (``IN [..]'') operators, as well as nested conditions using parentheses and property paths ``(Section::Group::Property)''. The editor validates as the user types, and marks empty clauses, missing connectors, and unmatched brackets. Validation is grounded in the property hierarchy. Valid queries compile to an expression tree evaluated per element, so that single statements drive both filtering and selection while staying consistent with the GUI controls. Contextual help is accessible via an adjacent icon.
+
+\subsubsection*{Styling the network}
 The styling panel (Figure 1.11) offers extensive visual customization options for nodes, edges, and groups.  Properties such as geometry (shape, size), color (fill, border, line), labels (text, placement, font), and annotations (badges, halos, arrows) can be configured independently for each element type. Up to four bubble sets allow visual grouping of nodes with adjustable appearance. Numeric and categorical attributes, whether user-supplied or computed from network metrics, can be dynamically mapped to visual features like color and size to highlight importance.
 
-\subsubsection{Editing network data}
+\subsubsection*{Editing network data}
 GLL includes an integrated data editor (Figure 1.4) for modifying network data in tabular format. Supported operations include column sorting, cell editing, node and edge addition or deletion, table reset, and export to spreadsheet format. Users can also add new columns to define custom properties for nodes or edges, which become immediately available in the filtering and styling interfaces, enabling graph creation and manipulation entirely within the application.
 
-\subsubsection{Exporting results}
+\subsubsection*{Exporting results}
 A graph can be exported in GLL's native JSON format or as a high-resolution image (Figure 1.6). JSON exports preserve the complete application state, including views, filters, coordinates, and styling, enabling session restoration and collaborative sharing.
 
-\section{Application use case}
-\subsection{Visualizing a network-based model of autosomal dominant polycystic kidney disease (ADPKD)}
+\subsection*{Application use cases}
+We demonstrate the network visualization capabilities of GLL with two case studies. Both input datasets are available as Excel files available at \url{https://github.com/Delta4AI/GraphLensLite/tree/main/manuscript} to allow exploration and visual interaction with real-world networks to understand the tools features and customization capabilities.
+
+\subsubsection{Use case: Modelling autosomal dominant polycystic kidney disease (ADPKD)}
+
+\begin{figure*}[!t]
+    \centering
+    \includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{adpkd-model.png}
+    \caption{ADPKD molecular model rendered in Graph Lens Lite. Nodes represent molecular features (genes and proteins) associated with ADPKD; edges combine direct protein-protein interactions (IntAct, BioGRID, Reactome) with literature sentence-level co-annotations from Delta4's Hyper-C platform. Color encodes mechanism membership; node size encodes a graph-topology metric.}
+    \label{fig:adpkd-model}
+\end{figure*}
+
 Autosomal Dominant Polycystic Kidney Disease (ADPKD) is the most common inherited kidney disorder, characterized by the gradual development and enlargement of multiple cysts in both kidneys, which ultimately leads to a progressive deterioration in kidney function \citep{formicaMolecularPathwaysInvolved2020}. ADPKD is a multi-factorial disease involving different disease mechanisms and molecular pathways. The exact mechanisms of ADPKD development and progression are still not fully understood and a better understanding of disease pathobiology is the basis for the discovery of novel drug targets and the development of new treatment options. We consolidated a set of biomedical data on ADPKD to model disease pathobiology and visualize molecular interactions using GLL. Literature associated ADPKD molecular features (genes and proteins) were extracted from Delta4's Hyper-C software platform that consists of sentence-level literature co-annotations between individual molecular features and ADPKD. This set of literature-associated ADPKD molecular features was complemented by genes showing differential expression in ADPKD as compared to healthy tissue based on Omics data. We downloaded the ADPKD bulk RNA-Seq dataset with the accession number GSE7869 from the Gene Expression Omnibus and re-analyzed the dataset to generate lists of differentially expressed genes \citep{songSystemsBiologyAutosomal2009}. Global gene expression profiling was conducted on renal cysts of different volumes, and non-cancerous renal cortical tissue from nephrectomized kidneys were used as controls. Differential gene expression analysis involved data normalization, statistical modeling using linear models, identification of regulated genes based on log2 fold-change (log2FC) and adjusted p-values. Ultimately, the ADPKD phenotype model was enriched with 20 genes which showed absolute log2FC > 2 and adjusted p-values < 0.05 across all four comparisons (large, medium, and small cysts, as well as minimally cystic tissue as compared to healthy tissue from nephrectomized kidneys respectively). In addition we re-analyzed a single-nucleus RNA sequencing (sn-RNA-Seq) dataset with the GEO accession number GSE185948, offering insights into the cellular heterogeneity of ADPKD \citep{mutoDefiningCellularComplexity2022}. Genes with a p-value < 0.05 were included as candidates in the analysis. Ultimately, the ADPKD phenotype molecular model was enriched with genes that were expressed in at least one cell type with absolute log2FC values > 2.5. In addition we retrieved information on genetic associations with ADPKD from the OpenTargets platform \citep{bunielloOpenTargetsPlatform2025}. Expression in healthy tissue and relevant renal cell types of molecular features of the ADPKD molecular model, quantified as normalized transcripts per million (nTPMs), were extracted from the Human Protein Atlas consensus expression profile dataset \citep{karlssonSingleCellType2021}. Information on subcellular location for features of the ADPKD molecular model was retrieved from UniProt \citep{ahmadUniProtWebsiteAPI2025}. Finally, we assigned molecular features of the ADPKD molecular model to mechanisms being discussed in recent reviews to be associated with ADPKD disease development and progression. Assignment of molecular features to mechanisms was done using the Gene Ontology (GO) annotation.
 
 The final constructed ADPKD molecular model consisted of 263 molecular features that were connected by 1574 edges (\textbf{Supplementary datafile S1}). Edges in the constructed network consisted of direct protein-protein interactions consolidated from IntAct \citep{orchardMIntActProjectIntAct2014}, BioGRID \citep{oughtredBioGRIDDatabaseComprehensive2021}, and Reactome \citep{milacicReactomePathwayKnowledgebase2024} as well as of literature sentence-level co-annotations of publications focusing on ADPKD using the catalogs of molecular features and phenotypes as given in Delta4's Hyper-C software platform.
 
-The constructed molecular model can now be used to explore the pathobiology of ADPKD by either filtering for (i) certain molecular mechanisms, (ii) individual cell types, (iii) the most up- or down-regulated genes in renal tissue or specific cell types, (iv) the most central genes based on graph properties like node degree or betweenness among others. Figure 1 for example shows genes of the Wnt signaling pathway (in green for positive modulation of the pathway, red for negative modulation of the pathway, dark blue for modulation of the pathway, and light blue for genes being pathway members without any further information on regulation) as well as additional molecules being associated with ADPKD that are linked to members of the Wnt signaling pathway (in grey) via either protein-protein interactions or co-annotations in the context of ADPKD. This network view allows investigating novel connections of Wnt signaling pathway members with ADPKD-associated proteins.
+The constructed molecular model can now be used to explore the pathobiology of ADPKD by either filtering for (i) certain molecular mechanisms, (ii) individual cell types, (iii) the most up- or down-regulated genes in renal tissue or specific cell types, (iv) the most central genes based on graph properties like node degree or betweenness among others. Figure~\ref{fig:adpkd-model} for example shows genes of the Wnt signaling pathway (in green for positive modulation of the pathway, red for negative modulation of the pathway, dark blue for modulation of the pathway, and light blue for genes being pathway members without any further information on regulation) as well as additional molecules being associated with ADPKD that are linked to members of the Wnt signaling pathway (in grey) via either protein-protein interactions or co-annotations in the context of ADPKD. This network view allows investigating novel connections of Wnt signaling pathway members with ADPKD-associated proteins.
 
 The molecular model can subsequently be used to (i) screen for compounds showing beneficial impact on dysregulated disease mechanisms as shown previously in other renal diseases \citep{gebeshuberComputationalDrugRepositioning2023}, (ii) identify drug targets of interest, investigate cell-cell interaction analysis to identify relevant receptor-ligand pairs following previously reported analyses \citep{evgeniouMetaAnalysisHumanTranscriptomics2021}, or (iii) prioritize drug targets for the development of new chemical entities.
 
-\section{Conclusion}
-We have developed Graph Lens Lite for visualizing, exploring and sharing biological networks. GLL is designed for portability with a focus on extensive visual customization. The entire application, together with an average sized graph containing approximately 1000 nodes, can be packed into an archive of only a few megabytes. Unlike comparable tools that may require installation, GLL requires only a web browser for core functionality. GLL is distributed as platform-specific Electron bundles for Windows, macOS, and Linux, as well as a platform-independent, self-contained HTML file. This minimal distribution enables users to load demonstration data or create and work with templates without external dependencies or API calls, ensuring long-term stability and offline operation.
+\subsubsection{Use case: Modelling the mechanism of action of the drug iguratimod}
 
-\section*{Acknowledgments}
+motivation \\
+model construction \\
+exploration \& findings \\
+how is it different from the ADPKD case \\
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{DISCUSSION}
+We have developed Graph Lens Lite for visualizing, exploring and sharing biological networks.
+
+% AI-DRAFTED -- REVIEW
+% Lead-in paragraph for Table 1. Defines the criteria used in the comparison
+% grid in plain prose, because the table itself is restricted to symbols and
+% short labels (Patterns guideline + practical width constraint). Rewrite in
+% your voice; the row definitions and the GLL-positioning sentence are both
+% AI-drafted.
+%
+% Definitions to convey (each one corresponds to a row in the table):
+%   * Web / Desktop -- which deployment surfaces the tool supports natively
+%   * License -- license under which the application is distributed
+%   * Open source -- application source code publicly released under an
+%     OSI-approved license
+%   * Offline-ready -- core functionality usable without an external server
+%     or third-party API; demo data loaders and optional integrations may
+%     still require network access
+%   * Local AI assistant -- a built-in AI agent powered by a locally hosted
+%     open-source model, so natural-language interaction never sends graph
+%     data to a third-party API
+Table~\ref{tab:tools} positions Graph Lens Lite against the tools introduced earlier across deployment surface, licensing, distribution model, data sovereignty, sharing, in-application interactivity, query expressiveness, and built-in AI assistance. \emph{Single-file HTML} indicates that the entire application is distributed as one HTML file that runs locally with no installer, server, or toolchain. \emph{Offline-ready} means that core functionality is usable without an external server or third-party API (optional demo data loaders may still require network access). \emph{Portable workspace state} indicates that the complete application state -- data, view, filters, layout, and styling -- can be exported and re-imported as a single file. \emph{In-app data editor} indicates that nodes, edges, and custom properties can be created, edited, and deleted from the GUI without leaving the application. \emph{Query DSL with GUI sync} indicates a user-facing query language (Boolean / comparison / set-membership operators) whose state is bidirectionally synchronized with the graphical filtering controls. \emph{Local AI assistant} denotes a built-in AI agent powered by a locally hosted open-source model, so natural-language interaction never sends graph data to a third-party service.
+
+% TODO (extend after the table): one or two paragraphs of comparative
+% commentary tying the rows back to GLL's positioning. Suggested angles:
+%   * Portability/offline trade-off vs server-backed tools (STRING, OmicsNet)
+%   * Web/desktop dual deployment alongside Cytoscape and Graphia
+%   * Local-AI as a unique differentiator at the time of writing
+%   * Honest acknowledgement of what GLL does NOT offer relative to
+%     Cytoscape's plugin ecosystem, Graphia's 3D rendering, STRING's data
+%     breadth, OmicsNet's enrichment
+
+% AI-DRAFTED -- REVIEW
+% Table ported from doctoral_thesis/chapters/intro/06_data_visualization.tex
+% and reformatted for Cell Press Patterns:
+%   * Tools as rows, attributes as columns (scales by adding rows)
+%   * Cells restricted to ✓ / -- only (definitions live in the lead-in
+%     paragraph above the table -- including License, which is no longer a
+%     column; mention "all tools except STRING are permissive / weak-copyleft
+%     open source" in prose if a reviewer asks)
+%   * Column headers rotated 60° to keep the grid portrait-friendly with
+%     9 columns
+%   * No bold/italic/colored markers (Cell Press rule)
+%   * Dropped: PINA, BioLinker, NAViGaTOR (niche/dated -- can re-add)
+%   * Dropped columns: License + Open source (redundant; see above)
+%   * Added columns (Tier-1 differentiators): Single-file HTML, Portable
+%     workspace state, In-app data editor, Query DSL + GUI sync, Local AI
+%     assistant
+%
+% TODO -- review and confirm each cell. High-confidence cells are filled.
+% Cells marked "?" indicate I am NOT confident enough to commit a value;
+% please verify against current tool documentation and replace with ✓ or --.
+%
+% TODO -- consider adding rows for sigma.js / Cytoscape.js / vis-network /
+% Pajek / NodeXL if relevant at submission time.
+
+\begin{table*}[!htbp]
+\centering
+\caption{Comparison of selected network analysis and visualization tools for biomedical research. Cells: \checkmark{} present, -- absent.}
+\label{tab:tools}
+\small
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.1}
+\newcommand{\rh}[1]{\rotatebox[origin=l]{90}{#1}}
+\begin{tabularx}{\textwidth}{@{}X *{8}{>{\centering\arraybackslash}p{1.4cm}}@{}}
+\toprule
+Tool & \rh{Web} & \rh{Desktop} & \rh{Single-file HTML} & \rh{Offline-ready} & \rh{Portable state} & \rh{Data editor} & \rh{Query DSL} & \rh{AI assistant} \\
+\midrule
+Graph Lens Lite                                                  & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+Cytoscape \citep{shannonCytoscapeSoftwareEnvironment2003}        & --         & \checkmark & --         & \checkmark & \checkmark & \checkmark & \checkmark*5          & --         \\
+Cytoscape Web \citep{onoCytoscapeWebBringing2025}                & \checkmark & --         & --         & --         & \checkmark          & \checkmark          & --         & \checkmark*4        \\
+Gephi \citep{bastianGephiOpenSource2009}                         & --         & \checkmark & --         & \checkmark & \checkmark & \checkmark & --         & --         \\
+Gephi Lite \citep{jacomyGephiGephilite2025}                      & \checkmark & --         & --         & \checkmark & \checkmark          & \checkmark & --         & --         \\
+Graphia \citep{freemanGraphiaPlatformGraphbased2022}             & \checkmark & \checkmark & --         & \checkmark & \checkmark          & \checkmark         & \checkmark*3         & --         \\
+OmicsNet 2.0 \citep{zhouOmicsNet20Webbased2022}                  & \checkmark & --         & --         & --         & \checkmark*2          & --         & --         & --         \\
+STRING \citep{szklarczykSTRINGDatabase20252025}                  & \checkmark*1 & --         & --         & --         & \checkmark         & --         & --         & --         \\
+Reactome Pathway Browser \citep{milacicReactomePathwayKnowledgebase2024}		& \checkmark*1 & -- & -- & -- & \checkmark & -- & -- & -- \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+% *1 Reactome Pathway Browser and STRING achieve portable states by encoding selection and analysis tokens into a shareable URL.
+% *2 Omicsnet 2.0 provides a possibility to export to a JSON file but the re-import process seems to be broken as the loaded network has different style applied and is larger than the initially exported graph (e.g. 9 nodes exported, hundreds imported).
+% *3 Graphia facilitates filtering, metrics, structural analysis and clustering with their transform GUI which uses a DSL underneath, but is not directly queryable.
+% *4 cytoscape web natively only supports OpenAI via API key and no local LLMs
+% *5 cytoscape supports full-text search via Lucene and a no-syntax GUI filter builder, but no unified AI-generatable query language (see )
+
+% ── AI-DRAFTED (revision) — REVIEW ──────────────────────────────────────────
+% Comparative commentary that turns the table footnotes *1–*5 into prose,
+% addressing the post-table TODO (Portability/offline trade-off; Query DSL;
+% local-AI differentiator). Measured tone — qualifies the checkmarks honestly
+% rather than overstating GLL. Carry over what you like; the three paragraphs
+% are independent and can be used separately.
+%
+% Several checkmarks in Table~\ref{tab:tools} warrant qualification, and those
+% qualifications are where GLL's positioning becomes concrete.
+%
+% Portable state. STRING and the Reactome Pathway Browser export a shareable
+% state only by encoding the current selection and analysis parameters into a
+% URL [*1], not by serializing a full workspace. OmicsNet 2.0 offers JSON export
+% but, in our testing, re-import was unreliable — a nine-node export reloaded as
+% a differently styled network of several hundred nodes [*2] — so round-trip
+% fidelity is not guaranteed. GLL serializes the complete application state
+% (data, view, filters, layout, and styling) to a single file that re-imports
+% identically, which is what makes session restoration and file-based
+% collaboration dependable.
+%
+% Query expressiveness. The Query DSL column separates a directly queryable,
+% text-based filtering language from adjacent capabilities that resemble one but
+% are not equivalent. Graphia drives filtering, metrics, and clustering through
+% a transform GUI backed by a DSL internally, but that language is not exposed
+% for users to write or share [*3]. Cytoscape provides Lucene-style full-text
+% search and a no-syntax GUI filter builder [*5]; both are useful, but neither
+% is a single query surface that a user can type and share and that the
+% assistant can generate into. GLL exposes one validated query language,
+% bidirectionally synchronized with the GUI controls, so the same expression can
+% be written by hand, built through the interface, or emitted by the assistant.
+%
+% AI assistance. Cytoscape Web includes an assistant, but it calls OpenAI
+% through a user-supplied API key with no local-model path [*4], so graph
+% context leaves the machine. GLL's assistant runs against a locally hosted
+% model by default, so natural-language interaction never transmits graph data
+% to a third party — the distinction the "Local AI assistant" definition draws.
+%
+% ── NOTE: Query DSL column label (consider) ─────────────────────────────────
+% The asterisked cells (*3 Graphia, *5 Cytoscape) carry a \checkmark but have
+% query-like machinery that is not a user-facing, shareable, AI-generatable
+% language. Options to make the column claim precise:
+%   (a) keep \checkmark*N and rely on the footnotes (current; Cell-Press-clean);
+%   (b) use a partial/half marker for Graphia and Cytoscape to visually separate
+%       "has a DSL underneath / has search" from GLL's directly queryable one;
+%   (c) split into two narrow columns — "Query DSL" and "AI-generatable" — to
+%       capture that GLL's language is the only one an assistant emits into.
+% (a) is simplest; (c) carries the most signal but widens an already-wide table.
+% ─────────────────────────────────────────────────────────────────────────────
+
+ GLL is designed for portability with a focus on extensive visual customization. The entire application, together with an average sized graph containing approximately 1000 nodes, can be packed into an archive of only a few megabytes. Unlike comparable tools that may require installation, GLL requires only a web browser for core functionality. GLL is distributed as platform-specific Electron bundles for Windows, macOS, and Linux, as well as a platform-independent, self-contained HTML file. This minimal distribution enables users to load demonstration data or create and work with templates without external dependencies or API calls, ensuring long-term stability and offline operation.
+
+% TODO: extend the Discussion. Reference papers (PhosNetVis, AnnoMate) spend
+% ~1-2 pages here. Suggested angles to cover (pick what fits):
+%   - Significance: how GLL changes the practical workflow for researchers
+%     building disease-pathobiology or MoA models compared to Cytoscape /
+%     Gephi / STRING / OmicsNet / Cytoscape Web / Gephi Lite / Graphia
+%   - Design philosophy: portability and offline-first as deliberate trade-offs
+%     against the data-integration breadth of server-backed tools
+%   - The Graph Assistant (LLM-grounded query generator): what it enables, what
+%     it does not, and the LOCAL, no-data-egress security model (NOTE: this is
+%     local Ollama with no API key — NOT a "user-key" model; see the correction
+%     in the Methods Graph Assistant subsection)
+%   - Adoption / community: training material, guided tour, template generation,
+%     plans for further data-source integrations
+%   - Outlook: future directions (additional demo loaders, plugin API, etc.)
+%
+% ── AI-DRAFTED (revision) — Discussion expansion (~+250 w target) ────────────
+% Three short paragraphs; the first reuses the comparative-commentary block that
+% already sits under Table 1 (don't duplicate it — cross-reference or move it
+% here). The two below are net-new angles for a Resource Discussion.
+%
+%   Significance / workflow. "By combining web-based portability with the
+%   visual customization usually reserved for desktop tools, GLL lets a
+%   researcher move from a node/edge table to a styled, queryable, shareable
+%   network model without installation, a server, or scripting. The same single
+%   file that holds the application also holds the model, so a curated network
+%   -- such as the ADPKD model presented here -- can be circulated to a
+%   collaborator or attached to a manuscript and reopened in an identical state.
+%   This lowers the practical barrier between building a disease-pathobiology or
+%   mechanism-of-action model and communicating it."
+%
+%   Design philosophy. "GLL deliberately trades the data-integration breadth of
+%   server-backed platforms (STRING, OmicsNet) for portability, offline
+%   operation, and data sovereignty. It is not a database front-end: it assumes
+%   the user arrives with, or assembles, a focused network and wants to explore,
+%   analyze, style, and share it locally. The local AI assistant follows the same
+%   principle -- grounding natural-language interaction in the loaded graph while
+%   keeping all data on the user's machine -- rather than routing graph content
+%   through a hosted model."
+%
+% (Keep an honest "what GLL does NOT do" sentence here too — plugin ecosystem
+%  (Cytoscape), 3D rendering (Graphia), enrichment/data breadth (STRING/OmicsNet)
+%  — it strengthens credibility and feeds naturally into Limitations.)
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection*{Limitations of the study}
+- Performance
+- Extending import/export capabilities and new data formats (SPARQL, RDF, XML, ..)
+- keeping query and UI in sync is difficult?
+- Adding new APIs as input sources
+- Connecting other LLM sources
+
+% TODO: write 1-2 paragraphs honestly listing current limitations. Suggested
+% angles to cover (delete those that don't apply, expand the ones that do):
+%   - Browser rendering performance ceiling for very large networks (>~10k
+%     nodes); GLL is positioned for focused subnetworks, not genome-scale
+%     topologies
+%   - No built-in enrichment / pathway analysis beyond the STRING demo loader;
+%     users compose with external tools
+%   - Collaboration via JSON workspace exchange, not real-time co-editing
+%   - 3D layouts out of scope by design
+%   - Demo data sources limited to STRING; KEGG / Reactome / etc. on the
+%     roadmap but not yet shipped
+%   - Graph Assistant requires user-supplied LLM API key; no offline LLM path
+%
+% ── AI-DRAFTED (revision) — draft prose (~+130 w), CORRECTED against code ────
+% Two bullets above are WRONG and should be deleted:
+%   * "requires user-supplied LLM API key; no offline LLM path" — backwards. The
+%     assistant is offline/local by design (Ollama); the real limitation is the
+%     OPPOSITE: it requires a separately installed Ollama runtime + a downloaded
+%     model, and there is currently no hosted/cloud-provider option.
+% Verified, defensible limitations to draw on:
+%   * Canvas rendering (G6 v5) is interactive for focused networks; very large
+%     graphs degrade — e.g. a known slow path on empty-canvas deselection for
+%     large graphs (src/README.md references AntV/G6#7195). Positioning: focused
+%     subnetworks, not genome-scale topologies.
+%   * Topological analysis is limited to five centralities computed as
+%     UNDIRECTED (degree, betweenness, closeness, eigenvector, PageRank); no
+%     community detection, clustering coefficient, or directed-graph metrics.
+%   * No built-in enrichment/pathway analysis; the only data connector is the
+%     STRING demo loader (KEGG/Reactome/etc. not yet shipped).
+%   * Assistant requires a local Ollama install + a downloaded instruction model;
+%     quality depends on the chosen model and no cloud provider is offered.
+%   * Collaboration is by JSON workspace exchange, not real-time co-editing; 3D
+%     layouts are out of scope by design.
+%
+%   Draft: "Graph Lens Lite targets focused, interpretable subnetworks rather
+%   than genome-scale topologies; canvas rendering remains interactive for
+%   models of up to a few thousand elements but degrades on substantially larger
+%   graphs. Topological analysis currently covers five centrality measures
+%   computed on the undirected graph, without community detection or
+%   directed-graph metrics. The application performs no enrichment or pathway
+%   analysis of its own and ships a single live data connector (STRING), so
+%   users assemble multi-source models externally or through the data editor.
+%   The AI assistant runs locally by design and therefore depends on a separately
+%   installed Ollama runtime and a downloaded instruction-following model, with
+%   response quality varying by model; no hosted-provider option is offered.
+%   Collaboration is asynchronous, through portable workspace files rather than
+%   real-time co-editing."
+% ─────────────────────────────────────────────────────────────────────────────
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{METHODS}
+
+\subsection*{Implementation and architecture}
+% TODO: describe the implementation stack. Suggested points to expand:
+%   - HTML / CSS / vanilla JS (ES modules) -- no heavy build framework on the
+%     core rendering loop
+%   - AntV G6 as the graph visualization engine; bubble-set grouping, lasso
+%     selection, property-based styling implemented as custom layers on top of
+%     G6 primitives
+%   - State management: in-memory store, fully serializable to a portable JSON
+%     workspace file (covers nodes, edges, computed metrics, filters, layouts,
+%     styling, view state)
+%   - No required server component; STRING demo loader is the only outbound
+%     network call in the core app
+%   - Browser support and minimum versions
+%   - Testing: framework, coverage approach, CI
+%
+% ── AI-DRAFTED (revision) — VERIFIED FACTS + draft prose (~120–160 w) ────────
+% Confirmed against the codebase (cite-ready):
+%   * Zero-framework vanilla JS (ES modules); no React/Vue. Bundled with esbuild
+%     (ES2020 target, minified). [package.json, src/gll.js]
+%   * Rendering engine: AntV G6 v5 (Canvas 2D), vendored as lib/g6.min.js.
+%     [src/graph/core.js]
+%   * Bubble-set grouping (up to 4 groups), lasso selection, and property-based
+%     styling are custom layers on top of G6 primitives. [src/graph/bubble_sets.js,
+%     src/config.js]
+%   * State: a single in-memory store serialized to one portable JSON workspace
+%     capturing data, per-layout positions, filters, node/edge styles, bubble-
+%     group membership, query text+AST, and view state. [src/managers/io.js]
+%   * No required server; the STRING demo loader is the ONLY outbound request in
+%     the core app (no telemetry). [src/utilities/demo_loader.js]
+%
+%   Draft: "Graph Lens Lite is implemented in vanilla JavaScript as ECMAScript
+%   modules with no front-end framework, bundled with esbuild. Network rendering
+%   is handled by AntV G6 (v5) on an HTML canvas; bubble-set grouping, lasso
+%   selection, and fine-grained property-based styling are implemented as custom
+%   layers over G6 primitives. The complete session lives in a single in-memory
+%   store that serializes losslessly to one JSON workspace file -- data,
+%   per-layout coordinates, filters, styles, bubble-group membership, the active
+%   query and its syntax tree, and view state -- which is what enables exact
+%   session restoration and file-based collaboration. The core application
+%   requires no server: the optional STRING demo loader is the only outbound
+%   network request, and no usage data leaves the client."
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Query Language}
+% NOTE: heading uses \subsection (numbered) while every sibling uses
+% \subsection* (unnumbered). Change to \subsection* for consistency.
+- AST
+- foundation of filtering? idk
+%
+% ── AI-DRAFTED (revision) — draft prose (~120–150 w), grounded in QUERY_LANGUAGE.md
+% This subsection is the Methods home for the filtering language; keep it
+% factual and let the Results "Filtering" prose stay user-facing.
+%
+%   Draft: "Filtering is driven by a small, purpose-built query language rather
+%   than free-text search. A query combines three-part property paths
+%   (Section::Group::Property) with a compact, unambiguous operator set --
+%   numeric range (BETWEEN), inverted range (LOWER THAN .. OR GREATER THAN ..),
+%   and categorical membership (IN [..]) -- composed with Boolean connectors
+%   (AND, OR, NOT) and nested parentheses. The editor parses input live and
+%   validates it against the property hierarchy of the loaded graph, so empty
+%   clauses, missing connectors, unmatched brackets, and references to
+%   non-existent properties are flagged as the user types. A valid query
+%   compiles to a validated abstract syntax tree whose per-element test methods
+%   evaluate each node and edge directly; the same tree drives both filtering
+%   and selection and stays synchronized with the GUI controls."
+%
+% (Reconcile operator names with the >=/<= description used elsewhere — see the
+%  NOTE in the Results "Filtering the network" section.)
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection*{Graph Assistant (LLM-grounded query generation)}
+% TODO: this is a new feature compared to the prior bioRxiv draft and deserves
+% its own Methods subsection. Suggested points to cover:
+%   - Purpose: natural-language -> GLL query string, grounded in the actual
+%     loaded property hierarchy (not hallucinated)
+%   - Architecture: structured-output prompts, hallucination guard, refinement
+%     loop, reasoning-trace visualization for thinking-capable models
+%   - Security model: budget meter, first-run setup, focus-on-select behavior
+%
+% ── CORRECTION (verified in code) — provider model is LOCAL-ONLY ─────────────
+% The original bullet "Provider abstraction: Anthropic / OpenAI / others" and
+% "user-entered API key" describe a design that is NOT in the shipped code.
+% Ground truth: the only client is `OllamaClient` [src/managers/assistant/
+% client.js:1]; setup tells users to "point it at a running Ollama instance"
+% [settings.js:131]; calls hit `${endpoint}/api/chat` only. There is NO
+% Anthropic/OpenAI path and NO API-key field. This is GOOD NEWS — it makes the
+% "Local AI assistant" column and the no-data-leaves-the-machine claim literally
+% true, not aspirational. Remove the multi-provider/API-key language wherever it
+% appears (here + the Discussion TODO bullet "user-key / no-server-persistence").
+%
+% ── AI-DRAFTED (revision) — VERIFIED FACTS + draft prose (~150–190 w) ────────
+% Confirmed mechanism (cite-ready):
+%   * Local backend: Ollama REST API; default num_ctx 16384. [client.js]
+%   * Intent routing: the chat model emits a sentinel block
+%     <<<QUERY_INTENT>>>{summary,scope}<<<END>>> stripped from the visible reply;
+%     a drift detector recovers when small models omit it. [intent.js, index.js]
+%   * Context snapshot per request: app/workspace state, node/edge counts,
+%     visible/selected counts, per-element selection properties + computed
+%     metrics, active filters, current query (+validity), the 3-level property
+%     hierarchy with types/ranges, bubble groups, recent actions. [context.js]
+%   * Structured output: a JSON Schema is passed via Ollama's `format` parameter;
+%     buildQuerySchema() rewrites the `field` slot as an ENUM of the real property
+%     paths and `op` as an enum of BETWEEN/LT_OR_GT/IN, so unsupported operators
+%     and non-existent fields are unrepresentable by construction. [query_schema.js]
+%   * Repair loop: one retry; invented property names are mapped to nearest real
+%     paths by Levenshtein distance (closestPaths) injected as a repair hint.
+%     [query_generator.js]
+%   * Thinking models: reasoning tokens (message.thinking) shown in a collapsible
+%     accordion, separate from the answer. [client.js, index.js]
+%   * Budget meter: chars/4 token estimate vs num_ctx, tiers at 60/85/100%; on
+%     overflow it offers drop-history / minimal-selection / raise-num_ctx.
+%     [budget_meter.js, index.js]
+%
+%   Draft: "The assistant runs entirely against a locally hosted model served by
+%   Ollama; no graph data is transmitted to a third-party service. Each turn, a
+%   read-only snapshot of the workspace -- element counts, the current selection
+%   with its property values and computed metrics, active filters, the live
+%   query, and the graph's property hierarchy with data types and value ranges --
+%   is supplied as context so responses are grounded in the actual data. When a
+%   request implies a filter, the model does not write query text directly; it
+%   emits a structured syntax tree constrained by a JSON Schema in which the
+%   permissible fields are an enumeration of the graph's real property paths and
+%   the permissible operators are the language's own, making unsupported
+%   operators and non-existent properties impossible to express. A single repair
+%   pass maps any invented name onto its nearest real property by edit distance
+%   before retrying. A context-budget meter estimates token usage against the
+%   model's context window and offers targeted reductions when a request would
+%   overflow. Generated queries are therefore valid by construction rather than
+%   validated after the fact."
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection*{Packaging and distribution}
+% TODO: describe the build and release pipeline. Suggested points to expand:
+%   - electron-builder for Windows / macOS / Linux bundles
+%   - Self-contained single-file HTML bundle for platform-independent use
+%   - GitHub Releases as the distribution channel; semver versioning
+%   - MIT license; source on GitHub
+%   - Approximate bundle size (compare against PhosNetVis-style claims)
+%
+% ── AI-DRAFTED (revision) — VERIFIED FACTS + draft prose (~90–120 w) ─────────
+% Confirmed (cite-ready):
+%   * Desktop bundles via electron-builder (Electron 36): Windows (NSIS +
+%     portable), macOS (DMG + ZIP), Linux (AppImage + .deb + .snap). [package.json]
+%   * Platform-independent single-file HTML produced with inline-source, inlining
+%     the esbuild bundle, CSS, and assets as data URIs. ~2.6 MB total. [src/package/
+%     inline_html.mjs]
+%   * Distribution: GitHub Releases + GitHub Pages (single-file HTML); semantic
+%     versioning; current v1.13.1; MIT license. [.github/workflows/release.yml]
+%   * Tests: 632 cases across 21 files under Vitest; multi-OS CI (Node 22) on tag.
+%     [tests/, .github/workflows/release.yml]  (NB: no coverage gate configured —
+%     state coverage approach honestly, or add a vitest --coverage run before
+%     claiming a number.)
+%
+%   Draft: "Graph Lens Lite is released under the MIT license with source on
+%   GitHub. Desktop builds for Windows, macOS, and Linux are produced with
+%   electron-builder (Electron 36); a platform-independent, self-contained
+%   variant inlines the application bundle, styles, and assets into a single
+%   ~2.6 MB HTML file that runs from any modern browser with no installer or
+%   server. Releases are distributed through GitHub Releases and GitHub Pages
+%   under semantic versioning. The codebase is covered by 632 automated tests
+%   (Vitest) run in continuous integration across all three desktop platforms on
+%   every tagged release."
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection*{ADPKD molecular model construction}
+% TODO: the methodological detail currently lives inside the use-case
+% paragraphs under RESULTS. For the Patterns submission, consider moving the
+% data-source / threshold / assembly description into METHODS and leaving only
+% narrative and findings in RESULTS. Sources currently described:
+%   - Delta4 Hyper-C literature co-annotations (sentence-level)
+%   - GSE7869 bulk RNA-Seq, log2FC > 2 and adjusted p < 0.05 across all four
+%     contrasts
+%   - GSE185948 single-nucleus RNA-Seq, log2FC > 2.5 and p < 0.05 in ≥1 cell
+%     type
+%   - OpenTargets (genetic associations)
+%   - Human Protein Atlas consensus expression profile (nTPMs)
+%   - UniProt (subcellular localization)
+%   - IntAct, BioGRID, Reactome (direct PPI edges)
+%   - Hyper-C sentence-level co-annotations (literature edges)
+%   - GO annotation for mechanism assignment
+Literature co-annotations \\
+RNA-Seq data ? \\
+OpenTargets data ? \\
+HPA data (nTPM) ? \\
+UniProt (subcellular location) ? \\
+Direct PPI edges (omicsnet? IntAct, BioGRID, Reactome?) \\
+Mechanisms (GO?) \\
+
+\subsection*{Iguratimod mechanism of action model construction}
+Literature co-annotations \\
+
+
+\subsection*{Reproducing the case study}
+% TODO: one short paragraph telling a reader how to reproduce Figure 1 from
+% scratch: clone the repo, load Supplementary datafile S1, follow documented
+% walkthrough, optionally fetch fresh data via the listed accessions.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{RESOURCE AVAILABILITY}
+
+\subsection*{Lead contact}
+Requests for further information and resources should be directed to and will be fulfilled by the lead contact, Matthias Ley (\href{mailto:matthias.ley@delta4.ai}{matthias.ley@delta4.ai}).
+
+\subsection*{Materials availability}
+This study did not generate new physical materials. All artefacts are available in the data and code availability statement.
+
+\subsection*{Data and code availability}
+\begin{itemize}
+	% TODO: zenodo URL
+	% TODO: upload supplementary datafile s2
+    \item The Graph Lens Lite source code, distribution bundles, test data, templates, and documentation are publicly available at GitHub (\url{https://github.com/Delta4AI/GraphLensLite}) and archived at Zenodo (\url{https://doi.org/foobar}).
+    \item The curated ADPKD molecular model used in the first application use case is provided as supplementary data file S1 and is publicly available as of the date of publication.
+    \item The curated iguratimod mechanism of action model used in the second application use case is provided as supplementary data file S2 and is publicly available as of the date of publication.
+    \item Any additional information required to reproduce the analyses reported in this paper is available from the lead contact upon request.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{ACKNOWLEDGMENTS}
+% AI-DRAFTED note: per Cell Press convention, funding statements live inside
+% ACKNOWLEDGMENTS rather than in a separate FUNDING section. The two original
+% paragraphs (Acknowledgments + Funding) are concatenated below verbatim --
+% no prose rewriting. Review the merged paragraph and reorder as preferred.
 The authors want to thank all working group members of the EU COST Action Program PerMediK (Personalized Medicine in Chronic Kidney Disease: Improved outcome based on Big Data) for fruitful discussions during the regular COST Action project meetings.
 
-\section*{Author contributions}
-M.L.: conceptualization; resources; software; visualization; writing - original draft, review \& editing. K.K.-I.: data curation; validation; writing - review \& editing. L.F.: validation; writing - review \& editing. S.W.: validation; writing - review \& editing. F.B.: validation; writing - review \& editing. E.B.: validation; writing - review \& editing. L.G.: validation; writing - review \& editing. P.A.: validation; writing - review \& editing. P.H.: data curation; validation; writing - review \& editing. J.L.: data curation; funding acquisition; validation; writing - review \& editing. P.P.: conceptualization; data curation; funding acquisition; supervision; validation; writing - original draft, review \& editing. K.K.: funding acquisition; supervision; validation; writing - review \& editing.
-
-\section*{Supplementary data}
-Supplementary datafile S1: The ADPKD molecular model input file
-
-\section*{Conflict of interest}
-K.K. is a co-founder of Delta4 GmbH (Vienna, Austria). M.L., K.K.-I., L.F., S.W., F.B., E.B., L.G., P.A., and P.P. are employed at Delta4 GmbH (Vienna, Austria).
-
-\section*{Funding}
 This project has received funding from the Austrian Research Promotion Agency (FFG) under grant agreement number 915133 (ADPKD Drug Discovery). Enrico Bono is supported by a grant from the European Union's Horizon Europe Marie Skłodowska-Curie Actions Doctoral Networks program project PICKED (HORIZON–\allowbreak{}MSCA–\allowbreak{}2023–\allowbreak{}DN-01, grant number 101168626). Louiza Galou is supported by a grant from the European Union's Horizon Europe Marie Skłodowska-Curie Actions Doctoral Networks Industrial Doctorates program project PROMOTE (HORIZON–MSCA–2023– DN-01, grant number 101169245). Paul Perco and Matthias Ley are members of and would like to cordially thank the EU COST Action Program PerMediK, CA21165, supported by COST (European Cooperation in Science and Technology).
 
-\section*{Data availability}
-The source code, test data, templates and documentation are available at GitHub (\url{https://github.com/Delta4AI/GraphLensLite}).
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{AUTHOR CONTRIBUTIONS}
+M.L.: conceptualization; resources; software; visualization; writing - original draft, review \& editing. K.K.-I.: data curation; validation; writing - review \& editing. L.F.: validation; writing - review \& editing. S.W.: validation; writing - review \& editing. F.B.: validation; writing - review \& editing. E.B.: validation; writing - review \& editing. L.G.: validation; writing - review \& editing. P.A.: validation; writing - review \& editing. P.H.: data curation; validation; writing - review \& editing. J.L.: data curation; funding acquisition; validation; writing - review \& editing. P.P.: conceptualization; data curation; funding acquisition; supervision; validation; writing - original draft, review \& editing. K.K.: funding acquisition; supervision; validation; writing - review \& editing.
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{DECLARATION OF INTERESTS}
+% Note: this section was previously titled "Conflict of interest" in the
+% earlier bioRxiv/Oxford drafts. Prose preserved verbatim; only the heading
+% is renamed to match Cell Press convention.
+K.K. is a co-founder of Delta4 GmbH (Vienna, Austria). M.L., K.K.-I., L.F., S.W., F.B., E.B., L.G., P.A., and P.P. are employed at Delta4 GmbH (Vienna, Austria).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{SUPPLEMENTAL INFORMATION INDEX}
+\begin{description}
+  \item Data S1. ADPKD molecular model input file (spreadsheet) used in the application use case.
+\end{description}

@@ -1,12 +1,28 @@
 # Graph Lens Lite — Publication
 
-Multi-venue LaTeX setup for the Graph Lens Lite paper. The body content lives in
-`shared/content.tex` and is rendered by two venue-specific drivers:
+LaTeX setup for the Graph Lens Lite paper. The body content lives in
+`shared/content.tex` and is rendered by two venue-specific drivers that share
+the same section structure (Cell Press *Patterns* Resource Article style):
 
-| Directory  | Target venue           |
-|------------|------------------------|
-| `oxford/`  | Oxford Bioinformatics  |
-| `biorxiv/` | bioRxiv preprint       |
+| Directory   | Target venue                                  |
+|-------------|-----------------------------------------------|
+| `biorxiv/`  | bioRxiv preprint                              |
+| `patterns/` | Cell Press *Patterns* (Resource Article)      |
+
+Drivers differ only in preamble (document class, citation style, fonts, line
+numbering). The shared body uses `\section*{UPPERCASE}` headings and works
+identically in both.
+
+## Author conventions in `shared/content.tex`
+
+Look for these markers when reviewing the draft:
+
+- `% AI-DRAFTED -- REVIEW` — prose drafted by the AI assistant during the
+  manuscript restructure. Treat as a starting point; revise in your own voice
+  before submission. Anything not marked is user-original prose preserved
+  verbatim from the prior draft.
+- `% TODO` — structural placeholder. The heading exists, the body is empty,
+  the comment block lists the angles to consider.
 
 ## Prerequisites
 
@@ -56,19 +72,6 @@ sudo tlmgr install natbib acronym preprint lineno enumitem lm
 
 ## Building
 
-Each flavor is compiled from its own directory. A full build requires
-`pdflatex` → `bibtex` → `pdflatex` → `pdflatex` (two extra passes resolve
-cross-references and citations).
-
-### Oxford Bioinformatics
-
-```bash
-cd oxford/
-latexmk -pdf main
-```
-
-Output: `oxford/main.pdf`
-
 ### bioRxiv
 
 ```bash
@@ -78,20 +81,30 @@ latexmk -pdf main
 
 Output: `biorxiv/main.pdf`
 
-### Build both at once
-
-From the manuscript directory:
+### Cell Press Patterns (Resource Article)
 
 ```bash
-for dir in oxford biorxiv; do
-  (cd "$dir" && latexmk -pdf main)
-done
+cd patterns/
+latexmk -pdf main
+```
+
+Output: `patterns/main.pdf`
+
+Uses the generic Cell Press LaTeX template (v1.10) with the bundled
+`numbered.bst` (AMA-style numbered citations) and `numcompress.sty`.
+
+### Build both flavors at once
+
+From the `manuscript/` directory:
+
+```bash
+for dir in biorxiv patterns; do (cd "$dir" && latexmk -pdf main); done
 ```
 
 ### Clean auxiliary files
 
 ```bash
-cd oxford/   # or biorxiv/
+cd biorxiv/   # or patterns/
 latexmk -C
 ```
 
@@ -112,30 +125,27 @@ writing. Duplicate cite keys are rejected automatically.
 
 ```
 shared/
-  content.tex              Body sections shared across venues
-  abbreviations.tex        Acronym definitions
+  content.tex              Body sections (SUMMARY through SUPPLEMENTAL INFO)
   reference.bib            Bibliography database
   Fig/                     Figures
 
-oxford/
-  main.tex                 OUP driver (structured abstract, journal metadata)
-  oup-authoring-template.cls
-
 biorxiv/
-  main.tex                 Preprint driver (article class, line numbers)
+  main.tex                 Preprint driver (article class, natbib author-year)
+
+patterns/
+  main.tex                 Cell Press Patterns driver (Resource Article)
+  numbered.bst             AMA-style numbered bibliography
+  numcompress.sty          Range-compression for numeric citations
 
 ../scripts/
   add_reference_to_manuscript.py   Fetch PubMed citation → BibTeX (Python 3)
 ```
 
-Edit `shared/content.tex` to change the paper body — both flavors pick up the
-changes. For small venue-specific differences inside the shared content, use the
-`\ifbiorxiv` flag:
+Both drivers `\input{../shared/content}` — edit the shared body once, both
+flavors pick up the changes.
 
-```latex
-\ifbiorxiv
-  Supplementary data are available at \url{...}
-\else
-  Supplementary data are available at \textit{Bioinformatics} online.
-\fi
-```
+> **Note on word counts.** Cell Press *Patterns* Resource Articles are
+> typically 5,000–7,000 words (vs. ~2,500 in the prior bioRxiv draft).
+> The METHODS section and the Limitations subsection are intentionally
+> scaffolded with TODO placeholders so they can absorb the expansion before
+> submission.

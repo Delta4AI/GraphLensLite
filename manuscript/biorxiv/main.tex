@@ -1,11 +1,11 @@
 %%
 %% bioRxiv preprint
 %%
+%% Same body and section structure as the Cell Press Patterns flavor; only the
+%% preamble differs (article class, natbib author-year citations, lineno line
+%% numbers expected for preprints).
+%%
 \documentclass[11pt]{article}
-
-% ── Venue flag ────────────────────────────────────────────────────────────────
-\newif\ifbiorxiv
-\biorxivtrue
 
 % ── Page geometry & fonts ────────────────────────────────────────────────────
 \usepackage[a4paper, margin=2.5cm]{geometry}
@@ -20,11 +20,17 @@
 \usepackage{xcolor}
 \usepackage{amsmath,amssymb}
 \usepackage{natbib}
-\usepackage{authblk}          % author/affiliation blocks
-\usepackage{lineno}            % line numbers (expected for preprints)
+\usepackage{authblk}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{lineno}
 \linenumbers
 
 \graphicspath{{../shared/Fig/}}
+
+% Match the Patterns flavor: no automatic section numbering, since headings
+% are written as \section*{UPPERCASE} in shared/content.tex.
+\setcounter{secnumdepth}{-2}
 
 % ── Title ────────────────────────────────────────────────────────────────────
 \title{Graph Lens Lite: An interactive biological network viewer for displaying, exploring, and sharing disease pathobiology and drug mechanism of action models}
@@ -60,18 +66,7 @@
 \begin{document}
 \maketitle
 
-% ── Abstract ─────────────────────────────────────────────────────────────────
-\begin{abstract}
-\noindent\textbf{Motivation:} Biological network visualization together with graph-based analyses are key techniques in systems biology and network medicine to detect patterns and generate new hypotheses regarding disease pathobiology, drug target identification, biomarker prioritization, or digital drug discovery. Network representations are also a way to communicate research findings and share results with colleagues and coworkers. \\
-\textbf{Results:} We have developed Graph Lens Lite, a browser-based tool that combines rich visualization capabilities with a streamlined interface for exploring and sharing biological networks. It offers an expressive query language, topological network analysis, GUI-based filtering, visual grouping, customizable layouts, a data-editor, and fine-grained property-based styling options, particularly suited for visualizing molecular models of disease pathobiology or drug mechanism of action. \\
-\textbf{Availability:} Graph Lens Lite is available at GitHub (\url{https://github.com/Delta4AI/GraphLensLite}). \\
-\textbf{Supplementary information:} Supplementary data are available at \textit{Bioinformatics} online.
-
-\medskip
-\noindent\textbf{Keywords:} network visualization, graph exploration, disease pathobiology, drug mechanism of action
-\end{abstract}
-
-% ── Shared body ──────────────────────────────────────────────────────────────
+% ── Shared body (SUMMARY through SUPPLEMENTAL INFORMATION INDEX) ─────────────
 \input{../shared/content}
 
 % ── Bibliography ─────────────────────────────────────────────────────────────
