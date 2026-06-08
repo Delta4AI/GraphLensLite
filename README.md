@@ -47,9 +47,27 @@ npm run serve            # static http-server on :8000
 npm start                # electron app
 npm run dist-linux       # Linux build
 npm run dist-windows     # Windows build
+npm run serve:api        # standalone ingest service (HTTP API + live viewer)
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full list of npm scripts, version management, code style, and commit guidelines.
+
+## Send data via the API
+
+Run Graph Lens Lite as a small standalone service so other apps can push graphs to it over HTTP and watch them render live in the browser:
+
+```bash
+cp .env.example .env     # set GLL_API_TOKEN
+npm run serve:api        # serves the viewer + ingest API (default :7637)
+```
+
+```bash
+curl -X POST http://127.0.0.1:7637/api/graph \
+  -H "Authorization: Bearer $GLL_API_TOKEN" -H "Content-Type: application/json" \
+  -d '{"nodes":[{"id":"A"},{"id":"B"}],"edges":[{"source":"A","target":"B"}]}'
+```
+
+Open `http://127.0.0.1:7637/` and the pushed graph appears; further pushes update it live. Full reference: [API.md](API.md).
 
 ## Contributing
 

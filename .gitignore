@@ -20,6 +20,9 @@ src/gll.bundle.js.map
 # Python virtual environment
 .venv/
 
+# Local service configuration (token, port). Commit .env.example instead.
+.env
+
 # Log files
 *.log
 

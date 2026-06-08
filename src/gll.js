@@ -36,6 +36,7 @@ import {StringDemoDataLoader} from "./utilities/demo_loader.js";
 import {Popup} from "./utilities/popup.js";
 import {StaticUtilities} from "./utilities/static.js";
 import {generateTourData, GuidedTour} from "./utilities/tour.js";
+import {initApiClient} from "./managers/api_client.js";
 
 
 // Stores all reference objects
@@ -619,4 +620,9 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // Live ingest: exposes window.renderGraphData and, when served over http(s)
+  // by the standalone service, loads the latest pushed graph and subscribes to
+  // live updates. Inert in the file:// Electron build.
+  initApiClient(cache);
 })
