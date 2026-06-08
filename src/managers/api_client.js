@@ -19,6 +19,38 @@ function isHttpContext() {
 }
 
 /**
+ * Normalize an incoming payload into the shape the render pipeline requires.
+ * Callers may POST a bare `{ nodes, edges }`:
+ *  - The data table builder (DataTable.loadTabData) maps over
+ *    `nodeDataHeaders`/`edgeDataHeaders`, so those must exist.
+ *  - Edge visibility is tracked by `edge.id`; id-less edges all collapse to a
+ *    single `null` key and only one renders, so every edge needs a unique id.
+ * A full export already carries these, in which case the provided values win.
+ *
+ * @param {object} data
+ * @returns {object} a new object — the input is not mutated.
+ */
+function normalizeGraph(data) {
+  const seen = new Set();
+  const edges = data.edges.map((edge, index) => {
+    let id = edge?.id;
+    if (id == null || seen.has(id)) {
+      id = `${edge?.source}-${edge?.target}`;
+      if (seen.has(id)) id = `${id}-${index}`;
+    }
+    seen.add(id);
+    return edge?.id === id ? edge : { ...edge, id };
+  });
+
+  return {
+    nodeDataHeaders: [],
+    edgeDataHeaders: [],
+    ...data,
+    edges,
+  };
+}
+
+/**
  * Apply a native graph payload (same shape as a File→Open JSON / export) to the
  * running app, replacing the current graph. Mirrors IOManager.loadFileWrapper.
  *
@@ -32,21 +64,23 @@ async function applyGraph(cache, data) {
     return false;
   }
 
+  const graph = normalizeGraph(data);
+
   cache.ui.setDataSourceLabel(DATA_SOURCE_LABEL);
-  await cache.ui.showLoading("Loading", `Rendering graph (${data.nodes.length} nodes, ${data.edges.length} edges)`);
+  await cache.ui.showLoading("Loading", `Rendering graph (${graph.nodes.length} nodes, ${graph.edges.length} edges)`);
 
   try {
     // Restore Sets/Maps for native JSON parity (no-op for minimal payloads).
-    cache.io.restoreSetsFromJSON(data);
+    cache.io.restoreSetsFromJSON(graph);
 
     if (cache.graph) {
       await cache.gcm.destroyGraphAndRollBackUI();
       await cache.gcm.resetEventLocks();
     }
 
-    cache.io.preProcessData(data);
+    cache.io.preProcessData(graph);
     cache.ui.updateHoverToggleButton();
-    cache.buildDataTable(data);
+    cache.buildDataTable(graph);
     cache.ui.buildUI();
 
     const savedQuery = cache.data.layouts?.[cache.data.selectedLayout]?.query;
@@ -69,49 +103,78 @@ async function applyGraph(cache, data) {
     }
     return true;
   } finally {
-    await cache.ui.hideLoading();
+    // Guard overlay cleanup so a hideLoading error can never mask a real
+    // render failure (refreshUI touches DOM that may be absent on failure).
+    try {
+      await cache.ui.hideLoading();
+    } catch (err) {
+      cache?.ui?.debug?.(`hideLoading failed after graph apply: ${err.message}`);
+    }
   }
+}
+
+/**
+ * Build a serializing scheduler for graph application. G6 graph teardown
+ * corrupts if a new render starts while the previous one is still settling, so
+ * applications must never overlap. Under replace semantics only the latest
+ * payload matters, so intermediate payloads that arrive mid-render are
+ * coalesced away.
+ *
+ * @param {object} cache
+ * @returns {(data: object) => void}
+ */
+function createGraphScheduler(cache) {
+  let rendering = false;
+  let queued = null;
+
+  return function schedule(data) {
+    queued = data;
+    if (rendering) return;
+    rendering = true;
+    (async () => {
+      try {
+        while (queued !== null) {
+          const next = queued;
+          queued = null;
+          await applyGraph(cache, next);
+        }
+      } finally {
+        rendering = false;
+      }
+    })();
+  };
 }
 
 /**
  * Wire up the live ingest client. Always exposes `window.renderGraphData`.
  * Opens the SSE connection only in an http(s) context.
  *
+ * The service streams the current graph on connect and on every push, so a
+ * single SSE subscription covers both initial state and live updates — there
+ * is deliberately no separate initial fetch, which would race the on-connect
+ * frame and tear down a half-rendered graph.
+ *
  * @param {object} cache
  * @param {object} [deps]  Injectable for tests.
- * @param {Function} [deps.fetchImpl]
  * @param {Function} [deps.EventSourceImpl]
  * @returns {EventSource|null} the live connection, or null when inert.
  */
 function initApiClient(cache, deps = {}) {
-  const fetchImpl = deps.fetchImpl ?? (typeof fetch !== "undefined" ? fetch : null);
   const EventSourceImpl =
     deps.EventSourceImpl ?? (typeof EventSource !== "undefined" ? EventSource : null);
+
+  const schedule = createGraphScheduler(cache);
 
   if (typeof window !== "undefined") {
     window.renderGraphData = (data) => applyGraph(cache, data);
   }
 
-  if (!isHttpContext()) return null;
-
-  // Initial state: render whatever graph the service already holds.
-  if (fetchImpl) {
-    fetchImpl("/api/graph")
-      .then((res) => (res.status === 200 ? res.json() : null))
-      .then((data) => {
-        if (data) return applyGraph(cache, data);
-      })
-      .catch(() => {
-        /* no service or no graph yet — stay on the landing screen */
-      });
-  }
-
-  if (!EventSourceImpl) return null;
+  if (!isHttpContext() || !EventSourceImpl) return null;
 
   const source = new EventSourceImpl("/api/events");
   source.addEventListener("graph", (event) => {
     try {
-      applyGraph(cache, JSON.parse(event.data));
+      schedule(JSON.parse(event.data));
     } catch (err) {
       cache?.ui?.error?.(`Failed to apply pushed graph: ${err.message}`);
     }
@@ -120,4 +183,4 @@ function initApiClient(cache, deps = {}) {
   return source;
 }
 
-export { initApiClient, applyGraph, isHttpContext, DATA_SOURCE_LABEL };
+export { initApiClient, applyGraph, normalizeGraph, isHttpContext, DATA_SOURCE_LABEL };
