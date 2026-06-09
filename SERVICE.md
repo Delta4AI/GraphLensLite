@@ -60,6 +60,11 @@ to the console (development convenience only — it changes on restart).
 | `GET /api/events`    | none   | Server-Sent Events stream. Emits a `graph` event on connect and on every push. Used by the viewer for live updates. |
 | `GET /health`        | none   | Liveness. Returns `{ "ok": true, "version": "..." }`.               |
 
+All three `/api/graph` and `/api/events` calls accept an optional `?session=<id>`
+query param that isolates a caller's graph and live stream from others. Omitting
+it uses the shared `"default"` session (the original single-graph behaviour). See
+[API.md §2.1](API.md) for the id format and handoff pattern.
+
 Reads (`GET /api/graph`, `/api/events`) are intentionally open — they are the
 viewer's delivery channel, exactly like serving the HTML. Only **writes**
 (`POST /api/graph`) require the bearer token.

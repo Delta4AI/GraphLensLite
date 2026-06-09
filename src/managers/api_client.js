@@ -13,9 +13,45 @@
 
 const DATA_SOURCE_LABEL = "Live (API)";
 
+/**
+ * Accepted session-id shape. Mirrors SESSION_ID_PATTERN in server/validate.js;
+ * duplicated rather than shared because that module is CommonJS/Node and this
+ * is a browser bundle with no shared build step.
+ */
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
 /** @returns {boolean} true when running over http/https (i.e. served by the service) */
 function isHttpContext() {
   return typeof location !== "undefined" && /^https?:$/.test(location.protocol);
+}
+
+/**
+ * Read the `session` id from the viewer's own URL. Returns it only when it
+ * matches the service's accepted format; a malformed id is dropped (the viewer
+ * falls back to the default session) rather than forwarded — the SSE endpoint
+ * would reject a bad id with 400 and EventSource would not reconnect.
+ *
+ * @param {string} [search]  Defaults to `location.search`.
+ * @returns {string|null}
+ */
+function readSessionId(search) {
+  const raw = new URLSearchParams(
+    search ?? (typeof location !== "undefined" ? location.search : ""),
+  ).get("session");
+  return raw && SESSION_ID_PATTERN.test(raw) ? raw : null;
+}
+
+/**
+ * Build the relative SSE URL, carrying the viewer's session id when present so
+ * the stream is scoped to the same session the producer pushed to. Stays
+ * relative (no leading slash) for reverse-proxy sub-path support.
+ *
+ * @param {string} [search]  Defaults to `location.search`.
+ * @returns {string}
+ */
+function sseEventsUrl(search) {
+  const id = readSessionId(search);
+  return id ? `api/events?session=${encodeURIComponent(id)}` : "api/events";
 }
 
 /**
@@ -176,7 +212,9 @@ function initApiClient(cache, deps = {}) {
   // served at the service root (/api/events) and when mounted under a reverse-
   // proxy sub-path (e.g. /graph-lens-lite/ -> /graph-lens-lite/api/events). A
   // root-absolute "/api/events" would drop the prefix and 404 behind a proxy.
-  const source = new EventSourceImpl("api/events");
+  // Carries ?session=<id> from the viewer's own URL so the stream is scoped to
+  // the session the producer pushed to (omitted → shared default session).
+  const source = new EventSourceImpl(sseEventsUrl());
   source.addEventListener("graph", (event) => {
     try {
       schedule(JSON.parse(event.data));
@@ -188,4 +226,12 @@ function initApiClient(cache, deps = {}) {
   return source;
 }
 
-export { initApiClient, applyGraph, normalizeGraph, isHttpContext, DATA_SOURCE_LABEL };
+export {
+  initApiClient,
+  applyGraph,
+  normalizeGraph,
+  isHttpContext,
+  readSessionId,
+  sseEventsUrl,
+  DATA_SOURCE_LABEL,
+};

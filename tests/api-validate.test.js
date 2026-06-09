@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateGraph, parseGraphJson } from "../server/validate.js";
+import { validateGraph, parseGraphJson, parseSessionId, DEFAULT_SESSION } from "../server/validate.js";
 import { extractBearer, checkToken } from "../server/auth.js";
 
 describe("validateGraph", () => {
@@ -102,5 +102,28 @@ describe("checkToken", () => {
 
   it("rejects tokens of different length without throwing", () => {
     expect(checkToken("Bearer short", "a-much-longer-token")).toBe(false);
+  });
+});
+
+describe("parseSessionId", () => {
+  it("falls back to the default session when absent", () => {
+    expect(parseSessionId(undefined)).toEqual({ ok: true, sessionId: DEFAULT_SESSION });
+    expect(parseSessionId(null)).toEqual({ ok: true, sessionId: DEFAULT_SESSION });
+    expect(parseSessionId("")).toEqual({ ok: true, sessionId: DEFAULT_SESSION });
+  });
+
+  it("accepts URL-safe ids within the length bound", () => {
+    expect(parseSessionId("abc-123_DEF")).toEqual({ ok: true, sessionId: "abc-123_DEF" });
+    expect(parseSessionId("x".repeat(64))).toEqual({ ok: true, sessionId: "x".repeat(64) });
+  });
+
+  it("rejects ids over 64 characters", () => {
+    expect(parseSessionId("x".repeat(65)).ok).toBe(false);
+  });
+
+  it("rejects ids with disallowed characters", () => {
+    for (const bad of ["a/b", "a b", "a.b", "../etc", "a:b", "café"]) {
+      expect(parseSessionId(bad).ok).toBe(false);
+    }
   });
 });

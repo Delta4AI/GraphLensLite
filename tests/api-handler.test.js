@@ -151,6 +151,51 @@ describe("routing", () => {
   });
 });
 
+describe("sessions", () => {
+  const G1 = { nodes: [{ id: "1" }], edges: [] };
+  const G2 = { nodes: [{ id: "2" }, { id: "3" }], edges: [] };
+
+  it("echoes the resolved session and subscriber count on POST", async () => {
+    const res = await postGraph(VALID_GRAPH, { headers: {} });
+    const json = await res.json();
+    expect(json).toMatchObject({ success: true, session: "default", subscribers: expect.any(Number) });
+  });
+
+  it("isolates graphs by session id on GET", async () => {
+    await fetch(`${baseUrl}/api/graph?session=alice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify(G1),
+    });
+    await fetch(`${baseUrl}/api/graph?session=bob`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify(G2),
+    });
+    expect(await (await fetch(`${baseUrl}/api/graph?session=alice`)).json()).toEqual(G1);
+    expect(await (await fetch(`${baseUrl}/api/graph?session=bob`)).json()).toEqual(G2);
+  });
+
+  it("returns 204 for a known-empty session", async () => {
+    const res = await fetch(`${baseUrl}/api/graph?session=neverwritten`);
+    expect(res.status).toBe(204);
+  });
+
+  it("rejects an invalid session id with 400 on POST", async () => {
+    const res = await fetch(`${baseUrl}/api/graph?session=bad/id`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify(VALID_GRAPH),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects an invalid session id with 400 on GET", async () => {
+    const res = await fetch(`${baseUrl}/api/graph?session=${encodeURIComponent("a b")}`);
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("GET /api/events (SSE)", () => {
   it("streams the current graph immediately on connect", async () => {
     await postGraph(VALID_GRAPH);
@@ -166,5 +211,28 @@ describe("GET /api/events (SSE)", () => {
 
     controller.abort();
     reader.cancel().catch(() => {});
+  });
+
+  it("replays only the requested session's graph on connect", async () => {
+    const sessGraph = { nodes: [{ id: "Z" }], edges: [] };
+    await fetch(`${baseUrl}/api/graph?session=stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify(sessGraph),
+    });
+    const controller = new AbortController();
+    const res = await fetch(`${baseUrl}/api/events?session=stream`, { signal: controller.signal });
+    const reader = res.body.getReader();
+    const { value } = await reader.read();
+    const text = new TextDecoder().decode(value);
+    expect(text).toContain("event: graph");
+    expect(text).toContain('"Z"');
+    controller.abort();
+    reader.cancel().catch(() => {});
+  });
+
+  it("rejects an invalid session id with 400", async () => {
+    const res = await fetch(`${baseUrl}/api/events?session=${encodeURIComponent("a/b")}`);
+    expect(res.status).toBe(400);
   });
 });

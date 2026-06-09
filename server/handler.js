@@ -1,7 +1,7 @@
 "use strict";
 
 const { checkToken } = require("./auth");
-const { validateGraph, parseGraphJson } = require("./validate");
+const { validateGraph, parseGraphJson, parseSessionId } = require("./validate");
 const { serveStatic: defaultServeStatic } = require("./static");
 
 const SSE_HEARTBEAT_MS = 25000;
@@ -54,7 +54,7 @@ function readBody(req, maxBytes) {
   });
 }
 
-async function handlePostGraph(req, res, { store, config }) {
+async function handlePostGraph(req, res, { store, config }, url) {
   // Auth first, so unauthenticated callers always get 401 (never a 403 that
   // would hint at endpoint behaviour before the token is checked).
   if (!checkToken(req.headers.authorization, config.token)) {
@@ -66,6 +66,12 @@ async function handlePostGraph(req, res, { store, config }) {
   // not send an Origin header.
   if (req.headers.origin) {
     sendJson(res, 403, { success: false, error: "Cross-origin requests are not allowed." });
+    return;
+  }
+
+  const session = parseSessionId(url.searchParams.get("session"));
+  if (!session.ok) {
+    sendJson(res, 400, { success: false, error: session.error });
     return;
   }
 
@@ -96,16 +102,23 @@ async function handlePostGraph(req, res, { store, config }) {
     return;
   }
 
-  store.setGraph(parsed);
+  const delivered = store.setGraph(parsed, session.sessionId);
   sendJson(res, 200, {
     success: true,
+    session: session.sessionId,
     nodes: parsed.nodes.length,
     edges: parsed.edges.length,
+    subscribers: delivered,
   });
 }
 
-function handleGetGraph(res, { store }) {
-  const graph = store.getGraph();
+function handleGetGraph(res, { store }, url) {
+  const session = parseSessionId(url.searchParams.get("session"));
+  if (!session.ok) {
+    sendJson(res, 400, { success: false, error: session.error });
+    return;
+  }
+  const graph = store.getGraph(session.sessionId);
   if (!graph) {
     res.writeHead(204, { "Cache-Control": "no-store" });
     res.end();
@@ -114,8 +127,15 @@ function handleGetGraph(res, { store }) {
   sendJson(res, 200, graph);
 }
 
-function handleEvents(req, res, { store }) {
-  if (store.subscriberCount() >= MAX_SSE_SUBSCRIBERS) {
+function handleEvents(req, res, { store }, url) {
+  const session = parseSessionId(url.searchParams.get("session"));
+  if (!session.ok) {
+    sendJson(res, 400, { success: false, error: session.error });
+    return;
+  }
+  // Cap total open streams across all sessions, not per session, so the socket
+  // ceiling holds regardless of how many session ids are in play.
+  if (store.totalSubscribers() >= MAX_SSE_SUBSCRIBERS) {
     sendJson(res, 503, { success: false, error: "Too many live viewers connected." });
     return;
   }
@@ -127,12 +147,12 @@ function handleEvents(req, res, { store }) {
   });
   res.write("retry: 3000\n\n");
 
-  const current = store.getGraph();
+  const current = store.getGraph(session.sessionId);
   if (current) {
     res.write(`event: graph\ndata: ${JSON.stringify(current)}\n\n`);
   }
 
-  const unsubscribe = store.addSubscriber({ write: (chunk) => res.write(chunk) });
+  const unsubscribe = store.addSubscriber({ write: (chunk) => res.write(chunk) }, session.sessionId);
   const heartbeat = setInterval(() => {
     try {
       res.write(": ping\n\n");
@@ -161,13 +181,14 @@ function handleEvents(req, res, { store }) {
  */
 function createHandler({ store, config, staticDir, version, serveStatic = defaultServeStatic }) {
   return function handler(req, res) {
-    let pathname;
+    let url;
     try {
-      pathname = new URL(req.url, "http://localhost").pathname;
+      url = new URL(req.url, "http://localhost");
     } catch {
       sendJson(res, 400, { success: false, error: "Malformed request URL." });
       return;
     }
+    const pathname = url.pathname;
     const method = req.method || "GET";
 
     if (pathname === "/health" && method === "GET") {
@@ -175,7 +196,7 @@ function createHandler({ store, config, staticDir, version, serveStatic = defaul
       return;
     }
     if (pathname === "/api/graph" && method === "POST") {
-      handlePostGraph(req, res, { store, config }).catch(() => {
+      handlePostGraph(req, res, { store, config }, url).catch(() => {
         if (!res.headersSent) {
           sendJson(res, 500, { success: false, error: "Internal server error." });
         }
@@ -183,11 +204,11 @@ function createHandler({ store, config, staticDir, version, serveStatic = defaul
       return;
     }
     if (pathname === "/api/graph" && method === "GET") {
-      handleGetGraph(res, { store });
+      handleGetGraph(res, { store }, url);
       return;
     }
     if (pathname === "/api/events" && method === "GET") {
-      handleEvents(req, res, { store });
+      handleEvents(req, res, { store }, url);
       return;
     }
     if (pathname.startsWith("/api/")) {

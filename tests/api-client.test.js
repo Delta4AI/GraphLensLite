@@ -1,6 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { initApiClient, applyGraph, normalizeGraph, isHttpContext, DATA_SOURCE_LABEL } from "../src/managers/api_client.js";
+import {
+  initApiClient,
+  applyGraph,
+  normalizeGraph,
+  isHttpContext,
+  readSessionId,
+  sseEventsUrl,
+  DATA_SOURCE_LABEL,
+} from "../src/managers/api_client.js";
 
 function makeCache({ layouts = {}, selectedLayout = "default" } = {}) {
   const cache = {
@@ -179,6 +187,36 @@ describe("isHttpContext", () => {
   });
 });
 
+describe("readSessionId", () => {
+  it("returns null when no session param is present", () => {
+    expect(readSessionId("")).toBeNull();
+    expect(readSessionId("?foo=bar")).toBeNull();
+  });
+
+  it("returns a well-formed session id", () => {
+    expect(readSessionId("?session=abc-123_X")).toBe("abc-123_X");
+  });
+
+  it("drops a malformed session id rather than forwarding it", () => {
+    expect(readSessionId("?session=" + encodeURIComponent("a/b"))).toBeNull();
+    expect(readSessionId("?session=" + "x".repeat(65))).toBeNull();
+  });
+});
+
+describe("sseEventsUrl", () => {
+  it("is the bare relative path with no session", () => {
+    expect(sseEventsUrl("")).toBe("api/events");
+  });
+
+  it("appends a valid session id", () => {
+    expect(sseEventsUrl("?session=room42")).toBe("api/events?session=room42");
+  });
+
+  it("omits a malformed session id", () => {
+    expect(sseEventsUrl("?session=bad id")).toBe("api/events");
+  });
+});
+
 describe("initApiClient", () => {
   it("always exposes window.renderGraphData", () => {
     vi.stubGlobal("location", { protocol: "file:" });
@@ -200,6 +238,13 @@ describe("initApiClient", () => {
     const source = initApiClient(cache, { EventSourceImpl: FakeEventSource });
     expect(source).toBeInstanceOf(FakeEventSource);
     expect(source.url).toBe("api/events");
+  });
+
+  it("scopes the SSE subscription to the viewer's session param", () => {
+    vi.stubGlobal("location", { protocol: "http:", search: "?session=room42" });
+    const cache = makeCache();
+    const source = initApiClient(cache, { EventSourceImpl: FakeEventSource });
+    expect(source.url).toBe("api/events?session=room42");
   });
 
   it("renders a graph delivered over SSE (on-connect or push)", async () => {

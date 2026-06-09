@@ -66,22 +66,44 @@ viewer. Minimum accepted body: a JSON object with `nodes` and `edges` arrays.
 ## 2. Request & responses
 
 ```
-POST http://<host>:<port>/api/graph
+POST http://<host>:<port>/api/graph[?session=<id>]
 Authorization: Bearer <GLL_API_TOKEN>
 Content-Type: application/json
 ```
 
-| Status | Meaning                                                          |
-| ------ | ---------------------------------------------------------------- |
-| `200`  | `{ "success": true, "nodes": N, "edges": M, "subscribers": K }`  |
-| `400`  | Body is not valid JSON.                                          |
-| `401`  | Missing or invalid bearer token.                                 |
-| `403`  | Request carried an `Origin` header (browser CSRF defence).       |
-| `413`  | Body exceeds the max body size (25 MB default).                  |
-| `422`  | JSON is valid but missing `nodes`/`edges` arrays.                |
+| Status | Meaning                                                                            |
+| ------ | ---------------------------------------------------------------------------------- |
+| `200`  | `{ "success": true, "session": "<id>", "nodes": N, "edges": M, "subscribers": K }` |
+| `400`  | Body is not valid JSON, **or** the `session` id is malformed (see §2.1).            |
+| `401`  | Missing or invalid bearer token.                                                   |
+| `403`  | Request carried an `Origin` header (browser CSRF defence).                         |
+| `413`  | Body exceeds the max body size (25 MB default).                                    |
+| `422`  | JSON is valid but missing `nodes`/`edges` arrays.                                  |
 
-> Read the current graph back with `GET /api/graph` (no auth). See
+> Read the current graph back with `GET /api/graph[?session=<id>]` (no auth). See
 > [SERVICE.md](SERVICE.md#endpoints).
+
+### 2.1 Sessions (multi-tenant handoff)
+
+By default every caller shares **one** live graph: a POST replaces it and pushes
+to every connected viewer. To give independent callers their own isolated graph,
+pass a `session` query param consistently on **all three** endpoints:
+
+```
+POST /api/graph?session=<id>      # writes that session's graph
+GET  /api/graph?session=<id>      # reads it back
+GET  /api/events?session=<id>     # SSE stream scoped to that session
+```
+
+- **Id format:** 1–64 characters from `A–Z a–z 0–9 _ -`. Anything else → `400`.
+- **Omitted / empty `session`** → the implicit `"default"` session, i.e. the
+  original single-graph behaviour. Existing callers need no changes.
+- **The producer owns the id.** Generate one (e.g. `crypto.randomUUID()`),
+  POST with it, then open the viewer at `/?session=<id>` so the viewer
+  subscribes to the matching stream. (Same handoff shape as OntoloViz.)
+- **Bounded:** the server holds at most a fixed number of sessions
+  (`MAX_SESSIONS`, 64) and evicts least-recently-used ones — preferring sessions
+  with no connected viewer. The global live-viewer cap (100) spans all sessions.
 
 ---
 
