@@ -67,7 +67,10 @@ curl -X POST http://127.0.0.1:7637/api/graph \
   -d '{"nodes":[{"id":"A"},{"id":"B"}],"edges":[{"source":"A","target":"B"}]}'
 ```
 
-Open `http://127.0.0.1:7637/` and the pushed graph appears; further pushes update it live. Full reference: [API.md](API.md).
+Open `http://127.0.0.1:7637/` and the pushed graph appears; further pushes update it live.
+
+- **[SERVICE.md](SERVICE.md)** — running, configuring, and deploying the ingest service.
+- **[API.md](API.md)** — payload reference for other apps: how to build JSON for meaningful graphs (styling, filterable data, bubble groups, layouts).
 
 ## Contributing
 
