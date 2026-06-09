@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.14.0
+
+### Features
+
+#### HTTP Ingest Service (new)
+
+Standalone HTTP service (`npm run serve:api`) that lets other applications push graphs and watch them render live in a browser. Independent of the Electron desktop app — the desktop build never starts a server.
+
+* `POST /api/graph` ingest endpoint protected by a bearer token; replaces the current graph and pushes it to connected viewers
+* Live viewer over Server-Sent Events (`GET /api/events`) — pushes render immediately and replace the current graph without a reload
+* `GET /api/graph` (latest graph, `204` until first ingest) and `GET /health` (liveness with version) endpoints
+* Environment-based configuration: `GLL_API_TOKEN`, `GLL_API_PORT`, `GLL_API_HOST`, `GLL_MAX_BODY_BYTES`, `GLL_STATIC_DIR` (see [SERVICE.md](SERVICE.md) and `.env.example`)
+* Payload reference for external apps and agents documented in [API.md](API.md)
+
+### Security
+
+* Cross-origin browser `POST`s rejected (`403` on any `Origin` header) as a CSRF defence
+* Incoming JSON sanitized against prototype pollution — `__proto__`, `constructor`, and `prototype` keys stripped at every level
+
+### Fixes
+
+* Fixed pushed graphs not rendering reliably in the live viewer
+
 ## 1.13.0
 
 ### Features
