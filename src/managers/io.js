@@ -1593,13 +1593,21 @@ class IOManager {
   parseLayouts(jsonLayouts) {
     const parsedLayouts = {};
     Object.entries(jsonLayouts).forEach(([key, layout]) => {
+      const positions =
+        layout.positions instanceof Map
+          ? layout.positions
+          : new Map(Object.entries(layout.positions || {}));
       parsedLayouts[key] = {
+        // layoutType gates the initial layout run in core.js: a view with no
+        // positions needs one so the force algorithm fires. Authored payloads
+        // (e.g. bubble groups, §7) omit it; without this default they'd render
+        // every node stacked at the origin. Honour an explicit value when given.
+        layoutType:
+          layout.layoutType ||
+          (positions.size === 0 ? this.cache.DEFAULTS.LAYOUT : undefined),
         internals: layout.internals || null,
         // Check if already a Map (from restoreSetsFromJSON), otherwise convert
-        positions:
-          layout.positions instanceof Map
-            ? layout.positions
-            : new Map(Object.entries(layout.positions || {})),
+        positions,
         filters: this.parseFiltersAsMap(layout.filters),
         isCustom: layout.isCustom || false,
         query: layout["query"] || undefined,
