@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.14.2
+
+### Features
+
+#### Per-session graph isolation (multi-tenant handoff)
+
+The ingest service now supports optional per-session graphs, so multiple apps or users behind a reverse proxy can each load their own graph instead of overwriting one shared global graph.
+
+* `?session=<id>` query param accepted on `POST /api/graph`, `GET /api/graph`, and `GET /api/events`; each session has its own graph and its own set of live viewers
+* Omitting `session` uses a shared `"default"` session — the original single-graph behaviour, so existing callers and proxies need no changes
+* `POST /api/graph` response now includes the resolved `session` and the live `subscribers` count
+* The live viewer reads `?session=<id>` from its own URL and subscribes to the matching stream (works at the service root and behind a reverse-proxy sub-path)
+* Session ids are bounded (`^[A-Za-z0-9_-]{1,64}$`, `400` otherwise) and the server holds at most 64 sessions with least-recently-used eviction; the live-viewer cap (100) spans all sessions
+* Handoff pattern documented in [API.md](API.md) §2.1 and [SERVICE.md](SERVICE.md)
+
+## 1.14.1
+
+### Fixes
+
+* Authored payloads with empty/missing node positions are now force-laid-out instead of rendering collapsed at the origin
+* Live viewer connects to the events stream via a relative URL so it works behind a reverse-proxy sub-path
+
 ## 1.14.0
 
 ### Features
