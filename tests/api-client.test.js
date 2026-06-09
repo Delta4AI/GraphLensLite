@@ -199,7 +199,7 @@ describe("initApiClient", () => {
     const cache = makeCache();
     const source = initApiClient(cache, { EventSourceImpl: FakeEventSource });
     expect(source).toBeInstanceOf(FakeEventSource);
-    expect(source.url).toBe("/api/events");
+    expect(source.url).toBe("api/events");
   });
 
   it("renders a graph delivered over SSE (on-connect or push)", async () => {

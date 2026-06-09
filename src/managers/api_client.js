@@ -171,7 +171,12 @@ function initApiClient(cache, deps = {}) {
 
   if (!isHttpContext() || !EventSourceImpl) return null;
 
-  const source = new EventSourceImpl("/api/events");
+  // Relative URL (no leading slash), like the page's other assets (gll.js,
+  // lib/*, style.css). Resolved against the document URL, so it works both when
+  // served at the service root (/api/events) and when mounted under a reverse-
+  // proxy sub-path (e.g. /graph-lens-lite/ -> /graph-lens-lite/api/events). A
+  // root-absolute "/api/events" would drop the prefix and 404 behind a proxy.
+  const source = new EventSourceImpl("api/events");
   source.addEventListener("graph", (event) => {
     try {
       schedule(JSON.parse(event.data));
