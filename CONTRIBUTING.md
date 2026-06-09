@@ -19,6 +19,7 @@ dnf install libxcrypt-compat wine   # only needed for cross-platform builds
 |---|---|
 | `npm run bundle:serve` | Dev server with watch + sourcemaps (recommended for development) |
 | `npm run serve` | Static http-server on :8000 |
+| `npm run serve:api` | Standalone HTTP ingest service with live SSE viewer (see [SERVICE.md](SERVICE.md)) |
 | `npm start` | Electron app (injects version automatically) |
 | `npm run bundle` | One-off bundle (no minify) |
 | `npm run bundle:prod` | Production bundle (minified) |
@@ -98,7 +99,7 @@ npm test            # run the full suite once
 npm run test:watch  # re-run on file changes
 ```
 
-Tests live in `tests/` as `*.test.js`. Assistant-specific tests (`tests/assistant-*.test.js`) cover settings/endpoint validation, the context snapshot, markdown rendering + sanitization, and the query-warning linter.
+Tests live in `tests/` as `*.test.js`. Assistant-specific tests (`tests/assistant-*.test.js`) cover settings/endpoint validation, the context snapshot, markdown rendering + sanitization, and the query-warning linter. Ingest-service tests (`tests/api-*.test.js`) cover config resolution, the graph store, request handling/routing, payload validation, and the browser client.
 
 ## Code Style
 
