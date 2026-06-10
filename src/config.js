@@ -29,6 +29,15 @@ const DEFAULTS = {
       ENABLED: false, COLOR: "#403C53", WIDTH: 3,
     }
   },
+  // Element interaction-state spec (former G6 node/edge state config in
+  // core.js). Single source for the styling UI and the sigma reducers.
+  STATE: {
+    ACCENT_COLOR: "#C33D35",   // selected/highlight halo + highlight fill
+    DIM_COLOR: "#E4E3EA",      // dim fill
+    NODE_HALO_WIDTH: 12,       // px, halo ring stroke width on nodes
+    EDGE_HALO_WIDTH: 6,        // px, emphasis width budget on selected edges
+    HALO_OPACITY: 0.4,
+  },
   LAYOUT: "force",
   LAYOUT_INTERNALS: {
     "force": {gravity: 10},

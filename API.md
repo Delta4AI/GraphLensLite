@@ -196,7 +196,7 @@ An edge is an object. `source` and `target` are required and must match node
 | `id`          | string | `"<source>::<target>"` | Explicit edge id. Auto-generated if omitted.              |
 | `label`       | string | —                      | Display text along the edge.                              |
 | `description` | string | —                      | Tooltip text.                                             |
-| `type`        | string | `"line"`               | `line` (straight); also `cubic`, `quadratic`, `polyline`. |
+| `type`        | string | `"line"`               | `line` (straight); also `cubic`, `quadratic`, `polyline`. **Note:** since the Sigma renderer, `polyline` renders as a curve (same as `cubic`/`quadratic`). |
 | `style`       | object | —                      | Visual styling — see below.                               |
 | `D4Data`      | object | —                      | Data attributes that define filters — see §6.             |
 
@@ -206,14 +206,14 @@ An edge is an object. `source` and `target` are required and must match node
 | ---------------- | ------- | ------------- | ---------------------------------------------------- |
 | `stroke`         | hex     | `"#403C5390"` | Line colour (last 2 hex digits = alpha).             |
 | `lineWidth`      | number  | `0.75`        | Line thickness (px).                                 |
-| `lineDash`       | number  | `0`           | Dash length; `0` = solid, e.g. `10` = dashed.        |
+| `lineDash`       | number  | `0`           | Dash length. **Note:** kept in the data model and round-trips through export, but the Sigma renderer draws all edges solid (dashes are not rendered in v1). |
 | `startArrow`     | boolean | `false`       | Arrowhead at the source end.                         |
-| `startArrowType` | string  | `"triangle"`  | `triangle`/`circle`/`diamond`/`vee`/`rect`/`simple`. |
+| `startArrowType` | string  | `"triangle"`  | `triangle`/`circle`/`diamond`/`vee`/`rect`/`simple`. Since the Sigma renderer all heads draw as triangles; the value is kept and round-trips. |
 | `startArrowSize` | number  | `8`           | Source arrowhead size.                               |
 | `endArrow`       | boolean | `false`       | Arrowhead at the target end.                         |
 | `endArrowType`   | string  | `"triangle"`  | Same enum as `startArrowType`.                       |
 | `endArrowSize`   | number  | `8`           | Target arrowhead size.                               |
-| `halo`           | boolean | `false`       | Glow behind the edge.                                |
+| `halo`           | boolean | `false`       | Glow behind the edge. Since the Sigma renderer, per-edge halos are kept in the model (and round-trip) but are not drawn; selection halos still render. |
 | `haloStroke`     | hex     | `"#403C53"`   | Halo colour.                                         |
 | `haloLineWidth`  | number  | `3`           | Halo thickness (px).                                 |
 

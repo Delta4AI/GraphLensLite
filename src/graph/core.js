@@ -100,11 +100,9 @@ class GraphCoreManager {
         nodeReducer: makeNodeReducer(this.cache, elementStates),
         edgeReducer: makeEdgeReducer(this.cache, elementStates),
         elementStates,
-        settings: {
-          // Initial heuristic; io.preProcessData flips HIDE_LABELS based on
-          // CFG.MAX_NODES_BEFORE_HIDING_LABELS before this runs.
-          renderLabels: !this.cache.CFG.HIDE_LABELS,
-        },
+        // Label visibility (CFG.HIDE_LABELS) is synced live by the adapter
+        // on construction and on every render().
+        settings: {},
       });
 
       const layout = this.cache.data.layouts[this.cache.data.selectedLayout];

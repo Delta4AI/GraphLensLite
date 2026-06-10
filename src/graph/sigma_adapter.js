@@ -7,9 +7,86 @@
  * behind the G6-shaped facade the rest of the app still calls. Facade methods
  * are transitional and get slimmed/deleted in Phases 2-6.
  */
-import { Sigma, exportImage } from "../lib/sigma.bundle.mjs";
+import {
+  Sigma,
+  exportImage,
+  EdgeRectangleProgram,
+  EdgeArrowProgram,
+  EdgeDoubleArrowProgram,
+  createEdgeArrowHeadProgram,
+  createEdgeCompoundProgram,
+  NodeSquareProgram,
+  nodeImage,
+  edgeCurve,
+} from "../lib/sigma.bundle.mjs";
 import { circular, forceAtlas2 } from "../lib/graphology.bundle.mjs";
-import { nodeAttributesFromStyle, edgeAttributesFromStyle } from "./graph_model.js";
+import { nodeAttributesFromStyle, edgeAttributesFromStyle, flipY } from "./graph_model.js";
+import { drawNodeLabel, drawEdgeLabel } from "./label_renderers.js";
+
+// Rasterization resolution for the SVG shape textures. 512 px keeps shapes
+// crisp at the ~4x zoom the UI allows (risk #1 in MIGRATION.md).
+const SHAPE_TEXTURE_RESOLUTION = 512;
+
+/**
+ * Node/edge program registry (G6 type vocabulary → sigma programs).
+ * Nodes: circle native, square via @sigma/node-square; every other shape —
+ * and any bordered/haloed node — uses the SVG texture program ("shape").
+ * Edges: straight programs are sigma built-ins; curved ones come from
+ * @sigma/edge-curve (cubic/quadratic/polyline all map to one curve type).
+ */
+function buildProgramRegistry() {
+  const shapeProgram = nodeImage.createNodeImageProgram({
+    size: { mode: "force", value: SHAPE_TEXTURE_RESOLUTION },
+    objectFit: "contain",
+    drawingMode: "background",
+    keepWithinCircle: false,
+    padding: 0,
+  });
+  const curveOptions = (extremity) => ({
+    arrowHead: extremity
+      ? { ...edgeCurve.DEFAULT_EDGE_CURVE_PROGRAM_OPTIONS.arrowHead, extremity }
+      : null,
+    drawLabel: drawCurvedEdgeLabelWithSize,
+  });
+  return {
+    nodeProgramClasses: {
+      square: NodeSquareProgram,
+      shape: shapeProgram,
+    },
+    edgeProgramClasses: {
+      line: EdgeRectangleProgram,
+      arrow: EdgeArrowProgram,
+      sourceArrow: createEdgeCompoundProgram([
+        EdgeRectangleProgram,
+        createEdgeArrowHeadProgram({ extremity: "source" }),
+      ]),
+      doubleArrow: EdgeDoubleArrowProgram,
+      curve: edgeCurve.createEdgeCurveProgram(curveOptions(null)),
+      curvedArrow: edgeCurve.createEdgeCurveProgram(curveOptions("target")),
+      curvedSourceArrow: edgeCurve.createEdgeCurveProgram(curveOptions("source")),
+      curvedDoubleArrow: edgeCurve.createEdgeCurveProgram(curveOptions("both")),
+    },
+  };
+}
+
+// Curved-edge labels reuse @sigma/edge-curve's drawer, proxying the settings
+// so per-edge labelSize/labelColor (graph_model attrs) are honoured.
+const drawCurvedEdgeLabelBase = edgeCurve.createDrawCurvedEdgeLabel(
+  edgeCurve.DEFAULT_EDGE_CURVE_PROGRAM_OPTIONS,
+);
+function drawCurvedEdgeLabelWithSize(context, edgeData, sourceData, targetData, settings) {
+  const effective =
+    edgeData.labelSize != null || edgeData.labelColor != null
+      ? {
+          ...settings,
+          edgeLabelSize: edgeData.labelSize ?? settings.edgeLabelSize,
+          edgeLabelColor: edgeData.labelColor
+            ? { color: edgeData.labelColor }
+            : settings.edgeLabelColor,
+        }
+      : settings;
+  drawCurvedEdgeLabelBase(context, edgeData, sourceData, targetData, effective);
+}
 
 const FIT_PADDING_PX = 80;
 // Clamp fit zoom so a tiny selection (e.g. a single node) doesn't punch the
@@ -43,8 +120,38 @@ class SigmaAdapter {
       zIndex: true,
       nodeReducer,
       edgeReducer,
+      ...buildProgramRegistry(),
+      // Custom drawers honour the per-element label attrs from graph_model
+      // (size, color, background, placement, offsets, auto-rotate).
+      defaultDrawNodeLabel: drawNodeLabel,
+      defaultDrawEdgeLabel: drawEdgeLabel,
+      renderEdgeLabels: true,
       ...settings,
     });
+    this.#syncLabelVisibility();
+  }
+
+  /**
+   * Keep CFG.HIDE_LABELS live (io.preProcessData flips it per
+   * MAX_NODES_BEFORE_HIDING_LABELS on every load). Sigma's label density
+   * grid stays the default thinning mechanism; HIDE_LABELS is the explicit
+   * override on top — but elements the user explicitly labelled (style
+   * pipeline emits a label attr despite HIDE_LABELS) must stay visible,
+   * matching the old G6 semantics.
+   *
+   * NOTE: this owns renderLabels/renderEdgeLabels — a caller-supplied value
+   * in constructor `settings` is overwritten here by design (CFG.HIDE_LABELS
+   * is the single source of truth for label visibility).
+   */
+  #syncLabelVisibility() {
+    let nodeLabels = true;
+    let edgeLabels = true;
+    if (this.cache.CFG?.HIDE_LABELS) {
+      nodeLabels = this.graph.someNode((_, attrs) => attrs.label != null);
+      edgeLabels = this.graph.someEdge((_, attrs) => attrs.label != null);
+    }
+    this.sigma.setSetting("renderLabels", nodeLabels);
+    this.sigma.setSetting("renderEdgeLabels", edgeLabels);
   }
 
   // ---------------------------------------------------------------- lifecycle
@@ -58,6 +165,7 @@ class SigmaAdapter {
     if (this.killed) return false;
     if (this.pendingLayout) await this.layout();
     await this.#applyPersistedPositions();
+    this.#syncLabelVisibility();
 
     this.sigma.refresh();
 
@@ -125,7 +233,8 @@ class SigmaAdapter {
         const x = pos?.style?.x;
         const y = pos?.style?.y;
         if (!this.graph.hasNode(id) || !Number.isFinite(x) || !Number.isFinite(y)) continue;
-        this.graph.mergeNodeAttributes(id, { x, y });
+        // Persisted positions are app-model (y-down); graphology is y-up.
+        this.graph.mergeNodeAttributes(id, { x, y: flipY(y) });
         const ref = this.cache.nodeRef.get(id);
         if (ref) {
           ref.style.x = x;
@@ -157,7 +266,9 @@ class SigmaAdapter {
         if (item.type !== undefined) ref.type = item.type;
         if (item.style) Object.assign(ref.style, item.style);
       }
-      const attrs = nodeAttributesFromStyle(item.style ?? {});
+      // Map from the merged ref where possible: shape/texture attrs depend on
+      // the full style (fill+stroke+lineWidth+size), not just the delta.
+      const attrs = nodeAttributesFromStyle(ref?.style ?? item.style ?? {}, ref?.type ?? item.type);
       if (Object.keys(attrs).length > 0) {
         this.graph.mergeNodeAttributes(item.id, attrs);
       }
@@ -173,7 +284,8 @@ class SigmaAdapter {
         if (item.type !== undefined) ref.type = item.type;
         if (item.style) Object.assign(ref.style, item.style);
       }
-      const attrs = edgeAttributesFromStyle(item.style ?? {});
+      // Merged ref: the program key depends on type + both arrow flags.
+      const attrs = edgeAttributesFromStyle(ref?.style ?? item.style ?? {}, ref?.type ?? item.type);
       if (Object.keys(attrs).length > 0) {
         this.graph.mergeEdgeAttributes(item.id, attrs);
       }
@@ -196,7 +308,9 @@ class SigmaAdapter {
       if (!this.graph.hasNode(ref.id)) continue;
       const attrs = this.graph.getNodeAttributes(ref.id);
       ref.style.x = attrs.x;
-      ref.style.y = attrs.y;
+      // Graphology is y-up; the app model (and everything persisted from it)
+      // stays y-down — flip on the way out, mirror of the mapper's flip in.
+      ref.style.y = flipY(attrs.y);
       ref.style.visibility = attrs.hidden ? "hidden" : "visible";
       ref.states = [...(this.elementStates.get(ref.id) ?? [])];
       views.push(ref);

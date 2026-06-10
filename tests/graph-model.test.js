@@ -3,24 +3,40 @@ import {
   buildGraphologyGraph,
   nodeAttributesFromStyle,
   edgeAttributesFromStyle,
+  sigmaEdgeType,
+  flipY,
   makeNodeReducer,
   makeEdgeReducer,
   STATE_ACCENT_COLOR,
   STATE_DIM_COLOR,
 } from "../src/graph/graph_model.js";
+import { HALO_EXTRA_PX } from "../src/graph/shape_textures.js";
+import { DEFAULTS } from "../src/config.js";
 
 // ==========================================================================
-// Graph model (sigma migration Phase 1) — graphology population from the
-// app cache and the node/edge reducer factories. Node-safe: must never
+// Graph model (sigma migration Phases 1-2) — graphology population from the
+// app cache, the G6→sigma attribute mapping (shapes, borders, labels,
+// y-axis flip) and the node/edge reducer factories. Node-safe: must never
 // import the sigma bundle.
+//
+// Phase-2 conventions under test:
+//   - app model is y-down (G6 heritage), graphology/sigma y-up → flipY once
+//   - G6 `size` is a diameter, sigma `size` a radius → halved
+//   - states render as halo textures (selected/highlight), not flat fills
 // ==========================================================================
 
-function makeNode(id, style = {}) {
-  return { id, style: { size: 20, fill: "#403C53", ...style } };
+const ACCENT_URI = encodeURIComponent(STATE_ACCENT_COLOR); // "%23C33D35"
+
+function makeNode(id, style = {}, type = undefined) {
+  const node = { id, style: { size: 20, fill: "#403C53", ...style } };
+  if (type !== undefined) node.type = type;
+  return node;
 }
 
-function makeEdge(id, source, target, style = {}) {
-  return { id, source, target, style: { lineWidth: 0.75, stroke: "#403C5390", ...style } };
+function makeEdge(id, source, target, style = {}, type = undefined) {
+  const edge = { id, source, target, style: { lineWidth: 0.75, stroke: "#403C5390", ...style } };
+  if (type !== undefined) edge.type = type;
+  return edge;
 }
 
 function createMockCache({ nodes = [], edges = [], positions = new Map() } = {}) {
@@ -50,7 +66,7 @@ describe("buildGraphologyGraph — population", () => {
     expect(graph.hasEdge("e1")).toBe(true);
   });
 
-  it("uses persisted layout positions when present", () => {
+  it("uses persisted layout positions when present, flipping y into sigma space", () => {
     const positions = new Map([["a", { style: { x: 42, y: -7 } }]]);
     const cache = createMockCache({
       nodes: [makeNode("a", { x: 1, y: 1 })],
@@ -60,16 +76,16 @@ describe("buildGraphologyGraph — population", () => {
     const graph = buildGraphologyGraph(cache);
 
     expect(graph.getNodeAttribute("a", "x")).toBe(42);
-    expect(graph.getNodeAttribute("a", "y")).toBe(-7);
+    expect(graph.getNodeAttribute("a", "y")).toBe(7);
   });
 
-  it("falls back to style x/y when no persisted position exists", () => {
+  it("falls back to style x/y when no persisted position exists (y flipped)", () => {
     const cache = createMockCache({ nodes: [makeNode("a", { x: 5, y: 6 })] });
 
     const graph = buildGraphologyGraph(cache);
 
     expect(graph.getNodeAttribute("a", "x")).toBe(5);
-    expect(graph.getNodeAttribute("a", "y")).toBe(6);
+    expect(graph.getNodeAttribute("a", "y")).toBe(-6);
   });
 
   it("assigns deterministic numeric placeholder coordinates otherwise", () => {
@@ -96,7 +112,7 @@ describe("buildGraphologyGraph — population", () => {
     const graph = buildGraphologyGraph(cache);
 
     expect(graph.getNodeAttribute("a", "x")).toBe(3);
-    expect(graph.getNodeAttribute("a", "y")).toBe(4);
+    expect(graph.getNodeAttribute("a", "y")).toBe(-4);
   });
 
   it("maps labels only when style.label is truthy", () => {
@@ -126,12 +142,12 @@ describe("buildGraphologyGraph — population", () => {
     expect(graph.getNodeAttribute("gone", "hidden")).toBe(true);
   });
 
-  it("takes the first dimension of an array size (G6 [w, h])", () => {
+  it("maps G6 diameter size to sigma radius (first dimension of [w, h] arrays)", () => {
     const cache = createMockCache({ nodes: [makeNode("a", { size: [30, 12] })] });
 
     const graph = buildGraphologyGraph(cache);
 
-    expect(graph.getNodeAttribute("a", "size")).toBe(30);
+    expect(graph.getNodeAttribute("a", "size")).toBe(15);
   });
 
   it("supports parallel (multi) edges and self loops with their own ids", () => {
@@ -183,6 +199,74 @@ describe("buildGraphologyGraph — population", () => {
     expect(graph.getEdgeAttribute("e1", "size")).toBe(2);
     expect(graph.getEdgeAttribute("e1", "color")).toBe("#112233");
   });
+
+  it("assigns node shape programs and textures from the G6 type", () => {
+    const cache = createMockCache({
+      nodes: [
+        makeNode("c", {}, "circle"),
+        makeNode("r", {}, "rect"),
+        makeNode("h", {}, "hexagon"),
+      ],
+    });
+
+    const graph = buildGraphologyGraph(cache);
+
+    expect(graph.getNodeAttribute("c", "type")).toBe("circle");
+    expect(graph.getNodeAttribute("r", "type")).toBe("square");
+    expect(graph.getNodeAttribute("h", "type")).toBe("shape");
+    expect(graph.getNodeAttribute("h", "image")).toMatch(/^data:image\/svg\+xml,/);
+    expect(graph.getNodeAttribute("h", "shape")).toBe("hexagon");
+  });
+
+  it("assigns edge programs from the G6 type", () => {
+    const cache = createMockCache({
+      nodes: [makeNode("a"), makeNode("b")],
+      edges: [
+        makeEdge("straight", "a", "b", {}, "line"),
+        makeEdge("curved", "a", "b", {}, "cubic"),
+        makeEdge("arrowed", "a", "b", { endArrow: true }, "line"),
+      ],
+    });
+
+    const graph = buildGraphologyGraph(cache);
+
+    expect(graph.getEdgeAttribute("straight", "type")).toBe("line");
+    expect(graph.getEdgeAttribute("curved", "type")).toBe("curve");
+    expect(graph.getEdgeAttribute("arrowed", "type")).toBe("arrow");
+  });
+});
+
+describe("y-axis orientation (Phase 2 decision #5)", () => {
+  it("flipY is its own inverse (single boundary flip)", () => {
+    expect(flipY(20)).toBe(-20);
+    expect(flipY(flipY(20))).toBe(20);
+    expect(flipY(0)).toBe(-0);
+  });
+
+  it("a G6-era persisted position round-trips to the same on-screen orientation", () => {
+    // Legacy file: node persisted below-right of origin in G6 space (y-down).
+    const legacyPersisted = { x: 100, y: 50 };
+    const positions = new Map([["a", { style: { ...legacyPersisted } }]]);
+    const cache = createMockCache({ nodes: [makeNode("a")], positions });
+
+    // Load: on screen the node must sit BELOW the origin → sigma y negative.
+    const graph = buildGraphologyGraph(cache);
+    const sigmaY = graph.getNodeAttribute("a", "y");
+    expect(sigmaY).toBe(-50);
+
+    // Save: the adapter reads positions back through flipY into the app
+    // model (SigmaAdapter.getNodeData), which is what persistNodePositions
+    // and the JSON/Excel exports serialize.
+    const persistedAgain = { x: graph.getNodeAttribute("a", "x"), y: flipY(sigmaY) };
+    expect(persistedAgain).toEqual(legacyPersisted);
+
+    // Reload of the re-exported file lands on the same screen position.
+    const cache2 = createMockCache({
+      nodes: [makeNode("a")],
+      positions: new Map([["a", { style: persistedAgain }]]),
+    });
+    expect(buildGraphologyGraph(cache2).getNodeAttribute("a", "y")).toBe(sigmaY);
+  });
 });
 
 describe("attribute mapping helpers", () => {
@@ -192,12 +276,48 @@ describe("attribute mapping helpers", () => {
     expect(nodeAttributesFromStyle({ visibility: "visible" })).toEqual({ hidden: false });
   });
 
+  it("nodeAttributesFromStyle flips y into sigma space, x unchanged", () => {
+    expect(nodeAttributesFromStyle({ x: 10, y: 20 })).toEqual({ x: 10, y: -20 });
+  });
+
   it("nodeAttributesFromStyle ignores non-finite coordinates", () => {
     expect(nodeAttributesFromStyle({ x: NaN, y: "5" })).toEqual({});
   });
 
-  it("nodeAttributesFromStyle keeps a size of 0 (presence check, not truthiness)", () => {
+  it("nodeAttributesFromStyle halves G6 diameter sizes (0 stays 0)", () => {
     expect(nodeAttributesFromStyle({ size: 0 })).toEqual({ size: 0 });
+    expect(nodeAttributesFromStyle({ size: 20 })).toEqual({ size: 10 });
+  });
+
+  it("nodeAttributesFromStyle maps border fields", () => {
+    expect(nodeAttributesFromStyle({ stroke: "#123456", lineWidth: 2 })).toEqual({
+      borderColor: "#123456",
+      borderSize: 2,
+    });
+  });
+
+  it("nodeAttributesFromStyle maps label styling fields", () => {
+    const attrs = nodeAttributesFromStyle({
+      labelFontSize: 16,
+      labelFill: "#654321",
+      labelBackground: true,
+      labelBackgroundFill: "#FEDCBA",
+      labelPlacement: "top-right",
+      labelOffsetX: 5,
+      labelOffsetY: -3,
+      labelPadding: 4,
+    });
+
+    expect(attrs).toEqual({
+      labelSize: 16,
+      labelColor: "#654321",
+      labelBackground: true,
+      labelBackgroundColor: "#FEDCBA",
+      labelPlacement: "top-right",
+      labelOffsetX: 5,
+      labelOffsetY: -3,
+      labelPadding: 4,
+    });
   });
 
   it("nodeAttributesFromStyle emits no label when label is truthy but labelText is absent", () => {
@@ -213,11 +333,58 @@ describe("attribute mapping helpers", () => {
     expect(edgeAttributesFromStyle({ label: false })).toEqual({ label: null });
     expect(edgeAttributesFromStyle({ visibility: "hidden" })).toEqual({ hidden: true });
   });
+
+  it("texture-only shapes get the shape program, a texture and a transparent color", () => {
+    for (const shape of ["diamond", "hexagon", "triangle", "star"]) {
+      const attrs = nodeAttributesFromStyle({ fill: "#403C53", size: 20 }, shape);
+      expect(attrs.type).toBe("shape");
+      expect(attrs.shape).toBe(shape);
+      expect(attrs.fillColor).toBe("#403C53");
+      expect(attrs.color).toBe("#00000000");
+      expect(attrs.image).toMatch(/^data:image\/svg\+xml,/);
+    }
+  });
+
+  it("plain circle and rect stay on native programs with their fill color", () => {
+    const circle = nodeAttributesFromStyle({ fill: "#403C53" }, "circle");
+    const rect = nodeAttributesFromStyle({ fill: "#403C53" }, "rect");
+
+    expect(circle.type).toBe("circle");
+    expect(circle.image).toBeUndefined();
+    expect(circle.color).toBe("#403C53");
+    expect(rect.type).toBe("square");
+    expect(rect.image).toBeUndefined();
+  });
+
+  it("bordered circle/rect route through the texture program (native programs cannot draw borders)", () => {
+    const attrs = nodeAttributesFromStyle(
+      { fill: "#403C53", stroke: "#C33D35", lineWidth: 2, size: 20 },
+      "circle",
+    );
+
+    expect(attrs.type).toBe("shape");
+    expect(attrs.image).toContain(ACCENT_URI);
+  });
+
+  it("sigmaEdgeType maps the full type × arrows matrix", () => {
+    expect(sigmaEdgeType("line")).toBe("line");
+    expect(sigmaEdgeType("line", { endArrow: true })).toBe("arrow");
+    expect(sigmaEdgeType("line", { startArrow: true })).toBe("sourceArrow");
+    expect(sigmaEdgeType("line", { startArrow: true, endArrow: true })).toBe("doubleArrow");
+    for (const curved of ["cubic", "quadratic", "polyline"]) {
+      expect(sigmaEdgeType(curved)).toBe("curve");
+      expect(sigmaEdgeType(curved, { endArrow: true })).toBe("curvedArrow");
+      expect(sigmaEdgeType(curved, { startArrow: true })).toBe("curvedSourceArrow");
+      expect(sigmaEdgeType(curved, { startArrow: true, endArrow: true })).toBe(
+        "curvedDoubleArrow",
+      );
+    }
+  });
 });
 
 describe("reducers — states and hidden handling", () => {
-  function reducerFixture() {
-    const nodes = [makeNode("a"), makeNode("b")];
+  function reducerFixture({ nodeType } = {}) {
+    const nodes = [makeNode("a", {}, nodeType), makeNode("b", {}, nodeType)];
     const edges = [makeEdge("e1", "a", "b")];
     const cache = createMockCache({ nodes, edges });
     cache.graphData = buildGraphologyGraph(cache);
@@ -248,45 +415,77 @@ describe("reducers — states and hidden handling", () => {
     expect(res.color).toBe("#403C53");
   });
 
-  it("node: selected gets the accent color and raised zIndex", () => {
+  it("node: selected gets an accent halo texture, grown size and raised zIndex", () => {
     const { nodeReducer, elementStates } = reducerFixture();
     elementStates.set("a", ["selected"]);
 
-    const res = nodeReducer("a", { color: "#403C53", hidden: false, zIndex: 0 });
+    const res = nodeReducer("a", { color: "#403C53", size: 10, hidden: false, zIndex: 0 });
 
-    expect(res.color).toBe(STATE_ACCENT_COLOR);
+    expect(res.type).toBe("shape");
+    expect(res.image).toContain(ACCENT_URI); // halo ring in the app accent
+    expect(res.image).toContain(encodeURIComponent("#403C53")); // own fill kept
+    expect(res.size).toBe(10 + HALO_EXTRA_PX);
     expect(res.zIndex).toBe(1);
+    expect(res.color).toBe("#00000000");
   });
 
-  it("node: highlight and dim apply their state colors", () => {
+  it("node: highlight gets an accent-filled halo texture without zIndex bump", () => {
     const { nodeReducer, elementStates } = reducerFixture();
-
     elementStates.set("a", ["highlight"]);
-    expect(nodeReducer("a", { color: "#403C53", hidden: false }).color).toBe(STATE_ACCENT_COLOR);
 
+    const res = nodeReducer("a", { color: "#403C53", size: 10, hidden: false, zIndex: 0 });
+
+    expect(res.type).toBe("shape");
+    expect(res.image).toContain(ACCENT_URI);
+    expect(res.size).toBe(10 + HALO_EXTRA_PX);
+    expect(res.zIndex).toBe(0);
+  });
+
+  it("node: dim on a native-program node swaps the fill color only", () => {
+    const { nodeReducer, elementStates } = reducerFixture();
     elementStates.set("a", ["dim"]);
-    expect(nodeReducer("a", { color: "#403C53", hidden: false }).color).toBe(STATE_DIM_COLOR);
+
+    const res = nodeReducer("a", { color: "#403C53", size: 10, hidden: false });
+
+    expect(res.color).toBe(STATE_DIM_COLOR);
+    expect(res.image).toBeUndefined();
+    expect(res.size).toBe(10);
+  });
+
+  it("node: dim on a texture node swaps the texture to the dim fill, size unchanged", () => {
+    const { cache, nodeReducer, elementStates } = reducerFixture({ nodeType: "hexagon" });
+    const base = { ...cache.graphData.getNodeAttributes("a") };
+    elementStates.set("a", ["dim"]);
+
+    const res = nodeReducer("a", { ...base });
+
+    expect(res.type).toBe("shape");
+    expect(res.image).not.toBe(base.image);
+    expect(res.image).toContain(encodeURIComponent(STATE_DIM_COLOR));
+    expect(res.size).toBe(base.size);
   });
 
   it("node: selected takes precedence over dim", () => {
     const { nodeReducer, elementStates } = reducerFixture();
     elementStates.set("a", ["dim", "selected"]);
 
-    const res = nodeReducer("a", { color: "#403C53", hidden: false });
+    const res = nodeReducer("a", { color: "#403C53", size: 10, hidden: false });
 
-    expect(res.color).toBe(STATE_ACCENT_COLOR);
+    expect(res.image).toContain(ACCENT_URI);
     expect(res.zIndex).toBe(1);
   });
 
   it("node: does not mutate the input data", () => {
     const { nodeReducer, elementStates } = reducerFixture();
     elementStates.set("a", ["selected"]);
-    const data = { color: "#403C53", hidden: false, zIndex: 0 };
+    const data = { color: "#403C53", size: 10, hidden: false, zIndex: 0 };
 
     nodeReducer("a", data);
 
     expect(data.color).toBe("#403C53");
+    expect(data.size).toBe(10);
     expect(data.zIndex).toBe(0);
+    expect(data.image).toBeUndefined();
   });
 
   it("edge: hidden when its own hidden attr is set", () => {
@@ -313,12 +512,13 @@ describe("reducers — states and hidden handling", () => {
     expect(edgeReducer("e1", data)).toBe(data);
   });
 
-  it("edge: selected/highlight/dim state colors", () => {
+  it("edge: selected widens by the halo budget; highlight/dim recolor", () => {
     const { edgeReducer, elementStates } = reducerFixture();
 
     elementStates.set("e1", ["selected"]);
-    const selected = edgeReducer("e1", { color: "#403C5390", hidden: false, zIndex: 0 });
+    const selected = edgeReducer("e1", { color: "#403C5390", size: 1, hidden: false, zIndex: 0 });
     expect(selected.color).toBe(STATE_ACCENT_COLOR);
+    expect(selected.size).toBe(1 + DEFAULTS.STATE.EDGE_HALO_WIDTH / 2);
     expect(selected.zIndex).toBe(1);
 
     elementStates.set("e1", ["highlight"]);

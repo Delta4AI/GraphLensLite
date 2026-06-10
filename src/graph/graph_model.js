@@ -1,5 +1,5 @@
 /**
- * Node-safe graph model for the Sigma.js renderer (MIGRATION.md Phase 1).
+ * Node-safe graph model for the Sigma.js renderer (MIGRATION.md Phases 1-2).
  *
  * Builds the graphology instance from the app cache and provides the
  * G6-style → sigma attribute mapping plus the node/edge reducer factories.
@@ -7,48 +7,137 @@
  * imports this module under node.
  */
 import { Graph } from "../lib/graphology.bundle.mjs";
+import { DEFAULTS } from "../config.js";
+import { shapeTextureURI, isTextureOnlyShape, HALO_EXTRA_PX } from "./shape_textures.js";
 
-// Former G6 state-spec colors (selected/highlight halo + fill, dim fill)
-// from the old core.js Graph config. Phase 2 does full visual parity.
-const STATE_ACCENT_COLOR = "#C33D35";
-const STATE_DIM_COLOR = "#E4E3EA";
+// Element interaction-state colors (former G6 state spec) live in config so
+// the styling UI and the reducers share one source.
+const STATE_ACCENT_COLOR = DEFAULTS.STATE.ACCENT_COLOR;
+const STATE_DIM_COLOR = DEFAULTS.STATE.DIM_COLOR;
+
+// Texture nodes paint their fill inside the SVG; the sigma `color` attribute
+// must be fully transparent or the image quad shows a colored square.
+const TRANSPARENT = "#00000000";
 
 /**
- * Map a G6-shaped node style object to sigma node attributes.
- * Crude Phase-1 mapping; Phase 2 does full parity (shapes, borders, badges).
- * Only emits keys that are actually present on the style.
- *
- * @param {object} style  G6 node style ({x, y, size, fill, label, labelText, visibility, ...})
- * @returns {object} partial sigma attrs ({x?, y?, size?, color?, label?, hidden?})
+ * The model boundary owns the y-axis convention flip: the app model (G6
+ * heritage: nodeRef styles, persisted positions, Excel/JSON files) is
+ * y-down, sigma/graphology is y-up. Negate exactly once when crossing in
+ * either direction so legacy files keep their orientation and save→load
+ * round-trips are stable.
  */
-function nodeAttributesFromStyle(style = {}) {
+function flipY(y) {
+  return -y;
+}
+
+/**
+ * Map a G6 node style + type to sigma node attributes.
+ * Only emits keys that are actually present on the style; shape-program
+ * attributes (`type`/`shape`/`image`/...) are only emitted when `type` is
+ * given. Shapes without a native sigma program — and any shape with a
+ * border, which the native circle/square programs cannot draw — render
+ * through the SVG texture program ("shape").
+ *
+ * @param {object} style  G6 node style ({x, y, size, fill, stroke, lineWidth, label*, visibility, ...})
+ * @param {string} [type] G6 node type (circle|diamond|hexagon|rect|triangle|star)
+ * @returns {object} partial sigma attrs
+ */
+function nodeAttributesFromStyle(style = {}, type = undefined) {
   const attrs = {};
   if (Number.isFinite(style.x)) attrs.x = style.x;
-  if (Number.isFinite(style.y)) attrs.y = style.y;
+  if (Number.isFinite(style.y)) attrs.y = flipY(style.y);
   if (style.size !== undefined) {
-    // G6 size may be a number or [w, h] — take the first dimension.
-    attrs.size = Array.isArray(style.size) ? style.size[0] : style.size;
+    // G6 size is a diameter (or [w, h]); sigma size is a radius.
+    attrs.size = (Array.isArray(style.size) ? style.size[0] : style.size) / 2;
   }
   if (style.fill !== undefined) attrs.color = style.fill;
+  if (style.stroke !== undefined) attrs.borderColor = style.stroke;
+  if (style.lineWidth !== undefined) attrs.borderSize = style.lineWidth;
+
   if (style.label === false) {
     attrs.label = null;
   } else if (style.label && style.labelText !== undefined) {
     attrs.label = style.labelText == null ? null : String(style.labelText);
   }
+  Object.assign(attrs, labelStyleAttributes(style));
   if (style.visibility !== undefined) {
     attrs.hidden = style.visibility === "hidden";
+  }
+
+  if (type !== undefined) Object.assign(attrs, nodeProgramAttributes(style, type));
+  return attrs;
+}
+
+/**
+ * Shape-program attributes for a node: which sigma program draws it, plus
+ * the texture data-URI when the SVG shape program is needed.
+ */
+function nodeProgramAttributes(style = {}, type) {
+  const fill = style.fill ?? DEFAULTS.NODE.FILL_COLOR;
+  const stroke = style.stroke ?? null;
+  const lineWidth = style.lineWidth ?? 0;
+  const hasBorder = Boolean(stroke) && lineWidth > 0;
+  const attrs = { shape: type };
+
+  if (isTextureOnlyShape(type) || hasBorder) {
+    const size = Array.isArray(style.size) ? style.size[0] : style.size;
+    attrs.type = "shape";
+    attrs.fillColor = fill;
+    attrs.color = TRANSPARENT;
+    attrs.image = shapeTextureURI({
+      shape: type,
+      fill,
+      stroke: hasBorder ? stroke : null,
+      lineWidth: hasBorder ? lineWidth : 0,
+      size: (size ?? DEFAULTS.NODE.SIZE) / 2,
+    });
+  } else {
+    attrs.type = type === "rect" ? "square" : "circle";
   }
   return attrs;
 }
 
 /**
- * Map a G6-shaped edge style object to sigma edge attributes.
- * All edges render as straight lines in Phase 1 (curves/arrows are Phase 2).
- *
- * @param {object} style  G6 edge style ({lineWidth, stroke, label, labelText, visibility, ...})
- * @returns {object} partial sigma attrs ({size?, color?, label?, hidden?})
+ * Shared label styling attrs (read by the custom label renderers).
+ * G6 names → renderer attrs; only present keys are emitted.
  */
-function edgeAttributesFromStyle(style = {}) {
+function labelStyleAttributes(style) {
+  const attrs = {};
+  if (style.labelFontSize !== undefined) attrs.labelSize = style.labelFontSize;
+  if (style.labelFill !== undefined) attrs.labelColor = style.labelFill;
+  if (style.labelBackground !== undefined) attrs.labelBackground = style.labelBackground;
+  if (style.labelBackgroundFill !== undefined) attrs.labelBackgroundColor = style.labelBackgroundFill;
+  if (style.labelPlacement !== undefined) attrs.labelPlacement = style.labelPlacement;
+  if (style.labelOffsetX !== undefined) attrs.labelOffsetX = style.labelOffsetX;
+  if (style.labelOffsetY !== undefined) attrs.labelOffsetY = style.labelOffsetY;
+  if (style.labelPadding !== undefined) attrs.labelPadding = style.labelPadding;
+  if (style.labelAutoRotate !== undefined) attrs.labelAutoRotate = style.labelAutoRotate;
+  return attrs;
+}
+
+/**
+ * Sigma edge program key for a G6 edge type + arrow flags.
+ * Degradations (documented in API.md §5): `polyline` renders as a curve,
+ * `lineDash` is dropped, arrow head shapes all render as triangles.
+ */
+function sigmaEdgeType(type, style = {}) {
+  const curved = type === "cubic" || type === "quadratic" || type === "polyline";
+  const start = Boolean(style.startArrow);
+  const end = Boolean(style.endArrow);
+  if (start && end) return curved ? "curvedDoubleArrow" : "doubleArrow";
+  if (end) return curved ? "curvedArrow" : "arrow";
+  if (start) return curved ? "curvedSourceArrow" : "sourceArrow";
+  return curved ? "curve" : "line";
+}
+
+/**
+ * Map a G6 edge style + type to sigma edge attributes.
+ *
+ * @param {object} style  G6 edge style ({lineWidth, stroke, *Arrow*, label*, visibility, ...})
+ * @param {string} [type] G6 edge type (line|cubic|quadratic|polyline)
+ * @returns {object} partial sigma attrs
+ */
+function edgeAttributesFromStyle(style = {}, type = undefined) {
   const attrs = {};
   if (style.lineWidth !== undefined) attrs.size = style.lineWidth;
   if (style.stroke !== undefined) attrs.color = style.stroke;
@@ -57,9 +146,11 @@ function edgeAttributesFromStyle(style = {}) {
   } else if (style.label && style.labelText !== undefined) {
     attrs.label = style.labelText == null ? null : String(style.labelText);
   }
+  Object.assign(attrs, labelStyleAttributes(style));
   if (style.visibility !== undefined) {
     attrs.hidden = style.visibility === "hidden";
   }
+  if (type !== undefined) attrs.type = sigmaEdgeType(type, style);
   return attrs;
 }
 
@@ -76,8 +167,9 @@ function placeholderPosition(index, total) {
 
 /**
  * Build a graphology Graph from cache.nodeRef/edgeRef. Positions come from
- * the selected layout's persisted positions Map when present, else from the
- * node style, else a deterministic placeholder spread.
+ * the selected layout's persisted positions Map when present (app-model
+ * y-down → flipped), else from the node style (flipped by the mapper), else
+ * a deterministic placeholder spread (already in sigma space).
  *
  * @param {object} cache  app cache (needs nodeRef, edgeRef, data.layouts/selectedLayout)
  * @returns {Graph}
@@ -89,14 +181,13 @@ function buildGraphologyGraph(cache) {
 
   let index = 0;
   for (const node of cache.nodeRef.values()) {
-    const mapped = nodeAttributesFromStyle(node.style ?? {});
+    const mapped = nodeAttributesFromStyle(node.style ?? {}, node.type);
     const persisted = positions?.get(node.id)?.style;
     const fallback = placeholderPosition(index, total);
     graph.addNode(node.id, {
+      ...mapped,
       x: Number.isFinite(persisted?.x) ? persisted.x : (mapped.x ?? fallback.x),
-      y: Number.isFinite(persisted?.y) ? persisted.y : (mapped.y ?? fallback.y),
-      size: mapped.size,
-      color: mapped.color,
+      y: Number.isFinite(persisted?.y) ? flipY(persisted.y) : (mapped.y ?? fallback.y),
       label: mapped.label ?? null,
       hidden: mapped.hidden ?? false,
       zIndex: 0,
@@ -109,10 +200,9 @@ function buildGraphologyGraph(cache) {
       cache.ui?.debug?.(`Skipping edge ${edge.id}: missing endpoint node`);
       continue;
     }
-    const mapped = edgeAttributesFromStyle(edge.style ?? {});
+    const mapped = edgeAttributesFromStyle(edge.style ?? {}, edge.type);
     graph.addEdgeWithKey(edge.id, edge.source, edge.target, {
-      size: mapped.size,
-      color: mapped.color,
+      ...mapped,
       label: mapped.label ?? null,
       hidden: mapped.hidden ?? false,
       zIndex: 0,
@@ -120,6 +210,35 @@ function buildGraphologyGraph(cache) {
   }
 
   return graph;
+}
+
+/**
+ * State treatment for a node, per the old G6 state spec:
+ *   selected  → own fill, accent halo ring, raised zIndex
+ *   highlight → accent fill, accent halo ring
+ *   dim       → dim fill
+ * Halo states render through the texture program (the only sigma mechanism
+ * that draws a ring around non-circular shapes); the node grows by
+ * HALO_EXTRA_PX so the halo bleeds outward like G6's did.
+ */
+function applyNodeState(data, state) {
+  const res = { ...data };
+  const shape = data.shape ?? "circle";
+  const baseSize = data.size ?? DEFAULTS.NODE.SIZE / 2;
+  const fill = data.fillColor ?? data.color;
+  const stroke = data.borderColor ?? null;
+  const lineWidth = data.borderSize ?? 0;
+
+  if (state === "dim" && data.type !== "shape") {
+    res.color = STATE_DIM_COLOR;
+    return res;
+  }
+
+  res.type = "shape";
+  res.color = TRANSPARENT;
+  res.image = shapeTextureURI({ shape, fill, stroke, lineWidth, size: baseSize, state });
+  if (state !== "dim") res.size = baseSize + HALO_EXTRA_PX;
+  return res;
 }
 
 /**
@@ -134,22 +253,20 @@ function makeNodeReducer(cache, elementStates) {
     if (data.hidden) return data;
     const states = elementStates.get(node);
     if (!states || states.length === 0) return data;
-    const res = { ...data };
     if (states.includes("selected")) {
-      res.color = STATE_ACCENT_COLOR;
-      res.zIndex = 1;
-    } else if (states.includes("highlight")) {
-      res.color = STATE_ACCENT_COLOR;
-    } else if (states.includes("dim")) {
-      res.color = STATE_DIM_COLOR;
+      return { ...applyNodeState(data, "selected"), zIndex: 1 };
     }
-    return res;
+    if (states.includes("highlight")) return applyNodeState(data, "highlight");
+    if (states.includes("dim")) return applyNodeState(data, "dim");
+    return data;
   };
 }
 
 /**
  * Sigma edgeReducer factory. An edge is hidden when its own `hidden` attr is
- * set OR either endpoint is hidden/filtered.
+ * set OR either endpoint is hidden/filtered. States: selected = accent +
+ * widened (the halo budget — sigma edges have no underdraw), highlight =
+ * accent, dim = de-emphasis color.
  *
  * @param {object} cache  needs edgeRef and graphData (the live graphology graph)
  * @param {Map<string, string[]>} elementStates
@@ -172,6 +289,7 @@ function makeEdgeReducer(cache, elementStates) {
     const res = { ...data };
     if (states.includes("selected")) {
       res.color = STATE_ACCENT_COLOR;
+      res.size = (data.size ?? 1) + DEFAULTS.STATE.EDGE_HALO_WIDTH / 2;
       res.zIndex = 1;
     } else if (states.includes("highlight")) {
       res.color = STATE_ACCENT_COLOR;
@@ -186,6 +304,8 @@ export {
   buildGraphologyGraph,
   nodeAttributesFromStyle,
   edgeAttributesFromStyle,
+  sigmaEdgeType,
+  flipY,
   makeNodeReducer,
   makeEdgeReducer,
   STATE_ACCENT_COLOR,
