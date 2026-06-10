@@ -49,20 +49,76 @@ function resolveSettingsColor(settingsColor, data) {
   return settingsColor?.color ?? "#000";
 }
 
-function drawBackground(context, color, x, y, width, height) {
+function drawBackground(context, color, x, y, width, height, radius = BACKGROUND_RADIUS) {
   context.fillStyle = color;
   context.beginPath();
   if (typeof context.roundRect === "function") {
-    context.roundRect(x, y, width, height, BACKGROUND_RADIUS);
+    context.roundRect(x, y, width, height, radius);
   } else {
     context.rect(x, y, width, height);
   }
   context.fill();
 }
 
+// G6 v5 badge parity: a badge is a small colored pill with white text,
+// anchored on the node perimeter. Fallbacks mirror DEFAULTS.NODE.BADGE
+// (config is intentionally not imported — this module stays dependency-free;
+// graph_model.js bakes the configured defaults into the attrs).
+const BADGE_TEXT_COLOR = "#FFFFFF";
+const FALLBACK_BADGE_COLOR = "#C33D35";
+const FALLBACK_BADGE_FONT_SIZE = 8;
+const BADGE_PADDING = 2;
+
+/**
+ * Draw the node's badges as colored pills with white text, each centered on
+ * the node perimeter per its placement. Called from drawNodeLabel, so badges
+ * follow label visibility (v1 limitation).
+ *
+ * @param {CanvasRenderingContext2D} context
+ * @param {object} data  node display data (x, y, size, badge, badges, badgePalette, badgeFontSize)
+ * @param {object} settings  sigma settings (labelFont)
+ */
+function drawNodeBadges(context, data, settings) {
+  if (!data.badge || !Array.isArray(data.badges) || data.badges.length === 0) return;
+
+  const size = Number.isFinite(data.badgeFontSize)
+    ? data.badgeFontSize
+    : FALLBACK_BADGE_FONT_SIZE;
+  context.font = `bold ${size}px ${settings.labelFont}`;
+
+  data.badges.forEach((badge, index) => {
+    const text = badge?.text == null ? "" : String(badge.text);
+    if (!text) return;
+
+    const width = context.measureText(text).width;
+    const boxWidth = width + 2 * BADGE_PADDING;
+    const boxHeight = size + 2 * BADGE_PADDING;
+
+    // Normalize corner placements onto the perimeter circle.
+    const [ux, uy] = placementVector(badge.placement);
+    const norm = Math.hypot(ux, uy) || 1;
+    const cx = data.x + (ux / norm) * data.size;
+    const cy = data.y + (uy / norm) * data.size;
+
+    const color = data.badgePalette?.[index] ?? FALLBACK_BADGE_COLOR;
+    drawBackground(
+      context,
+      color,
+      cx - boxWidth / 2,
+      cy - boxHeight / 2,
+      boxWidth,
+      boxHeight,
+      boxHeight / 2, // pill: fully rounded ends
+    );
+    context.fillStyle = BADGE_TEXT_COLOR;
+    context.fillText(text, cx - width / 2, cy + size * 0.35);
+  });
+}
+
 /**
  * Node label drawer (sigma `defaultDrawNodeLabel`). G6 parity: default
  * placement is "bottom" (sigma's default drawer is right-anchored only).
+ * Also draws the node's badges (see drawNodeBadges) after the label.
  *
  * @param {CanvasRenderingContext2D} context
  * @param {object} data  node display data in viewport px (x, y, size, label, label* attrs)
@@ -102,6 +158,8 @@ function drawNodeLabel(context, data, settings) {
 
   context.fillStyle = color;
   context.fillText(data.label, boxCenterX - width / 2, boxCenterY + size * 0.35);
+
+  drawNodeBadges(context, data, settings);
 }
 
 /**

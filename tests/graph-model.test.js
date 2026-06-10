@@ -351,10 +351,27 @@ describe("attribute mapping helpers", () => {
     const rect = nodeAttributesFromStyle({ fill: "#403C53" }, "rect");
 
     expect(circle.type).toBe("circle");
-    expect(circle.image).toBeUndefined();
+    expect(circle.image).toBeNull();
     expect(circle.color).toBe("#403C53");
     expect(rect.type).toBe("square");
-    expect(rect.image).toBeUndefined();
+    expect(rect.image).toBeNull();
+  });
+
+  it("native programs clear texture-only attrs so shape→native merges don't go stale", () => {
+    // The adapter applies updates via mergeNodeAttributes: a node leaving the
+    // texture program (e.g. border removed) must null out image/fillColor or
+    // hover would later read a stale fillColor into its state textures.
+    const attrs = nodeAttributesFromStyle({ fill: "#403C53" }, "circle");
+
+    expect(attrs.image).toBeNull();
+    expect(attrs.fillColor).toBeNull();
+    expect(attrs.color).toBe("#403C53"); // never left at the texture TRANSPARENT
+  });
+
+  it("native programs restore the default fill when the style has none", () => {
+    const attrs = nodeAttributesFromStyle({}, "circle");
+
+    expect(attrs.color).toBe(DEFAULTS.NODE.FILL_COLOR);
   });
 
   it("bordered circle/rect route through the texture program (native programs cannot draw borders)", () => {
@@ -381,6 +398,73 @@ describe("attribute mapping helpers", () => {
       );
     }
   });
+});
+
+describe("badge attribute mapping", () => {
+  const BADGES = [
+    { text: "A", placement: "right-top" },
+    { text: "B", placement: "left" },
+  ];
+
+  it("maps badge attrs when badges are set", () => {
+    const attrs = nodeAttributesFromStyle({
+      badge: true,
+      badges: BADGES,
+      badgePalette: ["#112233", "#445566"],
+      badgeFontSize: 10,
+    });
+
+    expect(attrs).toEqual({
+      badge: true,
+      badges: BADGES,
+      badgePalette: ["#112233", "#445566"],
+      badgeFontSize: 10,
+    });
+  });
+
+  it("omits badge keys entirely when the style carries no badge fields", () => {
+    expect(nodeAttributesFromStyle({ fill: "#fff" })).toEqual({ color: "#fff" });
+  });
+
+  it("emits badge:false and empty arrays on badge_clear results (not omitted)", () => {
+    // The adapter merges attributes — omitting the keys would leave stale
+    // badges in graphology after a badge_clear command.
+    const attrs = nodeAttributesFromStyle({ badge: false, badges: [], badgePalette: [] });
+
+    expect(attrs).toEqual({ badge: false, badges: [], badgePalette: [] });
+  });
+
+  it("treats badge:true with no badges as cleared", () => {
+    expect(nodeAttributesFromStyle({ badge: true, badges: [] })).toEqual({
+      badge: false,
+      badges: [],
+      badgePalette: [],
+    });
+  });
+
+  it("bakes the default badge color into missing palette entries", () => {
+    const attrs = nodeAttributesFromStyle({
+      badge: true,
+      badges: BADGES,
+      badgePalette: ["#112233"],
+    });
+
+    expect(attrs.badgePalette).toEqual(["#112233", DEFAULTS.NODE.BADGE.COLOR]);
+    expect(attrs.badgeFontSize).toBe(DEFAULTS.NODE.BADGE.FONT_SIZE);
+  });
+
+  it("propagates badge attrs into the built graph", () => {
+    const cache = createMockCache({
+      nodes: [makeNode("a", { badge: true, badges: [BADGES[0]] })],
+    });
+
+    const graph = buildGraphologyGraph(cache);
+
+    expect(graph.getNodeAttribute("a", "badge")).toBe(true);
+    expect(graph.getNodeAttribute("a", "badges")).toEqual([BADGES[0]]);
+    expect(graph.getNodeAttribute("a", "badgePalette")).toEqual([DEFAULTS.NODE.BADGE.COLOR]);
+  });
+
 });
 
 describe("reducers — states and hidden handling", () => {

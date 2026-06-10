@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { drawNodeLabel, drawEdgeLabel, placementVector } from "../src/graph/label_renderers.js";
+import { DEFAULTS } from "../src/config.js";
 
 // ==========================================================================
 // Canvas label renderers (Phase 2 label parity). Pure functions of
@@ -11,10 +12,9 @@ const CHAR_W = 6;
 function stubContext() {
   const calls = [];
   const record = (name) => (...args) => calls.push([name, ...args]);
-  return {
+  const ctx = {
     calls,
     font: "",
-    fillStyle: "",
     measureText: (text) => ({ width: String(text).length * CHAR_W }),
     fillText: record("fillText"),
     save: record("save"),
@@ -26,6 +26,17 @@ function stubContext() {
     rect: record("rect"),
     fill: record("fill"),
   };
+  // fillStyle assignments are recorded in the call log (badge tests need the
+  // order of pill/text colors) while reads keep returning the latest value.
+  let fillStyle = "";
+  Object.defineProperty(ctx, "fillStyle", {
+    get: () => fillStyle,
+    set: (value) => {
+      fillStyle = value;
+      calls.push(["fillStyle", value]);
+    },
+  });
+  return ctx;
 }
 
 const SETTINGS = {
@@ -57,6 +68,31 @@ describe("placementVector", () => {
   it("defaults to bottom and tolerates junk", () => {
     expect(placementVector(undefined)).toEqual([0, 1]);
     expect(placementVector("diagonal")).toEqual([0, 0]);
+  });
+
+  it("maps all 12 badge placements (DEFAULTS.STYLES.NODE_BADGE_PLACEMENTS)", () => {
+    const expected = {
+      left: [-1, 0],
+      right: [1, 0],
+      top: [0, -1],
+      bottom: [0, 1],
+      "left-top": [-1, -1],
+      "left-bottom": [-1, 1],
+      "right-top": [1, -1],
+      "right-bottom": [1, 1],
+      "top-left": [-1, -1],
+      "top-right": [1, -1],
+      "bottom-left": [-1, 1],
+      "bottom-right": [1, 1],
+    };
+
+    // The fixture must stay in sync with the configured placement list.
+    expect(Object.keys(expected).sort()).toEqual(
+      [...DEFAULTS.STYLES.NODE_BADGE_PLACEMENTS].sort(),
+    );
+    for (const [placement, vector] of Object.entries(expected)) {
+      expect(placementVector(placement), placement).toEqual(vector);
+    }
   });
 });
 
@@ -133,6 +169,131 @@ describe("drawNodeLabel", () => {
       SETTINGS,
     );
     expect(findCall(ctx, "rect")).toBeDefined();
+  });
+});
+
+describe("drawNodeLabel — badges (G6 v5 parity: colored pill + white text)", () => {
+  const NODE = { x: 100, y: 100, size: 10, label: "abc" };
+  const BADGE_FONT = 8;
+  const BADGE_PAD = 2;
+  const badged = (badges, extra = {}) => ({
+    ...NODE,
+    badge: true,
+    badges,
+    badgePalette: ["#112233"],
+    badgeFontSize: BADGE_FONT,
+    ...extra,
+  });
+  const fillTexts = (ctx) => ctx.calls.filter(([name]) => name === "fillText");
+  const fillStyles = (ctx) =>
+    ctx.calls.filter(([name]) => name === "fillStyle").map(([, value]) => value);
+
+  it("draws no badges without badge attrs", () => {
+    const ctx = stubContext();
+
+    drawNodeLabel(ctx, NODE, SETTINGS);
+
+    expect(fillTexts(ctx)).toHaveLength(1); // label only
+    expect(findCall(ctx, "roundRect")).toBeUndefined();
+  });
+
+  it("draws a colored pill with white text on the node perimeter (right placement)", () => {
+    const ctx = stubContext();
+
+    drawNodeLabel(ctx, badged([{ text: "B", placement: "right" }]), SETTINGS);
+
+    // Pill: 1-char text (6px) + 2px padding → 10×12 box centered at (110, 100),
+    // fully rounded ends (radius = half height).
+    const boxWidth = CHAR_W + 2 * BADGE_PAD;
+    const boxHeight = BADGE_FONT + 2 * BADGE_PAD;
+    expect(findCall(ctx, "roundRect").slice(1)).toEqual([
+      110 - boxWidth / 2,
+      100 - boxHeight / 2,
+      boxWidth,
+      boxHeight,
+      boxHeight / 2,
+    ]);
+
+    const texts = fillTexts(ctx);
+    expect(texts).toHaveLength(2); // label + badge
+    const [, badgeText, bx, by] = texts[1];
+    expect(badgeText).toBe("B");
+    expect(bx).toBeCloseTo(110 - CHAR_W / 2);
+    expect(by).toBeCloseTo(100 + BADGE_FONT * 0.35);
+
+    const styles = fillStyles(ctx);
+    expect(styles).toContain("#112233"); // pill color from the palette
+    expect(styles[styles.length - 1]).toBe("#FFFFFF"); // badge text drawn white, last
+    expect(ctx.font).toBe(`bold ${BADGE_FONT}px Arial`);
+  });
+
+  it("normalizes corner placements onto the perimeter circle (top-right)", () => {
+    const ctx = stubContext();
+
+    drawNodeLabel(ctx, badged([{ text: "B", placement: "top-right" }]), SETTINGS);
+
+    const [, , bx, by] = fillTexts(ctx)[1];
+    const d = NODE.size / Math.SQRT2;
+    expect(bx).toBeCloseTo(100 + d - CHAR_W / 2);
+    expect(by).toBeCloseTo(100 - d + BADGE_FONT * 0.35);
+  });
+
+  it("draws one pill per badge and falls back to the default badge color", () => {
+    const ctx = stubContext();
+
+    drawNodeLabel(
+      ctx,
+      badged([
+        { text: "A", placement: "left" },
+        { text: "B", placement: "right" },
+      ]),
+      SETTINGS,
+    );
+
+    expect(ctx.calls.filter(([name]) => name === "roundRect")).toHaveLength(2);
+    expect(fillTexts(ctx)).toHaveLength(3); // label + 2 badges
+    const styles = fillStyles(ctx);
+    expect(styles).toContain("#112233"); // palette entry for badge 0
+    expect(styles).toContain(DEFAULTS.NODE.BADGE.COLOR); // fallback for badge 1
+  });
+
+  it("skips empty-text badges and ignores badge attrs when badge is false", () => {
+    const empty = stubContext();
+    drawNodeLabel(empty, badged([{ text: "", placement: "left" }]), SETTINGS);
+    expect(fillTexts(empty)).toHaveLength(1);
+
+    const off = stubContext();
+    drawNodeLabel(
+      off,
+      { ...badged([{ text: "B", placement: "left" }]), badge: false },
+      SETTINGS,
+    );
+    expect(fillTexts(off)).toHaveLength(1);
+    expect(findCall(off, "roundRect")).toBeUndefined();
+  });
+
+  it("follows label visibility (v1: no label → no badges)", () => {
+    const ctx = stubContext();
+
+    drawNodeLabel(
+      ctx,
+      { ...badged([{ text: "B", placement: "right" }]), label: null },
+      SETTINGS,
+    );
+
+    expect(ctx.calls).toEqual([]);
+  });
+
+  it("falls back to a finite badge font size", () => {
+    const ctx = stubContext();
+
+    drawNodeLabel(
+      ctx,
+      badged([{ text: "B", placement: "right" }], { badgeFontSize: NaN }),
+      SETTINGS,
+    );
+
+    expect(ctx.font).toBe("bold 8px Arial");
   });
 });
 

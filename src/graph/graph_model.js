@@ -60,11 +60,33 @@ function nodeAttributesFromStyle(style = {}, type = undefined) {
     attrs.label = style.labelText == null ? null : String(style.labelText);
   }
   Object.assign(attrs, labelStyleAttributes(style));
+  Object.assign(attrs, badgeAttributes(style));
   if (style.visibility !== undefined) {
     attrs.hidden = style.visibility === "hidden";
   }
 
   if (type !== undefined) Object.assign(attrs, nodeProgramAttributes(style, type));
+  return attrs;
+}
+
+/**
+ * Badge attrs (read by drawNodeLabel). Emitted whenever the style carries
+ * explicit badge fields — including badge:false / empty arrays — because the
+ * adapter merges attributes; omitting the keys on a badge_clear would leave
+ * stale badges in graphology. Missing palette entries get the default badge
+ * color baked in so the renderer needs no config import.
+ */
+function badgeAttributes(style) {
+  if (style.badge === undefined && style.badges === undefined) return {};
+  const badges = style.badge ? (style.badges ?? []) : [];
+  const attrs = {
+    badge: badges.length > 0,
+    badges,
+    badgePalette: badges.map((_, i) => style.badgePalette?.[i] ?? DEFAULTS.NODE.BADGE.COLOR),
+  };
+  if (badges.length > 0) {
+    attrs.badgeFontSize = style.badgeFontSize ?? DEFAULTS.NODE.BADGE.FONT_SIZE;
+  }
   return attrs;
 }
 
@@ -93,6 +115,14 @@ function nodeProgramAttributes(style = {}, type) {
     });
   } else {
     attrs.type = type === "rect" ? "square" : "circle";
+    // Texture→native transitions (e.g. border removed) merge over the old
+    // attrs, so clear exactly what the shape branch sets: a stale fillColor
+    // corrupts state textures on hover and a stale TRANSPARENT color makes
+    // the node invisible. The image program skips non-string images, so
+    // null is safe.
+    attrs.color = fill;
+    attrs.fillColor = null;
+    attrs.image = null;
   }
   return attrs;
 }
