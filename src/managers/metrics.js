@@ -77,7 +77,11 @@ class NetworkMetrics {
   }
 
   async updateMetricUI() {
-    if (!this.cache.visibleElementsChanged) return;
+    // Recompute when visibility changed OR the selected metric was never
+    // computed. Under sigma a fresh load produces no visibility diff (elements
+    // start visible), so gating on the flag alone would block metrics forever.
+    const cached = this.metricValueCache.get(this.selected);
+    if (!this.cache.visibleElementsChanged && cached?.values?.size) return;
 
     const metricName = this.m[this.selected].label;
     await this.cache.ui.showLoading("Calculating", `Network Metric: ${metricName}`);

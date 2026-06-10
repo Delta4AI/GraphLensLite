@@ -23,6 +23,9 @@ class QueryAST {
   #evalExpr(expr, element, requestedMainGroup) {
     if (!Array.isArray(expr)) return false;
 
+    /* ---------- 0. empty query = no constraints = match everything ------ */
+    if (expr.length === 0) return true;
+
     /* ---------- 1. unwrap single-element containers --------------------- */
     if (expr.length === 1) {
       return this.#evalExpr(expr[0], element, requestedMainGroup);

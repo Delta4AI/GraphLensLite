@@ -403,6 +403,30 @@ describe('QueryAST: edge evaluation', () => {
 })
 
 // --------------------------------------------------------------------------
+// Empty query semantics: no constraints = match everything
+// --------------------------------------------------------------------------
+
+describe('QueryAST: empty instructions', () => {
+  it('matches any node via testNode', () => {
+    const ast = new QueryAST([])
+    expect(ast.testNode(makeNode({ g: { a: 5 } }))).toBe(true)
+    expect(ast.testNode(makeNode())).toBe(true)
+  })
+
+  it('matches any edge via testEdge', () => {
+    const ast = new QueryAST([])
+    expect(ast.testEdge(makeEdge({ groupX: { weight: 0.5 } }))).toBe(true)
+    expect(ast.testEdge(makeEdge())).toBe(true)
+  })
+
+  it('does not change non-empty invalid input semantics', () => {
+    // Non-empty but malformed expression still falls through to false
+    const ast = new QueryAST([{ type: 'garbage' }, { type: 'garbage' }])
+    expect(ast.testNode(makeNode({ g: { a: 5 } }))).toBe(false)
+  })
+})
+
+// --------------------------------------------------------------------------
 // Edge cases / robustness
 // --------------------------------------------------------------------------
 
@@ -425,10 +449,10 @@ describe('QueryAST: edge cases', () => {
     expect(ast.testNode(node)).toBe(false)
   })
 
-  it('returns false for empty instructions', () => {
+  it('matches everything for empty instructions (no constraints)', () => {
     const ast = new QueryAST([])
     const node = makeNode({ g: { a: 5 } })
-    expect(ast.testNode(node)).toBe(false)
+    expect(ast.testNode(node)).toBe(true)
   })
 
   it('handles single instruction without nesting', () => {

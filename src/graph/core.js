@@ -8,6 +8,15 @@ import {
 } from "./graph_model.js";
 import { SigmaAdapter } from "./sigma_adapter.js";
 
+// One-time listener registration guards. These must live at module scope:
+// the Cache singleton is reset *in place* on every file load (Cache.reset()),
+// which would re-arm EVENT_LOCKS-based guards and stack duplicate document/
+// window listeners (even counts turn toggle hotkeys into no-ops). The handlers
+// resolve managers through `this.cache.*`, which always points at the live,
+// in-place-reset Cache instance.
+let hotkeysRegistered = false;
+let globalEventsRegistered = false;
+
 class GraphCoreManager {
   constructor(cache) {
     this.cache = cache;
@@ -100,6 +109,18 @@ class GraphCoreManager {
       });
 
       const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
+
+      // Re-apply per-layout node/edge styles on every graph rebuild (data-editor
+      // apply, JSON load). buildGraphologyGraph does not merge layout.nodeStyles/
+      // edgeStyles, and the only other applyLayoutStyles caller is changeLayout().
+      // Runs before the layout algorithm below so freshly computed positions are
+      // never clobbered by the style reset. Skipped when the layout carries no
+      // custom styles: refs are already originalStyle right after a rebuild, and
+      // the full reset pass clones every element (~700 ms at 15k elements).
+      if (layout.nodeStyles?.size || layout.edgeStyles?.size) {
+        await this.cache.lm.applyLayoutStyles(layout);
+      }
+
       // If layout has no positions yet but has a layoutType, apply that layout algorithm once
       if (layout.positions.size === 0 && layout.layoutType) {
         const internals =
@@ -682,7 +703,7 @@ class GraphCoreManager {
   }
 
   registerHotkeyEvents() {
-    if (this.cache.EVENT_LOCKS.HOTKEY_EVENTS_REGISTERED) return;
+    if (hotkeysRegistered) return;
 
     document.addEventListener("keydown", async (event) => {
       const activeElement = document.activeElement;
@@ -736,11 +757,13 @@ class GraphCoreManager {
       }
     });
 
-    this.cache.EVENT_LOCKS.HOTKEY_EVENTS_REGISTERED = true;
+    hotkeysRegistered = true;
   }
 
   registerGlobalEventListeners() {
-    if (this.cache.EVENT_LOCKS.GLOBAL_EVENTS_REGISTERED) return;
+    // All targets (document, queryTextArea, innerGraphContainer, bottomBar)
+    // are static DOM that survives file loads — same stacking hazard as hotkeys.
+    if (globalEventsRegistered) return;
 
     [
       "input",
@@ -770,7 +793,7 @@ class GraphCoreManager {
     this.cache.ui.makeBottomBarResizable();
     this.registerTooltipWheelHandler();
     this.registerTooltipExpandToggle();
-    this.cache.EVENT_LOCKS.GLOBAL_EVENTS_REGISTERED = true;
+    globalEventsRegistered = true;
   }
 
   registerTooltipExpandToggle() {
