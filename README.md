@@ -82,8 +82,7 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ## Known Issues
 
-1. Deselection by clicking on empty spaces in the canvas takes a long time on large graphs (see [GitHub issue](https://github.com/antvis/G6/issues/7195))
-2. The Query Editor cursor tends to change position on multiline queries
+1. The Query Editor cursor tends to change position on multiline queries
 
 ## Disclaimer
 

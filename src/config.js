@@ -1,7 +1,7 @@
 /**
  * Defaults for the graph, layouts and UI
  */
-const VERSION = "1.14.2";
+const VERSION = "1.15.0";
 
 const DEFAULTS = {
   NODE: {
@@ -39,14 +39,16 @@ const DEFAULTS = {
     HALO_OPACITY: 0.4,
   },
   LAYOUT: "force",
+  // Keys define the layout template vocabulary (workspace-creation dropdown).
+  // Option objects ride into the headless @antv/layout classes for
+  // radial/concentric/mds; force (forceAtlas2.inferSettings), circular and
+  // grid are self-tuning/geometric and take no options.
   LAYOUT_INTERNALS: {
-    "force": {gravity: 10},
-    // "fruchterman": {gravity: 5, speed: 5, clustering: true, nodeClusterBy: 'cluster', clusterGravity: 16},
-    // "antv-dagre": {nodesep: 100, ranksep: 70, controlPoints: true},
-    "circular": {startRadius: 10, endRadius: 300},
+    "force": {},
+    "circular": {},
     "radial": {direction: "LR", nodeSize: 32, unitRadius: 100, linkDistance: 200},
     "concentric": {nodeSize: 32, maxLevelDiff: 0.5, sortBy: 'degree', preventOverlap: true},
-    "grid": {sortBy: "id", nodeSize: 32},
+    "grid": {},
     "mds": {nodeSize: 32, linkDistance: 100},
   },
   CUSTOM_LAYOUT_NAME: "custom",

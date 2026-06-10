@@ -199,7 +199,7 @@ const TOUR_STEPS = [
     targets: [
       {selector: "#innerGraphContainer"},
       {selector: "#lassoWrapper"},
-      {selector: ".g6-minimap"},
+      {selector: ".gll-minimap"},
     ],
     position: "left",
   },

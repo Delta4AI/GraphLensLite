@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.15.0
+
+### Features
+
+#### Renderer migration: AntV G6 → Sigma.js (WebGL)
+
+The entire rendering stack moved from AntV G6 5.x (canvas) to Sigma.js v3 (WebGL nodes/edges, canvas labels) on a graphology data model. Measured on the 6000-node / 9000-edge benchmark (see `MIGRATION.md` for the full record):
+
+| Metric | G6 (1.14.x) | Sigma (1.15.0) |
+|---|---|---|
+| Load (data → rendered) | 1.6 s | 0.79 s |
+| Wheel-zoom FPS | ~4 | ~60 |
+| First-interaction stall | ~11 s | 64 ms |
+| 500-node select | 140 ms | 46 ms |
+
+* All six node shapes ported (circle and square as native WebGL programs; hexagon, diamond, triangle, star as crisp SVG textures)
+* Selection, hover-highlight and dim states reimplemented as sigma reducers; lasso select is a custom canvas overlay; click/shift-select, node drag with position persistence, and tooltips preserved
+* Bubble groups drawn natively on a canvas layer under the nodes via `bubblesets-js`; member sync, styling UI and filter/manual membership unchanged
+* Minimap and PNG export (with the bubble-set layer composited) reimplemented on sigma
+* Layouts run headlessly: force (graphology forceAtlas2), circular/grid (geometric), radial/concentric/mds (`@antv/layout` v2)
+* Fixed slow deselection when clicking empty canvas on large graphs (antvis/G6#7195) — removed from Known Issues
+* Distribution is ≈0.9 MB smaller (the 1.1 MB vendored `g6.min.js` is gone; sigma + graphology + headless layouts add ≈0.2 MB)
+* Documented degradations: dashed edges render solid and polyline edges render curved (no off-the-shelf WebGL programs for either)
+
 ## 1.14.2
 
 ### Features

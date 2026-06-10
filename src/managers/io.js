@@ -1768,7 +1768,6 @@ class IOManager {
   }
 
   async exportPNG() {
-    // https://g6.antv.antgroup.com/en/api/reference/g6/dataurloptions#properties
 
     try {
       await this.cache.ui.showLoading("Loading", "Generating picture data");

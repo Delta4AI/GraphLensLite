@@ -32,7 +32,7 @@ class Cache {
 
   reset() {
     this.initialized = false;
-    this.graph = null;  // The G6 graph object
+    this.graph = null;  // The renderer adapter (SigmaAdapter)
 
     // Stores json serializable data that is essential to reconstruct the graph
     this.data = {

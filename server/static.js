@@ -28,7 +28,7 @@ const DEFAULT_DOCUMENT = "graph_lens_lite.html";
  * path-traversal attempt. Returns null when the request escapes the root.
  *
  * @param {string} rootDir  Absolute static root.
- * @param {string} urlPath  Decoded pathname (e.g. "/lib/g6.min.js").
+ * @param {string} urlPath  Decoded pathname (e.g. "/lib/sigma.bundle.mjs").
  * @returns {string|null}
  */
 function resolveStaticPath(rootDir, urlPath) {

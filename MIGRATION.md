@@ -1,5 +1,9 @@
 # Migration: AntV G6 → Sigma.js v3
 
+**Status: COMPLETE (v1.15.0, 2026-06-10).** All phases (0–6) landed on
+`feat/sigma-renderer`; G6 is removed. This document is kept as the
+architectural record of the cutover.
+
 Full cutover of the rendering stack from AntV G6 5.0.48 (canvas) to Sigma.js v3 +
 graphology + bubblesets-js. G6 is removed entirely at the end; no dual-renderer
 period. Work happens on a long-lived feature branch (`feat/sigma-renderer`) and

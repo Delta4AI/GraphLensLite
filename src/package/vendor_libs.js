@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Copies ESM builds of npm deps into src/lib/ so they load under raw-module
-// dev serve (npm run serve) and keep parity with vendored libs (g6, exceljs).
+// dev serve (npm run serve) and keep parity with vendored libs (exceljs).
 // Also regenerates the assistant system prompt JS module from its .md source.
 const fs = require('fs');
 const path = require('path');
