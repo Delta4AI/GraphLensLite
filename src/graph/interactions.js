@@ -31,6 +31,7 @@ class InteractionManager {
     this.enabled = { drag: true, click: true, hover: true, tooltip: true, lasso: false };
 
     this.draggedNode = null;
+    this.dragGroup = null;
     this.dragMoved = false;
     // Covers the click that ends a micro-drag (1-2 move events — sigma's
     // captor only swallows clicks after >=3 dragged events itself).
@@ -115,6 +116,13 @@ class InteractionManager {
     if (!this.enabled.drag) return;
     this.draggedNode = node;
     this.dragMoved = false;
+    // Dragging a selected node moves the whole selection along.
+    // (selectedNodes starts as a Set and becomes an array after the first
+    // selection — new Set() tolerates both.)
+    const selected = new Set(this.cache.selectedNodes ?? []);
+    this.dragGroup = selected.has(node) ? selected : null;
+    // Pin the label so sigma's per-frame label grid can't drop it mid-drag.
+    this.adapter.graph.mergeNodeAttributes(node, { forceLabel: true });
     // Pin the normalization bbox: without it every x/y write re-normalizes
     // the coordinate space and the graph swims under the cursor.
     const sigma = this.adapter.sigma;
@@ -127,7 +135,16 @@ class InteractionManager {
     // as-is; the flip to app space happens once in getNodeData (see
     // graph_model.js flipY contract).
     const pos = this.adapter.sigma.viewportToGraph(event);
-    this.adapter.graph.mergeNodeAttributes(this.draggedNode, { x: pos.x, y: pos.y });
+    const graph = this.adapter.graph;
+    // Move by delta so a group drag preserves relative positions.
+    const dragged = graph.getNodeAttributes(this.draggedNode);
+    const dx = pos.x - dragged.x;
+    const dy = pos.y - dragged.y;
+    for (const id of this.dragGroup ?? [this.draggedNode]) {
+      if (!graph.hasNode(id)) continue;
+      const a = graph.getNodeAttributes(id);
+      graph.mergeNodeAttributes(id, { x: a.x + dx, y: a.y + dy });
+    }
     this.dragMoved = true;
     this.hideTooltip();
     // Keep the camera from panning along with the node drag.
@@ -139,8 +156,12 @@ class InteractionManager {
   async #onMouseUp() {
     if (!this.draggedNode) return;
     const moved = this.dragMoved;
+    const dragged = this.draggedNode;
     this.draggedNode = null;
+    this.dragGroup = null;
     this.dragMoved = false;
+    const graph = this.adapter.graph;
+    if (graph.hasNode(dragged)) graph.mergeNodeAttributes(dragged, { forceLabel: false });
     if (!moved) return;
     // Set synchronously before any await: sigma emits clickNode right after
     // mouseup with no microtask boundary, so the flag must already be up.
@@ -233,11 +254,12 @@ class InteractionManager {
     const canvas = document.createElement("canvas");
     canvas.className = "lasso-overlay";
     // Sits above sigma's layers and swallows all pointer input while active,
-    // which is what disables camera pan / node drag in lasso mode.
+    // which is what disables camera pan / node drag in lasso mode. Stays
+    // below the toolbar (1000) so its lasso toggle remains clickable.
     Object.assign(canvas.style, {
       position: "absolute",
       inset: "0",
-      zIndex: "1000",
+      zIndex: "900",
       cursor: "crosshair",
       touchAction: "none",
       display: "none",
