@@ -22,6 +22,7 @@ import {
 import { circular, forceAtlas2 } from "../lib/graphology.bundle.mjs";
 import { nodeAttributesFromStyle, edgeAttributesFromStyle, flipY } from "./graph_model.js";
 import { drawNodeLabel, drawEdgeLabel } from "./label_renderers.js";
+import { InteractionManager } from "./interactions.js";
 
 // Rasterization resolution for the SVG shape textures. 512 px keeps shapes
 // crisp at the ~4x zoom the UI allows (risk #1 in MIGRATION.md).
@@ -99,16 +100,17 @@ class SigmaAdapter {
   /**
    * @param {object} cache  app cache; cache.graphData must hold the graphology graph
    * @param {string|HTMLElement} container
-   * @param {object} opts  {nodeReducer, edgeReducer, elementStates, settings}
+   * @param {object} opts  {nodeReducer, edgeReducer, elementStates, hoverIds, settings}
    */
-  constructor(cache, container, { nodeReducer, edgeReducer, elementStates, settings = {} }) {
+  constructor(
+    cache,
+    container,
+    { nodeReducer, edgeReducer, elementStates, hoverIds = new Set(), settings = {} },
+  ) {
     this.cache = cache;
     this.graph = cache.graphData;
     this.elementStates = elementStates;
     this.pendingLayout = null;
-    // Single handler per event name (G6's emitter allowed several). Nothing
-    // dispatches these yet; Phase 3 replaces this with real sigma events.
-    this.eventHandlers = new Map();
     this.killed = false;
 
     const containerEl =
@@ -116,7 +118,7 @@ class SigmaAdapter {
 
     this.sigma = new Sigma(this.graph, containerEl, {
       allowInvalidContainer: true,
-      enableEdgeEvents: false,
+      enableEdgeEvents: true,
       zIndex: true,
       nodeReducer,
       edgeReducer,
@@ -128,6 +130,7 @@ class SigmaAdapter {
       renderEdgeLabels: true,
       ...settings,
     });
+    this.interactions = new InteractionManager(this, cache, hoverIds, containerEl);
     this.#syncLabelVisibility();
   }
 
@@ -195,6 +198,7 @@ class SigmaAdapter {
   destroy() {
     if (this.killed) return;
     this.killed = true;
+    this.interactions.destroy();
     this.sigma.kill();
   }
 
@@ -405,7 +409,10 @@ class SigmaAdapter {
   // ----------------------------------------------------------------- viewport
 
   async fitView() {
-    // Sigma normalizes the graph bbox, so the default camera frames everything.
+    // Drop the bbox pinned by node dragging (see InteractionManager) so the
+    // normalization re-covers all current positions, then the default camera
+    // frames everything.
+    this.sigma.setCustomBBox(null);
     this.sigma.getCamera().setState({ x: 0.5, y: 0.5, ratio: 1, angle: 0 });
   }
 
@@ -546,31 +553,16 @@ class SigmaAdapter {
     });
   }
 
-  // -------------------------------------------------- events/behaviors (stubs)
+  // ------------------------------------------------------------- interactions
 
-  // TODO(Phase 3): real interaction wiring (drag, click/shift-select, hover,
-  // lasso, tooltip). Sigma's built-in camera already provides wheel-zoom and
-  // drag-pan; handlers registered here are stored but not dispatched yet.
-
-  on(event, handler) {
-    this.eventHandlers.set(event, handler);
+  /** @param {"drag"|"click"|"hover"|"tooltip"|"lasso"} name */
+  setInteractionEnabled(name, enabled) {
+    this.interactions.setEnabled(name, enabled);
   }
 
-  off(event) {
-    this.eventHandlers.delete(event);
+  isInteractionEnabled(name) {
+    return this.interactions.isEnabled(name);
   }
-
-  getEvents() {
-    return Object.fromEntries(this.eventHandlers);
-  }
-
-  async setBehaviors() {} // TODO(Phase 3)
-
-  getBehaviors() {
-    return []; // TODO(Phase 3)
-  }
-
-  async setElementZIndex() {} // TODO(Phase 3): dragend z-fix is gone with G6
 
   // ----------------------------------------------------------- plugins (stubs)
 
@@ -594,8 +586,6 @@ class SigmaAdapter {
       async drawBubbleSets() {},
     };
   }
-
-  async updatePlugin() {} // TODO(Phase 3): tooltip enable/disable
 
   // ------------------------------------------------------------------- export
 

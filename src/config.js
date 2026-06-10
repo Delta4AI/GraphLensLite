@@ -239,9 +239,6 @@ const CFG = {
 // Edge filter header
   EXCEL_EDGE_HEADER: "Edge filters",
 
-// Set to true in case original g6.min.js is used and issue #7195 is NOT resolved (https://github.com/antvis/G6/issues/7195)
-  APPLY_BUBBLE_SET_HOTFIX: false,
-
 // Set to true to use current filter configuration for pushing property to query editor, e.g. if slider is inverted
 // false uses defaults (non-inverted) and min/max
   QUERY_BTN_USE_CURRENT_FILTER: true,

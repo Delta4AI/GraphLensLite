@@ -11,16 +11,6 @@ import { SigmaAdapter } from "./sigma_adapter.js";
 class GraphCoreManager {
   constructor(cache) {
     this.cache = cache;
-    // TODO(Phase 3): transitional type-only stubs — ui.js toggles behaviors by
-    // `.type`; real sigma interaction wiring replaces this entirely.
-    this.BEHAVIOURS = {
-      DRAG_ELEMENT: { type: "drag-element" },
-      DRAG_CANVAS: { type: "drag-canvas" },
-      ZOOM_CANVAS: { type: "zoom-canvas" },
-      HOVER_ACTIVATE: { type: "hover-activate" },
-      LASSO_SELECT: { type: "lasso-select" },
-      CLICK_SELECT: { type: "click-select" },
-    };
   }
 
   *traverseD4Data(nodeOrEdge) {
@@ -96,10 +86,14 @@ class GraphCoreManager {
       this.cache.graphData = buildGraphologyGraph(this.cache);
 
       const elementStates = new Map();
+      // Hover layer (InteractionManager writes, reducers read) is separate
+      // from elementStates so hover can never corrupt selection state.
+      const hoverIds = new Set();
       this.cache.graph = new SigmaAdapter(this.cache, "innerGraphContainer", {
-        nodeReducer: makeNodeReducer(this.cache, elementStates),
-        edgeReducer: makeEdgeReducer(this.cache, elementStates),
+        nodeReducer: makeNodeReducer(this.cache, elementStates, hoverIds),
+        edgeReducer: makeEdgeReducer(this.cache, elementStates, hoverIds),
         elementStates,
+        hoverIds,
         // Label visibility (CFG.HIDE_LABELS) is synced live by the adapter
         // on construction and on every render().
         settings: {},

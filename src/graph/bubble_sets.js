@@ -264,8 +264,6 @@ class GraphBubbleSetManager {
   }
 
   getAvoidMembers(members) {
-    if (this.cache.CFG.APPLY_BUBBLE_SET_HOTFIX && this.cache.CFG.AVOID_MEMBERS_IN_BUBBLE_GROUPS) return [];
-
     const checkMembership = members instanceof Set
       ? (nodeID) => members.has(nodeID)
       : (nodeID) => members.includes(nodeID);

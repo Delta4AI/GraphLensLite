@@ -242,22 +242,66 @@ function applyNodeState(data, state) {
 }
 
 /**
- * Sigma nodeReducer factory. Reads the graphology `hidden` attribute plus the
- * app-level element-states Map (selected/highlight/dim, formerly G6 states).
+ * 1-degree hover neighborhood (G6 hover-activate parity): the element itself
+ * plus, for a node, its neighbors and incident edges, or, for an edge, its
+ * two endpoints. Hidden members are harmless to include — the reducers bail
+ * out on hidden elements before consulting hover state.
+ *
+ * @param {import("../lib/graphology.bundle.mjs").Graph} graph
+ * @param {string} id  node or edge key
+ * @param {boolean} isEdge
+ * @returns {Set<string>}
+ */
+function hoverNeighborhood(graph, id, isEdge) {
+  const ids = new Set([id]);
+  if (isEdge) {
+    if (graph.hasEdge(id)) {
+      for (const nodeId of graph.extremities(id)) ids.add(nodeId);
+    }
+    return ids;
+  }
+  if (graph.hasNode(id)) {
+    for (const neighbor of graph.neighbors(id)) ids.add(neighbor);
+    for (const edge of graph.edges(id)) ids.add(edge);
+  }
+  return ids;
+}
+
+/**
+ * Hover layer is separate from the selection-bearing elementStates Map so a
+ * hover/leave cycle can never corrupt selection: a non-empty hoverIds Set
+ * means "hover active" — members render highlighted, every other visible
+ * element dims. Selection wins over hover so selected elements stay
+ * recognizable while the rest of the graph dims.
+ */
+function hoverStateFor(id, hoverIds) {
+  if (hoverIds.size === 0) return null;
+  return hoverIds.has(id) ? "highlight" : "dim";
+}
+
+/**
+ * Sigma nodeReducer factory. Reads the graphology `hidden` attribute, the
+ * app-level element-states Map (selected/highlight/dim, formerly G6 states)
+ * and the hover layer (see hoverStateFor).
  *
  * @param {object} cache
  * @param {Map<string, string[]>} elementStates
+ * @param {Set<string>} [hoverIds]  production code MUST pass the shared Set
+ *   mutated by InteractionManager — the default creates a fresh (permanently
+ *   empty) Set and exists only so node tests can omit hover wiring
  */
-function makeNodeReducer(cache, elementStates) {
+function makeNodeReducer(cache, elementStates, hoverIds = new Set()) {
   return (node, data) => {
     if (data.hidden) return data;
-    const states = elementStates.get(node);
-    if (!states || states.length === 0) return data;
+    const states = elementStates.get(node) ?? [];
+    const hoverState = hoverStateFor(node, hoverIds);
     if (states.includes("selected")) {
       return { ...applyNodeState(data, "selected"), zIndex: 1 };
     }
-    if (states.includes("highlight")) return applyNodeState(data, "highlight");
-    if (states.includes("dim")) return applyNodeState(data, "dim");
+    if (states.includes("highlight") || hoverState === "highlight") {
+      return applyNodeState(data, "highlight");
+    }
+    if (states.includes("dim") || hoverState === "dim") return applyNodeState(data, "dim");
     return data;
   };
 }
@@ -270,8 +314,9 @@ function makeNodeReducer(cache, elementStates) {
  *
  * @param {object} cache  needs edgeRef and graphData (the live graphology graph)
  * @param {Map<string, string[]>} elementStates
+ * @param {Set<string>} [hoverIds]
  */
-function makeEdgeReducer(cache, elementStates) {
+function makeEdgeReducer(cache, elementStates, hoverIds = new Set()) {
   return (edge, data) => {
     if (data.hidden) return data;
     const ref = cache.edgeRef.get(edge);
@@ -284,16 +329,17 @@ function makeEdgeReducer(cache, elementStates) {
         return { ...data, hidden: true };
       }
     }
-    const states = elementStates.get(edge);
-    if (!states || states.length === 0) return data;
+    const states = elementStates.get(edge) ?? [];
+    const hoverState = hoverStateFor(edge, hoverIds);
+    if (states.length === 0 && hoverState === null) return data;
     const res = { ...data };
     if (states.includes("selected")) {
       res.color = STATE_ACCENT_COLOR;
       res.size = (data.size ?? 1) + DEFAULTS.STATE.EDGE_HALO_WIDTH / 2;
       res.zIndex = 1;
-    } else if (states.includes("highlight")) {
+    } else if (states.includes("highlight") || hoverState === "highlight") {
       res.color = STATE_ACCENT_COLOR;
-    } else if (states.includes("dim")) {
+    } else if (states.includes("dim") || hoverState === "dim") {
       res.color = STATE_DIM_COLOR;
     }
     return res;
@@ -306,6 +352,7 @@ export {
   edgeAttributesFromStyle,
   sigmaEdgeType,
   flipY,
+  hoverNeighborhood,
   makeNodeReducer,
   makeEdgeReducer,
   STATE_ACCENT_COLOR,

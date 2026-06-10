@@ -5,6 +5,7 @@ import {
   edgeAttributesFromStyle,
   sigmaEdgeType,
   flipY,
+  hoverNeighborhood,
   makeNodeReducer,
   makeEdgeReducer,
   STATE_ACCENT_COLOR,
@@ -526,5 +527,117 @@ describe("reducers — states and hidden handling", () => {
 
     elementStates.set("e1", ["dim"]);
     expect(edgeReducer("e1", { color: "#403C5390", hidden: false }).color).toBe(STATE_DIM_COLOR);
+  });
+});
+
+describe("hover layer (Phase 3) — hoverNeighborhood + reducer composition", () => {
+  // a—b—c chain plus isolated d: hovering b highlights {a, b, c, e1, e2}
+  // and dims {d, e3?}. The hover layer (a Set) is separate from the
+  // selection-bearing elementStates Map by design.
+  function hoverFixture() {
+    const nodes = [makeNode("a"), makeNode("b"), makeNode("c"), makeNode("d")];
+    const edges = [makeEdge("e1", "a", "b"), makeEdge("e2", "b", "c")];
+    const cache = createMockCache({ nodes, edges });
+    cache.graphData = buildGraphologyGraph(cache);
+    const elementStates = new Map();
+    const hoverIds = new Set();
+    return {
+      cache,
+      elementStates,
+      hoverIds,
+      nodeReducer: makeNodeReducer(cache, elementStates, hoverIds),
+      edgeReducer: makeEdgeReducer(cache, elementStates, hoverIds),
+    };
+  }
+
+  it("node neighborhood includes the node, its neighbors and incident edges", () => {
+    const { cache } = hoverFixture();
+
+    const ids = hoverNeighborhood(cache.graphData, "b", false);
+
+    expect(ids).toEqual(new Set(["a", "b", "c", "e1", "e2"]));
+  });
+
+  it("leaf node neighborhood excludes unconnected elements", () => {
+    const { cache } = hoverFixture();
+
+    const ids = hoverNeighborhood(cache.graphData, "a", false);
+
+    expect(ids).toEqual(new Set(["a", "b", "e1"]));
+    expect(ids.has("d")).toBe(false);
+  });
+
+  it("edge neighborhood is the edge plus its two endpoints", () => {
+    const { cache } = hoverFixture();
+
+    expect(hoverNeighborhood(cache.graphData, "e1", true)).toEqual(new Set(["e1", "a", "b"]));
+  });
+
+  it("unknown ids yield only themselves (no throw)", () => {
+    const { cache } = hoverFixture();
+
+    expect(hoverNeighborhood(cache.graphData, "nope", false)).toEqual(new Set(["nope"]));
+    expect(hoverNeighborhood(cache.graphData, "nope", true)).toEqual(new Set(["nope"]));
+  });
+
+  it("empty hover layer leaves nodes and edges untouched", () => {
+    const { nodeReducer, edgeReducer } = hoverFixture();
+    const nodeData = { color: "#403C53", hidden: false };
+    const edgeData = { color: "#403C5390", hidden: false };
+
+    expect(nodeReducer("a", nodeData)).toBe(nodeData);
+    expect(edgeReducer("e1", edgeData)).toBe(edgeData);
+  });
+
+  it("hover members highlight, everything else dims", () => {
+    const { nodeReducer, edgeReducer, hoverIds } = hoverFixture();
+    for (const id of ["a", "b", "e1"]) hoverIds.add(id);
+
+    const member = nodeReducer("a", { color: "#403C53", size: 10, hidden: false });
+    expect(member.type).toBe("shape");
+    expect(member.image).toContain(ACCENT_URI);
+
+    const outsider = nodeReducer("d", { color: "#403C53", size: 10, hidden: false });
+    expect(outsider.color).toBe(STATE_DIM_COLOR);
+
+    expect(edgeReducer("e1", { color: "#403C5390", hidden: false }).color).toBe(STATE_ACCENT_COLOR);
+    expect(edgeReducer("e2", { color: "#403C5390", hidden: false }).color).toBe(STATE_DIM_COLOR);
+  });
+
+  it("selection wins over hover dim — selected elements stay selected-looking", () => {
+    const { nodeReducer, edgeReducer, hoverIds, elementStates } = hoverFixture();
+    elementStates.set("d", ["selected"]);
+    elementStates.set("e2", ["selected"]);
+    for (const id of ["a", "b", "e1"]) hoverIds.add(id);
+
+    const node = nodeReducer("d", { color: "#403C53", size: 10, hidden: false, zIndex: 0 });
+    expect(node.image).toContain(ACCENT_URI);
+    expect(node.zIndex).toBe(1);
+
+    const edge = edgeReducer("e2", { color: "#403C5390", size: 1, hidden: false, zIndex: 0 });
+    expect(edge.color).toBe(STATE_ACCENT_COLOR);
+    expect(edge.zIndex).toBe(1);
+  });
+
+  it("hover never touches elementStates — clearing hover restores selection exactly", () => {
+    const { nodeReducer, hoverIds, elementStates } = hoverFixture();
+    elementStates.set("a", ["selected"]);
+    for (const id of ["b", "c", "e2"]) hoverIds.add(id);
+
+    nodeReducer("a", { color: "#403C53", size: 10, hidden: false });
+    hoverIds.clear();
+
+    expect(elementStates.get("a")).toEqual(["selected"]);
+    const res = nodeReducer("a", { color: "#403C53", size: 10, hidden: false, zIndex: 0 });
+    expect(res.image).toContain(ACCENT_URI);
+    expect(res.zIndex).toBe(1);
+  });
+
+  it("hidden elements stay untouched by the hover layer", () => {
+    const { nodeReducer, hoverIds } = hoverFixture();
+    hoverIds.add("a");
+    const data = { color: "#403C53", hidden: true };
+
+    expect(nodeReducer("d", data)).toBe(data);
   });
 });

@@ -298,6 +298,8 @@ body, html {
     width: 100%;
     height: 100%;
     border: 1px solid #ccc;
+    /* Anchor for the absolutely positioned tooltip and lasso overlay */
+    position: relative;
 }
 
 #innerGraphContainer .g6-minimap {

@@ -440,77 +440,37 @@ class UIManager {
 
   async toggleLassoSelection() {
     const lassoWrapper = document.getElementById("lassoWrapper");
-    let lassoIsActive = lassoWrapper.classList.contains("active");
-    lassoIsActive ? lassoWrapper.classList.remove("active") : lassoWrapper.classList.add("active");
+    const enableLasso = !lassoWrapper.classList.contains("active");
+    lassoWrapper.classList.toggle("active", enableLasso);
 
-    const clickAndDragBehaviors = [
-      this.cache.gcm.BEHAVIOURS.DRAG_CANVAS,
-      this.cache.gcm.BEHAVIOURS.DRAG_ELEMENT
-    ];
+    // The lasso overlay owns the pointer while active (camera pan and node
+    // drag are swallowed by it); tooltip clicks are routed away too. Hover
+    // needs no toggling here: the overlay blocks sigma's mousemove anyway.
+    this.cache.graph.setInteractionEnabled("lasso", enableLasso);
+    this.cache.graph.setInteractionEnabled("drag", !enableLasso);
+    this.cache.graph.setInteractionEnabled("tooltip", !enableLasso);
 
-    if (!this.cache.CFG.DISABLE_HOVER_EFFECT) {
-      clickAndDragBehaviors.push(this.cache.gcm.BEHAVIOURS.HOVER_ACTIVATE);
-    }
-
-    const lassoBehaviors = [
-      this.cache.gcm.BEHAVIOURS.LASSO_SELECT,
-    ];
-
-    if (!this.cache.CFG.APPLY_BUBBLE_SET_HOTFIX || (this.cache.CFG.APPLY_BUBBLE_SET_HOTFIX && !this.cache.CFG.DISABLE_HOVER_EFFECT)) {
-      lassoBehaviors.push(this.cache.gcm.BEHAVIOURS.CLICK_SELECT);
-    }
-
-    let behaviors = await this.cache.graph.getBehaviors()
-      .filter(b => ![
-        ...clickAndDragBehaviors.map(b => b.type),
-        ...lassoBehaviors.map(b => b.type)
-      ].includes(b.type));
-
-    lassoIsActive ? this.info("Switched to click and drag mode") : this.info("Switched to lasso selection mode");
-
-    await this.cache.graph.setBehaviors([...behaviors, ...lassoIsActive ? clickAndDragBehaviors : lassoBehaviors]);
-    await this.cache.graph.updatePlugin({key: 'tooltip', enable: lassoIsActive});
+    this.info(enableLasso ? "Switched to lasso selection mode" : "Switched to click and drag mode");
   }
 
   async toggleHoverEffect(btn) {
-    const isCurrentlyEnabled = !this.cache.CFG.DISABLE_HOVER_EFFECT;
+    const enable = this.cache.CFG.DISABLE_HOVER_EFFECT;
+    this.cache.CFG.DISABLE_HOVER_EFFECT = !enable;
 
-    if (isCurrentlyEnabled) {
-      this.cache.CFG.DISABLE_HOVER_EFFECT = true;
-      btn.classList.remove("green", "highlight");
-      btn.classList.add("red");
-      btn.title = "Enable hover highlight effect (H)";
-      const behaviors = await this.cache.graph.getBehaviors();
-      const filtered = behaviors.filter(b => b.type !== this.cache.gcm.BEHAVIOURS.HOVER_ACTIVATE.type);
-      await this.cache.graph.setBehaviors(filtered);
-
-      // Clear any lingering highlight/dim states from the hover behavior
-      const stateMap = {};
-      for (const node of this.cache.graph.getNodeData()) {
-        const states = await this.cache.graph.getElementState(node.id);
-        const cleaned = states.filter(s => s !== "highlight" && s !== "dim");
-        if (cleaned.length !== states.length) stateMap[node.id] = cleaned;
-      }
-      for (const edge of this.cache.graph.getEdgeData()) {
-        const states = await this.cache.graph.getElementState(edge.id);
-        const cleaned = states.filter(s => s !== "highlight" && s !== "dim");
-        if (cleaned.length !== states.length) stateMap[edge.id] = cleaned;
-      }
-      if (Object.keys(stateMap).length > 0) {
-        await this.cache.graph.setElementState(stateMap);
-      }
-
-      this.info("Hover highlight effect disabled");
-    } else {
-      this.cache.CFG.DISABLE_HOVER_EFFECT = false;
+    if (enable) {
       btn.classList.remove("red");
       btn.classList.add("green", "highlight");
       btn.title = "Disable hover highlight effect (H)";
-      const behaviors = await this.cache.graph.getBehaviors();
-      behaviors.push(this.cache.gcm.BEHAVIOURS.HOVER_ACTIVATE);
-      await this.cache.graph.setBehaviors(behaviors);
-      this.info("Hover highlight effect enabled");
+    } else {
+      btn.classList.remove("green", "highlight");
+      btn.classList.add("red");
+      btn.title = "Enable hover highlight effect (H)";
     }
+
+    // Disabling also clears any lingering hover highlight/dim layer;
+    // selection states are untouched (they live in elementStates).
+    this.cache.graph.setInteractionEnabled("hover", enable);
+    this.info(enable ? "Hover highlight effect enabled" : "Hover highlight effect disabled");
   }
 
   updateHoverToggleButton() {

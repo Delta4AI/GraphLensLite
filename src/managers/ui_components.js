@@ -658,8 +658,10 @@ class UIComponentManager {
         </div>
       </div>
       <div class="tooltip-header-actions">
-        <button class="tooltip-expand-btn" onclick="window.toggleTooltipExpand(this)">⛶</button>
-        <button class="tooltip-close-btn" onclick="window.closeTooltip(this)">×</button>
+        <!-- no inline onclick: tooltip HTML is sanitized at display time;
+             InteractionManager handles these via a delegated listener -->
+        <button class="tooltip-expand-btn">⛶</button>
+        <button class="tooltip-close-btn">×</button>
       </div>
     </div>
     <div class="tooltip-content">`;
