@@ -9,6 +9,7 @@ export {
   EdgeDoubleArrowProgram,
   createEdgeArrowHeadProgram,
   createEdgeCompoundProgram,
+  drawDiscNodeHover,
 } from 'sigma/rendering';
 export {NodeSquareProgram} from '@sigma/node-square';
 export * as nodeImage from '@sigma/node-image';

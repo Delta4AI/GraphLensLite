@@ -181,13 +181,6 @@ class UIManager {
       this.hideBottomBar();
       queryBtn.classList.remove("highlight");
     }
-
-    // Wait for CSS transition to complete (300ms) before resizing graph canvas
-    setTimeout(() => {
-      if (this.cache.graph) {
-        this.cache.graph.resize();
-      }
-    }, 300);
   }
 
   async closeBottomBar() {
@@ -207,11 +200,6 @@ class UIManager {
     const bottomBar = document.getElementById("bottomBar");
     if (bottomBar.classList.contains("active")) {
       this.hideBottomBar();
-      setTimeout(() => {
-        if (this.cache.graph) {
-          this.cache.graph.resize();
-        }
-      }, 300);
     }
   }
 
@@ -232,13 +220,6 @@ class UIManager {
     }
 
     await this.hideLoading();
-
-    // Wait for CSS transition to complete (300ms) before resizing graph canvas
-    setTimeout(() => {
-      if (this.cache.graph) {
-        this.cache.graph.resize();
-      }
-    }, 300);
   }
 
   async reloadApp() {
@@ -374,11 +355,6 @@ class UIManager {
         bottomBar.style.height = finalHeight + 'px';
         mainContent.style.height = newMainHeight + 'px';
         this.bottomBarHeight = finalHeight;
-
-        // Resize graph canvas after manual resize (no transition, resize immediately)
-        if (this.cache.graph) {
-          this.cache.graph.resize();
-        }
       }
 
       shadowBar.style.display = 'none';
@@ -417,13 +393,6 @@ class UIManager {
       styleBtn.classList.add("highlight");
       outerGraphContainer.classList.add("styling-panel-active");
     }
-
-    // Wait for CSS transition to complete (300ms) before resizing graph canvas
-    setTimeout(() => {
-      if (this.cache.graph) {
-        this.cache.graph.resize();
-      }
-    }, 300);
   }
 
   toggleSelectionEditor() {

@@ -15,6 +15,7 @@ import {
   EdgeDoubleArrowProgram,
   createEdgeArrowHeadProgram,
   createEdgeCompoundProgram,
+  drawDiscNodeHover,
   NodeSquareProgram,
   nodeImage,
   edgeCurve,
@@ -29,6 +30,33 @@ import { Minimap } from "./minimap.js";
 // Rasterization resolution for the SVG shape textures. 512 px keeps shapes
 // crisp at the ~4x zoom the UI allows (risk #1 in MIGRATION.md).
 const SHAPE_TEXTURE_RESOLUTION = 512;
+// @sigma/node-image defaults to 500 ms before regenerating the texture atlas
+// after a miss; style changes left nodes invisible (transparent base color)
+// for that long. 50 ms keeps batching without visible flicker.
+const ATLAS_REGEN_DEBOUNCE_MS = 50;
+// Trailing-edge debounce for container ResizeObserver → sigma.resize();
+// rides out the 0.3 s CSS panel transitions without a resize per frame.
+const RESIZE_DEBOUNCE_MS = 50;
+
+/**
+ * While a node drag is in flight, sigma's captor still updates hoveredNode on
+ * every mousemove, popping passed-over nodes' hover labels. Gate any hover
+ * drawer so only the dragged node may draw while a drag is active.
+ *
+ * @param {(context, data, settings) => void} drawer
+ * @param {() => string|null} getDraggedNode
+ */
+function guardHoverDrawer(drawer, getDraggedNode) {
+  // Defensive: if a future sigma bundle moves the wrapped drawer off the
+  // instance/export we read it from, fail to "no hover" instead of throwing
+  // inside sigma's render loop (which would swallow the error silently).
+  if (typeof drawer !== "function") return () => {};
+  return (context, data, settings) => {
+    const dragged = getDraggedNode();
+    if (dragged && data.key !== dragged) return;
+    drawer(context, data, settings);
+  };
+}
 
 /**
  * Node/edge program registry (G6 type vocabulary → sigma programs).
@@ -36,15 +64,43 @@ const SHAPE_TEXTURE_RESOLUTION = 512;
  * and any bordered/haloed node — uses the SVG texture program ("shape").
  * Edges: straight programs are sigma built-ins; curved ones come from
  * @sigma/edge-curve (cubic/quadratic/polyline all map to one curve type).
+ *
+ * @param {() => string|null} getDraggedNode  hover-guard input (see
+ *   guardHoverDrawer); NodeSquareProgram carries its own instance drawHover
+ *   which bypasses defaultDrawNodeHover, so it gets wrapped here.
  */
-function buildProgramRegistry() {
+function buildProgramRegistry(getDraggedNode) {
   const shapeProgram = nodeImage.createNodeImageProgram({
     size: { mode: "force", value: SHAPE_TEXTURE_RESOLUTION },
     objectFit: "contain",
     drawingMode: "background",
     keepWithinCircle: false,
     padding: 0,
+    debounceTimeout: ATLAS_REGEN_DEBOUNCE_MS,
   });
+  // ANGLE/radeonsi intermittently fails generateMipmap on NPOT atlas
+  // re-uploads (GL_INVALID_OPERATION), leaving textures mipmap-incomplete —
+  // sampled as opaque black (the hover-after-restyle black boxes). The
+  // program never sets TEXTURE_MIN_FILTER, so the NEAREST_MIPMAP_LINEAR
+  // default requires a complete mip chain; force LINEAR, which needs none.
+  // 512 px rasters lose nothing visible to non-mipmapped minification.
+  const originalBindTextures = shapeProgram.prototype.bindTextures;
+  shapeProgram.prototype.bindTextures = function () {
+    originalBindTextures.call(this);
+    const gl = this.normalProgram?.gl ?? this.gl;
+    if (!gl) return;
+    for (let i = 0; i < (this.textures?.length ?? 0); i++) {
+      gl.activeTexture(gl.TEXTURE0 + i);
+      gl.bindTexture(gl.TEXTURE_2D, this.textures[i]);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }
+  };
+  class GuardedSquareProgram extends NodeSquareProgram {
+    constructor(...args) {
+      super(...args);
+      this.drawHover = guardHoverDrawer(this.drawHover, getDraggedNode);
+    }
+  }
   const curveOptions = (extremity) => ({
     arrowHead: extremity
       ? { ...edgeCurve.DEFAULT_EDGE_CURVE_PROGRAM_OPTIONS.arrowHead, extremity }
@@ -53,7 +109,7 @@ function buildProgramRegistry() {
   });
   return {
     nodeProgramClasses: {
-      square: NodeSquareProgram,
+      square: GuardedSquareProgram,
       shape: shapeProgram,
     },
     edgeProgramClasses: {
@@ -116,20 +172,36 @@ class SigmaAdapter {
     const containerEl =
       typeof container === "string" ? document.getElementById(container) : container;
 
+    // Lazy read: this.interactions is assigned AFTER new Sigma(...); the
+    // closure only runs per hover render, by which time it exists.
+    const getDraggedNode = () => this.interactions?.draggedNode ?? null;
+
     this.sigma = new Sigma(this.graph, containerEl, {
       allowInvalidContainer: true,
       enableEdgeEvents: true,
       zIndex: true,
       nodeReducer,
       edgeReducer,
-      ...buildProgramRegistry(),
+      ...buildProgramRegistry(getDraggedNode),
       // Custom drawers honour the per-element label attrs from graph_model
       // (size, color, background, placement, offsets, auto-rotate).
       defaultDrawNodeLabel: drawNodeLabel,
       defaultDrawEdgeLabel: drawEdgeLabel,
+      defaultDrawNodeHover: guardHoverDrawer(drawDiscNodeHover, getDraggedNode),
       renderEdgeLabels: true,
       ...settings,
     });
+    // Sigma only auto-resizes on window resize. Sidebar/bottom-bar toggles
+    // animate the container via CSS (0.3 s), which used to blank the graph
+    // until the next zoom/pan; observe the container directly instead.
+    this.resizeDebounce = null;
+    this.resizeObserver = new ResizeObserver(() => {
+      clearTimeout(this.resizeDebounce);
+      this.resizeDebounce = setTimeout(() => {
+        if (!this.killed) this.sigma.resize();
+      }, RESIZE_DEBOUNCE_MS);
+    });
+    this.resizeObserver.observe(containerEl);
     this.interactions = new InteractionManager(this, cache, hoverIds, containerEl);
     this.bubbleLayer = new BubbleSetLayer(this, cache);
     this.minimap = new Minimap(this, containerEl);
@@ -200,6 +272,8 @@ class SigmaAdapter {
   destroy() {
     if (this.killed) return;
     this.killed = true;
+    clearTimeout(this.resizeDebounce);
+    this.resizeObserver.disconnect();
     this.bubbleLayer.destroy();
     this.minimap.destroy();
     this.interactions.destroy();
