@@ -79,6 +79,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@antv/layout": "^2.0.0",
     "@sigma/edge-curve": "^3.1.0",
     "@sigma/export-image": "^3.0.0",
     "@sigma/node-image": "^3.0.0",

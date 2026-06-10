@@ -19,8 +19,8 @@ import {
   nodeImage,
   edgeCurve,
 } from "../lib/sigma.bundle.mjs";
-import { circular, forceAtlas2 } from "../lib/graphology.bundle.mjs";
 import { nodeAttributesFromStyle, edgeAttributesFromStyle, flipY } from "./graph_model.js";
+import { executeLayout } from "./layout_algorithms.js";
 import { drawNodeLabel, drawEdgeLabel } from "./label_renderers.js";
 import { InteractionManager } from "./interactions.js";
 import { BubbleSetLayer } from "./bubble_layer.js";
@@ -95,8 +95,6 @@ const FIT_PADDING_PX = 80;
 // Clamp fit zoom so a tiny selection (e.g. a single node) doesn't punch the
 // viewport to 100x — same UX guard as the old G6 fitViewToNodes.
 const MAX_FIT_ZOOM = 4;
-const FORCE_ITERATIONS = 200;
-const GRID_SPACING = 100;
 
 class SigmaAdapter {
   /**
@@ -526,37 +524,7 @@ class SigmaAdapter {
   async layout() {
     const spec = this.pendingLayout ?? { type: this.cache.DEFAULTS.LAYOUT };
     this.pendingLayout = null;
-    this.#executeLayout(spec);
-  }
-
-  #executeLayout(spec) {
-    const type = spec?.type;
-    if (type === "circular") {
-      circular.assign(this.graph, {
-        scale: Math.max(100, 12 * Math.sqrt(this.graph.order)),
-      });
-      return;
-    }
-    if (type === "grid") {
-      const cols = Math.ceil(Math.sqrt(this.graph.order)) || 1;
-      let i = 0;
-      this.graph.forEachNode((id) => {
-        this.graph.mergeNodeAttributes(id, {
-          x: (i % cols) * GRID_SPACING,
-          y: Math.floor(i / cols) * GRID_SPACING,
-        });
-        i++;
-      });
-      return;
-    }
-    // 'force' and everything else → forceAtlas2.
-    // TODO(Phase 5): radial/concentric/mds parity via @antv/layout or
-    // equivalents; consider the FA2 web-worker build for large graphs.
-    if (this.graph.order < 2) return; // FA2/inferSettings throw on 0-1 nodes
-    forceAtlas2.assign(this.graph, {
-      iterations: FORCE_ITERATIONS,
-      settings: forceAtlas2.inferSettings(this.graph),
-    });
+    await executeLayout(this.graph, spec);
   }
 
   // ------------------------------------------------------------- interactions
