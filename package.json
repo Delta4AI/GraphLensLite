@@ -31,7 +31,9 @@
     "serve:api": "npm run vendor-libs && node --env-file-if-exists=.env server/index.js",
     "version": "npm run inject-version && git add src/config.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "perf:fixture": "node scripts/generate_benchmark_fixture.js",
+    "perf": "node scripts/perf_benchmark.js"
   },
   "build": {
     "appId": "com.delta4ai.graphlenslite",
@@ -72,11 +74,21 @@
     "inline-source": "^8.0.3",
     "inline-source-cli": "^1.2.0",
     "jsdom": "^29.0.2",
+    "playwright": "^1.60.0",
     "rimraf": "^6.0.1",
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@sigma/edge-curve": "^3.1.0",
+    "@sigma/export-image": "^3.0.0",
+    "@sigma/node-image": "^3.0.0",
+    "@sigma/node-square": "^3.0.0",
+    "bubblesets-js": "^3.0.1",
     "dompurify": "^3.4.1",
-    "marked": "^18.0.2"
+    "graphology": "^0.26.0",
+    "graphology-layout": "^0.6.1",
+    "graphology-layout-forceatlas2": "^0.10.1",
+    "marked": "^18.0.2",
+    "sigma": "^3.0.3"
   }
 }

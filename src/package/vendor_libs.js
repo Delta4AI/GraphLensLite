@@ -47,6 +47,47 @@ for (const {from, to, pkg} of copies) {
   console.log(`[vendor-libs] ${path.relative(root, from)} -> ${path.relative(root, to)} (${pkg}@${ver} sha256:${hash.slice(0, 16)}…)`);
 }
 
+// Bundle multi-module deps (sigma + plugins, graphology + utils) into single
+// ESM files under src/lib/ so they load under raw-module dev serve, Electron
+// (file://), the esbuild app bundle and the inline-html dist — same parity
+// goal as the plain copies above, but these packages have bare-specifier
+// imports and need bundling instead of copying.
+const esbuild = require('esbuild');
+
+const bundles = [
+  {
+    entry: path.join(__dirname, 'vendor_entry_graphology.mjs'),
+    out: path.join(libDir, 'graphology.bundle.mjs'),
+    pkgs: ['graphology', 'graphology-layout', 'graphology-layout-forceatlas2', 'bubblesets-js'],
+  },
+  {
+    entry: path.join(__dirname, 'vendor_entry_sigma.mjs'),
+    out: path.join(libDir, 'sigma.bundle.mjs'),
+    pkgs: ['sigma', '@sigma/node-square', '@sigma/node-image', '@sigma/edge-curve', '@sigma/export-image'],
+  },
+];
+
+for (const {entry, out, pkgs} of bundles) {
+  try {
+    esbuild.buildSync({
+      entryPoints: [entry],
+      bundle: true,
+      format: 'esm',
+      target: 'es2020',
+      minify: true,
+      legalComments: 'eof',
+      outfile: out,
+      logLevel: 'silent',
+    });
+  } catch (err) {
+    console.error(`[vendor-libs] esbuild failed for ${path.relative(root, entry)}: ${err.message}`);
+    process.exit(1);
+  }
+  const versions = pkgs.map((p) => `${p}@${pkgVersion(p)}`).join(' ');
+  const sizeKb = (fs.statSync(out).size / 1024).toFixed(0);
+  console.log(`[vendor-libs] ${path.relative(root, entry)} -> ${path.relative(root, out)} (${sizeKb} kB; ${versions} sha256:${sha256(out).slice(0, 16)}…)`);
+}
+
 // Regenerate assistant prompt modules from their markdown sources so the
 // prompts stay human-readable in source control but load as plain JS
 // everywhere (serve, electron, bundle, tests).

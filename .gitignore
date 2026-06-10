@@ -11,6 +11,9 @@ dist/
 src/gll.bundle.js
 src/gll.bundle.js.map
 
+# Perf benchmark artifacts (regenerate via npm run perf:fixture / npm run perf)
+scripts/fixtures/
+
 # Compiled Java class files
 *.class
 

@@ -1,17 +1,3 @@
-const {
-  Graph,
-  NodeEvent,
-  EdgeEvent,
-  GraphEvent,
-  CanvasEvent,
-  CommonEvent,
-  WindowEvent,
-  Layout,
-  BaseLayout,
-  ExtensionCategory,
-  register
-} = G6;
-
 import {VERSION, DEFAULTS, CFG} from './config.js';
 
 import {GraphCoreManager} from './graph/core.js';
@@ -76,16 +62,9 @@ class Cache {
     };
 
     this.EVENT_LOCKS = {
-      BEFORE_DRAW_RUNNING: false,
       AFTER_DRAW_RUNNING: false,
-      DRAG_END_RUNNING: false,
-      BEFORE_RENDER_RUNNING: false,
-      AFTER_RENDER_RUNNING: false,
-      BEFORE_LAYOUT_RUNNING: false,
-      AFTER_LAYOUT_RUNNING: false,
       ONCE_AFTER_RENDER_RUNNING: false,
       ONCE_AFTER_RENDER_COMPLETED: false,
-      IS_DESELECTING: false,
       BUBBLE_GROUP_REDRAW_RUNNING: false,
       TRIGGER_SET_LAYOUT_ONCE: false,
       HOTKEY_EVENTS_REGISTERED: false,
@@ -198,6 +177,11 @@ class Cache {
 
     this.iterNodes();
     this.iterEdges();
+
+    // NOTE: cache.graphData (the graphology model) is built exclusively by
+    // gcm.createGraphInstance — a single owner keeps the renderer and the
+    // model from ever diverging across reload cycles.
+    this.graphData = null;
 
     this.dataTable.init();
   }

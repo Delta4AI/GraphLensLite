@@ -125,19 +125,17 @@ class GraphFilterManager {
 
   async updateElementVisibility(idsToShow, idsToHide) {
     this.cache.visibleElementsChanged = false;
+    // Current visibility comes from the graphology `hidden` attrs, surfaced
+    // as style.visibility by the renderer facade (sigma migration, Phase 1).
     const { nodes, edges } = await this.cache.graph.getData();
-    const { visible, hidden } = [...nodes, ...edges].reduce(
-      (acc, item) => {
-        acc[item.style.visibility === "visible" ? "visible" : "hidden"].push(
-          item.id,
-        );
-        return acc;
-      },
-      { visible: [], hidden: [] },
-    );
+    const visible = new Set();
+    const hidden = new Set();
+    for (const item of [...nodes, ...edges]) {
+      (item.style.visibility === "visible" ? visible : hidden).add(item.id);
+    }
 
-    const showElementsDiff = idsToShow.filter((id) => hidden.includes(id));
-    const hideElementsDiff = idsToHide.filter((id) => visible.includes(id));
+    const showElementsDiff = idsToShow.filter((id) => hidden.has(id));
+    const hideElementsDiff = idsToHide.filter((id) => visible.has(id));
 
     if (showElementsDiff.length > 0) {
       await this.cache.graph.showElement(showElementsDiff);

@@ -96,7 +96,7 @@ class GraphLayoutManager {
       this.cache.nodeRef.set(nodeID, node);
     }
     if (nodeUpdates.length > 0) {
-      this.cache.graph.updateNodeData(nodeUpdates);
+      await this.cache.graph.updateNodeData(nodeUpdates);
     }
 
     // Apply per-view edge styles - reset ALL edges, not just styled ones
@@ -131,7 +131,7 @@ class GraphLayoutManager {
       this.cache.edgeRef.set(edgeID, edge);
     }
     if (edgeUpdates.length > 0) {
-      this.cache.graph.updateEdgeData(edgeUpdates);
+      await this.cache.graph.updateEdgeData(edgeUpdates);
     }
 
     // Bubble set styles are automatically used since all references now use the current layout
@@ -556,7 +556,7 @@ class GraphLayoutManager {
     // becomes visible once the selection state changes and forces a re-read.
     const movedNodes = await cache.sm.getSelectedNodes();
     if (movedNodes.length > 0) {
-      this.cache.graph.updateNodeData(
+      await this.cache.graph.updateNodeData(
         movedNodes.map(n => ({id: n.id, style: {x: n.style.x, y: n.style.y}}))
       );
     }

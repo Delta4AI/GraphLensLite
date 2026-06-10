@@ -1,93 +1,25 @@
-const {
-  Graph,
-  NodeEvent,
-  EdgeEvent,
-  GraphEvent,
-  CanvasEvent,
-  CommonEvent,
-  WindowEvent,
-  Layout,
-  BaseLayout,
-  ExtensionCategory,
-  register,
-} = G6;
-
 import { StaticUtilities } from "../utilities/static.js";
 import { replaceColorScale } from "../utilities/color_scale_picker.js";
 import { replaceNumericScale } from "../utilities/numeric_scale_picker.js";
+import {
+  buildGraphologyGraph,
+  makeNodeReducer,
+  makeEdgeReducer,
+} from "./graph_model.js";
+import { SigmaAdapter } from "./sigma_adapter.js";
 
 class GraphCoreManager {
   constructor(cache) {
     this.cache = cache;
+    // TODO(Phase 3): transitional type-only stubs — ui.js toggles behaviors by
+    // `.type`; real sigma interaction wiring replaces this entirely.
     this.BEHAVIOURS = {
-      DRAG_ELEMENT: {
-        type: "drag-element",
-        cursor: { default: "default", grab: "default", grabbing: "default" },
-        shadow: true,
-        shadowFill: "#C33D35",
-        shadowFillOpacity: 0.5,
-        shadowStroke: "#C33D35",
-        shadowStrokeOpacity: 1.0,
-      },
-      DRAG_CANVAS: {
-        type: "drag-canvas",
-        key: "drag-canvas",
-        animation: false,
-      },
-      ZOOM_CANVAS: {
-        type: "zoom-canvas",
-        key: "zoom-canvas",
-        animation: false,
-      },
-      HOVER_ACTIVATE: {
-        type: "hover-activate",
-        enable: (event) => {
-          return event.targetType === "node" || event.targetType === "edge";
-        },
-        degree: 1,
-        state: "highlight",
-        inactiveState: "dim",
-      },
-      LASSO_SELECT: {
-        type: "lasso-select",
-        key: "lasso-select",
-        trigger: ["drag"],
-        style: {
-          fill: "#C33D35",
-          fillOpacity: 0.3,
-          stroke: "#C33D35",
-        },
-        enable: (event) => {
-          this.cache.ui.debug("LASSO CANVAS CLICK");
-
-          if (!this.cache.CFG.APPLY_BUBBLE_SET_HOTFIX) return true;
-
-          const selected = this.cache.graph
-            .getNodeData()
-            .filter((n) => n.states?.includes("selected"));
-
-          if (selected.length !== 0) {
-            this.cache.ui.debug(
-              "PREVENTING LASSO DESELECT EVENT BY REMOVING CANVAS CLICK EVENT",
-            );
-            const eventHandler = this.cache.graph.getEvents()["canvas:click"];
-            this.cache.graph.off("canvas:click");
-            setTimeout(() => {
-              this.cache.ui.debug("RESTORING CANVAS CLICK EVENT");
-              this.cache.graph.on("canvas:click", eventHandler);
-            }, 1000);
-
-            return false;
-          }
-          return true;
-        },
-      },
-      CLICK_SELECT: {
-        type: "click-select",
-        key: "click-select",
-        multiple: true,
-        trigger: ["shift"],
-      },
+      DRAG_ELEMENT: { type: "drag-element" },
+      DRAG_CANVAS: { type: "drag-canvas" },
+      ZOOM_CANVAS: { type: "zoom-canvas" },
+      HOVER_ACTIVATE: { type: "hover-activate" },
+      LASSO_SELECT: { type: "lasso-select" },
+      CLICK_SELECT: { type: "click-select" },
     };
   }
 
@@ -126,17 +58,17 @@ class GraphCoreManager {
         this.cache.layoutChanged ||
         forceRender
       ) {
-        // NOTE: only `styleChanged` re-syncs cached-ref mutations to G6 here.
-        // `layoutChanged` does NOT trigger updateData — callers that flip it
-        // while mutating node.style.x/y on cache.nodeRef refs must push their
-        // own updateNodeData payload, or the change won't reach G6 until the
-        // next selection-state change. See layoutSelectedNodes in layout.js.
+        // NOTE: only `styleChanged` re-syncs cached-ref mutations to the
+        // renderer here. `layoutChanged` does NOT trigger updateData — callers
+        // that flip it while mutating node.style.x/y on cache.nodeRef refs must
+        // push their own updateNodeData payload. See layoutSelectedNodes.
         if (this.cache.styleChanged) {
           await this.cache.ui.showLoading("Loading", "Updating graph ..");
           await new Promise((resolve) => requestAnimationFrame(resolve));
-          await this.cache.graph.updateData(
-            this.createSimplifiedDataForGraphObject(),
-          );
+          await this.cache.graph.updateData({
+            nodes: [...this.cache.nodeRef.values()],
+            edges: [...this.cache.edgeRef.values()],
+          });
           this.cache.styleChanged = false;
           this.cache.labelStyleChanged = false;
         }
@@ -147,12 +79,6 @@ class GraphCoreManager {
         await this.cache.ui.showLoading("Loading", "Redrawing graph ..");
         await new Promise((resolve) => requestAnimationFrame(resolve));
         return await this.cache.graph.draw();
-      }
-
-      // TODO: might have to move this
-      if (this.cache.EVENT_LOCKS.QUERY_SELECTION_EVENT) {
-        this.cache.qm.storeQuery();
-        this.cache.EVENT_LOCKS.QUERY_SELECTION_EVENT = false;
       }
     } catch (errorMsg) {
       this.cache.ui.error(errorMsg);
@@ -165,206 +91,23 @@ class GraphCoreManager {
 
   async createGraphInstance() {
     if (this.cache.graph === null) {
-      const behaviors = [
-        this.BEHAVIOURS.DRAG_CANVAS,
-        this.BEHAVIOURS.ZOOM_CANVAS,
-        this.BEHAVIOURS.DRAG_ELEMENT,
-      ];
+      // Rebuild the graphology model from the current refs/positions; it is
+      // the single data source the sigma renderer reads from.
+      this.cache.graphData = buildGraphologyGraph(this.cache);
 
-      if (!this.cache.CFG.DISABLE_HOVER_EFFECT) {
-        behaviors.push(this.BEHAVIOURS.HOVER_ACTIVATE);
-      }
-
-      const plugins = [
-        {
-          key: "tooltip",
-          type: "tooltip",
-          trigger: "click",
-          enterable: true,
-          getContent: (e, items) => {
-            const content = this.cache.toolTips.get(items[0].id);
-            requestAnimationFrame(() => {
-              const graphContainer = document.getElementById(
-                "innerGraphContainer",
-              );
-              if (!graphContainer) return;
-              const tooltip = graphContainer.querySelector(".tooltip");
-              if (!tooltip) return;
-              const body = tooltip.querySelector(".tooltip-content");
-              const btn = tooltip.querySelector(".tooltip-expand-btn");
-              if (!body || !btn) return;
-              tooltip.classList.remove("expanded");
-              btn.textContent = "⛶";
-              const isClipped =
-                body.scrollHeight > body.clientHeight + 1 ||
-                body.scrollWidth > body.clientWidth + 1;
-              btn.style.display = isClipped ? "" : "none";
-            });
-            return content;
-          },
+      const elementStates = new Map();
+      this.cache.graph = new SigmaAdapter(this.cache, "innerGraphContainer", {
+        nodeReducer: makeNodeReducer(this.cache, elementStates),
+        edgeReducer: makeEdgeReducer(this.cache, elementStates),
+        elementStates,
+        settings: {
+          // Initial heuristic; io.preProcessData flips HIDE_LABELS based on
+          // CFG.MAX_NODES_BEFORE_HIDING_LABELS before this runs.
+          renderLabels: !this.cache.CFG.HIDE_LABELS,
         },
-        {
-          key: "minimap",
-          type: "minimap",
-          position: "bottom-left",
-        },
-        ...[...this.cache.bs.traverseBubbleSets()].map((group) => ({
-          key: `bubbleSetPlugin-${group}`,
-          type: "bubble-sets",
-          members: [],
-          avoidMembers: [this.cache.CFG.INVISIBLE_DUMMY_NODE.id],
-          // avoidMembers: [...this.cache.nodeRef.keys()],
-          ...this.cache.data.layouts[this.cache.data.selectedLayout]
-            .bubbleSetStyle[group],
-          strokeOpacity: 0, // hide bubble groups initially (1 node persists due to bug)
-          fillOpacity: 0,
-          label: false,
-        })),
-      ];
-
-      this.cache.graph = new Graph({
-        container: "innerGraphContainer",
-        autoFit: false /* 'view' */,
-        animation: false,
-        autoResize: true,
-        padding: 10,
-        data: this.createSimplifiedDataForGraphObject(),
-        // NOTE: Do NOT add `type` or `style` here. In G6 v5, spec-level
-        // node/edge options override per-node data styles (Object.assign
-        // order in getComputedStyle: ...dataStyle, ...specDefault...).
-        // All per-node type/style is provided via createSimplifiedDataForGraphObject().
-        node: {
-          state: {
-            selected: {
-              halo: true,
-              haloStroke: "#C33D35",
-              haloLineWidth: 12,
-            },
-            highlight: { fill: "#C33D35", halo: true, lineWidth: 0 },
-            dim: { fill: "#E4E3EA" },
-          },
-        },
-        edge: {
-          state: {
-            highlight: { stroke: "#C33D35" },
-            selected: { halo: true, haloStroke: "#C33D35", haloLineWidth: 6 },
-          },
-        },
-        behaviors: behaviors,
-        plugins: plugins,
       });
 
-      this.cache.graph.on("node:dragend", async (event) => {
-        /**
-         * Persist all positions on every drag event
-         * and reset zIndex elevated by G6's frontElement during drag
-         */
-        if (this.cache.EVENT_LOCKS.DRAG_END_RUNNING) return;
-
-        this.cache.ui.debug("DRAG END");
-        this.cache.EVENT_LOCKS.DRAG_END_RUNNING = true;
-        await this.cache.lm.persistNodePositions();
-
-        const draggedId = event?.target?.id;
-        if (draggedId) {
-          await this.cache.graph.setElementZIndex(draggedId, 0);
-        }
-
-        this.cache.EVENT_LOCKS.DRAG_END_RUNNING = false;
-      });
-
-      this.cache.graph.on("beforelayout", async () => {
-        this.cache.ui.debug("BEFORE LAYOUT");
-      });
-
-      this.cache.graph.on("afterlayout", async () => {
-        /**
-         * Applies persisted positions (excel data or after moving nodes) after layouting has finished
-         * Also persists positions if this was the initial layout computation
-         */
-        if (this.cache.EVENT_LOCKS.AFTER_LAYOUT_RUNNING) return;
-
-        this.cache.ui.debug("AFTER LAYOUT");
-        this.cache.EVENT_LOCKS.AFTER_LAYOUT_RUNNING = true;
-
-        const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
-
-        if (layout.positions.size > 0) {
-          // Apply stored positions
-          this.cache.graph.updateNodeData(
-            Array.from(layout.positions, ([id, pos]) => ({
-              id,
-              style: pos.style,
-            })),
-          );
-          await this.cache.graph.draw();
-        } else if (layout.layoutType) {
-          // Initial layout - persist the computed positions and clean up layoutType
-          await this.cache.lm.persistNodePositions();
-          delete layout.layoutType;
-          this.cache.ui.debug("Initial layout positions persisted");
-        }
-
-        this.cache.EVENT_LOCKS.AFTER_LAYOUT_RUNNING = false;
-      });
-
-      this.cache.graph.on("canvas:click", async (event) => {
-        this.cache.ui.debug("CANVAS CLICK");
-      });
-
-      // this.cache.graph.off("canvas:click");
-
-      this.cache.graph.on("node:click", async (event) => {
-        this.cache.ui.debug("NODE CLICK");
-      });
-
-      this.cache.graph.on("edge:click", async (event) => {
-        this.cache.ui.debug("EDGE CLICK");
-      });
-
-      this.cache.graph.on(GraphEvent.BEFORE_DRAW, async (event) => {
-        if (this.cache.EVENT_LOCKS.BEFORE_DRAW_RUNNING) return;
-
-        this.cache.EVENT_LOCKS.BEFORE_DRAW_RUNNING = true;
-        this.cache.ui.debug("BEFORE DRAW");
-        if (this.cache.EVENT_LOCKS.IS_DESELECTING) {
-          this.cache.ui.debug("BEFORE DRAW DESELECTION EVENT");
-          this.cache.EVENT_LOCKS.IS_DESELECTING = false;
-        }
-        this.cache.EVENT_LOCKS.BEFORE_DRAW_RUNNING = false;
-      });
-
-      this.cache.graph.on(GraphEvent.AFTER_DRAW, async (event) => {
-        if (this.cache.EVENT_LOCKS.AFTER_DRAW_RUNNING) return;
-
-        this.cache.EVENT_LOCKS.AFTER_DRAW_RUNNING = true;
-        this.cache.ui.debug("AFTER DRAW");
-        await this.cache.sm.updateSelectedNodesAndEdges();
-        await this.cache.bs.redrawBubbleSets();
-
-        this.cache.EVENT_LOCKS.AFTER_DRAW_RUNNING = false;
-        await this.cache.ui.hideLoading();
-      });
-
-      this.cache.graph.on(GraphEvent.AFTER_RENDER, async () => {
-        this.cache.ui.debug("AFTER RENDER");
-
-        if (this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED) {
-          if (this.cache.EVENT_LOCKS.AFTER_RENDER_RUNNING) return;
-
-          this.cache.EVENT_LOCKS.AFTER_RENDER_RUNNING = true;
-
-          await this.cache.sm.updateSelectedNodesAndEdges();
-          await this.cache.bs.redrawBubbleSets();
-
-          this.cache.EVENT_LOCKS.AFTER_RENDER_RUNNING = false;
-          await this.cache.ui.hideLoading();
-        } else {
-          await this.initialAfterRenderEvent();
-        }
-      });
-
-      let layout = this.cache.data.layouts[this.cache.data.selectedLayout];
+      const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
       // If layout has no positions yet but has a layoutType, apply that layout algorithm once
       if (layout.positions.size === 0 && layout.layoutType) {
         const internals =
@@ -377,6 +120,11 @@ class GraphCoreManager {
     }
   }
 
+  /**
+   * One-time post-first-render routine (hotkeys, global listeners, plugin
+   * stubs, initial filter pass, initial layout persistence). Called
+   * sequentially by SigmaAdapter.render() — formerly G6's AFTER_RENDER event.
+   */
   async initialAfterRenderEvent() {
     if (this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_RUNNING) return;
 
@@ -614,8 +362,8 @@ class GraphCoreManager {
   }
 
   // Centre and scale the viewport so the given set of nodes fills it with
-  // padding. Handles the G6 zoom/translate quirk where translateTo at
-  // non-1 zoom misbehaves (antvis/G6#6373).
+  // padding. Direct camera fit — the old G6 zoom-at-non-1 translate
+  // workaround (antvis/G6#6373) is gone with the sigma renderer.
   async fitViewToNodes(nodeIDs) {
     const ids = [...nodeIDs];
     if (ids.length === 0) {
@@ -643,37 +391,7 @@ class GraphCoreManager {
       return;
     }
 
-    // all measurements at zoom 1 to avoid G6 translateTo bug at non-1 zoom
-    // see: https://github.com/antvis/G6/issues/6373#issuecomment-3615152579
-    await this.cache.graph.zoomTo(1);
-
-    const canvasMin = this.cache.graph.getViewportByCanvas([minX, minY]);
-    const canvasMax = this.cache.graph.getViewportByCanvas([maxX, maxY]);
-    const bboxWidth = Math.abs(canvasMax[0] - canvasMin[0]) || 1;
-    const bboxHeight = Math.abs(canvasMax[1] - canvasMin[1]) || 1;
-
-    const [viewportWidth, viewportHeight] = this.cache.graph.getSize();
-    const padding = 80;
-    // Clamp zoom so a tiny selection (e.g. a single node) doesn't punch
-    // the viewport to 100× and turn a clean UX into a jarring jump.
-    const zoomRaw = Math.min(
-      (viewportWidth - padding * 2) / bboxWidth,
-      (viewportHeight - padding * 2) / bboxHeight,
-    );
-    const zoom = Math.min(zoomRaw, 4);
-
-    // translateTo at zoom 1, then restore target zoom (G6 bug workaround)
-    const viewportCenter = [viewportWidth / 2, viewportHeight / 2];
-    const bboxCenter = this.cache.graph.getViewportByCanvas([
-      (minX + maxX) / 2,
-      (minY + maxY) / 2,
-    ]);
-    const offset = [
-      viewportCenter[0] - bboxCenter[0],
-      viewportCenter[1] - bboxCenter[1],
-    ];
-    await this.cache.graph.translateBy(offset);
-    await this.cache.graph.zoomTo(zoom);
+    this.cache.graph.fitViewToBounds({ minX, minY, maxX, maxY });
   }
 
   async updateEdges(overrides = {}, commands = []) {
@@ -857,169 +575,6 @@ class GraphCoreManager {
     );
   }
 
-  createSimplifiedDataForGraphObject() {
-    const filterObject = (obj, excludedKeys) => {
-      return Object.keys(obj)
-        .filter((key) => !excludedKeys.includes(key)) // Exclude specified keys
-        .reduce((newObj, key) => {
-          newObj[key] = obj[key];
-          return newObj;
-        }, {});
-    };
-
-    // Get current graph nodes to preserve states
-    let graphNodesMap = new Map();
-    if (this.cache.graph) {
-      try {
-        const graphNodes = this.cache.graph.getNodeData();
-        for (const gNode of graphNodes) {
-          graphNodesMap.set(gNode.id, gNode);
-        }
-      } catch (e) {
-        // Graph might not be ready yet
-      }
-    }
-
-    // Process nodes and exclude their unwanted properties
-    const filteredNodes = this.cache.data.nodes.map((node) => {
-      const filteredNode = filterObject(node, [
-        "D4Data",
-        "features",
-        "featureValues",
-        "featureWithinThreshold",
-        "originalStyle",
-        "originalType",
-      ]);
-
-      // Preserve states (like selection) from the current graph instance
-      const currentGraphNode = graphNodesMap.get(node.id);
-      if (currentGraphNode && currentGraphNode.states) {
-        filteredNode.states = currentGraphNode.states;
-      }
-
-      // Preserve visibility from current graph state or loaded data
-      const savedVisibility =
-        currentGraphNode?.style?.visibility || node.style?.visibility;
-
-      // load positions from the layouts position Map
-      const position = this.cache.data.layouts[
-        this.cache.data.selectedLayout
-      ].positions.get(node.id);
-
-      // Check if current layout has custom style for this node
-      const currentLayout =
-        this.cache.data.layouts[this.cache.data.selectedLayout];
-      const layoutData = currentLayout.nodeStyles.get(node.id);
-
-      if (layoutData) {
-        // Use layout-specific style and type
-        Object.assign(
-          filteredNode,
-          this.cache.style.getNodeStyleOrDefaults(node),
-        );
-        // Override with layout-specific type and style
-        if (layoutData.type !== undefined) {
-          filteredNode.type = layoutData.type;
-        }
-        if (layoutData.style) {
-          filteredNode.style = structuredClone(layoutData.style);
-        }
-      } else {
-        // Use default style
-        Object.assign(
-          filteredNode,
-          this.cache.style.getNodeStyleOrDefaults(node),
-        );
-      }
-
-      // Restore visibility if it was set in the loaded data
-      if (savedVisibility) {
-        filteredNode.style.visibility = savedVisibility;
-      }
-
-      if (position && position.style) {
-        filteredNode.style.x = position.style.x;
-        filteredNode.style.y = position.style.y;
-      }
-
-      return filteredNode;
-    });
-
-    // Get current graph edges to preserve states
-    let graphEdgesMap = new Map();
-    if (this.cache.graph) {
-      try {
-        const graphEdges = this.cache.graph.getEdgeData();
-        for (const gEdge of graphEdges) {
-          graphEdgesMap.set(gEdge.id, gEdge);
-        }
-      } catch (e) {
-        // Graph might not be ready yet
-      }
-    }
-
-    // Process edges if provided, and exclude unwanted properties
-    const filteredEdges = this.cache.data.edges.map((edge) => {
-      const filteredEdge = filterObject(edge, [
-        "D4Data",
-        "features",
-        "featureValues",
-        "featureWithinThreshold",
-        "originalStyle",
-        "originalType",
-      ]);
-
-      // Preserve states (like selection) from the current graph instance
-      const currentGraphEdge = graphEdgesMap.get(edge.id);
-      if (currentGraphEdge && currentGraphEdge.states) {
-        filteredEdge.states = currentGraphEdge.states;
-      }
-
-      // Preserve visibility from current graph state or loaded data
-      const savedVisibility =
-        currentGraphEdge?.style?.visibility || edge.style?.visibility;
-
-      // Check if current layout has custom style for this edge
-      const currentLayout =
-        this.cache.data.layouts[this.cache.data.selectedLayout];
-      const layoutData = currentLayout.edgeStyles.get(edge.id);
-
-      if (layoutData) {
-        // Use layout-specific style and type
-        Object.assign(
-          filteredEdge,
-          this.cache.style.getEdgeStyleOrDefaults(edge),
-        );
-        // Override with layout-specific type and style
-        if (layoutData.type !== undefined) {
-          filteredEdge.type = layoutData.type;
-        }
-        if (layoutData.style) {
-          filteredEdge.style = structuredClone(layoutData.style);
-        }
-      } else {
-        // Use default style
-        Object.assign(
-          filteredEdge,
-          this.cache.style.getEdgeStyleOrDefaults(edge),
-        );
-      }
-
-      // Restore visibility if it was set in the loaded data
-      if (savedVisibility) {
-        filteredEdge.style.visibility = savedVisibility;
-      }
-
-      return filteredEdge;
-    });
-
-    return {
-      nodes: [...filteredNodes, this.cache.CFG.INVISIBLE_DUMMY_NODE],
-      edges: filteredEdges,
-      combos: this.cache.data.combos || [],
-    };
-  }
-
   async preRenderEvent() {
     if (this.cache.styleChanged) return;
 
@@ -1111,16 +666,9 @@ class GraphCoreManager {
   }
 
   resetEventLocks() {
-    this.cache.EVENT_LOCKS.BEFORE_DRAW_RUNNING = false;
     this.cache.EVENT_LOCKS.AFTER_DRAW_RUNNING = false;
-    this.cache.EVENT_LOCKS.DRAG_END_RUNNING = false;
-    this.cache.EVENT_LOCKS.BEFORE_RENDER_RUNNING = false;
-    this.cache.EVENT_LOCKS.AFTER_RENDER_RUNNING = false;
-    this.cache.EVENT_LOCKS.BEFORE_LAYOUT_RUNNING = false;
-    this.cache.EVENT_LOCKS.AFTER_LAYOUT_RUNNING = false;
     this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_RUNNING = false;
     this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED = false;
-    this.cache.EVENT_LOCKS.IS_DESELECTING = false;
     this.cache.EVENT_LOCKS.BUBBLE_GROUP_REDRAW_RUNNING = false;
     this.cache.EVENT_LOCKS.TRIGGER_SET_LAYOUT_ONCE = false;
   }
@@ -1128,6 +676,10 @@ class GraphCoreManager {
   async destroyGraphAndRollBackUI() {
     await this.cache.graph?.destroy();
     this.cache.graph = null;
+    // Drop renderer-cycle state with the instance: the graphology model is
+    // rebuilt by createGraphInstance, plugin stubs are re-registered there.
+    this.cache.graphData = null;
+    this.cache.INSTANCES.BUBBLE_GROUPS = {};
 
     // isPositionsDirty = false;
     // syncPositionsDebounced.cancel?.();

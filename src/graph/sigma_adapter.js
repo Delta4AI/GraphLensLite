@@ -1,0 +1,500 @@
+/**
+ * Browser-only Sigma.js adapter (MIGRATION.md Phase 1).
+ *
+ * The ONLY module in src/ that imports the sigma bundle (it references WebGL
+ * globals at module scope and crashes under node). Wraps the Sigma instance,
+ * the graphology graph, the element-states Map and a pending-layout slot
+ * behind the G6-shaped facade the rest of the app still calls. Facade methods
+ * are transitional and get slimmed/deleted in Phases 2-6.
+ */
+import { Sigma, exportImage } from "../lib/sigma.bundle.mjs";
+import { circular, forceAtlas2 } from "../lib/graphology.bundle.mjs";
+import { nodeAttributesFromStyle, edgeAttributesFromStyle } from "./graph_model.js";
+
+const FIT_PADDING_PX = 80;
+// Clamp fit zoom so a tiny selection (e.g. a single node) doesn't punch the
+// viewport to 100x — same UX guard as the old G6 fitViewToNodes.
+const MAX_FIT_ZOOM = 4;
+const FORCE_ITERATIONS = 200;
+const GRID_SPACING = 100;
+
+class SigmaAdapter {
+  /**
+   * @param {object} cache  app cache; cache.graphData must hold the graphology graph
+   * @param {string|HTMLElement} container
+   * @param {object} opts  {nodeReducer, edgeReducer, elementStates, settings}
+   */
+  constructor(cache, container, { nodeReducer, edgeReducer, elementStates, settings = {} }) {
+    this.cache = cache;
+    this.graph = cache.graphData;
+    this.elementStates = elementStates;
+    this.pendingLayout = null;
+    // Single handler per event name (G6's emitter allowed several). Nothing
+    // dispatches these yet; Phase 3 replaces this with real sigma events.
+    this.eventHandlers = new Map();
+    this.killed = false;
+
+    const containerEl =
+      typeof container === "string" ? document.getElementById(container) : container;
+
+    this.sigma = new Sigma(this.graph, containerEl, {
+      allowInvalidContainer: true,
+      enableEdgeEvents: false,
+      zIndex: true,
+      nodeReducer,
+      edgeReducer,
+      ...settings,
+    });
+  }
+
+  // ---------------------------------------------------------------- lifecycle
+
+  /**
+   * G6 render = layout + draw. Runs the pending layout (if any), then the
+   * persisted-position choreography that used to live in core.js's G6
+   * `afterlayout` handler, then a full (re-indexing) refresh.
+   */
+  async render() {
+    if (this.killed) return false;
+    if (this.pendingLayout) await this.layout();
+    await this.#applyPersistedPositions();
+
+    this.sigma.refresh();
+
+    if (this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED) {
+      await this.#postRefresh();
+    } else {
+      // First render: run the one-time post-render routine (which re-renders
+      // once with ONCE_AFTER_RENDER_COMPLETED set, taking the branch above).
+      await this.cache.gcm.initialAfterRenderEvent();
+    }
+    return true;
+  }
+
+  /** G6 draw = pure visual update; graph structure is unchanged. */
+  async draw() {
+    if (this.killed) return false;
+    this.sigma.refresh({ skipIndexation: true });
+    await this.#postRefresh();
+    return true;
+  }
+
+  /**
+   * Kills the sigma instance. The `killed` guard keeps in-flight async
+   * choreography (e.g. a draw awaited across a reload) from refreshing a
+   * dead renderer — sigma throws on refresh-after-kill.
+   */
+  destroy() {
+    if (this.killed) return;
+    this.killed = true;
+    this.sigma.kill();
+  }
+
+  resize() {
+    this.sigma.resize();
+  }
+
+  /**
+   * Post-refresh choreography formerly driven by G6's AFTER_DRAW/AFTER_RENDER
+   * events: sync selection caches/UI, redraw bubble sets, drop the overlay.
+   */
+  async #postRefresh() {
+    if (this.cache.EVENT_LOCKS.AFTER_DRAW_RUNNING) return;
+    this.cache.EVENT_LOCKS.AFTER_DRAW_RUNNING = true;
+    try {
+      await this.cache.sm.updateSelectedNodesAndEdges();
+      await this.cache.bs.redrawBubbleSets();
+    } finally {
+      this.cache.EVENT_LOCKS.AFTER_DRAW_RUNNING = false;
+      // Inside finally: a throw above must never strand the loading overlay.
+      await this.cache.ui.hideLoading();
+    }
+  }
+
+  /**
+   * Persisted positions override layout output; a fresh initial layout gets
+   * persisted once and its `layoutType` marker removed (see commit b6f8606:
+   * authored payloads with empty positions are force-laid-out).
+   */
+  async #applyPersistedPositions() {
+    const layout = this.cache.data.layouts?.[this.cache.data.selectedLayout];
+    if (!layout) return;
+
+    if (layout.positions.size > 0) {
+      for (const [id, pos] of layout.positions) {
+        const x = pos?.style?.x;
+        const y = pos?.style?.y;
+        if (!this.graph.hasNode(id) || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+        this.graph.mergeNodeAttributes(id, { x, y });
+        const ref = this.cache.nodeRef.get(id);
+        if (ref) {
+          ref.style.x = x;
+          ref.style.y = y;
+        }
+      }
+    } else if (layout.layoutType) {
+      await this.cache.lm.persistNodePositions();
+      delete layout.layoutType;
+      this.cache.ui.debug("Initial layout positions persisted");
+    }
+  }
+
+  // --------------------------------------------------------------------- data
+
+  /** G6-shaped bulk update ({nodes, edges} arrays of {id, type?, style?}). */
+  async updateData({ nodes = [], edges = [] } = {}) {
+    await this.updateNodeData(nodes);
+    await this.updateEdgeData(edges);
+  }
+
+  /** @param {Array<{id: string, type?: string, style?: object}>} payload */
+  async updateNodeData(payload) {
+    for (const item of payload ?? []) {
+      // hasNode also guards the legacy INVISIBLE_DUMMY_NODE (never added here).
+      if (!item || !this.graph.hasNode(item.id)) continue;
+      const ref = this.cache.nodeRef.get(item.id);
+      if (ref) {
+        if (item.type !== undefined) ref.type = item.type;
+        if (item.style) Object.assign(ref.style, item.style);
+      }
+      const attrs = nodeAttributesFromStyle(item.style ?? {});
+      if (Object.keys(attrs).length > 0) {
+        this.graph.mergeNodeAttributes(item.id, attrs);
+      }
+    }
+  }
+
+  /** @param {Array<{id: string, type?: string, style?: object}>} payload */
+  async updateEdgeData(payload) {
+    for (const item of payload ?? []) {
+      if (!item || !this.graph.hasEdge(item.id)) continue;
+      const ref = this.cache.edgeRef.get(item.id);
+      if (ref) {
+        if (item.type !== undefined) ref.type = item.type;
+        if (item.style) Object.assign(ref.style, item.style);
+      }
+      const attrs = edgeAttributesFromStyle(item.style ?? {});
+      if (Object.keys(attrs).length > 0) {
+        this.graph.mergeEdgeAttributes(item.id, attrs);
+      }
+    }
+  }
+
+  /**
+   * G6-shaped live node objects backed by cache.nodeRef. Callers (selection.js,
+   * layout.js) mutate .style.x/.style.y on the returned objects and push them
+   * back via updateNodeData; x/y/visibility are synced from graphology here.
+   *
+   * @param {string[]} [ids]
+   */
+  getNodeData(ids) {
+    const refs = ids
+      ? [...ids].map((id) => this.cache.nodeRef.get(id)).filter(Boolean)
+      : [...this.cache.nodeRef.values()];
+    const views = [];
+    for (const ref of refs) {
+      if (!this.graph.hasNode(ref.id)) continue;
+      const attrs = this.graph.getNodeAttributes(ref.id);
+      ref.style.x = attrs.x;
+      ref.style.y = attrs.y;
+      ref.style.visibility = attrs.hidden ? "hidden" : "visible";
+      ref.states = [...(this.elementStates.get(ref.id) ?? [])];
+      views.push(ref);
+    }
+    return views;
+  }
+
+  /** @param {string[]} [ids] */
+  getEdgeData(ids) {
+    const refs = ids
+      ? [...ids].map((id) => this.cache.edgeRef.get(id)).filter(Boolean)
+      : [...this.cache.edgeRef.values()];
+    const views = [];
+    for (const ref of refs) {
+      if (!this.graph.hasEdge(ref.id)) continue;
+      const attrs = this.graph.getEdgeAttributes(ref.id);
+      ref.style.visibility = attrs.hidden ? "hidden" : "visible";
+      ref.states = [...(this.elementStates.get(ref.id) ?? [])];
+      views.push(ref);
+    }
+    return views;
+  }
+
+  /**
+   * Synchronous (returns a plain object); callers `await` it for G6 parity,
+   * which is a no-op. Keep it sync — getNodeData/getEdgeData results are
+   * chained with array methods directly under `await` across the app.
+   */
+  getData() {
+    return { nodes: this.getNodeData(), edges: this.getEdgeData() };
+  }
+
+  // ------------------------------------------------------------------- states
+
+  /** @returns {string[]} copy of the element's states (callers mutate freely) */
+  getElementState(id) {
+    return [...(this.elementStates.get(id) ?? [])];
+  }
+
+  /**
+   * G6 semantics: either (id, states[]) or a map of id → states[].
+   * Triggers the draw choreography (selection UI sync happens there).
+   */
+  async setElementState(mapOrId, states) {
+    if (typeof mapOrId === "string") {
+      this.#setStates(mapOrId, states ?? []);
+    } else {
+      for (const [id, elementStates] of Object.entries(mapOrId ?? {})) {
+        this.#setStates(id, elementStates ?? []);
+      }
+    }
+    await this.draw();
+  }
+
+  #setStates(id, states) {
+    if (states.length === 0) {
+      this.elementStates.delete(id);
+    } else {
+      this.elementStates.set(id, [...states]);
+    }
+  }
+
+  // --------------------------------------------------------------- visibility
+
+  // Both are `async` only for the G6 call-site contract; the body is fully
+  // synchronous (graphology writes + one skipIndexation refresh).
+  async showElement(ids) {
+    this.#setHidden(ids, false);
+  }
+
+  async hideElement(ids) {
+    this.#setHidden(ids, true);
+  }
+
+  #setHidden(ids, hidden) {
+    if (this.killed) return;
+    const visibility = hidden ? "hidden" : "visible";
+    for (const id of Array.isArray(ids) ? ids : [ids]) {
+      if (this.graph.hasNode(id)) {
+        this.graph.setNodeAttribute(id, "hidden", hidden);
+        const ref = this.cache.nodeRef.get(id);
+        if (ref) ref.style.visibility = visibility;
+      } else if (this.graph.hasEdge(id)) {
+        this.graph.setEdgeAttribute(id, "hidden", hidden);
+        const ref = this.cache.edgeRef.get(id);
+        if (ref) ref.style.visibility = visibility;
+      }
+    }
+    this.sigma.refresh({ skipIndexation: true });
+  }
+
+  // ----------------------------------------------------------------- viewport
+
+  async fitView() {
+    // Sigma normalizes the graph bbox, so the default camera frames everything.
+    this.sigma.getCamera().setState({ x: 0.5, y: 0.5, ratio: 1, angle: 0 });
+  }
+
+  /**
+   * Frame the given graph-space bounding box with padding. Replaces the old
+   * G6 zoom-at-non-1 workaround (antvis/G6#6373) with a direct camera fit.
+   */
+  fitViewToBounds({ minX, minY, maxX, maxY }) {
+    const camera = this.sigma.getCamera();
+    const { width, height } = this.sigma.getDimensions();
+    const p1 = this.sigma.graphToViewport({ x: minX, y: minY });
+    const p2 = this.sigma.graphToViewport({ x: maxX, y: maxY });
+    const spanX = Math.abs(p2.x - p1.x) || 1;
+    const spanY = Math.abs(p2.y - p1.y) || 1;
+    const scale = Math.max(
+      spanX / Math.max(width - 2 * FIT_PADDING_PX, 1),
+      spanY / Math.max(height - 2 * FIT_PADDING_PX, 1),
+    );
+    const ratio = Math.max(camera.getState().ratio * scale, 1 / MAX_FIT_ZOOM);
+    const center = this.sigma.viewportToFramedGraph(
+      this.sigma.graphToViewport({ x: (minX + maxX) / 2, y: (minY + maxY) / 2 }),
+    );
+    camera.setState({ x: center.x, y: center.y, ratio });
+  }
+
+  /** G6 zoom z ↔ sigma camera ratio 1/z. */
+  async zoomTo(zoom) {
+    if (!Number.isFinite(zoom) || zoom <= 0) return;
+    this.sigma.getCamera().setState({ ratio: 1 / zoom });
+  }
+
+  getZoom() {
+    return 1 / this.sigma.getCamera().getState().ratio;
+  }
+
+  /** @param {[number, number]} offset  viewport pixels */
+  async translateBy([dx, dy]) {
+    const { width, height } = this.sigma.getDimensions();
+    const target = this.sigma.viewportToFramedGraph({
+      x: width / 2 - dx,
+      y: height / 2 - dy,
+    });
+    this.sigma.getCamera().setState({ x: target.x, y: target.y });
+  }
+
+  /** Center the camera on the centroid of the given node/edge ids (zoom kept). */
+  async focusElement(ids) {
+    const points = [];
+    for (const id of Array.isArray(ids) ? ids : [ids]) {
+      if (this.graph.hasNode(id)) {
+        const attrs = this.graph.getNodeAttributes(id);
+        points.push({ x: attrs.x, y: attrs.y });
+      } else if (this.graph.hasEdge(id)) {
+        const edge = this.cache.edgeRef.get(id);
+        for (const nodeId of [edge?.source, edge?.target]) {
+          if (nodeId && this.graph.hasNode(nodeId)) {
+            const attrs = this.graph.getNodeAttributes(nodeId);
+            points.push({ x: attrs.x, y: attrs.y });
+          }
+        }
+      }
+    }
+    if (points.length === 0) return;
+    const centroid = {
+      x: points.reduce((sum, p) => sum + p.x, 0) / points.length,
+      y: points.reduce((sum, p) => sum + p.y, 0) / points.length,
+    };
+    const framed = this.sigma.viewportToFramedGraph(this.sigma.graphToViewport(centroid));
+    this.sigma.getCamera().setState({ x: framed.x, y: framed.y });
+  }
+
+  /** @returns {[number, number]|null} graph-space position */
+  getElementPosition(id) {
+    if (!this.graph.hasNode(id)) return null;
+    const attrs = this.graph.getNodeAttributes(id);
+    return [attrs.x, attrs.y];
+  }
+
+  /** Debug-only in callers; returns the camera center (framed coordinates). */
+  getPosition() {
+    const state = this.sigma.getCamera().getState();
+    return [state.x, state.y];
+  }
+
+  /** @returns {[number, number]} viewport size in px */
+  getSize() {
+    const { width, height } = this.sigma.getDimensions();
+    return [width, height];
+  }
+
+  /** Graph-space → viewport pixels (G6 name kept transitionally). */
+  getViewportByCanvas([x, y]) {
+    const point = this.sigma.graphToViewport({ x, y });
+    return [point.x, point.y];
+  }
+
+  // ------------------------------------------------------------------- layout
+
+  /** Stores the layout spec; executed by layout() or the next render(). */
+  async setLayout(spec) {
+    this.pendingLayout = spec;
+  }
+
+  /** Execute the pending (or default) layout and write x/y into graphology. */
+  async layout() {
+    const spec = this.pendingLayout ?? { type: this.cache.DEFAULTS.LAYOUT };
+    this.pendingLayout = null;
+    this.#executeLayout(spec);
+  }
+
+  #executeLayout(spec) {
+    const type = spec?.type;
+    if (type === "circular") {
+      circular.assign(this.graph, {
+        scale: Math.max(100, 12 * Math.sqrt(this.graph.order)),
+      });
+      return;
+    }
+    if (type === "grid") {
+      const cols = Math.ceil(Math.sqrt(this.graph.order)) || 1;
+      let i = 0;
+      this.graph.forEachNode((id) => {
+        this.graph.mergeNodeAttributes(id, {
+          x: (i % cols) * GRID_SPACING,
+          y: Math.floor(i / cols) * GRID_SPACING,
+        });
+        i++;
+      });
+      return;
+    }
+    // 'force' and everything else → forceAtlas2.
+    // TODO(Phase 5): radial/concentric/mds parity via @antv/layout or
+    // equivalents; consider the FA2 web-worker build for large graphs.
+    if (this.graph.order < 2) return; // FA2/inferSettings throw on 0-1 nodes
+    forceAtlas2.assign(this.graph, {
+      iterations: FORCE_ITERATIONS,
+      settings: forceAtlas2.inferSettings(this.graph),
+    });
+  }
+
+  // -------------------------------------------------- events/behaviors (stubs)
+
+  // TODO(Phase 3): real interaction wiring (drag, click/shift-select, hover,
+  // lasso, tooltip). Sigma's built-in camera already provides wheel-zoom and
+  // drag-pan; handlers registered here are stored but not dispatched yet.
+
+  on(event, handler) {
+    this.eventHandlers.set(event, handler);
+  }
+
+  off(event) {
+    this.eventHandlers.delete(event);
+  }
+
+  getEvents() {
+    return Object.fromEntries(this.eventHandlers);
+  }
+
+  async setBehaviors() {} // TODO(Phase 3)
+
+  getBehaviors() {
+    return []; // TODO(Phase 3)
+  }
+
+  async setElementZIndex() {} // TODO(Phase 3): dragend z-fix is gone with G6
+
+  // ----------------------------------------------------------- plugins (stubs)
+
+  /**
+   * TODO(Phase 4): bubble sets render on a custom sigma canvas layer via
+   * bubblesets-js. Until then GraphBubbleSetManager talks to this inert stub
+   * (it tracks `members` so the manager's in-sync short-circuit keeps working).
+   * Returns a fresh stub per call; core.registerPluginStates caches one per
+   * group in INSTANCES.BUBBLE_GROUPS, which destroyGraphAndRollBackUI resets.
+   *
+   * @param {string} _group  bubble group key (used from Phase 4 on)
+   */
+  getPluginInstance(_group) {
+    return {
+      members: new Map(),
+      async update(opts = {}) {
+        if (Array.isArray(opts.members)) {
+          this.members = new Map(opts.members.map((id) => [id, true]));
+        }
+      },
+      async drawBubbleSets() {},
+    };
+  }
+
+  async updatePlugin() {} // TODO(Phase 3): tooltip enable/disable
+
+  // ------------------------------------------------------------------- export
+
+  /** @returns {Promise<string>} PNG data URL of the current viewport */
+  async toDataURL() {
+    const blob = await exportImage.toBlob(this.sigma, { format: "png" });
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+}
+
+export { SigmaAdapter };
