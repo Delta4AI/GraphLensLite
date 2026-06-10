@@ -302,12 +302,17 @@ body, html {
     position: relative;
 }
 
-#innerGraphContainer .g6-minimap {
-    position: absolute !important;
-    bottom: 10px !important;
-    right: 10px !important;
-    top: auto !important;
-    left: auto !important;
+/* Owned minimap (src/graph/minimap.js) — kept at the position the old G6
+   minimap was CSS-forced to (bottom-right, despite its "bottom-left" config) */
+#innerGraphContainer .gll-minimap {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    z-index: 500;
+    border: 1px solid #403C53;
+    border-radius: 5px;
+    background-color: rgba(244, 244, 244, 0.85);
+    cursor: pointer;
 }
 
 #selectedElementsContainer {

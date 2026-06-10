@@ -23,6 +23,8 @@ import { circular, forceAtlas2 } from "../lib/graphology.bundle.mjs";
 import { nodeAttributesFromStyle, edgeAttributesFromStyle, flipY } from "./graph_model.js";
 import { drawNodeLabel, drawEdgeLabel } from "./label_renderers.js";
 import { InteractionManager } from "./interactions.js";
+import { BubbleSetLayer } from "./bubble_layer.js";
+import { Minimap } from "./minimap.js";
 
 // Rasterization resolution for the SVG shape textures. 512 px keeps shapes
 // crisp at the ~4x zoom the UI allows (risk #1 in MIGRATION.md).
@@ -131,6 +133,8 @@ class SigmaAdapter {
       ...settings,
     });
     this.interactions = new InteractionManager(this, cache, hoverIds, containerEl);
+    this.bubbleLayer = new BubbleSetLayer(this, cache);
+    this.minimap = new Minimap(this, containerEl);
     this.#syncLabelVisibility();
   }
 
@@ -198,6 +202,8 @@ class SigmaAdapter {
   destroy() {
     if (this.killed) return;
     this.killed = true;
+    this.bubbleLayer.destroy();
+    this.minimap.destroy();
     this.interactions.destroy();
     this.sigma.kill();
   }
@@ -564,40 +570,54 @@ class SigmaAdapter {
     return this.interactions.isEnabled(name);
   }
 
-  // ----------------------------------------------------------- plugins (stubs)
+  // ---------------------------------------------------------------- plugins
 
   /**
-   * TODO(Phase 4): bubble sets render on a custom sigma canvas layer via
-   * bubblesets-js. Until then GraphBubbleSetManager talks to this inert stub
-   * (it tracks `members` so the manager's in-sync short-circuit keeps working).
-   * Returns a fresh stub per call; core.registerPluginStates caches one per
-   * group in INSTANCES.BUBBLE_GROUPS, which destroyGraphAndRollBackUI resets.
+   * Per-group bubble-set handle backed by the shared BubbleSetLayer (the
+   * old G6 plugin-instance surface: `members` Map + update/drawBubbleSets).
+   * core.registerPluginStates caches one per group in INSTANCES.BUBBLE_GROUPS,
+   * which destroyGraphAndRollBackUI resets together with this adapter.
    *
-   * @param {string} _group  bubble group key (used from Phase 4 on)
+   * @param {string} key  legacy plugin key ("bubbleSetPlugin-<group>") or
+   *   plain group key
    */
-  getPluginInstance(_group) {
-    return {
-      members: new Map(),
-      async update(opts = {}) {
-        if (Array.isArray(opts.members)) {
-          this.members = new Map(opts.members.map((id) => [id, true]));
-        }
-      },
-      async drawBubbleSets() {},
-    };
+  getPluginInstance(key) {
+    const group = key.startsWith("bubbleSetPlugin-") ? key.slice("bubbleSetPlugin-".length) : key;
+    return this.bubbleLayer.getGroupHandle(group);
   }
 
   // ------------------------------------------------------------------- export
 
-  /** @returns {Promise<string>} PNG data URL of the current viewport */
+  /**
+   * PNG data URL of the current viewport. @sigma/export-image re-renders the
+   * scene on a temp renderer, which only carries sigma's own layers — the
+   * bubble-set canvas is composited UNDER it here (matching its on-screen
+   * z-order; export-image's default transparent background lets it show
+   * through). The minimap is a viewport control and stays out of exports.
+   */
   async toDataURL() {
     const blob = await exportImage.toBlob(this.sigma, { format: "png" });
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(blob);
-    });
+    const sigmaImage = await createImageBitmap(blob);
+    try {
+      const out = document.createElement("canvas");
+      out.width = sigmaImage.width;
+      out.height = sigmaImage.height;
+      const ctx = out.getContext("2d");
+      const bubbleCanvas = this.bubbleLayer.canvas;
+      if (bubbleCanvas?.width > 0 && bubbleCanvas?.height > 0) {
+        // Both canvases are viewport-aligned (export-image renders at
+        // window.devicePixelRatio over the live CSS dimensions), so the
+        // stretch is geometry-preserving at any DPR — worst case is
+        // resolution blur, never an offset.
+        ctx.drawImage(bubbleCanvas, 0, 0, out.width, out.height);
+      }
+      ctx.drawImage(sigmaImage, 0, 0);
+      return out.toDataURL("image/png");
+    } catch (error) {
+      throw new Error(`Graph image export failed: ${error?.message ?? error}`);
+    } finally {
+      sigmaImage.close();
+    }
   }
 }
 

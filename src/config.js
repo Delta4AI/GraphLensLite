@@ -223,8 +223,13 @@ const CFG = {
   MAX_EDGES_BEFORE_DISABLING_HOVER_EFFECT: 500,
   DISABLE_HOVER_EFFECT: false,
 
-// if network is greater than defined threshold, bubble groups may span across non-bubble group members
-  MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS: 300,
+// if network is greater than defined threshold, bubble groups may span across non-bubble group members.
+// Measured with the sigma renderer (bubblesets-js createOutline, virtualEdges on, viewport-scale
+// coordinates, 2026-06-10): 60 members + 1000 avoid rects ≈ 69 ms, +2000 ≈ 194 ms, 300 members +
+// 5700 avoid ≈ 12 s — virtual-edge routing around obstacles is O(members × avoid). 1000 keeps a
+// full per-group outline recompute under the ~100 ms interactivity budget; camera pan/zoom reuses
+// cached outlines and is unaffected (src/graph/bubble_layer.js).
+  MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS: 1000,
   AVOID_MEMBERS_IN_BUBBLE_GROUPS: false,
 
 // Maximum capacity of selection memory

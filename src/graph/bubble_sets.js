@@ -264,6 +264,13 @@ class GraphBubbleSetManager {
   }
 
   getAvoidMembers(members) {
+    // Flag is set by io.preProcessData when the network exceeds
+    // MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS: outlines
+    // then may span across non-members (bubblesets-js virtual-edge routing
+    // around obstacles is O(members × avoid) — see the threshold comment in
+    // config.js for the measured budget).
+    if (this.cache.CFG.AVOID_MEMBERS_IN_BUBBLE_GROUPS) return [];
+
     const checkMembership = members instanceof Set
       ? (nodeID) => members.has(nodeID)
       : (nodeID) => members.includes(nodeID);
