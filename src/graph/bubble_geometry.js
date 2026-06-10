@@ -12,8 +12,25 @@ import { bubblesets } from "../lib/graphology.bundle.mjs";
 // PointPath post-processing per the bubblesets-js README: sample the raw
 // marching-squares outline, B-spline it and drop collinear points. 8 px
 // sampling is the library's own example default and keeps point counts in
-// the low hundreds.
+// the low hundreds. Scaled with opts.scale (an 8 px step would flatten a
+// zoomed-out outline whose features are ~2 px) but never below 1 px.
 const OUTLINE_SAMPLE_PX = 8;
+const OUTLINE_SAMPLE_MIN_PX = 1;
+
+// bubblesets-js influence-field defaults (the library's own pixel-tuned
+// constants). They are absolute pixel radii, so the caller must scale them
+// with the on-screen node size (opts.scale): zoomed far out, an unscaled
+// 50 px negative disc around every avoid node swallows the (shrunken)
+// members' positive field and the outline collapses to nothing.
+const FIELD_NODE_R0 = 15;
+const FIELD_NODE_R1 = 50;
+const FIELD_EDGE_R0 = 10;
+const FIELD_EDGE_R1 = 20;
+const FIELD_MORPH_BUFFER = 10;
+const FIELD_PIXEL_GROUP = 4;
+// Marching-squares grid cell can never go below 1 px (pixelGroup 0 hangs
+// the library; sub-pixel cells just waste time).
+const FIELD_PIXEL_GROUP_MIN = 1;
 
 /**
  * Axis-aligned square around a node's viewport position.
@@ -32,19 +49,31 @@ function nodeViewportRect(x, y, radius) {
  *
  * @param {Array<{x,y,width,height}>} memberRects
  * @param {Array<{x,y,width,height}>} avoidRects
- * @param {{virtualEdges?: boolean}} [opts]  virtualEdges routes connecting
- *   corridors around avoid rects (the per-group style enables it); its cost
- *   is O(members × avoid) — see MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_
- *   IN_BUBBLE_GROUPS in config.js for the measured budget.
+ * @param {{virtualEdges?: boolean, scale?: number}} [opts]
+ *   virtualEdges routes connecting corridors around avoid rects (the
+ *   per-group style enables it); its cost is O(members × avoid) — see
+ *   MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS in config.js
+ *   for the measured budget.
+ *   scale multiplies the bubblesets influence-field pixel constants so the
+ *   field stays proportional to the rects at any zoom (1 = library
+ *   defaults; pass sigma's node-size zoom factor).
  * @returns {Array<{x: number, y: number}>} closed polygon (empty when no
  *   members or the outline collapsed)
  */
 function computeOutlinePoints(memberRects, avoidRects = [], opts = {}) {
   if (!memberRects || memberRects.length === 0) return [];
+  const s = opts.scale ?? 1;
   const path = bubblesets.createOutline(memberRects, avoidRects, [], {
     virtualEdges: opts.virtualEdges !== false,
+    nodeR0: FIELD_NODE_R0 * s,
+    nodeR1: FIELD_NODE_R1 * s,
+    edgeR0: FIELD_EDGE_R0 * s,
+    edgeR1: FIELD_EDGE_R1 * s,
+    morphBuffer: FIELD_MORPH_BUFFER * s,
+    pixelGroup: Math.max(FIELD_PIXEL_GROUP_MIN, FIELD_PIXEL_GROUP * s),
   });
-  const sampled = path.sample(OUTLINE_SAMPLE_PX).simplify(0).bSplines().simplify(0);
+  const samplePx = Math.max(OUTLINE_SAMPLE_MIN_PX, OUTLINE_SAMPLE_PX * s);
+  const sampled = path.sample(samplePx).simplify(0).bSplines().simplify(0);
   const points = [];
   for (let i = 0; i < sampled.length; i++) {
     const p = sampled.get(i);
@@ -53,20 +82,62 @@ function computeOutlinePoints(memberRects, avoidRects = [], opts = {}) {
   return points;
 }
 
+// Extreme-point comparators per placement (viewport space is y-down, so
+// "top" is the smallest y). Unknown placements fall back to "top".
+const PLACEMENT_EXTREME = {
+  top: (p, q) => p.y < q.y,
+  bottom: (p, q) => p.y > q.y,
+  left: (p, q) => p.x < q.x,
+  right: (p, q) => p.x > q.x,
+};
+
 /**
- * Label anchor: the topmost outline point (smallest y — viewport space is
- * y-down, so this is the visual top, where the old G6 plugin hung labels).
+ * Label anchor for an outline polygon.
+ *
+ * For edge placements ("top"/"bottom"/"left"/"right") the anchor is the
+ * extreme outline vertex in that direction; angle is the outline tangent at
+ * that vertex (from its two ring neighbors), normalized into [-PI/2, PI/2]
+ * so rotated text stays upright; (nx, ny) is the outward unit normal
+ * (perpendicular to the tangent, flipped if it points toward the vertex
+ * centroid). "center" returns the vertex centroid with angle 0, nx = ny = 0.
  *
  * @param {Array<{x: number, y: number}>} points
- * @returns {{x: number, y: number}|null}
+ * @param {"top"|"bottom"|"left"|"right"|"center"} [placement]
+ * @returns {{x: number, y: number, angle: number, nx: number, ny: number}|null}
  */
-function outlineLabelAnchor(points) {
+function outlineLabelAnchor(points, placement = "top") {
   if (!points || points.length === 0) return null;
-  let top = points[0];
+  const n = points.length;
+  let cx = 0;
+  let cy = 0;
   for (const p of points) {
-    if (p.y < top.y) top = p;
+    cx += p.x;
+    cy += p.y;
   }
-  return { x: top.x, y: top.y };
+  cx /= n;
+  cy /= n;
+  if (placement === "center") return { x: cx, y: cy, angle: 0, nx: 0, ny: 0 };
+
+  const isBetter = PLACEMENT_EXTREME[placement] ?? PLACEMENT_EXTREME.top;
+  let idx = 0;
+  for (let i = 1; i < n; i++) {
+    if (isBetter(points[i], points[idx])) idx = i;
+  }
+  const anchor = points[idx];
+  const prev = points[(idx - 1 + n) % n];
+  const next = points[(idx + 1) % n];
+
+  let angle = Math.atan2(next.y - prev.y, next.x - prev.x);
+  if (angle > Math.PI / 2) angle -= Math.PI;
+  else if (angle < -Math.PI / 2) angle += Math.PI;
+
+  let nx = -Math.sin(angle);
+  let ny = Math.cos(angle);
+  if (nx * (cx - anchor.x) + ny * (cy - anchor.y) > 0) {
+    nx = -nx;
+    ny = -ny;
+  }
+  return { x: anchor.x, y: anchor.y, angle, nx, ny };
 }
 
 /**
@@ -105,8 +176,7 @@ function positionsChecksum(points) {
 }
 
 // Style fields that change the painted result; everything else the manager
-// passes (members, avoidMembers, label placement extras) is keyed elsewhere
-// or ignored by the layer.
+// passes (members, avoidMembers) is keyed elsewhere by the layer.
 const STYLE_KEY_FIELDS = [
   "fill",
   "fillOpacity",
@@ -123,6 +193,9 @@ const STYLE_KEY_FIELDS = [
   "labelBackgroundRadius",
   "labelOffsetX",
   "labelOffsetY",
+  "labelPlacement",
+  "labelCloseToPath",
+  "labelAutoRotate",
 ];
 
 /**

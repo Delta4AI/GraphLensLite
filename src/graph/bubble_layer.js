@@ -14,8 +14,10 @@
  *     identity key in #syncGroupOutline catches them on the next frame, so
  *     a filter event can never leave a stale outline painted)
  *   - camera pan/zoom → cheap reprojection of the cached points (exact for
- *     pans; node radii drift slightly under zoom until the camera settles
- *     and #scheduleSettleRecompute re-fits the outline)
+ *     pans; under zoom the cache key quantizes log2(camera.ratio) into
+ *     RATIO_RECOMPUTE_LOG2-wide buckets, so node-radius drift forces a
+ *     re-fit at each bucket crossing — this also keeps an empty outline
+ *     from sticking once the zoom moves on)
  * This replaces the G6 plugin's recompute-per-draw churn (the patched
  * updateBubbleSetsPath path coalescing, issue #7195) with an owned cache.
  */
@@ -31,11 +33,14 @@ import {
 
 const LAYER_NAME = "bubbleSets";
 const OUTLINE_STROKE_WIDTH = 2;
-// Zoom drift before the settled camera forces an outline re-fit (node
-// screen radii scale non-linearly with the camera ratio, so a reprojected
-// outline slowly stops hugging the nodes).
+// Zoom drift before an outline re-fit: log2(camera.ratio) is quantized into
+// buckets of this width inside the outline cache key (node screen radii
+// scale non-linearly with the camera ratio, so a reprojected outline slowly
+// stops hugging the nodes).
 const RATIO_RECOMPUTE_LOG2 = 0.3;
-const SETTLE_RECOMPUTE_MS = 150;
+// Extra screen-px gap (beyond half the font box) between the outline and a
+// label drawn with labelCloseToPath: false.
+const LABEL_STANDOFF_PX = 8;
 
 class BubbleSetLayer {
   /**
@@ -49,13 +54,12 @@ class BubbleSetLayer {
 
     /** @type {Map<string, {members: Map<string, true>, avoidMembers: string[], opts: object}>} */
     this.groups = new Map();
-    // Per-group outline cache: identity key + graph-space points + the
-    // camera ratio the outline was fitted at.
-    /** @type {Map<string, {key: string, graphPoints: Array<{x,y}>, computedRatio: number}>} */
+    // Per-group outline cache: identity key (membership, style, positions,
+    // viewport size, ratio bucket) + graph-space points.
+    /** @type {Map<string, {key: string, graphPoints: Array<{x,y}>}>} */
     this.outlines = new Map();
 
     this.rafHandle = null;
-    this.settleTimer = null;
     this.lastPaintSignature = null;
 
     const sigma = adapter.sigma;
@@ -98,7 +102,6 @@ class BubbleSetLayer {
     if (this.killed) return;
     this.killed = true;
     if (this.rafHandle !== null) cancelAnimationFrame(this.rafHandle);
-    if (this.settleTimer !== null) clearTimeout(this.settleTimer);
     this.adapter.sigma.off("afterRender", this.renderHandler);
     // sigma.kill() may or may not remove custom layer canvases; remove() on
     // an already-detached node is a no-op, so drop ours defensively.
@@ -186,8 +189,9 @@ class BubbleSetLayer {
 
   /**
    * Recompute the group's outline when its identity (members, positions,
-   * style) changed, or when the camera ratio drifted too far from the one
-   * the outline was fitted at (debounced to camera idle).
+   * style) changed, or when the camera ratio left the log2 bucket the
+   * outline was fitted in (between crossings the cached points are merely
+   * reprojected).
    *
    * @returns {boolean} true when the cached outline was replaced
    */
@@ -207,16 +211,16 @@ class BubbleSetLayer {
     // here is the O(n) position checksum. Hidden flips stay correct: an
     // unhide changes visibleMembers.length, and a same-count hidden swap
     // changes the checksum (different nodes contribute their positions).
+    // The ratio bucket keys the zoom level the outline was fitted at: a
+    // bucket crossing recomputes (radius drift re-fit), and an empty
+    // outline can never outlive the zoom level that produced it.
+    const ratioBucket = Math.round(Math.log2(camera.ratio) / RATIO_RECOMPUTE_LOG2);
     const key =
       `${state.membersKey}|${state.avoidKey}|${visibleMembers.length}` +
-      `|${styleKey(state.opts)}|${positionsChecksum(memberPositions)}|${width}x${height}`;
+      `|${styleKey(state.opts)}|${positionsChecksum(memberPositions)}` +
+      `|${width}x${height}|r${ratioBucket}`;
     const cached = this.outlines.get(group);
-    if (cached && cached.key === key) {
-      if (Math.abs(Math.log2(camera.ratio / cached.computedRatio)) > RATIO_RECOMPUTE_LOG2) {
-        this.#scheduleSettleRecompute();
-      }
-      return false;
-    }
+    if (cached && cached.key === key) return false;
 
     if (visibleMembers.length === 0) {
       this.outlines.delete(group);
@@ -238,26 +242,27 @@ class BubbleSetLayer {
       avoidRects.push(toRect({ attrs }));
     }
 
-    const viewportPoints = computeOutlinePoints(memberRects, avoidRects, {
-      virtualEdges: state.opts.virtualEdges,
-    });
+    // Zoom-invariant influence field: bubblesets-js' radii are absolute
+    // pixels, so they must shrink/grow with the node rects. With sigma's
+    // default settings scaleSize(s, ratio) = s / sqrt(ratio), making
+    // fieldScale = scaleSize(1) / scaleSize(1, 1) exactly the node-radius
+    // zoom factor, normalized to 1 at camera ratio 1 (the reference zoom
+    // the pixel constants were tuned for) for any zoomToSizeRatioFunction.
+    const fieldScale = sigma.scaleSize(1) / sigma.scaleSize(1, 1);
+    const outlineOpts = { virtualEdges: state.opts.virtualEdges, scale: fieldScale };
+    let viewportPoints = computeOutlinePoints(memberRects, avoidRects, outlineOpts);
+    // Safety net: at extreme zoom-out the avoid nodes' negative field can
+    // still cancel the members' field entirely and collapse the outline.
+    // A hull that ignores avoid nodes beats a vanished group.
+    if (viewportPoints.length === 0 && avoidRects.length > 0) {
+      viewportPoints = computeOutlinePoints(memberRects, [], outlineOpts);
+    }
     this.outlines.set(group, {
       key,
       // Round-trip assumes camera.angle === 0 (the app never rotates the camera).
       graphPoints: viewportPoints.map((p) => sigma.viewportToGraph(p)),
-      computedRatio: camera.ratio,
     });
     return true;
-  }
-
-  #scheduleSettleRecompute() {
-    if (this.settleTimer !== null) clearTimeout(this.settleTimer);
-    this.settleTimer = setTimeout(() => {
-      this.settleTimer = null;
-      if (this.killed) return;
-      this.outlines.clear();
-      this.scheduleRedraw();
-    }, SETTLE_RECOMPUTE_MS);
   }
 
   #drawGroup(ctx, group, state) {
@@ -291,34 +296,50 @@ class BubbleSetLayer {
   }
 
   /**
-   * Group label at the topmost outline point (the old plugin's default
-   * hanging position). Honors text/fill/size/padding/background/offsets;
-   * labelPlacement/labelCloseToPath/labelAutoRotate are documented
-   * degradations of the port.
+   * Group label at the outline extreme picked by labelPlacement (the old G6
+   * plugin's surface): labelCloseToPath: false pushes it off the path along
+   * the outward normal; labelAutoRotate aligns on-path labels with the
+   * outline tangent. labelOffsetX/Y stay additive in screen space.
    */
   #drawLabel(ctx, points, opts, defaults) {
     const text = opts.labelText ?? defaults.labelText ?? "";
     if (!text) return;
-    const anchor = outlineLabelAnchor(points);
+    const placement = opts.labelPlacement ?? defaults.labelPlacement ?? "bottom";
+    const closeToPath = opts.labelCloseToPath ?? defaults.labelCloseToPath ?? true;
+    const autoRotate = opts.labelAutoRotate ?? defaults.labelAutoRotate ?? true;
+    const anchor = outlineLabelAnchor(points, placement);
     if (!anchor) return;
 
     const fontSize = opts.labelFontSize ?? defaults.labelFontSize ?? 12;
     const padding = opts.labelPadding ?? defaults.labelPadding ?? 2;
-    const x = anchor.x + (opts.labelOffsetX ?? 0);
-    const y = anchor.y + (opts.labelOffsetY ?? 0);
+    // Off-path labels clear the outline by half the padded font box plus a
+    // fixed gap, pushed along the outward normal (no-op for "center").
+    const standoff = closeToPath ? 0 : fontSize / 2 + padding + LABEL_STANDOFF_PX;
+    const x = anchor.x + anchor.nx * standoff + (opts.labelOffsetX ?? 0);
+    const y = anchor.y + anchor.ny * standoff + (opts.labelOffsetY ?? 0);
 
     ctx.font = `${fontSize}px Arial, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const textWidth = ctx.measureText(text).width;
 
+    // Rotation only makes sense hugging the path; "center" has no tangent.
+    const rotated = autoRotate && closeToPath && placement !== "center";
+    if (rotated) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(anchor.angle);
+    }
+    const lx = rotated ? 0 : x;
+    const ly = rotated ? 0 : y;
+
     if (opts.labelBackground ?? defaults.labelBackground) {
       const radius = opts.labelBackgroundRadius ?? defaults.labelBackgroundRadius ?? 5;
       ctx.fillStyle = opts.labelBackgroundFill ?? defaults.labelBackgroundFill ?? "#403C53";
       ctx.beginPath();
       ctx.roundRect(
-        x - textWidth / 2 - padding,
-        y - fontSize / 2 - padding,
+        lx - textWidth / 2 - padding,
+        ly - fontSize / 2 - padding,
         textWidth + 2 * padding,
         fontSize + 2 * padding,
         radius,
@@ -326,7 +347,8 @@ class BubbleSetLayer {
       ctx.fill();
     }
     ctx.fillStyle = opts.labelFill ?? defaults.labelFill ?? "#fff";
-    ctx.fillText(text, x, y);
+    ctx.fillText(text, lx, ly);
+    if (rotated) ctx.restore();
   }
 }
 

@@ -68,21 +68,119 @@ describe("computeOutlinePoints", () => {
     expect(pointInPolygon({ x: 50, y: 50 }, outline)).toBe(true);
     expect(pointInPolygon({ x: 75, y: 50 }, outline)).toBe(true);
   });
+
+  describe("scale option (zoom-invariant influence field)", () => {
+    // The avoid-member scenario shrunk by the scale factor must keep its
+    // shape: members enclosed, avoid node excluded. Without scaling the
+    // influence constants, the fixed 50 px negative disc of the avoid node
+    // would swallow the shrunken members' field.
+    it.each([0.25, 0.1])("preserves member/avoid geometry rescaled by %f", (s) => {
+      const members = [rectAt(50 * s, 100 * s, 10 * s), rectAt(250 * s, 100 * s, 10 * s)];
+      const avoid = [rectAt(150 * s, 100 * s, 10 * s)];
+      const outline = computeOutlinePoints(members, avoid, { scale: s });
+      expect(outline.length).toBeGreaterThan(3);
+      expect(pointInPolygon({ x: 50 * s, y: 100 * s }, outline)).toBe(true);
+      expect(pointInPolygon({ x: 250 * s, y: 100 * s }, outline)).toBe(true);
+      expect(pointInPolygon({ x: 150 * s, y: 100 * s }, outline)).toBe(false);
+    });
+
+    it("keeps a dense zoomed-out group intact where unscaled constants lose it", () => {
+      // Zoomed-out screen geometry: two 1 px members 6 px apart inside two
+      // rings of 32 avoid nodes (the dense-graph repro for the vanishing
+      // outline). Unscaled, the avoid nodes' negative field corrupts the
+      // outline (a member ends up outside); scaled it hugs both members
+      // and excludes the ring.
+      const members = [rectAt(0, 0, 1), rectAt(6, 0, 1)];
+      const avoid = [];
+      for (const radius of [14, 22]) {
+        for (let i = 0; i < 16; i++) {
+          const ang = (i / 16) * 2 * Math.PI;
+          avoid.push(rectAt(3 + radius * Math.cos(ang), radius * Math.sin(ang), 1));
+        }
+      }
+
+      const unscaled = computeOutlinePoints(members, avoid);
+      const coversBoth = (outline) =>
+        outline.length > 0 &&
+        pointInPolygon({ x: 0, y: 0 }, outline) &&
+        pointInPolygon({ x: 6, y: 0 }, outline);
+      expect(coversBoth(unscaled)).toBe(false);
+
+      const scaled = computeOutlinePoints(members, avoid, { scale: 0.1 });
+      expect(coversBoth(scaled)).toBe(true);
+      expect(pointInPolygon({ x: 17, y: 0 }, scaled)).toBe(false);
+    });
+  });
 });
 
 describe("outlineLabelAnchor", () => {
-  it("returns the topmost point (smallest y — viewport space is y-down)", () => {
+  // Axis-aligned diamond-cornered square ring (clockwise in y-down viewport
+  // space) with a unique extreme vertex per side and centroid (5, 5); each
+  // extreme's ring neighbors form an axis-aligned tangent.
+  const ring = [
+    { x: 0, y: 0 },
+    { x: 5, y: -1 }, // top apex
+    { x: 10, y: 0 },
+    { x: 11, y: 5 }, // right apex
+    { x: 10, y: 10 },
+    { x: 5, y: 11 }, // bottom apex
+    { x: 0, y: 10 },
+    { x: -1, y: 5 }, // left apex
+  ];
+
+  it("defaults to the topmost point (smallest y — viewport space is y-down)", () => {
     const points = [
       { x: 5, y: 9 },
       { x: 7, y: 2 },
       { x: 1, y: 6 },
     ];
-    expect(outlineLabelAnchor(points)).toEqual({ x: 7, y: 2 });
+    expect(outlineLabelAnchor(points)).toMatchObject({ x: 7, y: 2 });
   });
 
   it("returns null for empty or missing outlines", () => {
     expect(outlineLabelAnchor([])).toBeNull();
     expect(outlineLabelAnchor(null)).toBeNull();
+  });
+
+  it.each([
+    ["top", { x: 5, y: -1 }],
+    ["bottom", { x: 5, y: 11 }],
+    ["left", { x: -1, y: 5 }],
+    ["right", { x: 11, y: 5 }],
+  ])("picks the %s extreme vertex", (placement, expected) => {
+    expect(outlineLabelAnchor(ring, placement)).toMatchObject(expected);
+  });
+
+  it("returns a horizontal tangent angle on horizontal edges", () => {
+    // Top apex neighbors (0,0)/(10,0) and bottom apex neighbors
+    // (10,10)/(0,10) are horizontal; bottom's reversed tangent (PI) must
+    // normalize back to 0 so text stays upright.
+    expect(outlineLabelAnchor(ring, "top").angle).toBeCloseTo(0);
+    expect(outlineLabelAnchor(ring, "bottom").angle).toBeCloseTo(0);
+  });
+
+  it("returns a vertical tangent angle within [-PI/2, PI/2] on vertical edges", () => {
+    expect(Math.abs(outlineLabelAnchor(ring, "left").angle)).toBeCloseTo(Math.PI / 2);
+    expect(Math.abs(outlineLabelAnchor(ring, "right").angle)).toBeCloseTo(Math.PI / 2);
+  });
+
+  it.each([
+    ["top", { nx: 0, ny: -1 }],
+    ["bottom", { nx: 0, ny: 1 }],
+    ["left", { nx: -1, ny: 0 }],
+    ["right", { nx: 1, ny: 0 }],
+  ])("normal at the %s extreme points away from the centroid", (placement, normal) => {
+    const anchor = outlineLabelAnchor(ring, placement);
+    expect(anchor.nx).toBeCloseTo(normal.nx);
+    expect(anchor.ny).toBeCloseTo(normal.ny);
+  });
+
+  it("center placement returns the vertex centroid with no rotation or normal", () => {
+    expect(outlineLabelAnchor(ring, "center")).toEqual({ x: 5, y: 5, angle: 0, nx: 0, ny: 0 });
+  });
+
+  it("falls back to top for unknown placements", () => {
+    expect(outlineLabelAnchor(ring, "diagonal")).toMatchObject({ x: 5, y: -1 });
   });
 });
 
@@ -171,9 +269,7 @@ describe("positionsChecksum", () => {
 describe("styleKey", () => {
   it("is stable for equal styles and ignores irrelevant fields", () => {
     const style = { fill: "#403C53", fillOpacity: 0.25, stroke: "#C33D35", label: true };
-    expect(styleKey({ ...style, labelCloseToPath: true })).toBe(
-      styleKey({ ...style, labelCloseToPath: false }),
-    );
+    expect(styleKey({ ...style, members: ["a"] })).toBe(styleKey({ ...style, members: ["b"] }));
   });
 
   it("changes when a painted field changes", () => {
@@ -182,6 +278,12 @@ describe("styleKey", () => {
       styleKey({ label: true, labelText: "b" }),
     );
     expect(styleKey({ fillOpacity: 0 })).not.toBe(styleKey({ fillOpacity: 0.25 }));
+  });
+
+  it("changes when a label placement knob changes (paint signature must invalidate)", () => {
+    expect(styleKey({ labelPlacement: "top" })).not.toBe(styleKey({ labelPlacement: "bottom" }));
+    expect(styleKey({ labelCloseToPath: true })).not.toBe(styleKey({ labelCloseToPath: false }));
+    expect(styleKey({ labelAutoRotate: true })).not.toBe(styleKey({ labelAutoRotate: false }));
   });
 
   it("distinguishes the literal string \"undefined\" from a missing field", () => {
