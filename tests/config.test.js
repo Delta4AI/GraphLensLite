@@ -214,11 +214,6 @@ describe('CFG', () => {
     expect(typeof CFG.EXCEL_EDGE_HEADER).toBe('string')
   })
 
-  it('INVISIBLE_DUMMY_NODE has hidden visibility', () => {
-    expect(CFG.INVISIBLE_DUMMY_NODE.style.visibility).toBe('hidden')
-    expect(CFG.INVISIBLE_DUMMY_NODE.id).toBeTruthy()
-  })
-
   it('boolean flags default correctly', () => {
     expect(typeof CFG.HIDE_LABELS).toBe('boolean')
     expect(typeof CFG.DISABLE_HOVER_EFFECT).toBe('boolean')

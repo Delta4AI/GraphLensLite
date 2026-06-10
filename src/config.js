@@ -252,13 +252,6 @@ const CFG = {
 
 // Set to true to reset positions of selected elements when clicking the reset selection button in the top right selection frame
   RESET_SELECTION_BUTTON_RESETS_POSITIONS: true,
-  INVISIBLE_DUMMY_NODE: {
-    id: "INVISIBLEDUMMYNODEWITHIMPOSSIBLEID",
-    style: {
-      visibility: "hidden"
-    },
-  },
-
   INVISIBLE_CHAR: "\u200B",
 
   // AI Assistant configuration lives entirely in localStorage (key

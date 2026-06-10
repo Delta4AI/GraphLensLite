@@ -106,18 +106,14 @@ class GraphBubbleSetManager {
       for (let prop of propsInGroup) {
         let nodeIDsToBeGrouped = this.cache.propIDsToNodeIDsToBeShown.get(prop) || [];
         for (let nodeID of nodeIDsToBeGrouped) {
-          // Explicitly exclude dummy node
-          if (nodeID !== this.cache.CFG.INVISIBLE_DUMMY_NODE.id) {
-            actualMembers.add(nodeID);
-          }
+          actualMembers.add(nodeID);
         }
       }
 
       // Add members from manual group selection
       const manualMembers = currentLayout[`${group}ManualMembers`] || new Set();
       for (let nodeID of manualMembers) {
-        // Explicitly exclude dummy node
-        if (nodeID !== this.cache.CFG.INVISIBLE_DUMMY_NODE.id && this.cache.nodeRef.has(nodeID)) {
+        if (this.cache.nodeRef.has(nodeID)) {
           actualMembers.add(nodeID);
         }
       }
@@ -205,9 +201,8 @@ class GraphBubbleSetManager {
       for (let prop of propsInGroup) {
         let nodeIDsToBeGrouped = this.cache.propIDsToNodeIDsToBeShown.get(prop) || [];
         for (let nodeID of nodeIDsToBeGrouped) {
-          // Explicitly exclude dummy node and hidden dangling nodes
-          if (nodeID !== this.cache.CFG.INVISIBLE_DUMMY_NODE.id &&
-              !this.cache.hiddenDanglingNodeIDs.has(nodeID)) {
+          // Exclude hidden dangling nodes
+          if (!this.cache.hiddenDanglingNodeIDs.has(nodeID)) {
             newSetMembers.add(nodeID);
           }
         }
@@ -217,9 +212,8 @@ class GraphBubbleSetManager {
       const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`];
       if (manualMembers && manualMembers.size > 0) {
         for (let nodeID of manualMembers) {
-          // Only add if node is still visible (not filtered out), and explicitly exclude dummy node and hidden dangling nodes
-          if (nodeID !== this.cache.CFG.INVISIBLE_DUMMY_NODE.id &&
-              this.cache.nodeRef.has(nodeID) &&
+          // Only add if node is still visible (not filtered out or hidden dangling)
+          if (this.cache.nodeRef.has(nodeID) &&
               !this.cache.hiddenDanglingNodeIDs.has(nodeID)) {
             newSetMembers.add(nodeID);
           }
@@ -235,15 +229,10 @@ class GraphBubbleSetManager {
   }
 
   async updateBubbleSet(group, members) {
-    // Ensure dummy node is never included in members
-    const filteredMembers = members instanceof Set
-      ? new Set([...members].filter(id => id !== this.cache.CFG.INVISIBLE_DUMMY_NODE.id))
-      : [...members].filter(id => id !== this.cache.CFG.INVISIBLE_DUMMY_NODE.id);
+    let empty = !members || (members instanceof Set ? members.size === 0 : members.length === 0);
+    const membersAsArray = members instanceof Set ? [...members] : members;
 
-    let empty = !filteredMembers || (filteredMembers instanceof Set ? filteredMembers.size === 0 : filteredMembers.length === 0);
-    const membersAsArray = filteredMembers instanceof Set ? [...filteredMembers] : filteredMembers;
-
-    const avoidMembers = empty ? [] : this.getAvoidMembers(filteredMembers);
+    const avoidMembers = empty ? [] : this.getAvoidMembers(members);
 
     if (StaticUtilities.arraysAreEqual(membersAsArray, [...this.cache.INSTANCES.BUBBLE_GROUPS[group].members.keys()])) {
       this.cache.ui.debug("BUBBLE GROUPS IN SYNC - SKIPPING UPDATE");
@@ -296,10 +285,7 @@ class GraphBubbleSetManager {
     }
 
     const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`];
-    // Filter out dummy node from selected nodes
-    const selectedNodeIds = [...this.cache.selectedNodes].filter(nodeId =>
-      nodeId !== this.cache.CFG.INVISIBLE_DUMMY_NODE.id
-    );
+    const selectedNodeIds = [...this.cache.selectedNodes];
 
     if (selectedNodeIds.length === 0) {
       this.cache.ui.warning("No nodes selected");
@@ -372,12 +358,11 @@ class GraphBubbleSetManager {
     for (let [group, quadrantPosition] of Object.entries(this.cache.DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS)) {
       const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`] || new Set();
 
-      // Filter out nodes that are no longer visible (filtered out) and explicitly exclude dummy node
+      // Filter out nodes that are no longer visible (filtered out)
       const visibleMembers = [...manualMembers].filter(nodeId =>
-        nodeId !== this.cache.CFG.INVISIBLE_DUMMY_NODE.id &&
         this.cache.nodeRef.has(nodeId) &&
-        this.cache.propIDsToNodeIDsToBeShown.size === 0 ||
-        [...this.cache.propIDsToNodeIDsToBeShown.values()].some(set => set.has(nodeId))
+        (this.cache.propIDsToNodeIDsToBeShown.size === 0 ||
+          [...this.cache.propIDsToNodeIDsToBeShown.values()].some(set => set.has(nodeId)))
       );
 
       if (visibleMembers.length > 0) {
@@ -401,15 +386,14 @@ class GraphBubbleSetManager {
   }
 
   cleanupManualGroupMembers() {
-    // Remove nodes from manual groups that are no longer visible (filtered out) or are the dummy node
+    // Remove nodes from manual groups that are no longer visible (filtered out)
     for (let group of Object.keys(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE)) {
       const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`];
 
       if (manualMembers && manualMembers.size > 0) {
         const toRemove = [];
         for (let nodeId of manualMembers) {
-          // Check if node is filtered out (not visible) or is the dummy node
-          if (nodeId === this.cache.CFG.INVISIBLE_DUMMY_NODE.id || !this.cache.nodeRef.has(nodeId)) {
+          if (!this.cache.nodeRef.has(nodeId)) {
             toRemove.push(nodeId);
           }
         }

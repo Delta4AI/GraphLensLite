@@ -22,7 +22,7 @@ The entire rendering stack moved from AntV G6 5.x (canvas) to Sigma.js v3 (WebGL
 * Layouts run headlessly: force (graphology forceAtlas2), circular/grid (geometric), radial/concentric/mds (`@antv/layout` v2)
 * Fixed slow deselection when clicking empty canvas on large graphs (antvis/G6#7195) — removed from Known Issues
 * Distribution is ≈0.9 MB smaller (the 1.1 MB vendored `g6.min.js` is gone; sigma + graphology + headless layouts add ≈0.2 MB)
-* Documented degradations: dashed edges render solid and polyline edges render curved (no off-the-shelf WebGL programs for either)
+* Documented degradations: dashed edges render solid and polyline edges render curved (no off-the-shelf WebGL programs for either); the bubble-group label placement / close-to-path / auto-rotate style knobs are currently no-ops (labels render at the outline top)
 
 ## 1.14.2
 

@@ -267,7 +267,6 @@ class SigmaAdapter {
   /** @param {Array<{id: string, type?: string, style?: object}>} payload */
   async updateNodeData(payload) {
     for (const item of payload ?? []) {
-      // hasNode also guards the legacy INVISIBLE_DUMMY_NODE (never added here).
       if (!item || !this.graph.hasNode(item.id)) continue;
       const ref = this.cache.nodeRef.get(item.id);
       if (ref) {
