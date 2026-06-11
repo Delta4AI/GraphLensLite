@@ -176,7 +176,7 @@ static async prompt(message) {
       const cloneDesc = document.createElement('p');
       cloneDesc.textContent = 'Copies all settings: positions, filters, query, and bubble groups';
       cloneDesc.style.fontSize = '12px';
-      cloneDesc.style.color = '#666';
+      cloneDesc.style.color = 'var(--text-muted)';
       cloneDesc.style.marginLeft = '20px';
       cloneDesc.style.marginTop = '5px';
       cloneDesc.style.marginBottom = '0';
@@ -220,7 +220,7 @@ static async prompt(message) {
       const templateDesc = document.createElement('p');
       templateDesc.textContent = 'Starts fresh with selected layout algorithm and default filters';
       templateDesc.style.fontSize = '12px';
-      templateDesc.style.color = '#666';
+      templateDesc.style.color = 'var(--text-muted)';
       templateDesc.style.marginLeft = '20px';
       templateDesc.style.marginTop = '5px';
       templateDesc.style.marginBottom = '10px';

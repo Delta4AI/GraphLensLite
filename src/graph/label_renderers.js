@@ -49,6 +49,21 @@ function resolveSettingsColor(settingsColor, data) {
   return settingsColor?.color ?? "#000";
 }
 
+// io.js bakes DEFAULTS.*.LABEL.FOREGROUND_COLOR ("#000000") into every
+// labelled element's style, so the per-element labelColor attr always wins
+// over the theme-driven sigma settings fallback. Treat that exact baked
+// default as "no explicit choice" so dark mode can flip it (in light mode
+// the fallback resolves to #000 — pixel-identical). Any other per-element
+// label color is an explicit user choice and is honoured as-is.
+const BAKED_DEFAULT_LABEL_COLOR = "#000000";
+
+function resolveElementLabelColor(elementColor, settingsColor, data) {
+  if (elementColor != null && elementColor !== BAKED_DEFAULT_LABEL_COLOR) {
+    return elementColor;
+  }
+  return resolveSettingsColor(settingsColor, data);
+}
+
 function drawBackground(context, color, x, y, width, height, radius = BACKGROUND_RADIUS) {
   context.fillStyle = color;
   context.beginPath();
@@ -138,7 +153,7 @@ function drawNodeLabel(context, data, settings) {
   const size = finiteSize(data.labelSize, settings.labelSize);
   const font = settings.labelFont;
   const weight = settings.labelWeight;
-  const color = data.labelColor ?? resolveSettingsColor(settings.labelColor, data);
+  const color = resolveElementLabelColor(data.labelColor, settings.labelColor, data);
   const padding = data.labelPadding ?? 2;
 
   context.font = `${weight} ${size}px ${font}`;
@@ -187,7 +202,7 @@ function drawEdgeLabel(context, edgeData, sourceData, targetData, settings) {
   const size = finiteSize(edgeData.labelSize, settings.edgeLabelSize);
   const font = settings.edgeLabelFont;
   const weight = settings.edgeLabelWeight;
-  const color = edgeData.labelColor ?? resolveSettingsColor(settings.edgeLabelColor, edgeData);
+  const color = resolveElementLabelColor(edgeData.labelColor, settings.edgeLabelColor, edgeData);
   const padding = edgeData.labelPadding ?? 1;
 
   context.font = `${weight} ${size}px ${font}`;
@@ -226,4 +241,4 @@ function drawEdgeLabel(context, edgeData, sourceData, targetData, settings) {
   context.restore();
 }
 
-export { drawNodeLabel, drawEdgeLabel, placementVector };
+export { drawNodeLabel, drawEdgeLabel, placementVector, BAKED_DEFAULT_LABEL_COLOR };

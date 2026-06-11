@@ -116,6 +116,27 @@ describe("drawNodeLabel", () => {
     expect(ctx2.fillStyle).toBe("#C33D35");
   });
 
+  it("treats the baked #000000 default as themeable (settings fallback wins)", () => {
+    // io.js bakes labelFill #000000 into every labelled element; the
+    // renderer must let the theme-driven settings fallback replace it.
+    const dark = stubContext();
+    drawNodeLabel(
+      dark,
+      { ...NODE, labelColor: "#000000" },
+      { ...SETTINGS, labelColor: { color: "#E7E6EE" } },
+    );
+    expect(dark.fillStyle).toBe("#E7E6EE");
+
+    // An explicit non-default per-node color is honoured as-is.
+    const explicit = stubContext();
+    drawNodeLabel(
+      explicit,
+      { ...NODE, labelColor: "#112233" },
+      { ...SETTINGS, labelColor: { color: "#E7E6EE" } },
+    );
+    expect(explicit.fillStyle).toBe("#112233");
+  });
+
   it("places the label below the node by default (G6 default placement)", () => {
     const ctx = stubContext();
     drawNodeLabel(ctx, NODE, SETTINGS);

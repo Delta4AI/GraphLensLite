@@ -25,7 +25,7 @@ import {
 } from "./edge_programs.js";
 import { nodeAttributesFromStyle, edgeAttributesFromStyle, flipY } from "./graph_model.js";
 import { executeLayout } from "./layout_algorithms.js";
-import { drawNodeLabel, drawEdgeLabel } from "./label_renderers.js";
+import { drawNodeLabel, drawEdgeLabel, BAKED_DEFAULT_LABEL_COLOR } from "./label_renderers.js";
 import { InteractionManager } from "./interactions.js";
 import { BubbleSetLayer } from "./bubble_layer.js";
 import { Minimap } from "./minimap.js";
@@ -57,7 +57,15 @@ function guardHoverDrawer(drawer, getDraggedNode) {
   return (context, data, settings) => {
     const dragged = getDraggedNode();
     if (dragged && data.key !== dragged) return;
-    drawer(context, data, settings);
+    // Sigma's drawDiscNodeHover hardcodes a white pill behind the label, so
+    // pin the FALLBACK to dark regardless of the theme-driven labelColor
+    // setting (dark mode flips it to a light color, unreadable on the pill).
+    // The attribute form keeps explicit per-element labelColor choices
+    // (sigma resolves data[attribute] || color).
+    drawer(context, data, {
+      ...settings,
+      labelColor: { attribute: "labelColor", color: "#000" },
+    });
   };
 }
 
@@ -166,13 +174,19 @@ const drawCurvedEdgeLabelBase = edgeCurve.createDrawCurvedEdgeLabel(
   edgeCurve.DEFAULT_EDGE_CURVE_PROGRAM_OPTIONS,
 );
 function drawCurvedEdgeLabelWithSize(context, edgeData, sourceData, targetData, settings) {
+  // The baked #000000 default counts as "no explicit color" so the
+  // theme-driven settings fallback applies (see label_renderers.js).
+  const explicitColor =
+    edgeData.labelColor && edgeData.labelColor !== BAKED_DEFAULT_LABEL_COLOR
+      ? edgeData.labelColor
+      : null;
   const effective =
-    edgeData.labelSize != null || edgeData.labelColor != null
+    edgeData.labelSize != null || explicitColor != null
       ? {
           ...settings,
           edgeLabelSize: edgeData.labelSize ?? settings.edgeLabelSize,
-          edgeLabelColor: edgeData.labelColor
-            ? { color: edgeData.labelColor }
+          edgeLabelColor: explicitColor
+            ? { color: explicitColor }
             : settings.edgeLabelColor,
         }
       : settings;

@@ -13,6 +13,7 @@ const MINIMAP_HEIGHT = 120;
 const MINIMAP_PADDING = 8;
 const DOT_RADIUS = 1.5;
 const DOT_COLOR = "#403C53";
+const DOT_COLOR_DARK = "#AAA3C4"; // brand purple is invisible on the dark thumb
 const VIEWPORT_STROKE = "#C33D35";
 
 class Minimap {
@@ -113,7 +114,8 @@ class Minimap {
     if (!fit) return;
 
     const graph = this.adapter.graph;
-    ctx.fillStyle = DOT_COLOR;
+    const isDark = document.documentElement.dataset.theme === "dark";
+    ctx.fillStyle = isDark ? DOT_COLOR_DARK : DOT_COLOR;
     graph.forEachNode((id, attrs) => {
       if (attrs.hidden) return;
       const p = this.#toThumb(fit, attrs.x, attrs.y);

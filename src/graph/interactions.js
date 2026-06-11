@@ -375,7 +375,7 @@ class InteractionManager {
     // `.tooltip` element inside #innerGraphContainer with this structure.
     el.className = "tooltip";
     el.style.visibility = "hidden";
-    el.style.background = "#fff"; // the old G6 plugin supplied the backdrop
+    // Backdrop comes from the .tooltip CSS rule (theme-aware var(--input-bg)).
     // Delegated expand/close handling (sanitization strips inline onclick).
     el.addEventListener("click", (event) => {
       const expandBtn = event.target.closest(".tooltip-expand-btn");

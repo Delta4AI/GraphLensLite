@@ -1,6 +1,7 @@
 import { StaticUtilities } from "../utilities/static.js";
 import { replaceColorScale } from "../utilities/color_scale_picker.js";
 import { replaceNumericScale } from "../utilities/numeric_scale_picker.js";
+import { initTheme, nodeLabelColorForTheme } from "../utilities/theme.js";
 import {
   buildGraphologyGraph,
   makeNodeReducer,
@@ -140,14 +141,25 @@ class GraphCoreManager {
     const hoverIds = new Set();
     try {
       const { SigmaAdapter } = await import("./sigma_adapter.js");
+      // initTheme (not currentTheme): re-resolves stored/OS preference so a
+      // graph constructed before the DOMContentLoaded theme boot still gets
+      // the right label colors. Idempotent after boot.
+      const theme = initTheme(document, window);
       this.cache.graph = new SigmaAdapter(this.cache, "innerGraphContainer", {
         nodeReducer: makeNodeReducer(this.cache, elementStates, hoverIds),
         edgeReducer: makeEdgeReducer(this.cache, elementStates, hoverIds),
         elementStates,
         hoverIds,
         // Label visibility (CFG.HIDE_LABELS) is synced live by the adapter
-        // on construction and on every render().
-        settings: {},
+        // on construction and on every render(). The labelColor fallback is
+        // theme-driven (ui.toggleDarkMode flips it live via setSetting).
+        settings: {
+          labelColor: { color: nodeLabelColorForTheme(theme) },
+          // Same for edge labels: label_renderers falls back here whenever
+          // the per-edge labelColor is the baked #000000 default (in light
+          // mode this resolves to #000 — identical to the old baked render).
+          edgeLabelColor: { color: nodeLabelColorForTheme(theme) },
+        },
       });
     } catch (err) {
       // The probe can pass while sigma's own context creation still fails

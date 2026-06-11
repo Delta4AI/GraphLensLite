@@ -2,6 +2,7 @@ import {StaticUtilities} from "../utilities/static.js";
 import {DropdownChecklist, InvertibleRangeSlider} from "./ui_components.js";
 import {createStyleDiv} from "./ui_style_div.js";
 import {Popup} from "../utilities/popup.js";
+import {applyTheme, currentTheme, nodeLabelColorForTheme} from "../utilities/theme.js";
 
 class UIManager {
   constructor(cache, debugEnabled = false) {
@@ -440,6 +441,29 @@ class UIManager {
     // selection states are untouched (they live in elementStates).
     this.cache.graph.setInteractionEnabled("hover", enable);
     this.info(enable ? "Hover highlight effect enabled" : "Hover highlight effect disabled");
+  }
+
+  toggleDarkMode() {
+    const next = currentTheme(document) === "dark" ? "light" : "dark";
+    applyTheme(document, next);
+    this.updateDarkModeButton();
+    // Flip the renderer's default label color (per-element labelColor attrs
+    // set by the user/style pipeline are untouched). setSetting schedules a
+    // refresh; the minimap redraws via its afterRender hook.
+    const sigma = this.cache.graph?.sigma;
+    if (sigma) {
+      sigma.setSetting("labelColor", { color: nodeLabelColorForTheme(next) });
+      sigma.setSetting("edgeLabelColor", { color: nodeLabelColorForTheme(next) });
+    }
+    this.info(next === "dark" ? "Dark mode enabled" : "Light mode enabled");
+  }
+
+  updateDarkModeButton() {
+    const btn = document.getElementById("darkModeToggleBtn");
+    if (!btn) return;
+    const isDark = currentTheme(document) === "dark";
+    btn.textContent = isDark ? "☀️" : "🌙";
+    btn.title = isDark ? "Switch to light mode" : "Switch to dark mode";
   }
 
   updateHoverToggleButton() {

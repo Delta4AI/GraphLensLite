@@ -23,6 +23,7 @@ import {Popup} from "./utilities/popup.js";
 import {StaticUtilities} from "./utilities/static.js";
 import {generateTourData, GuidedTour} from "./utilities/tour.js";
 import {initApiClient} from "./managers/api_client.js";
+import {initTheme} from "./utilities/theme.js";
 
 
 // Stores all reference objects
@@ -464,7 +465,10 @@ window.addEventListener('resize', () => {
 })
 
 window.addEventListener("DOMContentLoaded", () => {
+  // Stored preference wins; prefers-color-scheme is only the first-run default.
+  initTheme(document, window);
   cache.reset();
+  cache.ui.updateDarkModeButton();
   // cache.initialize();
 
   // Display version info
