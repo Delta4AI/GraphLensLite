@@ -193,7 +193,6 @@ describe('DEFAULTS.BUBBLE_GROUP_STYLE', () => {
 describe('CFG', () => {
   it('has expected threshold settings', () => {
     expect(CFG.MAX_NODES_BEFORE_HIDING_LABELS).toBeGreaterThan(0)
-    expect(CFG.MAX_NODES_BEFORE_DISABLING_HOVER_EFFECT).toBeGreaterThan(0)
     expect(CFG.MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS).toBeGreaterThan(0)
   })
 
