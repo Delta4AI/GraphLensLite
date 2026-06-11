@@ -124,6 +124,10 @@ class GraphFilterManager {
   }
 
   async updateElementVisibility(idsToShow, idsToHide) {
+    // cache.graph is null both before any data is loaded and when WebGL init
+    // failed (dead renderer); either way there is nothing to show/hide.
+    if (!this.cache.graph) return;
+
     this.cache.visibleElementsChanged = false;
     // Current visibility comes from the graphology `hidden` attrs, surfaced
     // as style.visibility by the renderer facade (sigma migration, Phase 1).

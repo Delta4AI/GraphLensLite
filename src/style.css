@@ -302,6 +302,33 @@ body, html {
     position: relative;
 }
 
+/* Persistent renderer-dead message (src/graph/webgl_support.js) — shown
+   where the graph would be when WebGL2 is unavailable */
+#innerGraphContainer .webgl-error {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 48px;
+    text-align: center;
+    background-color: #f4f4f4;
+    box-sizing: border-box;
+}
+
+#innerGraphContainer .webgl-error-title {
+    margin: 0;
+    font-weight: bold;
+    color: #403C53;
+}
+
+#innerGraphContainer .webgl-error-hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #666;
+}
+
 /* Owned minimap (src/graph/minimap.js) — kept at the position the old G6
    minimap was CSS-forced to (bottom-right, despite its "bottom-left" config) */
 #innerGraphContainer .gll-minimap {

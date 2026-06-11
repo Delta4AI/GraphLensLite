@@ -6,7 +6,16 @@ import {
   makeNodeReducer,
   makeEdgeReducer,
 } from "./graph_model.js";
-import { SigmaAdapter } from "./sigma_adapter.js";
+// NOTE: sigma_adapter.js is imported lazily in createGraphInstance(), never
+// statically: the sigma vendor bundle probes WebGL at module scope
+// (@sigma/node-image reads MAX_TEXTURE_SIZE from a throwaway context), so a
+// static import kills the whole app boot when WebGL is unavailable — before
+// the isWebGL2Available() check below could ever run.
+import {
+  isWebGL2Available,
+  renderWebGLUnavailableMessage,
+  WEBGL2_ERROR_MESSAGE,
+} from "./webgl_support.js";
 
 // One-time listener registration guards. These must live at module scope:
 // the Cache singleton is reset *in place* on every file load (Cache.reset()),
@@ -20,6 +29,8 @@ let globalEventsRegistered = false;
 class GraphCoreManager {
   constructor(cache) {
     this.cache = cache;
+    // In-flight createGraphInstance() memo — see the re-entrancy note there.
+    this.graphInitPromise = null;
   }
 
   *traverseD4Data(nodeOrEdge) {
@@ -89,15 +100,46 @@ class GraphCoreManager {
   }
 
   async createGraphInstance() {
-    if (this.cache.graph === null) {
-      // Rebuild the graphology model from the current refs/positions; it is
-      // the single data source the sigma renderer reads from.
-      this.cache.graphData = buildGraphologyGraph(this.cache);
+    if (this.cache.graph !== null) return;
 
-      const elementStates = new Map();
-      // Hover layer (InteractionManager writes, reducers read) is separate
-      // from elementStates so hover can never corrupt selection state.
-      const hoverIds = new Set();
+    // The init body awaits (dynamic import, layout passes), so two rapid
+    // calls would both pass the null check above and construct two
+    // SigmaAdapters — the first one orphaned, leaking a WebGL context.
+    // Memoize the in-flight init; cleared in finally so a failed init
+    // (cache.graph stays null) can be retried by the next load.
+    if (this.graphInitPromise) return this.graphInitPromise;
+
+    this.graphInitPromise = this.#initGraphInstance();
+    try {
+      return await this.graphInitPromise;
+    } finally {
+      this.graphInitPromise = null;
+    }
+  }
+
+  async #initGraphInstance() {
+    // Sigma v3 dies with an opaque TypeError when no WebGL context can be
+    // created (GPU blocklist, remote desktop, disabled flags). Probe first
+    // and leave cache.graph null — the same state as "no data loaded", so
+    // the rest of the app chrome keeps working; load paths already guard
+    // on a null graph after this call.
+    const containerEl = document.getElementById("innerGraphContainer");
+    if (!isWebGL2Available()) {
+      renderWebGLUnavailableMessage(containerEl);
+      this.cache.ui.error(WEBGL2_ERROR_MESSAGE);
+      return;
+    }
+
+    // Rebuild the graphology model from the current refs/positions; it is
+    // the single data source the sigma renderer reads from.
+    this.cache.graphData = buildGraphologyGraph(this.cache);
+
+    const elementStates = new Map();
+    // Hover layer (InteractionManager writes, reducers read) is separate
+    // from elementStates so hover can never corrupt selection state.
+    const hoverIds = new Set();
+    try {
+      const { SigmaAdapter } = await import("./sigma_adapter.js");
       this.cache.graph = new SigmaAdapter(this.cache, "innerGraphContainer", {
         nodeReducer: makeNodeReducer(this.cache, elementStates, hoverIds),
         edgeReducer: makeEdgeReducer(this.cache, elementStates, hoverIds),
@@ -107,29 +149,36 @@ class GraphCoreManager {
         // on construction and on every render().
         settings: {},
       });
+    } catch (err) {
+      // The probe can pass while sigma's own context creation still fails
+      // (e.g. context-count limits). Same dead-renderer handling.
+      this.cache.graph = null;
+      renderWebGLUnavailableMessage(containerEl);
+      this.cache.ui.error(`Graph renderer failed to initialize: ${err.message}`);
+      return;
+    }
 
-      const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
+    const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
 
-      // Re-apply per-layout node/edge styles on every graph rebuild (data-editor
-      // apply, JSON load). buildGraphologyGraph does not merge layout.nodeStyles/
-      // edgeStyles, and the only other applyLayoutStyles caller is changeLayout().
-      // Runs before the layout algorithm below so freshly computed positions are
-      // never clobbered by the style reset. Skipped when the layout carries no
-      // custom styles: refs are already originalStyle right after a rebuild, and
-      // the full reset pass clones every element (~700 ms at 15k elements).
-      if (layout.nodeStyles?.size || layout.edgeStyles?.size) {
-        await this.cache.lm.applyLayoutStyles(layout);
-      }
+    // Re-apply per-layout node/edge styles on every graph rebuild (data-editor
+    // apply, JSON load). buildGraphologyGraph does not merge layout.nodeStyles/
+    // edgeStyles, and the only other applyLayoutStyles caller is changeLayout().
+    // Runs before the layout algorithm below so freshly computed positions are
+    // never clobbered by the style reset. Skipped when the layout carries no
+    // custom styles: refs are already originalStyle right after a rebuild, and
+    // the full reset pass clones every element (~700 ms at 15k elements).
+    if (layout.nodeStyles?.size || layout.edgeStyles?.size) {
+      await this.cache.lm.applyLayoutStyles(layout);
+    }
 
-      // If layout has no positions yet but has a layoutType, apply that layout algorithm once
-      if (layout.positions.size === 0 && layout.layoutType) {
-        const internals =
-          this.cache.DEFAULTS.LAYOUT_INTERNALS[layout.layoutType] || {};
-        await this.cache.graph.setLayout({
-          type: layout.layoutType,
-          ...internals,
-        });
-      }
+    // If layout has no positions yet but has a layoutType, apply that layout algorithm once
+    if (layout.positions.size === 0 && layout.layoutType) {
+      const internals =
+        this.cache.DEFAULTS.LAYOUT_INTERNALS[layout.layoutType] || {};
+      await this.cache.graph.setLayout({
+        type: layout.layoutType,
+        ...internals,
+      });
     }
   }
 

@@ -961,6 +961,10 @@ class DataTable {
       // this.fileData = structuredClone(updatedFileData);
 
       await this.cache.gcm.createGraphInstance();
+      if (!this.cache.graph) {
+        this.cache.ui.error("Graph not initialized, aborting.");
+        return;
+      }
       await this.cache.graph.render();
 
       // Refresh UI to update node/edge counts and filter availability

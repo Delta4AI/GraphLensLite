@@ -17,6 +17,10 @@ class GraphSelectionManager {
    * Selects given element IDs while deselecting all others
    */
   async selectElements(elementIDs, refMap, stateOverride = "selected") {
+    // cache.graph is null both before any data is loaded and when WebGL init
+    // failed (dead renderer); selection is a silent no-op in either state.
+    if (!this.cache.graph) return;
+
     const visibility = {};
     const elementIDsAsSet = new Set(elementIDs);
 
@@ -35,6 +39,8 @@ class GraphSelectionManager {
   }
 
   async updateSelectedState(elemData, enable) {
+    if (!this.cache.graph) return;
+
     await this.cache.ui.showLoading(enable ? "Selecting" : "Deselecting", `Modifying selection of ${elemData.length} elements`);
     await new Promise(resolve => requestAnimationFrame(resolve));
 
@@ -55,6 +61,8 @@ class GraphSelectionManager {
   }
 
   async getSelectedNodes() {
+    if (!this.cache.graph) return [];
+
     return await this.cache.graph.getNodeData().filter(n => n.states?.includes("selected"));
   }
 
@@ -71,11 +79,15 @@ class GraphSelectionManager {
   }
 
   async toggleSelectionForAllNodes(enable) {
+    if (!this.cache.graph) return;
+
     const nodes = await this.cache.graph.getNodeData();
     await this.updateSelectedState(nodes, enable);
   }
 
   async toggleSelectionForAllEdges(enable) {
+    if (!this.cache.graph) return;
+
     const edges = await this.cache.graph.getEdgeData();
     await this.updateSelectedState(edges, enable);
   }
@@ -108,6 +120,11 @@ class GraphSelectionManager {
   }
 
   undoSelection() {
+    // Silent no-op without a renderer: syncSelectionCacheAndElementStates
+    // below reads cache.graph, and moving the memory index without syncing
+    // would desync the snapshot stack.
+    if (!this.cache.graph) return;
+
     if (this.cache.selectedMemoryIndex > 0) {
       this.cache.selectedMemoryIndex--;
       this.syncSelectionCacheAndElementStates();
@@ -117,6 +134,8 @@ class GraphSelectionManager {
   }
 
   redoSelection() {
+    if (!this.cache.graph) return;
+
     if (this.cache.selectionMemory.length > this.cache.selectedMemoryIndex + 1) {
       this.cache.selectedMemoryIndex++;
       this.syncSelectionCacheAndElementStates();

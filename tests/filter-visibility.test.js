@@ -93,4 +93,13 @@ describe("GraphFilterManager.updateElementVisibility", () => {
 
     expect(cache.metrics.invalidateMetricValues).toHaveBeenCalledTimes(1);
   });
+
+  it("is a silent no-op when the renderer is unavailable (cache.graph null)", async () => {
+    // Same state as "no data loaded yet" — must not crash or invalidate.
+    cache.graph = null;
+
+    await expect(fm.updateElementVisibility(["n1"], ["n2"])).resolves.toBeUndefined();
+    expect(cache.metrics.invalidateMetricValues).not.toHaveBeenCalled();
+    expect(cache.visibleElementsChanged).toBe(false);
+  });
 });

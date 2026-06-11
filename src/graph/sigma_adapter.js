@@ -35,7 +35,7 @@ const SHAPE_TEXTURE_RESOLUTION = 512;
 // after a miss; style changes left nodes invisible (transparent base color)
 // for that long. 50 ms keeps batching without visible flicker.
 const ATLAS_REGEN_DEBOUNCE_MS = 50;
-// Trailing-edge debounce for container ResizeObserver → sigma.resize();
+// Trailing-edge debounce for container ResizeObserver → this.resize();
 // rides out the 0.3 s CSS panel transitions without a resize per frame.
 const RESIZE_DEBOUNCE_MS = 50;
 
@@ -214,9 +214,7 @@ class SigmaAdapter {
     this.resizeDebounce = null;
     this.resizeObserver = new ResizeObserver(() => {
       clearTimeout(this.resizeDebounce);
-      this.resizeDebounce = setTimeout(() => {
-        if (!this.killed) this.sigma.resize();
-      }, RESIZE_DEBOUNCE_MS);
+      this.resizeDebounce = setTimeout(() => this.resize(), RESIZE_DEBOUNCE_MS);
     });
     this.resizeObserver.observe(containerEl);
     this.interactions = new InteractionManager(this, cache, hoverIds, containerEl);
@@ -297,8 +295,16 @@ class SigmaAdapter {
     this.sigma.kill();
   }
 
+  /**
+   * Container-resize entry point (ResizeObserver debounce + panel-toggle
+   * callers). NOT sigma.resize(): that only resizes the canvases — clearing
+   * their WebGL buffers — and never schedules a render, leaving the graph
+   * blank until the next camera move (scripts/resize_redraw_check.js).
+   * render() starts by resizing, so scheduling a render covers both.
+   */
   resize() {
-    this.sigma.resize();
+    if (this.killed) return;
+    this.sigma.scheduleRender();
   }
 
   /**

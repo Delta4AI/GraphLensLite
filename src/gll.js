@@ -388,6 +388,11 @@ async function loadDemoData() {
         cache.ui.buildUI();
 
         await cache.gcm.createGraphInstance();
+        if (!cache.graph) {
+          await cache.ui.hideLoading();
+          resolve(false);
+          return;
+        }
         await cache.graph.render();
         resolve(true);
       } else {
@@ -428,6 +433,10 @@ async function startTour() {
   cache.ui.buildUI();
 
   await cache.gcm.createGraphInstance();
+  if (!cache.graph) {
+    await cache.ui.hideLoading();
+    return;
+  }
   await cache.graph.render();
   await cache.ui.hideLoading();
 
