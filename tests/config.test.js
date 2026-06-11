@@ -200,10 +200,9 @@ describe('CFG', () => {
     expect(CFG.MAX_SELECTION_MEMORY).toBeGreaterThan(0)
   })
 
-  it('has valid filter step sizes', () => {
+  it('has a valid integer filter step size (floats use a continuous step="any")', () => {
     expect(CFG.FILTER_STEP_SIZE_INTEGER).toBe(1)
-    expect(CFG.FILTER_STEP_SIZE_FLOAT).toBeGreaterThan(0)
-    expect(CFG.FILTER_STEP_SIZE_FLOAT).toBeLessThan(1)
+    expect(CFG.FILTER_STEP_SIZE_FLOAT).toBeUndefined()
   })
 
   it('has required Excel header strings', () => {

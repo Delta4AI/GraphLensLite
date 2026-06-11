@@ -208,11 +208,10 @@ const CFG = {
 // Determines if filter sliders should be hidden when the minimum and maximum values are identical
   HIDE_SLIDERS_WITH_SAME_MIN_MAX_VALUES: true,
 
-// Specifies the slider step size for integer-based properties
+// Specifies the slider step size for integer-based properties.
+// Float-based properties use a continuous slider (step="any"), so they have no
+// configurable step — see InvertibleRangeSlider.
   FILTER_STEP_SIZE_INTEGER: 1,
-
-// Specifies the slider step size for float-based properties
-  FILTER_STEP_SIZE_FLOAT: 0.000001,
 
 // Specifies the slider thumb- and tooltip-values (only visually); internally, the full float precision is used
   FILTER_VISUAL_FLOAT_PRECISION: 3,

@@ -237,9 +237,12 @@ class InvertibleRangeSlider {
     this.sliderMin = defaultFilterData.lowerThreshold;
     this.sliderMax = defaultFilterData.upperThreshold;
     const allInteger = StaticUtilities.isInteger(this.sliderMin) && StaticUtilities.isInteger(this.sliderMax) && !defaultFilterData.hasFloatValues;
-    this.stepSize = allInteger
-      ? this.cache.CFG.FILTER_STEP_SIZE_INTEGER
-      : this.cache.CFG.FILTER_STEP_SIZE_FLOAT;
+    // Integer columns step by whole units (discrete counts). Float columns use
+    // "any" — a continuous control with no value grid, so the column max (and
+    // any high-decimal value) stays exactly selectable via both the slider and
+    // the number box, at any column magnitude. A fixed absolute step floored
+    // the reachable max below the true max and broke selection of the top node.
+    this.stepSize = allInteger ? this.cache.CFG.FILTER_STEP_SIZE_INTEGER : "any";
     this.initializeIds();
     this.inputStart = null;
     this.inputEnd = null;

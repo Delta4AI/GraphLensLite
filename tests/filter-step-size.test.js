@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { IOManager } from '../src/managers/io.js'
+import { InvertibleRangeSlider } from '../src/managers/ui_components.js'
 import { StaticUtilities } from '../src/utilities/static.js'
 import { CFG, DEFAULTS } from '../src/config.js'
 
@@ -139,12 +140,13 @@ describe('populateFilterPropsLowsAndHighs — hasFloatValues flag', () => {
 })
 
 describe('InvertibleRangeSlider step-size determination', () => {
-  // Mirrors the logic in the InvertibleRangeSlider constructor without needing DOM
+  // Mirrors the logic in the InvertibleRangeSlider constructor without needing DOM.
+  // Integer columns step by whole units; float columns use a continuous "any".
   function computeStepSize(filterDefault) {
     const sliderMin = filterDefault.lowerThreshold
     const sliderMax = filterDefault.upperThreshold
     const allInteger = StaticUtilities.isInteger(sliderMin) && StaticUtilities.isInteger(sliderMax) && !filterDefault.hasFloatValues
-    return allInteger ? CFG.FILTER_STEP_SIZE_INTEGER : CFG.FILTER_STEP_SIZE_FLOAT
+    return allInteger ? CFG.FILTER_STEP_SIZE_INTEGER : 'any'
   }
 
   it('uses integer step when all values are integers (min=0, max=10)', () => {
@@ -152,19 +154,19 @@ describe('InvertibleRangeSlider step-size determination', () => {
     expect(computeStepSize(fd)).toBe(CFG.FILTER_STEP_SIZE_INTEGER)
   })
 
-  it('uses float step when intermediate floats exist between integer min/max', () => {
+  it('uses continuous step when intermediate floats exist between integer min/max', () => {
     const fd = { lowerThreshold: 0, upperThreshold: 1, hasFloatValues: true }
-    expect(computeStepSize(fd)).toBe(CFG.FILTER_STEP_SIZE_FLOAT)
+    expect(computeStepSize(fd)).toBe('any')
   })
 
-  it('uses float step when min is a float', () => {
+  it('uses continuous step when min is a float', () => {
     const fd = { lowerThreshold: 0.5, upperThreshold: 10, hasFloatValues: true }
-    expect(computeStepSize(fd)).toBe(CFG.FILTER_STEP_SIZE_FLOAT)
+    expect(computeStepSize(fd)).toBe('any')
   })
 
-  it('uses float step when max is a float', () => {
+  it('uses continuous step when max is a float', () => {
     const fd = { lowerThreshold: 0, upperThreshold: 10.5, hasFloatValues: true }
-    expect(computeStepSize(fd)).toBe(CFG.FILTER_STEP_SIZE_FLOAT)
+    expect(computeStepSize(fd)).toBe('any')
   })
 
   it('uses integer step for large integer range', () => {
@@ -172,9 +174,9 @@ describe('InvertibleRangeSlider step-size determination', () => {
     expect(computeStepSize(fd)).toBe(CFG.FILTER_STEP_SIZE_INTEGER)
   })
 
-  it('uses float step when hasFloatValues is true even with same min/max', () => {
+  it('uses continuous step when hasFloatValues is true even with same min/max', () => {
     const fd = { lowerThreshold: 5, upperThreshold: 5, hasFloatValues: true }
-    expect(computeStepSize(fd)).toBe(CFG.FILTER_STEP_SIZE_FLOAT)
+    expect(computeStepSize(fd)).toBe('any')
   })
 
   it('uses integer step when hasFloatValues is undefined (backwards compat)', () => {
@@ -182,15 +184,40 @@ describe('InvertibleRangeSlider step-size determination', () => {
     // undefined is falsy, so !undefined === true → treated as all-integer
     expect(computeStepSize(fd)).toBe(CFG.FILTER_STEP_SIZE_INTEGER)
   })
+})
 
-  it('reproduces the original bug: min=0, max=1, no hasFloatValues flag', () => {
-    // Without the fix, this would yield integer step (the bug)
-    const fdBuggy = { lowerThreshold: 0, upperThreshold: 1, hasFloatValues: false }
-    expect(computeStepSize(fdBuggy)).toBe(CFG.FILTER_STEP_SIZE_INTEGER)
+describe('InvertibleRangeSlider — stepSize wiring (no DOM needed)', () => {
+  function makeCache(propID, filterDefault) {
+    return {
+      CFG,
+      DEFAULTS,
+      data: {
+        filterDefaults: new Map([[propID, { categories: new Set(), isInverted: false, ...filterDefault }]]),
+        layouts: { L: { filters: new Map() } },
+        selectedLayout: 'L'
+      },
+      propIDToInvertibleRangeSliders: new Map()
+    }
+  }
 
-    // With the fix, hasFloatValues=true yields float step
-    const fdFixed = { lowerThreshold: 0, upperThreshold: 1, hasFloatValues: true }
-    expect(computeStepSize(fdFixed)).toBe(CFG.FILTER_STEP_SIZE_FLOAT)
+  it('integer column → numeric step of 1', () => {
+    const propID = 'Node filters::Counts::drugs'
+    const slider = new InvertibleRangeSlider(propID, makeCache(propID, { lowerThreshold: 0, upperThreshold: 5, hasFloatValues: false }))
+    expect(slider.stepSize).toBe(1)
+  })
+
+  it('float column → continuous "any" so the exact column max stays selectable', () => {
+    // The reported AOP208 / ADCY1 case: full-precision float max.
+    const propID = 'Node filters::Interference Off Label::AOP208'
+    const slider = new InvertibleRangeSlider(propID, makeCache(propID, { lowerThreshold: 0, upperThreshold: 0.00339857993386777, hasFloatValues: true }))
+    expect(slider.stepSize).toBe('any')
+    expect(slider.sliderMax).toBe(0.00339857993386777)
+  })
+
+  it('float column with integer-looking bounds still uses "any" (hasFloatValues wins)', () => {
+    const propID = 'Node filters::Evidence::score'
+    const slider = new InvertibleRangeSlider(propID, makeCache(propID, { lowerThreshold: 0, upperThreshold: 1, hasFloatValues: true }))
+    expect(slider.stepSize).toBe('any')
   })
 })
 
