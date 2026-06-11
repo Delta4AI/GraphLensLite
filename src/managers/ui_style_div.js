@@ -933,28 +933,32 @@ function createStyleDiv(cache) {
     createBooleanControls(rowThirteen, "Edge Start Arrow", "Enable/Disable the start arrow of the selected edges.");
 
     const rowFourteen = createNewRow(edgeDiv);
-    appendLabel(rowFourteen, "Start Arrow Size", "Define the size of the start arrow of the selected edges.");
+    appendLabel(rowFourteen, "Start Arrow Size", "Define the size of the start marker of the selected edges.");
     createNumericalSlider(rowFourteen, "Edge Start Arrow Size", cache.DEFAULTS.EDGE.ARROWS.START_SIZE,
-      {min: 10, max: 40, step: 1}, "Define the size of the start arrow of the selected edges.", true);
+      {min: 4, max: 40, step: 1}, "Define the size of the start marker of the selected edges.", true);
 
     const rowFifteen = createNewRow(edgeDiv);
-    appendLabel(rowFifteen, "Start Arrow Type", "Define the type of the start arrow of the selected edges.");
+    appendLabel(rowFifteen, "Start Arrow Type",
+      "Marker shape at the source end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
     createCategoricalControls(rowFifteen, "Edge Start Arrow Type", cache.DEFAULTS.EDGE.ARROWS.START_TYPE,
-      cache.DEFAULTS.STYLES.EDGE_ARROW_TYPES, "Define the type of the start arrow of the selected edges.");
+      cache.DEFAULTS.STYLES.EDGE_ARROW_TYPES,
+      "Marker shape at the source end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
 
     const rowSixteen = createNewRow(edgeDiv);
     appendLabel(rowSixteen, "End Arrow", "Enable/Disable the end arrow of the selected edges.");
     createBooleanControls(rowSixteen, "Edge End Arrow", "Enable/Disable the end arrow of the selected edges.");
 
     const rowEighteen = createNewRow(edgeDiv);
-    appendLabel(rowEighteen, "End Arrow Size", "Define the size of the end arrow of the selected edges.");
+    appendLabel(rowEighteen, "End Arrow Size", "Define the size of the end marker of the selected edges.");
     createNumericalSlider(rowEighteen, "Edge End Arrow Size", cache.DEFAULTS.EDGE.ARROWS.END_SIZE,
-      {min: 10, max: 40, step: 1}, "Define the size of the end arrow of the selected edges.", true);
+      {min: 4, max: 40, step: 1}, "Define the size of the end marker of the selected edges.", true);
 
     const rowNineteen = createNewRow(edgeDiv);
-    appendLabel(rowNineteen, "End Arrow Type", "Define the type of the end arrow of the selected edges.");
+    appendLabel(rowNineteen, "End Arrow Type",
+      "Marker shape at the target end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
     createCategoricalControls(rowNineteen, "Edge End Arrow Type", cache.DEFAULTS.EDGE.ARROWS.END_TYPE,
-      cache.DEFAULTS.STYLES.EDGE_ARROW_TYPES, "Define the type of the end arrow of the selected edges.");
+      cache.DEFAULTS.STYLES.EDGE_ARROW_TYPES,
+      "Marker shape at the target end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
 
     appendHorizontalRule(edgeDiv);
 
@@ -964,7 +968,7 @@ function createStyleDiv(cache) {
 
     const rowTwentyOne = createNewRow(edgeDiv);
     appendLabel(rowTwentyOne, "Halo Color", "Define the color of the halo for the selected edges.");
-    createColorControls(rowTwentyOne, "Edge Halo Color", cache.DEFAULTS.EDGE.COLOR,
+    createColorControls(rowTwentyOne, "Edge Halo Color", cache.DEFAULTS.EDGE.HALO.COLOR,
       cache.DEFAULTS.STYLES.EDGE_COLORS);
 
     const rowTwentyTwo = createNewRow(edgeDiv);

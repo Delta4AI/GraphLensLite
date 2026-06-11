@@ -4,6 +4,8 @@ import {
   nodeAttributesFromStyle,
   edgeAttributesFromStyle,
   sigmaEdgeType,
+  edgeMarkerCode,
+  EDGE_MARKERS,
   flipY,
   hoverNeighborhood,
   makeNodeReducer,
@@ -246,7 +248,8 @@ describe("buildGraphologyGraph — population", () => {
 
     expect(graph.getEdgeAttribute("straight", "type")).toBe("line");
     expect(graph.getEdgeAttribute("curved", "type")).toBe("curve");
-    expect(graph.getEdgeAttribute("arrowed", "type")).toBe("arrow");
+    expect(graph.getEdgeAttribute("arrowed", "type")).toBe("styledLine");
+    expect(graph.getEdgeAttribute("arrowed", "endMarker")).toBe(EDGE_MARKERS.arrow);
   });
 });
 
@@ -526,19 +529,249 @@ describe("attribute mapping helpers", () => {
     });
   });
 
-  it("sigmaEdgeType maps the full type × arrows matrix", () => {
+  it("sigmaEdgeType routes plain edges to the fast paths", () => {
     expect(sigmaEdgeType("line")).toBe("line");
-    expect(sigmaEdgeType("line", { endArrow: true })).toBe("arrow");
-    expect(sigmaEdgeType("line", { startArrow: true })).toBe("sourceArrow");
-    expect(sigmaEdgeType("line", { startArrow: true, endArrow: true })).toBe("doubleArrow");
+    expect(sigmaEdgeType("line", { startArrow: false, endArrow: false, halo: false })).toBe("line");
     for (const curved of ["cubic", "quadratic", "polyline"]) {
       expect(sigmaEdgeType(curved)).toBe("curve");
-      expect(sigmaEdgeType(curved, { endArrow: true })).toBe("curvedArrow");
-      expect(sigmaEdgeType(curved, { startArrow: true })).toBe("curvedSourceArrow");
-      expect(sigmaEdgeType(curved, { startArrow: true, endArrow: true })).toBe(
-        "curvedDoubleArrow",
-      );
     }
+  });
+
+  it("sigmaEdgeType routes any marker or halo to the styled compound programs", () => {
+    for (const style of [
+      { endArrow: true },
+      { startArrow: true },
+      { startArrow: true, endArrow: true },
+      { halo: true },
+      { halo: true, haloLineWidth: 5 },
+    ]) {
+      expect(sigmaEdgeType("line", style)).toBe("styledLine");
+      for (const curved of ["cubic", "quadratic", "polyline"]) {
+        expect(sigmaEdgeType(curved, style)).toBe("styledCurve");
+      }
+    }
+  });
+
+  it("sigmaEdgeType ignores a halo with zero width or disabled flag", () => {
+    expect(sigmaEdgeType("line", { halo: true, haloLineWidth: 0 })).toBe("line");
+    expect(sigmaEdgeType("line", { halo: false, haloLineWidth: 5 })).toBe("line");
+    expect(sigmaEdgeType("cubic", { halo: true, haloLineWidth: 0 })).toBe("curve");
+  });
+
+  it("edgeMarkerCode maps the new vocabulary and legacy G6 aliases", () => {
+    expect(edgeMarkerCode("arrow")).toBe(EDGE_MARKERS.arrow);
+    expect(edgeMarkerCode("rect")).toBe(EDGE_MARKERS.rect);
+    expect(edgeMarkerCode("diamond")).toBe(EDGE_MARKERS.diamond);
+    expect(edgeMarkerCode("circle")).toBe(EDGE_MARKERS.circle);
+    expect(edgeMarkerCode("tee")).toBe(EDGE_MARKERS.tee);
+    // Legacy G6 arrow types degrade to the nearest marker, never to "none".
+    expect(edgeMarkerCode("triangle")).toBe(EDGE_MARKERS.arrow);
+    expect(edgeMarkerCode("vee")).toBe(EDGE_MARKERS.arrow);
+    expect(edgeMarkerCode("simple")).toBe(EDGE_MARKERS.arrow);
+    expect(edgeMarkerCode("triangleRect")).toBe(EDGE_MARKERS.rect);
+    expect(edgeMarkerCode("square")).toBe(EDGE_MARKERS.rect);
+    expect(edgeMarkerCode("unknown-future-type")).toBe(EDGE_MARKERS.arrow);
+    expect(edgeMarkerCode(undefined)).toBe(EDGE_MARKERS.arrow);
+  });
+});
+
+describe("edge marker + halo attribute mapping", () => {
+  // The adapter applies updates via mergeEdgeAttributes, so the full
+  // marker/halo set must be emitted on every type-bearing mapping — off
+  // states as 0/null, never omitted.
+  const FULL_OFF = {
+    startMarker: 0,
+    startMarkerSize: 0,
+    endMarker: 0,
+    endMarkerSize: 0,
+    haloWidth: 0,
+    haloColor: null,
+  };
+
+  it("emits the full marker/halo set (all off) for a bare typed edge", () => {
+    const attrs = edgeAttributesFromStyle({}, "line");
+
+    expect(attrs).toEqual({ type: "line", ...FULL_OFF });
+  });
+
+  it("omits marker/halo attrs when no type is given (delta-only mapping)", () => {
+    const attrs = edgeAttributesFromStyle({ stroke: "#112233" });
+
+    expect(attrs).toEqual({ color: "#112233" });
+  });
+
+  it("maps enabled arrows to marker enums with per-end sizes", () => {
+    const attrs = edgeAttributesFromStyle(
+      {
+        startArrow: true,
+        startArrowType: "tee",
+        startArrowSize: 12,
+        endArrow: true,
+        endArrowType: "circle",
+        endArrowSize: 10,
+      },
+      "line",
+    );
+
+    expect(attrs.type).toBe("styledLine");
+    expect(attrs.startMarker).toBe(EDGE_MARKERS.tee);
+    expect(attrs.startMarkerSize).toBe(12);
+    expect(attrs.endMarker).toBe(EDGE_MARKERS.circle);
+    expect(attrs.endMarkerSize).toBe(10);
+  });
+
+  it("disabled arrow flag zeroes the marker even when a type string is set", () => {
+    const attrs = edgeAttributesFromStyle(
+      { startArrow: false, startArrowType: "diamond", endArrow: true, endArrowType: "diamond" },
+      "line",
+    );
+
+    expect(attrs.startMarker).toBe(0);
+    expect(attrs.endMarker).toBe(EDGE_MARKERS.diamond);
+  });
+
+  it("non-finite or non-positive arrow sizes fall back to 0 (proportional sizing)", () => {
+    const attrs = edgeAttributesFromStyle(
+      { endArrow: true, endArrowSize: -3, startArrow: true, startArrowSize: "big" },
+      "line",
+    );
+
+    expect(attrs.startMarkerSize).toBe(0);
+    expect(attrs.endMarkerSize).toBe(0);
+  });
+
+  it("maps an enabled halo to haloWidth/haloColor", () => {
+    const attrs = edgeAttributesFromStyle(
+      { halo: true, haloLineWidth: 4, haloStroke: "#8CA6D9" },
+      "line",
+    );
+
+    expect(attrs.type).toBe("styledLine");
+    expect(attrs.haloWidth).toBe(4);
+    expect(attrs.haloColor).toBe("#8CA6D9");
+  });
+
+  it("halo without explicit width uses the config default width", () => {
+    const attrs = edgeAttributesFromStyle({ halo: true }, "line");
+
+    expect(attrs.haloWidth).toBe(DEFAULTS.EDGE.HALO.WIDTH);
+    expect(attrs.haloColor).toBe(DEFAULTS.EDGE.HALO.COLOR);
+  });
+
+  it("disabled halo clears width and color regardless of the other halo keys", () => {
+    const attrs = edgeAttributesFromStyle(
+      { halo: false, haloLineWidth: 9, haloStroke: "#8CA6D9" },
+      "line",
+    );
+
+    expect(attrs.haloWidth).toBe(0);
+    expect(attrs.haloColor).toBeNull();
+  });
+
+  describe("merge hygiene matrix (mergeEdgeAttributes semantics)", () => {
+    const merge = (from, to) => ({ ...from, ...to });
+    const ARROWS_ON = {
+      startArrow: true,
+      startArrowType: "rect",
+      startArrowSize: 12,
+      endArrow: true,
+      endArrowType: "tee",
+      endArrowSize: 10,
+    };
+    const HALO_ON = { halo: true, haloLineWidth: 5, haloStroke: "#C33D35" };
+
+    it("markers on → off clears both enums and routes back to the fast path", () => {
+      const res = merge(
+        edgeAttributesFromStyle(ARROWS_ON, "line"),
+        edgeAttributesFromStyle({ ...ARROWS_ON, startArrow: false, endArrow: false }, "line"),
+      );
+
+      expect(res.type).toBe("line");
+      expect(res.startMarker).toBe(0);
+      expect(res.endMarker).toBe(0);
+    });
+
+    it("halo on → off clears width/color and routes back to the fast path", () => {
+      const res = merge(
+        edgeAttributesFromStyle(HALO_ON, "line"),
+        edgeAttributesFromStyle({ ...HALO_ON, halo: false }, "line"),
+      );
+
+      expect(res.type).toBe("line");
+      expect(res.haloWidth).toBe(0);
+      expect(res.haloColor).toBeNull();
+    });
+
+    it("halo toggles never disturb marker attrs (and vice versa)", () => {
+      const both = edgeAttributesFromStyle({ ...ARROWS_ON, ...HALO_ON }, "line");
+      const haloOff = merge(
+        both,
+        edgeAttributesFromStyle({ ...ARROWS_ON, ...HALO_ON, halo: false }, "line"),
+      );
+
+      expect(haloOff.type).toBe("styledLine"); // markers still active
+      expect(haloOff.startMarker).toBe(EDGE_MARKERS.rect);
+      expect(haloOff.endMarker).toBe(EDGE_MARKERS.tee);
+      expect(haloOff.haloWidth).toBe(0);
+
+      const markersOff = merge(
+        both,
+        edgeAttributesFromStyle(
+          { ...ARROWS_ON, ...HALO_ON, startArrow: false, endArrow: false },
+          "line",
+        ),
+      );
+      expect(markersOff.type).toBe("styledLine"); // halo still active
+      expect(markersOff.haloWidth).toBe(5);
+      expect(markersOff.startMarker).toBe(0);
+      expect(markersOff.endMarker).toBe(0);
+    });
+
+    it("marker type change overwrites the enum in place", () => {
+      const res = merge(
+        edgeAttributesFromStyle(ARROWS_ON, "line"),
+        edgeAttributesFromStyle({ ...ARROWS_ON, endArrowType: "circle" }, "line"),
+      );
+
+      expect(res.endMarker).toBe(EDGE_MARKERS.circle);
+      expect(res.startMarker).toBe(EDGE_MARKERS.rect);
+    });
+
+    it("straight ↔ curved type changes keep the marker/halo set coherent", () => {
+      const straight = edgeAttributesFromStyle({ ...ARROWS_ON, ...HALO_ON }, "line");
+      const curved = merge(
+        straight,
+        edgeAttributesFromStyle({ ...ARROWS_ON, ...HALO_ON }, "cubic"),
+      );
+
+      expect(curved.type).toBe("styledCurve");
+      expect(curved.startMarker).toBe(EDGE_MARKERS.rect);
+      expect(curved.haloWidth).toBe(5);
+    });
+  });
+
+  it("propagates marker/halo attrs into the built graph", () => {
+    const cache = createMockCache({
+      nodes: [makeNode("a"), makeNode("b")],
+      edges: [
+        makeEdge(
+          "e1",
+          "a",
+          "b",
+          { endArrow: true, endArrowType: "tee", endArrowSize: 14, halo: true, haloLineWidth: 2 },
+          "line",
+        ),
+      ],
+    });
+
+    const graph = buildGraphologyGraph(cache);
+
+    expect(graph.getEdgeAttribute("e1", "type")).toBe("styledLine");
+    expect(graph.getEdgeAttribute("e1", "endMarker")).toBe(EDGE_MARKERS.tee);
+    expect(graph.getEdgeAttribute("e1", "endMarkerSize")).toBe(14);
+    expect(graph.getEdgeAttribute("e1", "startMarker")).toBe(0);
+    expect(graph.getEdgeAttribute("e1", "haloWidth")).toBe(2);
+    expect(graph.getEdgeAttribute("e1", "haloColor")).toBe(DEFAULTS.EDGE.HALO.COLOR);
   });
 });
 

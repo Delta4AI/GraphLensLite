@@ -11,9 +11,6 @@ import {
   Sigma,
   exportImage,
   EdgeRectangleProgram,
-  EdgeArrowProgram,
-  EdgeDoubleArrowProgram,
-  createEdgeArrowHeadProgram,
   createEdgeCompoundProgram,
   drawDiscNodeHover,
   NodeSquareProgram,
@@ -21,6 +18,11 @@ import {
   nodeImage,
   edgeCurve,
 } from "../lib/sigma.bundle.mjs";
+import {
+  EdgeHaloProgram,
+  createCurveHaloProgram,
+  createEdgeMarkerHeadProgram,
+} from "./edge_programs.js";
 import { nodeAttributesFromStyle, edgeAttributesFromStyle, flipY } from "./graph_model.js";
 import { executeLayout } from "./layout_algorithms.js";
 import { drawNodeLabel, drawEdgeLabel } from "./label_renderers.js";
@@ -64,8 +66,13 @@ function guardHoverDrawer(drawer, getDraggedNode) {
  * Nodes: circle native, square via @sigma/node-square, bordered circles via
  * @sigma/node-border ("borderCircle"); every other shape — and any bordered
  * non-circle or haloed node — uses the SVG texture program ("shape").
- * Edges: straight programs are sigma built-ins; curved ones come from
- * @sigma/edge-curve (cubic/quadratic/polyline all map to one curve type).
+ * Edges: two parametric programs per curvature (graph_model.sigmaEdgeType
+ * routes): "line"/"curve" are the plain fast paths for unstyled edges;
+ * "styledLine"/"styledCurve" compose halo-under → body → marker heads
+ * (compound programs draw in array order) and are fully parameterized by
+ * per-edge attrs (startMarker/endMarker enum + sizes, haloWidth/haloColor) —
+ * no registry growth per marker shape or halo toggle. Off states collapse to
+ * degenerate geometry in the custom programs (see edge_programs.js).
  *
  * @param {() => string|null} getDraggedNode  hover-guard input (see
  *   guardHoverDrawer); NodeSquareProgram carries its own instance drawHover
@@ -117,10 +124,12 @@ function buildProgramRegistry(getDraggedNode) {
       { size: { fill: true }, color: { attribute: "color" } },
     ],
   });
-  const curveOptions = (extremity) => ({
-    arrowHead: extremity
-      ? { ...edgeCurve.DEFAULT_EDGE_CURVE_PROGRAM_OPTIONS.arrowHead, extremity }
-      : null,
+  // One curve class serves both the plain "curve" type and the body/halo
+  // sub-programs of "styledCurve" (each gets its own instance + buffers).
+  // arrowHead stays null: end markers are drawn by the parametric marker-head
+  // sub-programs, oriented along the same bezier tangent.
+  const curveProgram = edgeCurve.createEdgeCurveProgram({
+    arrowHead: null,
     drawLabel: drawCurvedEdgeLabelWithSize,
   });
   return {
@@ -131,16 +140,22 @@ function buildProgramRegistry(getDraggedNode) {
     },
     edgeProgramClasses: {
       line: EdgeRectangleProgram,
-      arrow: EdgeArrowProgram,
-      sourceArrow: createEdgeCompoundProgram([
+      styledLine: createEdgeCompoundProgram([
+        EdgeHaloProgram,
         EdgeRectangleProgram,
-        createEdgeArrowHeadProgram({ extremity: "source" }),
+        createEdgeMarkerHeadProgram({ extremity: "source" }),
+        createEdgeMarkerHeadProgram({ extremity: "target" }),
       ]),
-      doubleArrow: EdgeDoubleArrowProgram,
-      curve: edgeCurve.createEdgeCurveProgram(curveOptions(null)),
-      curvedArrow: edgeCurve.createEdgeCurveProgram(curveOptions("target")),
-      curvedSourceArrow: edgeCurve.createEdgeCurveProgram(curveOptions("source")),
-      curvedDoubleArrow: edgeCurve.createEdgeCurveProgram(curveOptions("both")),
+      curve: curveProgram,
+      styledCurve: createEdgeCompoundProgram(
+        [
+          createCurveHaloProgram(curveProgram),
+          curveProgram,
+          createEdgeMarkerHeadProgram({ extremity: "source", curved: true }),
+          createEdgeMarkerHeadProgram({ extremity: "target", curved: true }),
+        ],
+        drawCurvedEdgeLabelWithSize,
+      ),
     },
   };
 }

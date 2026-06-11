@@ -207,13 +207,13 @@ An edge is an object. `source` and `target` are required and must match node
 | `stroke`         | hex     | `"#403C5390"` | Line colour (last 2 hex digits = alpha).             |
 | `lineWidth`      | number  | `0.75`        | Line thickness (px).                                 |
 | `lineDash`       | number  | `0`           | Dash length. **Note:** kept in the data model and round-trips through export, but the Sigma renderer draws all edges solid (dashes are not rendered in v1). |
-| `startArrow`     | boolean | `false`       | Arrowhead at the source end.                         |
-| `startArrowType` | string  | `"triangle"`  | `triangle`/`circle`/`diamond`/`vee`/`rect`/`simple`. Since the Sigma renderer all heads draw as triangles; the value is kept and round-trips. |
-| `startArrowSize` | number  | `8`           | Source arrowhead size.                               |
-| `endArrow`       | boolean | `false`       | Arrowhead at the target end.                         |
-| `endArrowType`   | string  | `"triangle"`  | Same enum as `startArrowType`.                       |
-| `endArrowSize`   | number  | `8`           | Target arrowhead size.                               |
-| `halo`           | boolean | `false`       | Glow behind the edge. Since the Sigma renderer, per-edge halos are kept in the model (and round-trip) but are not drawn; selection halos still render. |
+| `startArrow`     | boolean | `false`       | End marker at the source end.                        |
+| `startArrowType` | string  | `"arrow"`     | `arrow`/`rect`/`diamond`/`circle`/`tee` (⊣ inhibition bar). Legacy G6 names still load and round-trip unchanged (`triangle`/`vee`/`simple` → arrow, `triangleRect`/`square` → rect). |
+| `startArrowSize` | number  | `8`           | Source marker length (graph px). Unset/0 → sized proportionally to the line width. |
+| `endArrow`       | boolean | `false`       | End marker at the target end.                        |
+| `endArrowType`   | string  | `"arrow"`     | Same enum as `startArrowType`.                       |
+| `endArrowSize`   | number  | `8`           | Target marker length (graph px).                     |
+| `halo`           | boolean | `false`       | Glow drawn under the edge (total width = line + 2 × `haloLineWidth`), on straight and curved edges. Selecting an edge widens line and halo together. |
 | `haloStroke`     | hex     | `"#403C53"`   | Halo colour.                                         |
 | `haloLineWidth`  | number  | `3`           | Halo thickness (px).                                 |
 

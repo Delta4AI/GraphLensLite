@@ -174,24 +174,82 @@ function labelStyleAttributes(style) {
 }
 
 /**
- * Sigma edge program key for a G6 edge type + arrow flags.
+ * Edge end-marker vocabulary. The numeric codes are the `startMarker` /
+ * `endMarker` float attrs consumed by the WebGL marker-head program
+ * (edge_programs.js), which selects the SDF in its fragment shader:
+ *   arrow (directional triangle), rect, diamond, circle,
+ *   tee (⊣ inhibition bar, pharmacology-style).
+ * Legacy G6 arrow-type names map onto the nearest new marker so old files
+ * keep rendering; the original string still round-trips via the edge style.
+ */
+const EDGE_MARKERS = { arrow: 1, rect: 2, diamond: 3, circle: 4, tee: 5 };
+const LEGACY_MARKER_ALIASES = {
+  triangle: "arrow",
+  vee: "arrow",
+  simple: "arrow",
+  triangleRect: "rect",
+  square: "rect",
+};
+
+/** @returns {number} marker code for an arrow-type string (unknown → arrow) */
+function edgeMarkerCode(arrowType) {
+  const name = LEGACY_MARKER_ALIASES[arrowType] ?? arrowType;
+  return EDGE_MARKERS[name] ?? EDGE_MARKERS.arrow;
+}
+
+/** Effective halo width in px: 0 unless halo is enabled with a positive width. */
+function edgeHaloWidth(style) {
+  const width = style.haloLineWidth ?? DEFAULTS.EDGE.HALO.WIDTH;
+  return style.halo && width > 0 ? width : 0;
+}
+
+/**
+ * Sigma edge program key for a G6 edge type + marker/halo styling.
+ * Two parametric programs per curvature: the plain fast path ("line"/"curve")
+ * for the unstyled majority, and the compound halo+line+marker-heads program
+ * ("styledLine"/"styledCurve") whenever any end marker or halo is active —
+ * the per-edge attrs (start/endMarker, haloWidth, ...) parameterize it, so
+ * the registry never grows with the marker vocabulary.
  * Degradations (documented in API.md §5): `polyline` renders as a curve,
- * `lineDash` is dropped, arrow head shapes all render as triangles.
+ * `lineDash` is dropped.
  */
 function sigmaEdgeType(type, style = {}) {
   const curved = type === "cubic" || type === "quadratic" || type === "polyline";
-  const start = Boolean(style.startArrow);
-  const end = Boolean(style.endArrow);
-  if (start && end) return curved ? "curvedDoubleArrow" : "doubleArrow";
-  if (end) return curved ? "curvedArrow" : "arrow";
-  if (start) return curved ? "curvedSourceArrow" : "sourceArrow";
-  return curved ? "curve" : "line";
+  const styled = Boolean(style.startArrow) || Boolean(style.endArrow) || edgeHaloWidth(style) > 0;
+  if (curved) return styled ? "styledCurve" : "curve";
+  return styled ? "styledLine" : "line";
+}
+
+/**
+ * Marker + halo attrs read by the custom edge programs. Always emits the
+ * FULL set (off → 0/null): the adapter applies updates via
+ * mergeEdgeAttributes, so every toggle must overwrite what the previous
+ * style set or stale markers/halos survive a disable. Sizes are graph-space
+ * px (G6 arrow-size heritage); 0 means "derive from edge thickness" (sigma
+ * stock-arrow proportions).
+ */
+function edgeMarkerHaloAttributes(style) {
+  const haloWidth = edgeHaloWidth(style);
+  return {
+    startMarker: style.startArrow ? edgeMarkerCode(style.startArrowType) : 0,
+    startMarkerSize:
+      Number.isFinite(style.startArrowSize) && style.startArrowSize > 0 ? style.startArrowSize : 0,
+    endMarker: style.endArrow ? edgeMarkerCode(style.endArrowType) : 0,
+    endMarkerSize:
+      Number.isFinite(style.endArrowSize) && style.endArrowSize > 0 ? style.endArrowSize : 0,
+    haloWidth,
+    haloColor: haloWidth > 0 ? (style.haloStroke ?? DEFAULTS.EDGE.HALO.COLOR) : null,
+  };
 }
 
 /**
  * Map a G6 edge style + type to sigma edge attributes.
  *
- * @param {object} style  G6 edge style ({lineWidth, stroke, *Arrow*, label*, visibility, ...})
+ * Like the node mapper, the program-dependent attrs (type + marker/halo set)
+ * are only emitted when `type` is given — the adapter always maps from the
+ * merged ref (full style), so the set is complete and coherent there.
+ *
+ * @param {object} style  G6 edge style ({lineWidth, stroke, *Arrow*, halo*, label*, visibility, ...})
  * @param {string} [type] G6 edge type (line|cubic|quadratic|polyline)
  * @returns {object} partial sigma attrs
  */
@@ -208,7 +266,10 @@ function edgeAttributesFromStyle(style = {}, type = undefined) {
   if (style.visibility !== undefined) {
     attrs.hidden = style.visibility === "hidden";
   }
-  if (type !== undefined) attrs.type = sigmaEdgeType(type, style);
+  if (type !== undefined) {
+    attrs.type = sigmaEdgeType(type, style);
+    Object.assign(attrs, edgeMarkerHaloAttributes(style));
+  }
   return attrs;
 }
 
@@ -373,8 +434,10 @@ function makeNodeReducer(cache, elementStates, hoverIds = new Set()) {
 /**
  * Sigma edgeReducer factory. An edge is hidden when its own `hidden` attr is
  * set OR either endpoint is hidden/filtered. States: selected = accent +
- * widened (the halo budget — sigma edges have no underdraw), highlight =
- * accent, dim = de-emphasis color.
+ * widened (the emphasis budget), highlight = accent, dim = de-emphasis color.
+ * User halos compose with selection by construction: the halo program derives
+ * its width from the post-reducer `size` (+ 2 × haloWidth), so a selected
+ * edge's halo widens with the line while keeping its own color.
  *
  * @param {object} cache  needs edgeRef and graphData (the live graphology graph)
  * @param {Map<string, string[]>} elementStates
@@ -415,6 +478,8 @@ export {
   nodeAttributesFromStyle,
   edgeAttributesFromStyle,
   sigmaEdgeType,
+  edgeMarkerCode,
+  EDGE_MARKERS,
   flipY,
   hoverNeighborhood,
   makeNodeReducer,

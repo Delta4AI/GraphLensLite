@@ -195,7 +195,7 @@ describe("Excel style round-trip — edges", () => {
     const attrsAfter = edgeAttributesFromStyle(reimported.style, reimported.type);
 
     expect(attrsAfter).toEqual(attrsBefore);
-    expect(attrsBefore.type).toBe("curvedDoubleArrow"); // cubic + both arrows
+    expect(attrsBefore.type).toBe("styledCurve"); // cubic + both arrows
     expect(attrsBefore.size).toBe(2);
     expect(attrsBefore.labelSize).toBe(14);
     expect(attrsBefore.labelAutoRotate).toBe(true);

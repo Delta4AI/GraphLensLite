@@ -4,13 +4,12 @@
 // only. Bundled by src/package/vendor_libs.js via esbuild.
 export {Sigma, Camera, MouseCaptor} from 'sigma';
 export {
+  EdgeProgram,
   EdgeRectangleProgram,
-  EdgeArrowProgram,
-  EdgeDoubleArrowProgram,
-  createEdgeArrowHeadProgram,
   createEdgeCompoundProgram,
   drawDiscNodeHover,
 } from 'sigma/rendering';
+export {floatColor} from 'sigma/utils';
 export {NodeSquareProgram} from '@sigma/node-square';
 export {createNodeBorderProgram} from '@sigma/node-border';
 export * as nodeImage from '@sigma/node-image';
