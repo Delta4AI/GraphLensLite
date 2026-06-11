@@ -211,12 +211,14 @@ attribute vec2 a_normal;
 attribute float a_radius;
 attribute float a_marker;
 attribute float a_markerSize;
+attribute float a_borderSize;
 attribute vec2 a_corner;
 
 #ifdef PICKING_MODE
 attribute vec4 a_id;
 #else
 attribute vec4 a_color;
+attribute vec4 a_borderColor;
 #endif
 
 uniform mat3 u_matrix;
@@ -226,9 +228,11 @@ uniform float u_minEdgeThickness;
 uniform float u_feather;
 
 varying vec4 v_color;
+varying vec4 v_borderColor;
 varying float v_marker;
 varying vec2 v_uv;
 varying vec2 v_dimPx;
+varying float v_borderSizePx;
 varying float v_feather;
 
 const float bias = 255.0 / 254.0;
@@ -242,9 +246,11 @@ void main() {
     // No marker on this end: zero-area triangle off-screen -> no fragments.
     gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
     v_color = vec4(0.0);
+    v_borderColor = vec4(0.0);
     v_marker = 0.0;
     v_uv = vec2(0.0);
     v_dimPx = vec2(1.0);
+    v_borderSizePx = 0.0;
     v_feather = 1.0;
     return;
   }
@@ -270,6 +276,8 @@ void main() {
 
   v_uv = a_corner;
   v_dimPx = vec2(2.0 * halfWidth, len) / u_sizeRatio;
+  // Explicit border thickness (graph px → screen px); 0 lets the fragment derive it.
+  v_borderSizePx = a_borderSize > 0.0 ? a_borderSize / u_sizeRatio : 0.0;
   v_marker = a_marker;
   v_feather = u_feather;
 
@@ -277,6 +285,8 @@ void main() {
   v_color = a_id;
   #else
   v_color = a_color;
+  v_borderColor = a_borderColor;
+  v_borderColor.a *= bias;
   #endif
 
   v_color.a *= bias;
@@ -288,12 +298,18 @@ const MARKER_FRAGMENT_SHADER = /*glsl*/ `
 precision mediump float;
 
 varying vec4 v_color;
+varying vec4 v_borderColor;
 varying float v_marker;
 varying vec2 v_uv;
 varying vec2 v_dimPx;
+varying float v_borderSizePx;
 varying float v_feather;
 
 const vec4 transparent = vec4(0.0, 0.0, 0.0, 0.0);
+// Auto border band thickness as a fraction of the marker's smaller dimension;
+// used when no explicit border size is set, so the outline scales with the
+// marker and reads the same at any size/zoom.
+const float borderFraction = 0.2;
 
 void main(void) {
   float w = v_dimPx.x;            // full width across the edge (screen px)
@@ -325,8 +341,14 @@ void main(void) {
   gl_FragColor = d >= 0.0 ? v_color : transparent;
   #else
   float feather = max(v_feather, 0.001);
-  float t = smoothstep(-feather * 0.5, feather * 0.5, d);
-  gl_FragColor = mix(transparent, v_color, t);
+  float coverage = smoothstep(-feather * 0.5, feather * 0.5, d);   // 0 outside -> 1 inside
+  float borderPx = v_borderSizePx > 0.0 ? v_borderSizePx : min(v_dimPx.x, v_dimPx.y) * borderFraction;
+  // fillMix: 0 inside the border band (near the edge), 1 in the interior.
+  float fillMix = smoothstep(borderPx - feather * 0.5, borderPx + feather * 0.5, d);
+  // No border color (alpha ~0) -> the whole marker uses the fill color.
+  fillMix = max(fillMix, 1.0 - step(0.0039, v_borderColor.a));
+  vec4 body = mix(v_borderColor, v_color, fillMix);
+  gl_FragColor = mix(transparent, body, coverage);
   #endif
 }
 `;
@@ -354,7 +376,9 @@ function createEdgeMarkerHeadProgram({ extremity = "target", curved = false } = 
           { name: "a_radius", size: 1, type: FLOAT },
           { name: "a_marker", size: 1, type: FLOAT },
           { name: "a_markerSize", size: 1, type: FLOAT },
+          { name: "a_borderSize", size: 1, type: FLOAT },
           { name: "a_color", size: 4, type: UNSIGNED_BYTE, normalized: true },
+          { name: "a_borderColor", size: 4, type: UNSIGNED_BYTE, normalized: true },
           { name: "a_id", size: 4, type: UNSIGNED_BYTE, normalized: true },
         ],
         CONSTANT_ATTRIBUTES: [{ name: "a_corner", size: 2, type: FLOAT }],
@@ -373,7 +397,11 @@ function createEdgeMarkerHeadProgram({ extremity = "target", curved = false } = 
       const marked = isSource ? sourceData : targetData;
       const marker = (isSource ? data.startMarker : data.endMarker) || 0;
       const markerSize = (isSource ? data.startMarkerSize : data.endMarkerSize) || 0;
+      const borderSize = (isSource ? data.startMarkerBorderSize : data.endMarkerBorderSize) || 0;
       const thickness = data.size || 1;
+      // Explicit arrow fill wins; null inherits the edge color. Border null -> none.
+      const fillColor = (isSource ? data.startMarkerColor : data.endMarkerColor) ?? data.color;
+      const borderColor = (isSource ? data.startMarkerBorderColor : data.endMarkerBorderColor) ?? TRANSPARENT;
 
       // Direction from the marked node back along the edge.
       let awayX;
@@ -410,7 +438,9 @@ function createEdgeMarkerHeadProgram({ extremity = "target", curved = false } = 
       array[startIndex++] = marked.size || 1;
       array[startIndex++] = marker;
       array[startIndex++] = markerSize;
-      array[startIndex++] = floatColor(data.color);
+      array[startIndex++] = borderSize;
+      array[startIndex++] = floatColor(fillColor);
+      array[startIndex++] = floatColor(borderColor);
       array[startIndex++] = edgeIndex;
     }
 

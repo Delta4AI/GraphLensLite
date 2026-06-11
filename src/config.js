@@ -17,7 +17,13 @@ const DEFAULTS = {
   },
   EDGE: {
     COLOR: "#403C5390", LINE_WIDTH: 0.75, LINE_DASH: 0, TYPE: "line",
-    ARROWS: {START: false, END: false, START_SIZE: 8, START_TYPE: "arrow", END_SIZE: 8, END_TYPE: "arrow"},
+    ARROWS: {
+      START: false, END: false, START_SIZE: 8, START_TYPE: "arrow", END_SIZE: 8, END_TYPE: "arrow",
+      // null fill → marker inherits the edge stroke color; null border → no border (transparent).
+      START_COLOR: null, START_BORDER_COLOR: null, END_COLOR: null, END_BORDER_COLOR: null,
+      // Border band thickness in px; 0 → auto (scales with the marker, ~20%).
+      START_BORDER_SIZE: 0, END_BORDER_SIZE: 0,
+    },
     LABEL: {
       TEXT: null, FOREGROUND_COLOR: "#000000", BACKGROUND: false, BACKGROUND_COLOR: null,
       BACKGROUND_CURSOR: "default", BACKGROUND_FILL_OPACITY: 1, BACKGROUND_RADIUS: 0, BACKGROUND_STROKE_OPACITY: 1,
@@ -184,6 +190,10 @@ const DEFAULTS = {
     // "tee" (⊣ inhibition bar). Legacy G6 names (triangle/vee/...) still load
     // via aliases but are no longer offered in the UI.
     EDGE_ARROW_TYPES: ["arrow", "rect", "diamond", "circle", "tee"],
+    EDGE_ARROW_COLORS: {red: "#C33D35", purple: "#403C53", blue: "#8CA6D9", pink: "#EFB0AA", grey: "#ABACBD"},
+    EDGE_ARROW_BORDER_COLORS: {
+      red: "#C33D35", purple: "#403C53", blue: "#8CA6D9", pink: "#EFB0AA", grey: "#ABACBD", none: "#00000000"
+    },
     EDGE_HALO: {enable: true, disable: false},
     EDGE_HALO_STROKE: {red: "#C33D35", purple: "#403C53", blue: "#8CA6D9"},
     EDGE_HALO_WIDTH: {sm: 2, md: 3, lg: 5},

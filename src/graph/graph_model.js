@@ -253,9 +253,23 @@ function edgeMarkerHaloAttributes(style) {
     startMarker: style.startArrow ? edgeMarkerCode(style.startArrowType) : 0,
     startMarkerSize:
       Number.isFinite(style.startArrowSize) && style.startArrowSize > 0 ? style.startArrowSize : 0,
+    // null fill → marker program inherits the edge stroke color; null border → no border.
+    startMarkerColor: style.startArrow ? (style.startArrowColor ?? null) : null,
+    startMarkerBorderColor: style.startArrow ? (style.startArrowBorderColor ?? null) : null,
+    // Border band thickness in px; 0 → auto (proportional to the marker).
+    startMarkerBorderSize:
+      style.startArrow && Number.isFinite(style.startArrowBorderSize) && style.startArrowBorderSize > 0
+        ? style.startArrowBorderSize
+        : 0,
     endMarker: style.endArrow ? edgeMarkerCode(style.endArrowType) : 0,
     endMarkerSize:
       Number.isFinite(style.endArrowSize) && style.endArrowSize > 0 ? style.endArrowSize : 0,
+    endMarkerColor: style.endArrow ? (style.endArrowColor ?? null) : null,
+    endMarkerBorderColor: style.endArrow ? (style.endArrowBorderColor ?? null) : null,
+    endMarkerBorderSize:
+      style.endArrow && Number.isFinite(style.endArrowBorderSize) && style.endArrowBorderSize > 0
+        ? style.endArrowBorderSize
+        : 0,
     haloWidth,
     haloColor: haloWidth > 0 ? (style.haloStroke ?? DEFAULTS.EDGE.HALO.COLOR) : null,
   };

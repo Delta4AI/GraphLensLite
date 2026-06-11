@@ -349,6 +349,36 @@ const EXCEL_EDGE_PROPERTIES = [
     },
   },
   {
+    column: "Start Arrow Color",
+    type: "rgba",
+    apply: (e, v) => {
+      e.style.startArrowColor = v;
+    },
+    get: (e) => {
+      return e.style.startArrow ? e.style.startArrowColor : undefined;
+    },
+  },
+  {
+    column: "Start Arrow Border Color",
+    type: "rgba",
+    apply: (e, v) => {
+      e.style.startArrowBorderColor = v;
+    },
+    get: (e) => {
+      return e.style.startArrow ? e.style.startArrowBorderColor : undefined;
+    },
+  },
+  {
+    column: "Start Arrow Border Size",
+    type: "num",
+    apply: (e, v) => {
+      e.style.startArrowBorderSize = v;
+    },
+    get: (e) => {
+      return e.style.startArrow ? e.style.startArrowBorderSize : undefined;
+    },
+  },
+  {
     column: "End Arrow",
     type: "bool",
     apply: (e, v) => {
@@ -376,6 +406,36 @@ const EXCEL_EDGE_PROPERTIES = [
     },
     get: (e) => {
       return e.style.endArrowType;
+    },
+  },
+  {
+    column: "End Arrow Color",
+    type: "rgba",
+    apply: (e, v) => {
+      e.style.endArrowColor = v;
+    },
+    get: (e) => {
+      return e.style.endArrow ? e.style.endArrowColor : undefined;
+    },
+  },
+  {
+    column: "End Arrow Border Color",
+    type: "rgba",
+    apply: (e, v) => {
+      e.style.endArrowBorderColor = v;
+    },
+    get: (e) => {
+      return e.style.endArrow ? e.style.endArrowBorderColor : undefined;
+    },
+  },
+  {
+    column: "End Arrow Border Size",
+    type: "num",
+    apply: (e, v) => {
+      e.style.endArrowBorderSize = v;
+    },
+    get: (e) => {
+      return e.style.endArrow ? e.style.endArrowBorderSize : undefined;
     },
   },
   {

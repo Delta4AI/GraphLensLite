@@ -582,8 +582,14 @@ describe("edge marker + halo attribute mapping", () => {
   const FULL_OFF = {
     startMarker: 0,
     startMarkerSize: 0,
+    startMarkerColor: null,
+    startMarkerBorderColor: null,
+    startMarkerBorderSize: 0,
     endMarker: 0,
     endMarkerSize: 0,
+    endMarkerColor: null,
+    endMarkerBorderColor: null,
+    endMarkerBorderSize: 0,
     haloWidth: 0,
     haloColor: null,
   };
@@ -618,6 +624,55 @@ describe("edge marker + halo attribute mapping", () => {
     expect(attrs.startMarkerSize).toBe(12);
     expect(attrs.endMarker).toBe(EDGE_MARKERS.circle);
     expect(attrs.endMarkerSize).toBe(10);
+  });
+
+  it("emits explicit arrow fill + border colors when markers are enabled", () => {
+    const attrs = edgeAttributesFromStyle(
+      {
+        startArrow: true,
+        startArrowColor: "#C33D35",
+        startArrowBorderColor: "#000000",
+        endArrow: true,
+        endArrowColor: "#8CA6D9",
+      },
+      "line",
+    );
+
+    expect(attrs.startMarkerColor).toBe("#C33D35");
+    expect(attrs.startMarkerBorderColor).toBe("#000000");
+    expect(attrs.endMarkerColor).toBe("#8CA6D9");
+    // Border left unset -> null (no border) even with the marker enabled.
+    expect(attrs.endMarkerBorderColor).toBe(null);
+  });
+
+  it("maps an explicit arrow border size and zeroes it when the arrow is off", () => {
+    const on = edgeAttributesFromStyle({ startArrow: true, startArrowBorderSize: 6 }, "line");
+    expect(on.startMarkerBorderSize).toBe(6);
+
+    // Off arrow or non-positive size -> 0 (auto / proportional).
+    const off = edgeAttributesFromStyle({ startArrow: false, startArrowBorderSize: 6 }, "line");
+    expect(off.startMarkerBorderSize).toBe(0);
+    const zero = edgeAttributesFromStyle({ endArrow: true, endArrowBorderSize: -2 }, "line");
+    expect(zero.endMarkerBorderSize).toBe(0);
+  });
+
+  it("inherits the edge color (null marker color) when no arrow color is set", () => {
+    const attrs = edgeAttributesFromStyle({ startArrow: true, endArrow: true }, "line");
+
+    expect(attrs.startMarkerColor).toBe(null);
+    expect(attrs.endMarkerColor).toBe(null);
+    expect(attrs.startMarkerBorderColor).toBe(null);
+    expect(attrs.endMarkerBorderColor).toBe(null);
+  });
+
+  it("nulls arrow colors when the arrow flag is off (overwrites stale style)", () => {
+    const attrs = edgeAttributesFromStyle(
+      { startArrow: false, startArrowColor: "#C33D35", startArrowBorderColor: "#000000" },
+      "line",
+    );
+
+    expect(attrs.startMarkerColor).toBe(null);
+    expect(attrs.startMarkerBorderColor).toBe(null);
   });
 
   it("disabled arrow flag zeroes the marker even when a type string is set", () => {

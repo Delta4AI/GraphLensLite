@@ -193,6 +193,24 @@ function createStyleDiv(cache) {
       case "Edge End Arrow Type":
         await cache.gcm.updateEdges({style: {endArrowType: value}}, commands);
         break;
+      case "Edge Start Arrow Color":
+        await cache.gcm.updateEdges({style: {startArrowColor: value}}, commands);
+        break;
+      case "Edge Start Arrow Border Color":
+        await cache.gcm.updateEdges({style: {startArrowBorderColor: value}}, commands);
+        break;
+      case "Edge Start Arrow Border Size":
+        await cache.gcm.updateEdges({style: {startArrowBorderSize: value}}, commands);
+        break;
+      case "Edge End Arrow Color":
+        await cache.gcm.updateEdges({style: {endArrowColor: value}}, commands);
+        break;
+      case "Edge End Arrow Border Color":
+        await cache.gcm.updateEdges({style: {endArrowBorderColor: value}}, commands);
+        break;
+      case "Edge End Arrow Border Size":
+        await cache.gcm.updateEdges({style: {endArrowBorderSize: value}}, commands);
+        break;
       case "Edge Halo":
         await cache.gcm.updateEdges({style: {halo: value}}, commands);
         break;
@@ -961,6 +979,27 @@ function createStyleDiv(cache) {
       cache.DEFAULTS.STYLES.EDGE_ARROW_TYPES,
       "Marker shape at the source end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
 
+    const rowFifteenColor = createNewRow(edgeDiv);
+    appendLabel(rowFifteenColor, "Start Arrow Color",
+      "Fill color of the start marker. Leave unset to inherit the edge color.");
+    createColorControls(rowFifteenColor, "Edge Start Arrow Color", cache.DEFAULTS.EDGE.COLOR,
+      cache.DEFAULTS.STYLES.EDGE_ARROW_COLORS,
+      "Fill color of the start marker. Leave unset to inherit the edge color.");
+
+    const rowFifteenBorder = createNewRow(edgeDiv);
+    appendLabel(rowFifteenBorder, "Start Arrow Border Color",
+      "Outline color of the start marker. Set to none for no border.");
+    createColorControls(rowFifteenBorder, "Edge Start Arrow Border Color", cache.DEFAULTS.EDGE.HALO.COLOR,
+      cache.DEFAULTS.STYLES.EDGE_ARROW_BORDER_COLORS,
+      "Outline color of the start marker. Set to none for no border.");
+
+    const rowFifteenBorderSize = createNewRow(edgeDiv);
+    appendLabel(rowFifteenBorderSize, "Start Arrow Border Size",
+      "Thickness of the start marker border in px. 0 = auto (scales with the arrow).");
+    createNumericalSlider(rowFifteenBorderSize, "Edge Start Arrow Border Size",
+      cache.DEFAULTS.EDGE.ARROWS.START_BORDER_SIZE, {min: 0, max: 20, step: 1},
+      "Thickness of the start marker border in px. 0 = auto (scales with the arrow).", true);
+
     const rowSixteen = createNewRow(edgeDiv);
     appendLabel(rowSixteen, "End Arrow", "Enable/Disable the end arrow of the selected edges.");
     createBooleanControls(rowSixteen, "Edge End Arrow", "Enable/Disable the end arrow of the selected edges.");
@@ -976,6 +1015,27 @@ function createStyleDiv(cache) {
     createCategoricalControls(rowNineteen, "Edge End Arrow Type", cache.DEFAULTS.EDGE.ARROWS.END_TYPE,
       cache.DEFAULTS.STYLES.EDGE_ARROW_TYPES,
       "Marker shape at the target end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
+
+    const rowNineteenColor = createNewRow(edgeDiv);
+    appendLabel(rowNineteenColor, "End Arrow Color",
+      "Fill color of the end marker. Leave unset to inherit the edge color.");
+    createColorControls(rowNineteenColor, "Edge End Arrow Color", cache.DEFAULTS.EDGE.COLOR,
+      cache.DEFAULTS.STYLES.EDGE_ARROW_COLORS,
+      "Fill color of the end marker. Leave unset to inherit the edge color.");
+
+    const rowNineteenBorder = createNewRow(edgeDiv);
+    appendLabel(rowNineteenBorder, "End Arrow Border Color",
+      "Outline color of the end marker. Set to none for no border.");
+    createColorControls(rowNineteenBorder, "Edge End Arrow Border Color", cache.DEFAULTS.EDGE.HALO.COLOR,
+      cache.DEFAULTS.STYLES.EDGE_ARROW_BORDER_COLORS,
+      "Outline color of the end marker. Set to none for no border.");
+
+    const rowNineteenBorderSize = createNewRow(edgeDiv);
+    appendLabel(rowNineteenBorderSize, "End Arrow Border Size",
+      "Thickness of the end marker border in px. 0 = auto (scales with the arrow).");
+    createNumericalSlider(rowNineteenBorderSize, "Edge End Arrow Border Size",
+      cache.DEFAULTS.EDGE.ARROWS.END_BORDER_SIZE, {min: 0, max: 20, step: 1},
+      "Thickness of the end marker border in px. 0 = auto (scales with the arrow).", true);
 
     appendHorizontalRule(edgeDiv);
 
