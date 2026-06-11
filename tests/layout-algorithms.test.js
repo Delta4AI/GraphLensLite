@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { Graph } from "../src/lib/graphology.bundle.mjs";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { Graph, forceAtlas2 } from "../src/lib/graphology.bundle.mjs";
 import { executeLayout } from "../src/graph/layout_algorithms.js";
 import { DEFAULTS } from "../src/config.js";
 
@@ -154,6 +154,126 @@ describe("executeLayout — concentric", () => {
       .map((p) => ({ id: p.id, d: distance(p, center) }))
       .sort((a, b) => a.d - b.d);
     expect(byDistance[0].id).toBe("hub");
+  });
+});
+
+describe("executeLayout — force worker supervisor (browser path)", () => {
+  // Star graph order 12 → budget = min(5000, 500 + 12*2) = 524 ms.
+  const STAR_BUDGET_MS = 524;
+
+  /** Fake FA2Layout recording lifecycle calls; never touches Worker. */
+  function makeFakeSupervisor(calls, { startThrows = false } = {}) {
+    return class FakeSupervisor {
+      constructor(_graph, params) {
+        calls.push(["construct", params]);
+      }
+      start() {
+        calls.push(["start"]);
+        if (startThrows) throw new Error("start failed");
+      }
+      stop() {
+        calls.push(["stop"]);
+      }
+      kill() {
+        calls.push(["kill"]);
+      }
+    };
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("node fallback: without Worker and without override, force runs synchronously", async () => {
+    // Arrange: vitest runs under node — no Worker global.
+    expect(typeof Worker).toBe("undefined");
+    const graph = starGraph();
+    const before = positions(graph);
+
+    // Act: fake timers prove the sync path schedules no animation window.
+    vi.useFakeTimers();
+    await executeLayout(graph, specFor("force"));
+
+    // Assert: positions moved without any timer ever firing.
+    expect(vi.getTimerCount()).toBe(0);
+    const after = positions(graph);
+    const moved = after.filter((p, i) => distance(p, before[i]) > 0);
+    expect(moved.length).toBeGreaterThan(0);
+  });
+
+  it("worker path: constructs supervisor with inferred settings, start→stop→kill, resolves after budget", async () => {
+    // Arrange
+    vi.useFakeTimers();
+    const graph = starGraph();
+    const calls = [];
+    const FakeSupervisor = makeFakeSupervisor(calls);
+
+    // Act
+    const pending = executeLayout(graph, specFor("force"), { ForceSupervisor: FakeSupervisor });
+    await vi.advanceTimersByTimeAsync(STAR_BUDGET_MS);
+    await pending;
+
+    // Assert: full lifecycle, in order, with FA2 settings passed through.
+    expect(calls.map(([name]) => name)).toEqual(["construct", "start", "stop", "kill"]);
+    expect(calls[0][1].settings).toEqual(forceAtlas2.inferSettings(graph));
+  });
+
+  it("worker path: stop and kill still run when start throws", async () => {
+    // Arrange
+    const graph = starGraph();
+    const calls = [];
+    const FakeSupervisor = makeFakeSupervisor(calls, { startThrows: true });
+
+    // Act + Assert
+    await expect(
+      executeLayout(graph, specFor("force"), { ForceSupervisor: FakeSupervisor }),
+    ).rejects.toThrow("start failed");
+    expect(calls.map(([name]) => name)).toEqual(["construct", "start", "stop", "kill"]);
+  });
+
+  it("double-run guard: re-entrant force on the same graph is a no-op while animating", async () => {
+    // Arrange
+    vi.useFakeTimers();
+    const graph = starGraph();
+    const calls = [];
+    const FakeSupervisor = makeFakeSupervisor(calls);
+
+    // Act: second call lands while the first animation window is open.
+    const first = executeLayout(graph, specFor("force"), { ForceSupervisor: FakeSupervisor });
+    const second = executeLayout(graph, specFor("force"), { ForceSupervisor: FakeSupervisor });
+    await second; // resolves immediately — no second supervisor
+    await vi.advanceTimersByTimeAsync(STAR_BUDGET_MS);
+    await first;
+
+    // Assert: only one supervisor was ever constructed; guard released after.
+    expect(calls.filter(([name]) => name === "construct")).toHaveLength(1);
+    const rerun = executeLayout(graph, specFor("force"), { ForceSupervisor: FakeSupervisor });
+    await vi.advanceTimersByTimeAsync(STAR_BUDGET_MS);
+    await rerun;
+    expect(calls.filter(([name]) => name === "construct")).toHaveLength(2);
+  });
+
+  it("guard is released when the supervisor constructor throws", async () => {
+    // Arrange
+    const graph = starGraph();
+    class ThrowingSupervisor {
+      constructor() {
+        throw new Error("no worker");
+      }
+    }
+
+    // Act + Assert: rejection does not leave the graph marked as animating.
+    await expect(
+      executeLayout(graph, specFor("force"), { ForceSupervisor: ThrowingSupervisor }),
+    ).rejects.toThrow("no worker");
+    vi.useFakeTimers();
+    const calls = [];
+    const pending = executeLayout(graph, specFor("force"), {
+      ForceSupervisor: makeFakeSupervisor(calls),
+    });
+    await vi.advanceTimersByTimeAsync(STAR_BUDGET_MS);
+    await pending;
+    expect(calls.map(([name]) => name)).toEqual(["construct", "start", "stop", "kill"]);
   });
 });
 
