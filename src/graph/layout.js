@@ -1,4 +1,5 @@
 import {Popup} from "../utilities/popup.js";
+import {applyNoverlap} from "./layout_algorithms.js";
 
 class GraphLayoutManager {
   constructor(cache) {
@@ -562,6 +563,26 @@ class GraphLayoutManager {
     }
 
     await this.handleLayoutChangeLoadingEvent(action, eventLabels[action]);
+  }
+
+  /**
+   * Minimally spread overlapping nodes apart (noverlap anti-collision pass)
+   * across ALL nodes of the current workspace. Deliberately ignores the
+   * selection: overlap removal is global by nature — separating a selected
+   * subset would just push nodes into their unselected neighbours.
+   *
+   * Runs directly on the live graphology model (cache.graphData, the same
+   * instance the sigma adapter renders); its attribute merges trigger the
+   * sigma refresh, and persistNodePositions() reads the moved positions back
+   * through the adapter facade (graph.getNodeData syncs nodeRef styles).
+   */
+  async removeNodeOverlaps() {
+    const graph = this.cache.graphData;
+    if (!graph || graph.order < 2) return;
+    applyNoverlap(graph);
+    await this.persistNodePositions();
+    await this.handleLayoutChangeLoadingEvent("Remove overlaps",
+      "Spread overlapping nodes apart minimally");
   }
 
   async getPositions() {

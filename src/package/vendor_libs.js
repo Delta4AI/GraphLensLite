@@ -58,7 +58,7 @@ const bundles = [
   {
     entry: path.join(__dirname, 'vendor_entry_graphology.mjs'),
     out: path.join(libDir, 'graphology.bundle.mjs'),
-    pkgs: ['graphology', 'graphology-layout', 'graphology-layout-forceatlas2', 'graphology-metrics', 'graphology-communities-louvain', '@antv/layout', 'bubblesets-js'],
+    pkgs: ['graphology', 'graphology-layout', 'graphology-layout-forceatlas2', 'graphology-layout-noverlap', 'graphology-metrics', 'graphology-communities-louvain', '@antv/layout', 'bubblesets-js'],
   },
   {
     entry: path.join(__dirname, 'vendor_entry_sigma.mjs'),

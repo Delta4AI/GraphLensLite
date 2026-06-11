@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Graph, forceAtlas2 } from "../src/lib/graphology.bundle.mjs";
-import { executeLayout } from "../src/graph/layout_algorithms.js";
+import { applyNoverlap, executeLayout } from "../src/graph/layout_algorithms.js";
 import { DEFAULTS } from "../src/config.js";
 
 // ==========================================================================
@@ -274,6 +274,125 @@ describe("executeLayout — force worker supervisor (browser path)", () => {
     await vi.advanceTimersByTimeAsync(STAR_BUDGET_MS);
     await pending;
     expect(calls.map(([name]) => name)).toEqual(["construct", "start", "stop", "kill"]);
+  });
+});
+
+describe("noverlap post-pass (spec.noverlap)", () => {
+  const NOVERLAP_MARGIN = 5; // mirrors layout_algorithms.js
+
+  /** Two nodes whose grid cells (100 px apart) leave them visually overlapping. */
+  function overlappingPairGraph(size = 80) {
+    const graph = new Graph();
+    graph.addNode("a", { x: 0, y: 0, size });
+    graph.addNode("b", { x: 1, y: 1, size });
+    graph.addEdge("a", "b");
+    return graph;
+  }
+
+  function pairDistance(graph) {
+    const a = graph.getNodeAttributes("a");
+    const b = graph.getNodeAttributes("b");
+    return distance(a, b);
+  }
+
+  it("separates two perfectly overlapping nodes by ≥ combined size + margin", () => {
+    // Arrange: identical coordinates — the jitter branch of the algorithm.
+    const graph = new Graph();
+    graph.addNode("a", { x: 50, y: 50, size: 10 });
+    graph.addNode("b", { x: 50, y: 50, size: 10 });
+
+    // Act
+    applyNoverlap(graph);
+
+    // Assert
+    expect(pairDistance(graph)).toBeGreaterThanOrEqual(10 + 10 + NOVERLAP_MARGIN);
+  });
+
+  it.each([false, undefined])("noverlap: %s leaves base-layout positions untouched", async (flag) => {
+    // Arrange: oversized nodes on the 100-px grid lattice WOULD overlap.
+    const graph = overlappingPairGraph();
+
+    // Act
+    await executeLayout(graph, { ...specFor("grid"), noverlap: flag });
+
+    // Assert: exact lattice coordinates — no post-pass displacement.
+    graph.forEachNode((_id, attrs) => {
+      expect(attrs.x % 100).toBe(0);
+      expect(attrs.y % 100).toBe(0);
+    });
+  });
+
+  it.each(["grid", "circular"])("after %s: no node pair remains overlapping", async (type) => {
+    // Arrange: 8 size-80 nodes — the 100-px grid lattice and the circular
+    // ring gap (~76 px) both undercut the 80+80+margin clearance required.
+    const graph = new Graph();
+    for (let i = 0; i < 8; i++) graph.addNode(`n${i}`, { x: i, y: -i, size: 80 });
+
+    // Act
+    await executeLayout(graph, { ...specFor(type), noverlap: true });
+
+    // Assert: every pair is clear of its combined radii + margin.
+    const pts = positions(graph);
+    const pairDistances = pts.flatMap((p, i) => pts.slice(i + 1).map((q) => distance(p, q)));
+    expect(Math.min(...pairDistances)).toBeGreaterThanOrEqual(80 + 80 + NOVERLAP_MARGIN);
+  });
+
+  it("runs after the animated-force (worker supervisor) path", async () => {
+    // Arrange: a supervisor that never moves nodes isolates the post-pass.
+    vi.useFakeTimers();
+    const graph = overlappingPairGraph(10);
+    class InertSupervisor {
+      start() {}
+      stop() {}
+      kill() {}
+    }
+
+    // Act: 2-node budget = min(5000, 500 + 2*2) = 504 ms.
+    const pending = executeLayout(graph, { ...specFor("force"), noverlap: true }, {
+      ForceSupervisor: InertSupervisor,
+    });
+    await vi.advanceTimersByTimeAsync(504);
+    await pending;
+    vi.useRealTimers();
+
+    // Assert
+    expect(pairDistance(graph)).toBeGreaterThanOrEqual(10 + 10 + NOVERLAP_MARGIN);
+  });
+
+  it("respects node size: bigger nodes are pushed further apart", () => {
+    // Arrange: identical geometry, only the size attribute differs.
+    const makePair = (size) => {
+      const graph = new Graph();
+      graph.addNode("a", { x: 0, y: 0, size });
+      graph.addNode("b", { x: 1, y: 0, size });
+      return graph;
+    };
+    const small = makePair(5);
+    const big = makePair(20);
+
+    // Act
+    applyNoverlap(small);
+    applyNoverlap(big);
+
+    // Assert
+    expect(pairDistance(small)).toBeGreaterThanOrEqual(5 + 5 + NOVERLAP_MARGIN);
+    expect(pairDistance(big)).toBeGreaterThanOrEqual(20 + 20 + NOVERLAP_MARGIN);
+    expect(pairDistance(big)).toBeGreaterThan(pairDistance(small));
+  });
+
+  it("empty and single-node graphs are no-ops", () => {
+    // Arrange
+    const empty = new Graph();
+    const single = new Graph();
+    single.addNode("only", { x: 7, y: 9, size: 12 });
+
+    // Act
+    applyNoverlap(empty);
+    applyNoverlap(single);
+
+    // Assert
+    expect(empty.order).toBe(0);
+    expect(single.getNodeAttributes("only")).toMatchObject({ x: 7, y: 9 });
   });
 });
 

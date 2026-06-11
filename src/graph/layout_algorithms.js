@@ -10,6 +10,7 @@ import {
   circular,
   forceAtlas2,
   FA2Layout,
+  noverlap,
   RadialLayout,
   ConcentricLayout,
   MDSLayout,
@@ -17,6 +18,11 @@ import {
 
 const FORCE_ITERATIONS = 200;
 const GRID_SPACING = 100;
+
+// Noverlap anti-collision post-pass. The algorithm converges early once no
+// node pair overlaps; the iteration cap only bounds pathological cases.
+const NOVERLAP_MAX_ITERATIONS = 100;
+const NOVERLAP_MARGIN = 5; // graph-space px kept between node circles
 
 // Live force-layout time budget. FA2 has no usable convergence signal, so the
 // worker simply runs for a bounded wall-clock window: a base so small graphs
@@ -96,17 +102,42 @@ async function executeAntvLayout(graph, LayoutClass, options) {
 }
 
 /**
+ * Anti-collision post-pass: minimally spreads overlapping nodes apart.
+ * Node sizes are read from the graphology `size` attribute (sigma radius,
+ * always set by graph_model's node mapper) via noverlap's default reducer;
+ * nodes end up ≥ size_a + size_b + 2·margin apart once converged. Mutates
+ * x/y in place — symmetric in y, so it is agnostic to the app-model y-flip.
+ * @param {import('graphology').default} graph
+ */
+export function applyNoverlap(graph) {
+  if (graph.order < 2) return;
+  noverlap.assign(graph, {
+    maxIterations: NOVERLAP_MAX_ITERATIONS,
+    settings: { margin: NOVERLAP_MARGIN },
+  });
+}
+
+/**
  * Execute a layout spec against a graphology graph, assigning x/y per node.
  * @param {import('graphology').default} graph
- * @param {{type?: string}|null|undefined} spec  type + the LAYOUT_INTERNALS
- *   options for it; missing/unknown type falls back to forceAtlas2
+ * @param {{type?: string, noverlap?: boolean}|null|undefined} spec  type + the
+ *   LAYOUT_INTERNALS options for it; missing/unknown type falls back to
+ *   forceAtlas2. `noverlap: true` runs the anti-collision post-pass after the
+ *   base layout completes (any type).
  * @param {{ForceSupervisor?: typeof FA2Layout}} [testOverrides]  test seam:
  *   substitute the FA2 worker supervisor class (vitest has no Worker global,
  *   so the animated branch is otherwise unreachable under node)
  * @returns {Promise<void>}
  */
 export async function executeLayout(graph, spec, testOverrides = {}) {
-  const { type, ...options } = spec ?? {};
+  const { noverlap: removeOverlaps, ...baseSpec } = spec ?? {};
+  await executeBaseLayout(graph, baseSpec, testOverrides);
+  if (removeOverlaps === true) applyNoverlap(graph);
+}
+
+/** The pre-post-pass layout dispatch — see executeLayout. */
+async function executeBaseLayout(graph, spec, testOverrides) {
+  const { type, ...options } = spec;
   if (type === "circular") {
     // graphology's circular ignores the G6-era startRadius/endRadius options.
     circular.assign(graph, {
