@@ -33,6 +33,7 @@ class InteractionManager {
     this.draggedNode = null;
     this.dragGroup = null;
     this.dragMoved = false;
+    this.pinnedLabels = null;
     // Covers the click that ends a micro-drag (1-2 move events — sigma's
     // captor only swallows clicks after >=3 dragged events itself).
     this.suppressNextClick = false;
@@ -121,8 +122,20 @@ class InteractionManager {
     // selection — new Set() tolerates both.)
     const selected = new Set(this.cache.selectedNodes ?? []);
     this.dragGroup = selected.has(node) ? selected : null;
-    // Pin the label so sigma's per-frame label grid can't drop it mid-drag.
-    this.adapter.graph.mergeNodeAttributes(node, { forceLabel: true });
+    // Pin labels for the drag. Every position write rebuilds sigma's label
+    // grid, so the dragged node would evict neighbours' labels from any grid
+    // cell it passes through. Pin the dragged node's label (also keeps it up
+    // past labelRenderedSizeThreshold) AND every label currently on screen;
+    // all pins are released on mouseup and the grid re-settles.
+    // (displayedNodeLabels is a sigma internal — fall back to pinning just
+    // the dragged node if a future sigma drops it.)
+    this.pinnedLabels = new Set(this.adapter.sigma.displayedNodeLabels ?? []);
+    this.pinnedLabels.add(node);
+    for (const id of this.pinnedLabels) {
+      if (this.adapter.graph.hasNode(id)) {
+        this.adapter.graph.mergeNodeAttributes(id, { forceLabel: true });
+      }
+    }
     // Pin the normalization bbox: without it every x/y write re-normalizes
     // the coordinate space and the graph swims under the cursor.
     const sigma = this.adapter.sigma;
@@ -156,12 +169,14 @@ class InteractionManager {
   async #onMouseUp() {
     if (!this.draggedNode) return;
     const moved = this.dragMoved;
-    const dragged = this.draggedNode;
     this.draggedNode = null;
     this.dragGroup = null;
     this.dragMoved = false;
     const graph = this.adapter.graph;
-    if (graph.hasNode(dragged)) graph.mergeNodeAttributes(dragged, { forceLabel: false });
+    for (const id of this.pinnedLabels ?? []) {
+      if (graph.hasNode(id)) graph.mergeNodeAttributes(id, { forceLabel: false });
+    }
+    this.pinnedLabels = null;
     if (!moved) return;
     // Set synchronously before any await: sigma emits clickNode right after
     // mouseup with no microtask boundary, so the flag must already be up.

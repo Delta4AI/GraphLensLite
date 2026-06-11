@@ -42,9 +42,14 @@ const ATLAS_REGEN_DEBOUNCE_MS = 50;
 const RESIZE_DEBOUNCE_MS = 50;
 
 /**
- * While a node drag is in flight, sigma's captor still updates hoveredNode on
- * every mousemove, popping passed-over nodes' hover labels. Gate any hover
- * drawer so only the dragged node may draw while a drag is active.
+ * Sigma's hover layer (drawDiscNodeHover and per-program drawHover) paints a
+ * white disc + label pill on the hovers canvas, which sits ABOVE the labels
+ * canvas — on light backgrounds the pill invisibly blanks every label
+ * underneath. Acceptable on a deliberate hover; NOT while dragging, where
+ * the dragged node is permanently hovered and would wipe labels along its
+ * whole path (the dragged node's own label stays visible via the forceLabel
+ * pin in InteractionManager, on the labels canvas). So: suppress ALL hover
+ * drawing while a drag is in flight, keep the native pill otherwise.
  *
  * @param {(context, data, settings) => void} drawer
  * @param {() => string|null} getDraggedNode
@@ -55,8 +60,7 @@ function guardHoverDrawer(drawer, getDraggedNode) {
   // inside sigma's render loop (which would swallow the error silently).
   if (typeof drawer !== "function") return () => {};
   return (context, data, settings) => {
-    const dragged = getDraggedNode();
-    if (dragged && data.key !== dragged) return;
+    if (getDraggedNode()) return;
     // Sigma's drawDiscNodeHover hardcodes a white pill behind the label, so
     // pin the FALLBACK to dark regardless of the theme-driven labelColor
     // setting (dark mode flips it to a light color, unreadable on the pill).
@@ -235,6 +239,13 @@ class SigmaAdapter {
       defaultDrawEdgeLabel: drawEdgeLabel,
       defaultDrawNodeHover: guardHoverDrawer(drawDiscNodeHover, getDraggedNode),
       renderEdgeLabels: true,
+      // Label-grid thinning stays on, tuned denser than sigma's default
+      // (1 label per 100px cell): 50px cells show ~4x the labels and shrink
+      // the zone where two nearby nodes compete for one label slot. Drags
+      // can't pop neighbours' labels regardless — InteractionManager pins
+      // all on-screen labels for the duration of a drag. CFG.HIDE_LABELS
+      // remains the guard for huge graphs (MAX_NODES_BEFORE_HIDING_LABELS).
+      labelGridCellSize: 50,
       ...settings,
     });
     // Sigma only auto-resizes on window resize. Sidebar/bottom-bar toggles
