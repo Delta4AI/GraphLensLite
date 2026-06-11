@@ -4,6 +4,11 @@ import {detectCommunities as computeCommunityAssignments} from "./communities.js
 class GraphBubbleSetManager {
   constructor(cache) {
     this.cache = cache;
+    // Louvain detection prefs (transient UI state, not persisted/exported).
+    // weightProperty: undefined until first resolved (then a numeric edge
+    // prop hash, or null for topology-only); resolution: Louvain γ.
+    this.communityOptions = { weightProperty: undefined, resolution: 1 };
+    this.communityPopover = null;
     this.redrawBubbleSets = debounce(async () => {
       if (!this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED) return;
       if (this.cache.EVENT_LOCKS.BUBBLE_GROUP_REDRAW_RUNNING) return;
@@ -324,9 +329,41 @@ class GraphBubbleSetManager {
     await this.redrawBubbleSets();
   }
 
-  async detectCommunities() {
+  /**
+   * Enumerate numeric edge properties available as Louvain edge weights.
+   * Source of truth is cache.data.filterDefaults (the same registry the
+   * filter UI uses): edge section, not categorical, finite min/max.
+   * @returns {Array<{propHash: string, prop: string, label: string}>}
+   */
+  getNumericEdgeProperties() {
+    const props = [];
+    const filterDefaults = this.cache.data?.filterDefaults;
+    if (!filterDefaults) return props;
+    for (const [propHash, def] of filterDefaults) {
+      const [section, subSection, prop] = StaticUtilities.decodePropHashId(propHash);
+      if (section !== this.cache.CFG.EXCEL_EDGE_HEADER) continue;
+      if (def.isCategory) continue;
+      if (!Number.isFinite(def.lowerThreshold) || !Number.isFinite(def.upperThreshold)) continue;
+      props.push({ propHash, prop, label: subSection ? `${subSection} › ${prop}` : prop });
+    }
+    return props;
+  }
+
+  // Default weight: STRING's "Combined Score" when present, else topology-only
+  // (null) so generic graphs keep the original unweighted behaviour.
+  #defaultWeightProperty(numericProps) {
+    const combined = numericProps.find((p) => /combined\s*score/i.test(p.prop));
+    return combined ? combined.propHash : null;
+  }
+
+  async detectCommunities(options = {}) {
+    const weightProperty = options.weightProperty !== undefined
+      ? options.weightProperty
+      : (this.communityOptions.weightProperty ?? null);
+    const resolution = options.resolution ?? this.communityOptions.resolution ?? 1;
+
     const groups = [...this.traverseBubbleSets()];
-    const result = computeCommunityAssignments(this.cache, groups);
+    const result = computeCommunityAssignments(this.cache, groups, { weightProperty, resolution });
 
     if (!result) {
       this.cache.ui.warning("Community detection needs at least one visible edge");
@@ -353,10 +390,139 @@ class GraphBubbleSetManager {
     const assignedText = result.communityCount <= groups.length
       ? `all ${result.communityCount}`
       : `largest ${groups.length}`;
+    const weightLabel = weightProperty
+      ? (this.getNumericEdgeProperties().find((p) => p.propHash === weightProperty)?.label ?? "edge weight")
+      : "topology";
     this.cache.ui.info(
-      `Detected ${result.communityCount} communities (modularity ${result.modularity.toFixed(2)}); ` +
+      `Detected ${result.communityCount} communities ` +
+      `(weight: ${weightLabel}, resolution ${resolution}, modularity ${result.modularity.toFixed(2)}); ` +
       `assigned ${assignedText} to bubble groups`
     );
+  }
+
+  /**
+   * Toggle the Louvain configurator anchored to the 🧩 button: pick a numeric
+   * edge property to weight by (or topology-only) and the resolution, then run
+   * detection. Built lazily and repopulated on each open so it reflects the
+   * currently loaded data.
+   */
+  toggleCommunityDetectionPopover() {
+    if (this.communityPopover && this.communityPopover.classList.contains("open")) {
+      this.#closeCommunityDetectionPopover();
+      return;
+    }
+    this.#openCommunityDetectionPopover();
+  }
+
+  #closeCommunityDetectionPopover() {
+    this.communityPopover?.classList.remove("open");
+    if (this._communityOutsideHandler) {
+      document.removeEventListener("pointerdown", this._communityOutsideHandler, true);
+      this._communityOutsideHandler = null;
+    }
+  }
+
+  #openCommunityDetectionPopover() {
+    const anchor = document.getElementById("detectCommunitiesBtn");
+    if (!anchor) return;
+
+    const numericProps = this.getNumericEdgeProperties();
+    // Resolve the default weight on first open, and re-default whenever the
+    // stored property is gone (data was reloaded) so the dropdown selection
+    // and the stored option never drift out of sync.
+    const stored = this.communityOptions.weightProperty;
+    const storedExists = stored === null || numericProps.some((p) => p.propHash === stored);
+    if (stored === undefined || !storedExists) {
+      this.communityOptions.weightProperty = this.#defaultWeightProperty(numericProps);
+    }
+
+    const popover = this.#ensureCommunityDetectionPopover();
+    this.#populateCommunityDetectionPopover(numericProps);
+
+    // Anchor below the button, clamped to the viewport's right edge.
+    const rect = anchor.getBoundingClientRect();
+    popover.style.top = `${rect.bottom + 6}px`;
+    popover.style.left = `${Math.min(rect.left, window.innerWidth - 260)}px`;
+    popover.classList.add("open");
+
+    // Close on outside click (capture so it beats inner handlers).
+    this._communityOutsideHandler = (e) => {
+      if (!popover.contains(e.target) && e.target !== anchor) this.#closeCommunityDetectionPopover();
+    };
+    document.addEventListener("pointerdown", this._communityOutsideHandler, true);
+  }
+
+  #ensureCommunityDetectionPopover() {
+    if (this.communityPopover) return this.communityPopover;
+    const popover = document.createElement("div");
+    popover.className = "community-detection-popover";
+    popover.id = "communityDetectionPopover";
+    document.body.appendChild(popover);
+    this.communityPopover = popover;
+    return popover;
+  }
+
+  #populateCommunityDetectionPopover(numericProps) {
+    const popover = this.communityPopover;
+    popover.replaceChildren();
+
+    const title = document.createElement("div");
+    title.className = "community-popover-title";
+    title.textContent = "Detect communities (Louvain)";
+    popover.appendChild(title);
+
+    // Weight dropdown ------------------------------------------------------
+    const weightLabel = document.createElement("label");
+    weightLabel.className = "community-popover-row";
+    weightLabel.textContent = "Weight by";
+    const weightSelect = document.createElement("select");
+    weightSelect.className = "community-popover-select";
+    const topoOpt = document.createElement("option");
+    topoOpt.value = "";
+    topoOpt.textContent = "Unweighted (topology)";
+    weightSelect.appendChild(topoOpt);
+    for (const p of numericProps) {
+      const opt = document.createElement("option");
+      opt.value = p.propHash;
+      opt.textContent = p.label;
+      weightSelect.appendChild(opt);
+    }
+    weightSelect.value = this.communityOptions.weightProperty ?? "";
+    weightSelect.addEventListener("change", (e) => {
+      this.communityOptions.weightProperty = e.target.value || null;
+    });
+    weightLabel.appendChild(weightSelect);
+    popover.appendChild(weightLabel);
+
+    // Resolution slider ----------------------------------------------------
+    const resRow = document.createElement("label");
+    resRow.className = "community-popover-row";
+    const resText = document.createElement("span");
+    const setResText = (v) => { resText.textContent = `Resolution: ${Number(v).toFixed(2)}`; };
+    setResText(this.communityOptions.resolution);
+    const resSlider = document.createElement("input");
+    resSlider.type = "range";
+    resSlider.min = "0.25";
+    resSlider.max = "4";
+    resSlider.step = "0.05";
+    resSlider.value = String(this.communityOptions.resolution);
+    resSlider.className = "community-popover-slider";
+    resSlider.addEventListener("input", (e) => {
+      this.communityOptions.resolution = parseFloat(e.target.value);
+      setResText(e.target.value);
+    });
+    resRow.append(resText, resSlider);
+    popover.appendChild(resRow);
+
+    // Detect button --------------------------------------------------------
+    const detectBtn = document.createElement("button");
+    detectBtn.className = "community-popover-detect nw-button";
+    detectBtn.textContent = "Detect";
+    detectBtn.addEventListener("click", async () => {
+      this.#closeCommunityDetectionPopover();
+      await this.detectCommunities();
+    });
+    popover.appendChild(detectBtn);
   }
 
   updateManualGroupButtonState() {

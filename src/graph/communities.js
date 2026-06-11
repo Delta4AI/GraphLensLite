@@ -27,16 +27,26 @@ function mulberry32(seed) {
  *
  * @param {{nodeIDsToBeShown: Set<string>, edgeIDsToBeShown: Set<string>, edgeRef: Map<string, {source: string, target: string}>}} cache
  * @param {string[]} groups bubble-group keys in assignment order
+ * @param {{weightProperty?: string|null, resolution?: number}} [options]
+ *   weightProperty: numeric edge property hash to weight edges by (null =
+ *   topology only, the default). resolution: Louvain resolution γ (>1 yields
+ *   more, smaller communities; <1 fewer, larger; default 1).
  * @returns {{assignments: Map<string, Set<string>>, communityCount: number, modularity: number} | null}
  *   null when the visible graph has no edges (Louvain needs at least one).
  */
-function detectCommunities(cache, groups) {
-  const graph = buildVisibleGraph(cache);
+function detectCommunities(cache, groups, options = {}) {
+  const weightProperty = options.weightProperty ?? null;
+  const resolution = options.resolution ?? 1;
+
+  const graph = buildVisibleGraph(cache, {weightProperty});
   if (graph.size === 0) return null;
 
   const result = louvain.detailed(graph, {
     rng: mulberry32(LOUVAIN_RNG_SEED),
-    getEdgeWeight: null,
+    // String attribute name when weighting (buildVisibleGraph sets `weight`);
+    // null keeps every edge at weight 1 (topology-only, the original behaviour).
+    getEdgeWeight: weightProperty !== null ? "weight" : null,
+    resolution,
   });
 
   // Group node ids by community index, preserving the community index for a

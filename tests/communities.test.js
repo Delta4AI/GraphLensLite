@@ -17,10 +17,14 @@ function makeCache(nodeIds, edges) {
   const edgeRef = new Map()
   const edgeIDsToBeShown = new Set()
 
-  edges.forEach(([source, target], i) => {
+  // edges: [source, target] or [source, target, weight]. A weight is exposed
+  // the same way real edges carry numeric props: edge.featureValues.get('w').
+  edges.forEach(([source, target, weight], i) => {
     const id = `${source}::${target}::${i}`
     edgeIDsToBeShown.add(id)
-    edgeRef.set(id, { source, target })
+    const edge = { source, target }
+    if (weight !== undefined) edge.featureValues = new Map([['w', weight]])
+    edgeRef.set(id, edge)
   })
 
   return { nodeIDsToBeShown, edgeIDsToBeShown, edgeRef }
@@ -121,6 +125,71 @@ describe('detectCommunities — community structure', () => {
     expect(result.communityCount).toBe(2)
     expect(result.assignments.get('groupOne')).toEqual(new Set(['a', 'b', 'c']))
     expect(result.assignments.get('groupTwo')).toEqual(new Set(['x', 'y', 'z']))
+  })
+})
+
+describe('detectCommunities — edge weighting', () => {
+  const A = ['a1', 'a2', 'a3']
+  const B = ['b1', 'b2', 'b3']
+  // K6: every A-B pair also connected, so the two triangles are topologically
+  // invisible. Heavy intra-triangle weights + light cross weights make the
+  // structure visible ONLY to a weighted run.
+  const weightedClique = (ns, w) => cliqueEdges(ns).map(([s, t]) => [s, t, w])
+  const crossEdges = (w) => A.flatMap((a) => B.map((b) => [a, b, w]))
+  const k6 = [...weightedClique(A, 10), ...weightedClique(B, 10), ...crossEdges(0.1)]
+
+  it('finds no structure in a complete graph when unweighted', () => {
+    const cache = makeCache([...A, ...B], k6)
+    expect(detectCommunities(cache, GROUPS).communityCount).toBe(1)
+  })
+
+  it('recovers the two heavy triangles when weighted by the chosen property', () => {
+    const cache = makeCache([...A, ...B], k6)
+    const result = detectCommunities(cache, GROUPS, { weightProperty: 'w' })
+    expect(result.communityCount).toBe(2)
+    expect(result.assignments.get('groupOne')).toEqual(new Set(A))
+    expect(result.assignments.get('groupTwo')).toEqual(new Set(B))
+  })
+
+  it('matches the unweighted result when every weight is equal', () => {
+    const edges = [...cliqueEdges(A), ...cliqueEdges(B), ['a1', 'b1']]
+    const unweighted = detectCommunities(makeCache([...A, ...B], edges), GROUPS)
+    const equalWeights = edges.map(([s, t]) => [s, t, 5])
+    const weighted = detectCommunities(makeCache([...A, ...B], equalWeights), GROUPS, { weightProperty: 'w' })
+    expect(weighted.communityCount).toBe(unweighted.communityCount)
+  })
+
+  it('falls back to weight 1 for edges missing the weight property (no throw)', () => {
+    // Mixed: triangle A weighted, triangle B and bridge carry no 'w' value.
+    const edges = [...weightedClique(A, 10), ...cliqueEdges(B), ['a1', 'b1']]
+    const cache = makeCache([...A, ...B], edges)
+    let result
+    expect(() => { result = detectCommunities(cache, GROUPS, { weightProperty: 'w' }) }).not.toThrow()
+    expect(result.communityCount).toBe(2)
+  })
+})
+
+describe('detectCommunities — resolution', () => {
+  const A = ['a1', 'a2', 'a3']
+  const B = ['b1', 'b2', 'b3']
+  const bridged = [...cliqueEdges(A), ...cliqueEdges(B), ['a1', 'b1']]
+
+  it('keeps the two natural communities at resolution 1', () => {
+    const result = detectCommunities(makeCache([...A, ...B], bridged), GROUPS, { resolution: 1 })
+    expect(result.communityCount).toBe(2)
+  })
+
+  it('splits into finer communities at a high resolution', () => {
+    const coarse = detectCommunities(makeCache([...A, ...B], bridged), GROUPS, { resolution: 1 })
+    const fine = detectCommunities(makeCache([...A, ...B], bridged), GROUPS, { resolution: 4 })
+    expect(fine.communityCount).toBeGreaterThan(coarse.communityCount)
+  })
+
+  it('defaults to resolution 1 when omitted', () => {
+    const explicit = detectCommunities(makeCache([...A, ...B], bridged), GROUPS, { resolution: 1 })
+    const implicit = detectCommunities(makeCache([...A, ...B], bridged), GROUPS)
+    expect(implicit.communityCount).toBe(explicit.communityCount)
+    expect(implicit.modularity).toBeCloseTo(explicit.modularity, 10)
   })
 })
 

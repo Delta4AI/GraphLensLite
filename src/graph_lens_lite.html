@@ -141,8 +141,8 @@
       <button id="deselectNodesBtn" class="tiny-btn red disabled" title="Clear node selection"
               onclick="cache.sm.toggleSelectionForAllNodes(false)">×</button>
       <span id="manualBubbleGroupButtonContainer" class="manual-group-container"></span>
-      <button id="detectCommunitiesBtn" class="tiny-btn ml-1" title="Detect communities (Louvain) on the visible graph and assign the largest ones to the manual bubble groups"
-              onclick="cache.bs.detectCommunities()">🧩</button>
+      <button id="detectCommunitiesBtn" class="tiny-btn ml-1" title="Detect communities (Louvain): choose edge weighting and resolution, then assign the largest ones to the manual bubble groups"
+              onclick="cache.bs.toggleCommunityDetectionPopover()">🧩</button>
       <br>
       Selected edges: <span id="selectedEdges" class="red"></span>
       <button id="focusEdgesBtn" class="tiny-btn disabled ml-1" title="Center and zoom the viewport to show all selected edges"

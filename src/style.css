@@ -456,6 +456,55 @@ body, html {
     margin-bottom: 10px;
 }
 
+/* Louvain community-detection configurator (anchored to the 🧩 button) */
+.community-detection-popover {
+    position: fixed;
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    width: 240px;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    color: var(--text);
+    font-size: 12px;
+}
+
+.community-detection-popover.open {
+    display: flex;
+}
+
+.community-popover-title {
+    font-weight: bold;
+    color: var(--text-strong);
+}
+
+.community-popover-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.community-popover-select {
+    width: 100%;
+    background: var(--input-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 3px;
+}
+
+.community-popover-slider {
+    width: 100%;
+}
+
+.community-popover-detect {
+    align-self: flex-end;
+}
+
 h4 {
     margin: 0.2rem;
     font-weight: 500;
