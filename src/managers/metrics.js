@@ -51,9 +51,16 @@ class NetworkMetrics {
     this.multiselect = null;
     this.table = null;
     this.m = metrics;
-    this.collapsed = false;
+    // Panel starts visually closed (CSS .nw-root is max-height:0). Metrics are
+    // computed lazily — only while the panel is open — so this gate must start
+    // true to match the DOM and avoid an eager compute on first load.
+    this.collapsed = true;
     this.cache = cache;
     this.metricValueCache = new Map();
+    // Tracks whether any node tooltip currently carries metric text, so
+    // invalidation can blank stale values without parsing every tooltip when
+    // metrics were never shown.
+    this.metricTooltipsActive = false;
 
     this.selectBtns = {
       'Add to Selection': async () => this.updateSelectedNodes(true),
@@ -85,9 +92,24 @@ class NetworkMetrics {
     }
 
     this.collapsed = !willOpen;
+
+    // Compute on open: the panel and tooltips are only refreshed while visible,
+    // so opening is the trigger that fills (or refreshes) the selected metric.
+    if (willOpen) {
+      this.updateMetricUI().catch(err =>
+        this.cache.ui.error(`Failed to update metrics: ${err.message}`)
+      );
+    }
   }
 
   async updateMetricUI() {
+    // Lazy compute: skip the expensive graph algorithms while the panel is
+    // closed. Stale tooltip values can't linger because invalidateMetricValues
+    // blanks them on every visibility change; reopening the panel recomputes
+    // via toggleUI. This stops betweenness/eigenvector from running on every
+    // filter drag when nobody is looking at metrics.
+    if (this.collapsed) return;
+
     // Recompute when visibility changed OR the selected metric was never
     // computed. Under sigma a fresh load produces no visibility diff (elements
     // start visible), so gating on the flag alone would block metrics forever.
@@ -102,6 +124,7 @@ class NetworkMetrics {
     // never leaves the loading overlay stuck on screen.
     try {
       this.resetNodeToolTipMetricTexts();
+      this.metricTooltipsActive = false;
 
       const metricResult = await this.m[this.selected]?.calculate(this.cache);
       this.storeMetricValues(this.selected, metricResult);
@@ -118,6 +141,7 @@ class NetworkMetrics {
         this.updateNodeToolTipMetricText(ns.id, metricName, ns.text);
         this.multiselect.appendChild(opt);
       }
+      this.metricTooltipsActive = metricResult.scores.length > 0;
 
       /* graph-level table */
       this.table.innerHTML = '';
@@ -152,6 +176,14 @@ class NetworkMetrics {
 
   invalidateMetricValues() {
     this.metricValueCache.clear();
+    // Blank per-node tooltip metric text so a value computed for the previous
+    // subgraph is never shown after filtering. Cheap string work, and skipped
+    // entirely when no tooltip carries metric text (the common closed-panel
+    // case). Reopening the panel recomputes and repopulates.
+    if (this.metricTooltipsActive) {
+      this.resetNodeToolTipMetricTexts();
+      this.metricTooltipsActive = false;
+    }
   }
 
   async ensureMetricValues(metricId) {

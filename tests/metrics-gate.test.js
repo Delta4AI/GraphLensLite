@@ -32,10 +32,18 @@ function makeCache({ visibleElementsChanged = false } = {}) {
   }
 }
 
-// Helper: NetworkMetrics wired to a live DOM (multiselect, table, info button)
-function makeMetrics(cache) {
+// Helper: NetworkMetrics wired to a live DOM (multiselect, table, info button).
+// Metrics now compute lazily — only while the panel is open — so the
+// cache/visibility gating tests open the panel explicitly. Lazy-gate tests
+// pass { open: false } to assert the closed-panel no-op.
+function makeMetrics(cache, { open = true } = {}) {
   const metrics = new NetworkMetrics(cache)
   document.body.appendChild(metrics.buildMetricUI())
+  // The toggle button toggleUI() reaches for; absent it would throw.
+  const btn = document.createElement('button')
+  btn.id = 'metricsToggleBtn'
+  document.body.appendChild(btn)
+  if (open) metrics.collapsed = false
   return metrics
 }
 
@@ -109,5 +117,95 @@ describe('NetworkMetrics.updateMetricUI gating', () => {
     const cached = metrics.metricValueCache.get('pagerank')
     expect(cached?.values?.size).toBe(3)
     expect(metrics.multiselect.options.length).toBe(3)
+  })
+})
+
+describe('NetworkMetrics lazy panel gate', () => {
+  it('does not compute while the panel is closed', async () => {
+    // Arrange: panel closed (default real-world state)
+    const cache = makeCache({ visibleElementsChanged: true })
+    const metrics = makeMetrics(cache, { open: false })
+    expect(metrics.collapsed).toBe(true)
+
+    // Act
+    await metrics.updateMetricUI()
+
+    // Assert: no compute, no loading UI, no cached values
+    expect(cache.ui.showLoading).not.toHaveBeenCalled()
+    expect(metrics.metricValueCache.size).toBe(0)
+    expect(metrics.multiselect.options.length).toBe(0)
+  })
+
+  it('triggers a compute and flips collapsed when the panel is opened', () => {
+    // Arrange
+    const cache = makeCache()
+    const metrics = makeMetrics(cache, { open: false })
+    const spy = vi.spyOn(metrics, 'updateMetricUI').mockResolvedValue(undefined)
+
+    // Act
+    metrics.toggleUI()
+
+    // Assert
+    expect(metrics.collapsed).toBe(false)
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not compute when the panel is collapsed via toggleUI', () => {
+    // Arrange: start open so the first toggle closes it
+    const cache = makeCache()
+    const metrics = makeMetrics(cache, { open: true })
+    document.getElementById('networkMetricsContainer').classList.add('open')
+    const spy = vi.spyOn(metrics, 'updateMetricUI').mockResolvedValue(undefined)
+
+    // Act: toggle → closes
+    metrics.toggleUI()
+
+    // Assert
+    expect(metrics.collapsed).toBe(true)
+    expect(spy).not.toHaveBeenCalled()
+  })
+})
+
+describe('NetworkMetrics.invalidateMetricValues tooltip blanking', () => {
+  const TOOLTIP_WITH_METRIC =
+    '<div class="tooltip-metric-wrapper visible">' +
+    '<span class="tooltip-metric-header">Degree Centrality</span>' +
+    '<p class="tooltip-metric-content">Degree 2</p></div>'
+
+  function metricContentOf(tooltipHtml) {
+    const div = document.createElement('div')
+    div.innerHTML = tooltipHtml
+    return div.querySelector('.tooltip-metric-content')?.textContent
+  }
+
+  it('blanks stale tooltip metric text when metrics were displayed', () => {
+    // Arrange
+    const cache = makeCache()
+    cache.toolTips = new Map([['A', TOOLTIP_WITH_METRIC]])
+    const metrics = makeMetrics(cache)
+    metrics.metricValueCache.set('centrality', { values: new Map([['A', 2]]) })
+    metrics.metricTooltipsActive = true
+
+    // Act
+    metrics.invalidateMetricValues()
+
+    // Assert: cache cleared, tooltip metric text blanked, flag reset
+    expect(metrics.metricValueCache.size).toBe(0)
+    expect(metricContentOf(cache.toolTips.get('A'))).toBe('')
+    expect(metrics.metricTooltipsActive).toBe(false)
+  })
+
+  it('leaves tooltips untouched when no metric text is active', () => {
+    // Arrange: metrics never shown → nothing to blank
+    const cache = makeCache()
+    cache.toolTips = new Map([['A', TOOLTIP_WITH_METRIC]])
+    const metrics = makeMetrics(cache)
+    metrics.metricTooltipsActive = false
+
+    // Act
+    metrics.invalidateMetricValues()
+
+    // Assert: tooltip preserved verbatim
+    expect(cache.toolTips.get('A')).toBe(TOOLTIP_WITH_METRIC)
   })
 })
