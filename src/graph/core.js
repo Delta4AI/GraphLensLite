@@ -789,9 +789,6 @@ class GraphCoreManager {
         case "f":
           await this.fitViewToVisibleNodes();
           break;
-        case "e":
-          await this.cache.ui.toggleEditMode();
-          break;
         case "d":
           await this.cache.ui.toggleDataEditor();
           break;

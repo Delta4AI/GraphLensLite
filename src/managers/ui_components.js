@@ -308,8 +308,7 @@ class InvertibleRangeSlider {
   createSliderInput(id, initialValue, relatedSliderId) {
     const input = document.createElement("input");
     input.id = id;
-    input.style.width = '80px';
-    input.style.height = '16px';
+    input.style.height = '18px';
     input.style.boxSizing = 'border-box';
     input.value = initialValue;
     input.addEventListener('keydown', (ev) => {
@@ -349,29 +348,26 @@ class InvertibleRangeSlider {
     }
     this.isValidSlider = true;
 
-    const colLeft = document.createElement('div');
-    colLeft.classList.add('show-on-edit');
-    colLeft.style.transition = 'width 0.2s ease';
-    this.inputStart = this.createSliderInput(this.sliderIdStartInput, this.currentMin, this.sliderIdStart);
-    colLeft.appendChild(this.inputStart);
-
-    const colRight = document.createElement('div');
-    colRight.classList.add('show-on-edit');
-    colRight.style.transition = 'width 0.2s ease';
-    this.inputEnd = this.createSliderInput(this.sliderIdEndInput, this.currentMax, this.sliderIdEnd);
-    colRight.appendChild(this.inputEnd);
-
     const div = document.createElement("div");
     div.innerHTML = this.createDivInnerHTML();
     const slider = div.firstElementChild;
-    slider.classList.add('hide-on-edit');
     slider.style.width = '100%';
     slider.title = `Set the thresholds for the numeric property: ${StaticUtilities.formatPropsAsTree(this.propID)}\n---\n  - Move handles to set min/max (≥ min ∧ ≤ max).\n  - Swap handles to invert (≤ min ∨ ≥ max).\n  - Double-click to reset.`;
 
-    parent.appendChild(div);
-    parent.appendChild(colLeft);
+    // Min/max number boxes are always visible directly under the slider, so
+    // exact thresholds can be typed without a hidden "edit mode". They stay in
+    // sync with the handles via handleThresholdOnInputEvent (writes their values).
+    const inputRow = document.createElement('div');
+    inputRow.className = 'filter-input-row';
+    this.inputStart = this.createSliderInput(this.sliderIdStartInput, this.currentMin, this.sliderIdStart);
+    this.inputStart.title = "Lower threshold — type an exact value and press Enter";
+    this.inputEnd = this.createSliderInput(this.sliderIdEndInput, this.currentMax, this.sliderIdEnd);
+    this.inputEnd.title = "Upper threshold — type an exact value and press Enter";
+    inputRow.appendChild(this.inputStart);
+    inputRow.appendChild(this.inputEnd);
+
     parent.appendChild(slider);
-    parent.appendChild(colRight);
+    parent.appendChild(inputRow);
   }
 
   createDivInnerHTML() {

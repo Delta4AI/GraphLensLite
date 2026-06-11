@@ -397,18 +397,25 @@ body, html {
     cursor: pointer;
 }
 
+/*************************
+ Selection HUD (on-graph)
+ **************************/
 #selectedElementsContainer {
     position: absolute !important;
     top: 10px !important;
-    right: 10px !important;
+    left: 10px !important;
+    right: auto !important;
     bottom: auto !important;
-    left: auto !important;
+    width: 256px;
+    box-sizing: border-box;
     border: 1px solid var(--brand-border);
-    border-radius: 5px;
-    background-color: var(--surface);
-    transition: opacity 0.1s ease-in-out, right 0.3s ease-in-out, width 0.25s ease-in-out, max-width 0.25s ease-in-out, box-shadow 0.25s ease-in-out;
-    text-align: center;
-    padding: 2px;
+    border-radius: 8px;
+    background-color: var(--surface-translucent);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 14px rgba(64, 60, 83, 0.14);
+    transition: width 0.2s ease-in-out, box-shadow 0.2s ease-in-out, opacity 0.1s ease-in-out;
+    text-align: left;
+    padding: 8px 10px;
     font-size: 13px;
     z-index: 1000;
     max-width: calc(100% - 20px);
@@ -423,11 +430,223 @@ body, html {
 
 #selectedElementsContainer.expanded {
     width: 360px;
-    box-shadow: 0 6px 12px rgba(64, 60, 83, 0.2);
+    box-shadow: 0 8px 20px rgba(64, 60, 83, 0.22);
 }
 
+/* --- HUD header: title + tools toggle --- */
+.sel-hud-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.sel-hud-title {
+    font-weight: 700;
+    color: var(--brand-text);
+    letter-spacing: 0.02em;
+}
+
+.sel-hud-tools-toggle {
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-strong);
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 2px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.sel-hud-tools-toggle:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+#selectedElementsContainer.expanded .sel-hud-tools-toggle {
+    background: var(--accent-text);
+    color: #fff;
+    border-color: var(--accent-text);
+}
+
+/* --- shared HUD buttons --- */
+.sel-hud-btn {
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-strong);
+    background: var(--input-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 3px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.sel-hud-btn:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+.sel-hud-icon-btn {
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--text-strong);
+    background: var(--input-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.sel-hud-icon-btn:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+.sel-hud-icon-btn.red:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+/* --- toolbar row: lasso / style / undo / redo (always visible) --- */
+.sel-hud-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.sel-hud-toolbar-spacer {
+    flex: 1 1 auto;
+}
+
+#lassoWrapper {
+    display: inline-flex;
+    border-radius: 6px;
+}
+
+#lassoWrapper.active {
+    box-shadow: 0 0 0 2px var(--accent-text);
+}
+
+#lassoWrapper.active .sel-hud-btn {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+/* Inline lasso glyph reused by the guided tour (empty span + --size/--color). */
+.lasso-icon {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.lasso-icon::before {
+    content: "➰";
+    font-size: var(--size, 14px);
+    line-height: 1;
+}
+
+/* --- empty state (no selection) --- */
+.sel-hud-empty {
+    margin-top: 8px;
+}
+
+#selectedElementsContainer.has-selection .sel-hud-empty {
+    display: none;
+}
+
+.sel-hud-empty-title {
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+}
+
+.sel-hud-empty-hint {
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-faint);
+}
+
+.sel-hud-empty-hint strong {
+    color: var(--text-strong);
+}
+
+/* --- active state (has selection) --- */
+.sel-hud-active {
+    display: none;
+    margin-top: 8px;
+}
+
+#selectedElementsContainer.has-selection .sel-hud-active {
+    display: block;
+}
+
+.sel-hud-counts {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.sel-count {
+    font-size: 13px;
+    color: var(--text);
+}
+
+.sel-count strong {
+    font-size: 14px;
+}
+
+.sel-count-sep {
+    width: 1px;
+    height: 16px;
+    background: var(--border-soft);
+    margin: 0 4px;
+}
+
+.sel-hud-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.sel-group-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.sel-group-label {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.sel-hud-groups {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 6px;
+    min-height: 0;
+}
+
+/* --- expandable tools panel (Focus / Select / Arrange cards) --- */
 .selection-editor-panel {
-    width: 0;
     max-height: 0;
     opacity: 0;
     overflow: hidden;
@@ -436,11 +655,12 @@ body, html {
 }
 
 #selectedElementsContainer.expanded .selection-editor-panel {
-    width: 100%;
     max-height: 420px;
     opacity: 1;
-    margin-top: 6px;
+    margin-top: 8px;
     overflow-y: auto;
+    border-top: 1px solid var(--border-soft);
+    padding-top: 8px;
 }
 
 #selectedElementsContainer .selection-editor-panel .card-labeled {
@@ -792,6 +1012,71 @@ h5 {
     margin-top: 4px;
 }
 
+/* Styling-panel selection status: replaces silently-greyed cards with a
+   plain-language line about what is (or isn't) being styled. */
+.styling-status {
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 8px 10px;
+    margin-bottom: 4px;
+    border-radius: 6px;
+    background: var(--surface-3);
+    color: var(--text-strong);
+    border-left: 3px solid var(--accent-text);
+}
+
+.styling-status.empty {
+    color: var(--text-muted);
+    border-left-color: var(--border-soft);
+}
+
+/* Collapsible config sections (Node / Edge / Bubble) so the panel reads as
+   foldable sections instead of one tall wall of controls. */
+.card-labeled.card-collapsible {
+    padding: 4px;
+    text-align: left;
+}
+
+.card-labeled.card-collapsible::before {
+    display: none;
+}
+
+.card-collapse-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--brand-border);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font: inherit;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+.card-collapse-header:hover {
+    background: var(--accent-text);
+}
+
+.card-collapse-chevron {
+    font-size: 11px;
+    opacity: 0.85;
+}
+
+.card-labeled.collapsed > :not(.card-collapse-header) {
+    display: none;
+}
+
+/* Allow folding/unfolding a section even while its controls are disabled
+   (nothing selected), so the contents stay readable. */
+.card-labeled.card-collapsible.disabled .card-collapse-header {
+    pointer-events: auto;
+}
+
 .bubble-set-config-card-header::before {
     font-size: 12px;
 }
@@ -954,14 +1239,6 @@ h5 {
     margin-right: 6px;
 }
 
-#filterContainer #editBtn {
-    position: absolute;
-    right: 0;
-    z-index: 10;
-    border: 1px solid var(--border-strong);
-    border-radius: 6px;
-}
-
 .filter-row {
     display: flex;
     align-items: center;
@@ -975,8 +1252,22 @@ h5 {
 
 .filter-row-col2 {
     flex: 0 0 180px;
-    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
     margin-right: 10px;
+}
+
+/* Always-visible min/max threshold inputs under the range slider. */
+.filter-input-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+}
+
+.filter-input-row input {
+    flex: 1 1 0;
+    min-width: 0;
 }
 
 .filter-row-col3 {
@@ -1043,6 +1334,7 @@ h5 {
 #filterContainer.locked .filter-row-col2,
 #filterContainer.locked .slider-container,
 #filterContainer.locked input[type="number"],
+#filterContainer.locked .filter-input-row,
 #filterContainer.locked .range-slider-thumb,
 #filterContainer.locked .range-slider,
 #filterContainer.locked .header-card,
@@ -1059,9 +1351,8 @@ h5 {
     cursor: not-allowed !important;
 }
 
-/* Keep "Add to Query" buttons in edit mode active - full opacity and interactive */
-#filterContainer.locked button.purple,
-#filterContainer.locked .show-on-edit button.purple {
+/* Keep "Add to Query" buttons active - full opacity and interactive */
+#filterContainer.locked button.purple {
     opacity: 1 !important;
     pointer-events: auto !important;
     cursor: pointer !important;
@@ -1517,6 +1808,49 @@ hr {
     gap: 1px;
 }
 
+/* Labeled app action toolbar (replaces the row of bare-emoji header buttons). */
+.app-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.toolbar-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-strong);
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 3px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.toolbar-pill:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+.toolbar-pill.highlight,
+.toolbar-pill.active {
+    background: var(--accent-text);
+    color: #fff;
+    border-color: var(--accent-text);
+}
+
+.toolbar-sep {
+    width: 1px;
+    height: 18px;
+    background: var(--border-soft);
+    margin: 0 2px;
+}
+
 .button-separator {
     display: inline-block;
     width: 1px;
@@ -1748,26 +2082,6 @@ input:checked + .checkbox-green::after {
 
 .edit-container {
     height: auto !important;
-}
-
-.show-on-edit {
-    display: none;
-}
-
-.show-on-edit.show {
-    display: inline-block;
-    width: auto;
-    height: auto;
-}
-
-.show-on-edit-full-width {
-    display: none;
-}
-
-.show-on-edit-full-width.show {
-    display: block;
-    width: 100%;
-    height: auto;
 }
 
 /*************************
@@ -3018,44 +3332,6 @@ input:checked + .slider:before {
 .picker-range-arrow {
     font-size: 18px;
     color: #878996;
-}
-
-/*************************
- Lasso select icon
- **************************/
-.medium-btn:has(> button.lasso-icon),
-.small-btn:has(> button.lasso-icon) {
-    /*border-top: 0;*/
-    /*border-bottom: 0;*/
-    padding: 0;
-    display: inline-block;
-    vertical-align: top;
-    width: 16px;
-    height: 16px;
-    line-height: 16px;
-    text-align: center;
-}
-#lassoWrapper.active {
-    box-shadow: 0 0 5px #C33D35;
-    border-radius: 6px;
-}
-#lassoWrapper.medium-btn.active {
-    height: 22px;
-}
-#lassoWrapper.small-btn.active {
-    height: 16px;
-}
-.lasso-icon {
-    cursor: pointer;
-    width: 16px;
-    height: 16px;
-    font-size: 14px;
-    line-height: 16px;
-    background: none;
-    border: none;
-    padding: 0;
-    margin: 0 auto;
-    display: block;
 }
 
 /*************************

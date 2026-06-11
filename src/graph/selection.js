@@ -345,6 +345,27 @@ class GraphSelectionManager {
     const atLeastOneNodeSelected = selectedNodesCount > 0;
     const atLeastOneEdgeSelected = selectedEdgesCount > 0;
     const atLeastOneNodeOrEdgeSelected = atLeastOneNodeSelected || atLeastOneEdgeSelected;
+
+    // Swap the HUD between its empty state (instructions) and its active
+    // state (counts + actions). CSS keys off the `has-selection` class.
+    document.getElementById("selectedElementsContainer")
+      ?.classList.toggle("has-selection", atLeastOneNodeOrEdgeSelected);
+
+    // Tell the styling panel what it is acting on, so the node/edge cards
+    // are no longer silently greyed with no explanation.
+    const stylingStatus = document.getElementById("stylingSelectionStatus");
+    if (stylingStatus) {
+      if (atLeastOneNodeOrEdgeSelected) {
+        const parts = [];
+        if (selectedNodesCount) parts.push(`${selectedNodesCount} node${selectedNodesCount === 1 ? "" : "s"}`);
+        if (selectedEdgesCount) parts.push(`${selectedEdgesCount} edge${selectedEdgesCount === 1 ? "" : "s"}`);
+        stylingStatus.textContent = `Styling ${parts.join(" · ")}`;
+        stylingStatus.classList.remove("empty");
+      } else {
+        stylingStatus.textContent = "Nothing selected — select nodes or edges to style them. Bubble-group styling below works without a selection.";
+        stylingStatus.classList.add("empty");
+      }
+    }
     const moreThanOneNodeSelected = selectedNodesCount > 1;
 
     this.cache.ui.toggleStyleElementsThatRequireAtLeastOneSelectedNode(atLeastOneNodeSelected);

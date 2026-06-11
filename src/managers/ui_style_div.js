@@ -320,7 +320,7 @@ function createStyleDiv(cache) {
       const scaleButton = document.createElement("button");
       scaleButton.className = "style-inner-button style-numeric-scale-button";
       scaleButton.textContent = "∿";
-      scaleButton.title = `Scale ${property} based on a property's values`;
+      scaleButton.title = `Map by data: scale ${property} from a numeric property's values (e.g. larger nodes for higher degree)`;
       scaleButton.style.marginLeft = "2px";
       scaleButton.dataset.property = property;
       scaleButton.onclick = async () => {
@@ -409,7 +409,7 @@ function createStyleDiv(cache) {
     if (continuousScaleBtn) {
       const contScaleBtn = document.createElement("button");
       contScaleBtn.className = "style-inner-button style-color-button style-color-gradient-button";
-      contScaleBtn.title = `Set ${property} of the selected elements to a continuous scale.`;
+      contScaleBtn.title = `Map by data: colour ${property} on a continuous gradient from a property's values`;
       contScaleBtn.onclick = async () => {
         colorInput.value = "";
         await handleStyleChangeEvent(property, "set_continuous_color_scale");
@@ -1207,12 +1207,50 @@ function createStyleDiv(cache) {
     }
   }
 
+  // Turn a config card into a collapsible section: replace the floating
+  // `::before` title with a real clickable header (so the panel reads as a
+  // set of foldable sections instead of one tall wall of controls).
+  function makeCollapsible(label, startCollapsed = false) {
+    const card = root.querySelector(`[data-label="${label}"]`);
+    if (!card) return;
+    card.classList.add("card-collapsible");
+
+    const header = document.createElement("button");
+    header.type = "button";
+    header.className = "card-collapse-header";
+    header.setAttribute("aria-expanded", startCollapsed ? "false" : "true");
+
+    const title = document.createElement("span");
+    title.className = "card-collapse-title";
+    title.textContent = label;
+
+    const chevron = document.createElement("span");
+    chevron.className = "card-collapse-chevron";
+    chevron.textContent = startCollapsed ? "▸" : "▾";
+
+    header.append(title, chevron);
+    header.addEventListener("click", () => {
+      const collapsed = card.classList.toggle("collapsed");
+      chevron.textContent = collapsed ? "▸" : "▾";
+      header.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    });
+
+    card.insertBefore(header, card.firstChild);
+    if (startCollapsed) card.classList.add("collapsed");
+  }
+
   createFocusCard();
   createSelectCard();
   createArrangeNodesCard();
   createNodeConfigCard();
   createEdgeConfigCard();
   createBubbleSetConfigCard();
+
+  // Node stays open (most common); Edge is the largest section so it starts
+  // folded; bubble styling only matters once groups exist, so fold it too.
+  makeCollapsible("Node Configuration");
+  makeCollapsible("Edge Configuration", true);
+  makeCollapsible("Bubble Sets", true);
 
   return root;
 }

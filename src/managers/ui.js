@@ -370,15 +370,6 @@ class UIManager {
     });
   }
 
-  async toggleEditMode() {
-    const editBtn = document.getElementById("editBtn");
-    if (!editBtn) return;
-    let editModeActive = editBtn.classList.contains("active");
-    editModeActive ? editBtn.classList.remove("active") : editBtn.classList.add("active");
-
-    this.handleEditModeUIChanges();
-  }
-
   toggleStylingPanel() {
     const rightSidebar = document.getElementById("rightSidebar");
     const styleBtn = document.getElementById("styleToggleBtn");
@@ -403,8 +394,10 @@ class UIManager {
     if (!container || !panel || !toggleBtn) return;
 
     const isExpanded = container.classList.toggle("expanded");
-    toggleBtn.textContent = isExpanded ? "▴" : "▾";
-    toggleBtn.title = isExpanded ? "Collapse selection editor" : "Expand selection editor";
+    toggleBtn.textContent = isExpanded ? "Tools ▴" : "Tools ▾";
+    toggleBtn.title = isExpanded
+      ? "Hide selection tools"
+      : "Show selection tools: select by name, neighbours, or arrange the selection";
     toggleBtn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
   }
 
@@ -480,50 +473,6 @@ class UIManager {
     }
   }
 
-  handleEditModeUIChanges() {
-    const editBtn = document.getElementById("editBtn");
-    if (!editBtn) return;
-    const editModeActive = editBtn.classList.contains("active");
-
-    editModeActive ? editBtn.classList.add("highlight") : editBtn.classList.remove("highlight");
-
-    // handle all edit elements
-    const editElements = document.querySelectorAll('.show-on-edit, .show-on-edit-full-width');
-    editElements.forEach(el => {
-      editModeActive ? el.classList.add("show") : el.classList.remove("show");
-      el.style.height = editModeActive ? `${el.scrollHeight}px` : "0";
-    });
-
-    const hideOnEditElements = document.querySelectorAll('.hide-on-edit');
-    hideOnEditElements.forEach(el => {
-      el.style.display = editModeActive ? "none" : "";
-    });
-
-    // 'collapse' all open style rows
-    if (!editModeActive) {
-      const styleRows = document.querySelectorAll('.style-row');
-      styleRows.forEach(row => {
-        row.classList.remove("show");
-      });
-    }
-
-    // handle filter row layouts
-    const filterRows = document.querySelectorAll('.filter-row');
-    filterRows.forEach(row => {
-      const sliderCol = row.querySelector(".filter-row-col2");
-      const hasRangeSlider = sliderCol.querySelector(".hide-on-edit");
-      if (hasRangeSlider) {
-        sliderCol.style.display = editModeActive ? "flex" : "";
-        sliderCol.style.alignItems = editModeActive ? "center" : "";
-        sliderCol.style.gap = editModeActive ? "4px" : "";
-      } else {
-        sliderCol.style.display = "";
-        sliderCol.style.alignItems = "";
-        sliderCol.style.gap = "";
-      }
-    });
-  }
-
   buildUI() {
     this.cache.query.text = document.getElementById("queryTextArea");
     this.cache.query.overlay = document.getElementById("queryOverlay");
@@ -565,13 +514,7 @@ class UIManager {
 
   buildFilterUI() {
     const div = document.getElementById("filterContainer");
-    const editBtn = document.getElementById("editBtn");
     div.innerHTML = "";
-
-    // Re-append editBtn if it exists
-    if (editBtn) {
-      div.appendChild(editBtn);
-    }
 
     // Always create lock status bar, show/hide based on lock state
     const statusBar = this.createFilterLockStatusBar();
@@ -654,7 +597,6 @@ class UIManager {
     }
 
     this.manageDynamicWidgets();
-    this.handleEditModeUIChanges();
     this.cache.qm.updateQueryTextArea();
   }
 
@@ -756,10 +698,10 @@ class UIManager {
     statusBar.innerHTML = `
       <div class="filter-lock-message">
         <span class="filter-lock-icon">🔒</span>
-        <span>Filters locked | Query manually edited</span>
+        <span>Filters are driven by your edited query. Unlock to control them here again.</span>
       </div>
       <button class="filter-unlock-btn" onclick="cache.ui.unlockFiltersAndResetQuery()">
-        Reset
+        Unlock filters
       </button>
     `;
     return statusBar;

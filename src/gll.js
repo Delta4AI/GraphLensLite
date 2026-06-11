@@ -455,12 +455,10 @@ window.cache = cache;
 
 window.addEventListener('resize', () => {
   if (window.graph !== undefined && window.graph !== null && window.cache.initialized) {
-    const editModeActive = document.getElementById("editBtn").classList.contains("active");
     const sidebar = document.getElementById("sidebar");
-    const sidebarContentContainer = document.getElementById("sidebarContentContainer");
     const status = document.getElementById("sidebarStatusContainer");
 
-    status.style.maxWidth = editModeActive ? `${sidebarContentContainer.offsetWidth}px` : `${sidebar.offsetWidth}px`;
+    status.style.maxWidth = `${sidebar.offsetWidth}px`;
   }
 })
 
@@ -527,13 +525,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
     sidebar.style.width = `${newWidth}px`;
 
-    // Update status container max-width if needed
-    const editModeActive = document.getElementById("editBtn")?.classList.contains("active");
-    const sidebarContentContainer = document.getElementById("sidebarContentContainer");
+    // Update status container max-width to match the new sidebar width
     const status = document.getElementById("sidebarStatusContainer");
-
-    if (status && sidebarContentContainer) {
-      status.style.maxWidth = editModeActive ? `${sidebarContentContainer.offsetWidth}px` : `${newWidth}px`;
+    if (status) {
+      status.style.maxWidth = `${newWidth}px`;
     }
 
     isResizing = false;

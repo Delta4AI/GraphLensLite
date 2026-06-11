@@ -398,7 +398,6 @@ const TOUR_STEPS = [
            <br><strong>M</strong> — Toggle metrics panel
            <br><strong>Y</strong> — Toggle styling panel
            <br><strong>A</strong> — Toggle Graph Assistant
-           <br><strong>E</strong> — Toggle edit mode
            <br><strong>P</strong> — Export as PNG
            <br><strong>S</strong> — Save as JSON
            <br><br>
