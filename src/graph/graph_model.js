@@ -87,8 +87,27 @@ function badgeAttributes(style) {
   };
   if (badges.length > 0) {
     attrs.badgeFontSize = style.badgeFontSize ?? DEFAULTS.NODE.BADGE.FONT_SIZE;
+    attrs.badgeScaleFactor = badgeScaleFactor(style);
   }
   return attrs;
+}
+
+/**
+ * Zoom-independent badge scale factor, baked here (not in the renderer, which
+ * only sees zoom-scaled display data and stays config-free). When
+ * `badgeScaleWithNode` is on, badges grow/shrink with the node's model size
+ * relative to the default node size; otherwise the factor is 1 (current
+ * behavior). Recomputed on every restyle because the merged ref style always
+ * carries `size` alongside the badge keys.
+ *
+ * @param {object} style  G6 node style ({size, badgeScaleWithNode, ...})
+ * @returns {number} multiplier applied to badgeFontSize by the renderer
+ */
+function badgeScaleFactor(style) {
+  const scaleWithNode = style.badgeScaleWithNode ?? DEFAULTS.NODE.BADGE.SCALE_WITH_NODE;
+  if (!scaleWithNode) return 1;
+  const diameter = Array.isArray(style.size) ? style.size[0] : style.size;
+  return Number.isFinite(diameter) && diameter > 0 ? diameter / DEFAULTS.NODE.SIZE : 1;
 }
 
 /**

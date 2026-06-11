@@ -295,6 +295,46 @@ describe("drawNodeLabel — badges (G6 v5 parity: colored pill + white text)", (
 
     expect(ctx.font).toBe("bold 8px Arial");
   });
+
+  it("multiplies font and pill size by badgeScaleFactor (scale-with-node)", () => {
+    const ctx = stubContext();
+
+    drawNodeLabel(
+      ctx,
+      badged([{ text: "B", placement: "right" }], { badgeScaleFactor: 2 }),
+      SETTINGS,
+    );
+
+    const size = BADGE_FONT * 2;
+    expect(ctx.font).toBe(`bold ${size}px Arial`);
+    // Pill height scales with the effective font size; anchor stays on the
+    // node perimeter (unchanged by the factor).
+    const boxWidth = CHAR_W + 2 * BADGE_PAD;
+    const boxHeight = size + 2 * BADGE_PAD;
+    expect(findCall(ctx, "roundRect").slice(1)).toEqual([
+      110 - boxWidth / 2,
+      100 - boxHeight / 2,
+      boxWidth,
+      boxHeight,
+      boxHeight / 2,
+    ]);
+    const [, , , by] = fillTexts(ctx)[1];
+    expect(by).toBeCloseTo(100 + size * 0.35);
+  });
+
+  it("ignores non-finite or non-positive badgeScaleFactor (draws at base size)", () => {
+    for (const badgeScaleFactor of [NaN, 0, -1, undefined]) {
+      const ctx = stubContext();
+
+      drawNodeLabel(
+        ctx,
+        badged([{ text: "B", placement: "right" }], { badgeScaleFactor }),
+        SETTINGS,
+      );
+
+      expect(ctx.font).toBe(`bold ${BADGE_FONT}px Arial`);
+    }
+  });
 });
 
 describe("drawEdgeLabel", () => {

@@ -75,15 +75,23 @@ const BADGE_PADDING = 2;
  * follow label visibility (v1 limitation).
  *
  * @param {CanvasRenderingContext2D} context
- * @param {object} data  node display data (x, y, size, badge, badges, badgePalette, badgeFontSize)
+ * @param {object} data  node display data (x, y, size, badge, badges, badgePalette,
+ *                       badgeFontSize, badgeScaleFactor)
  * @param {object} settings  sigma settings (labelFont)
  */
 function drawNodeBadges(context, data, settings) {
   if (!data.badge || !Array.isArray(data.badges) || data.badges.length === 0) return;
 
-  const size = Number.isFinite(data.badgeFontSize)
+  const fontSize = Number.isFinite(data.badgeFontSize)
     ? data.badgeFontSize
     : FALLBACK_BADGE_FONT_SIZE;
+  // badgeScaleFactor (graph_model.js) is zoom-independent — like labels,
+  // badges keep a constant on-screen size; only the perimeter anchor
+  // (data.size) follows the camera.
+  const scale = Number.isFinite(data.badgeScaleFactor) && data.badgeScaleFactor > 0
+    ? data.badgeScaleFactor
+    : 1;
+  const size = fontSize * scale;
   context.font = `bold ${size}px ${settings.labelFont}`;
 
   data.badges.forEach((badge, index) => {

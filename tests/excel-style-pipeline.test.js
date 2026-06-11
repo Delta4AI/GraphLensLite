@@ -73,6 +73,7 @@ function getNodeStyleOrDefaults(node) {
       badges: src.badges ?? [],
       badgePalette: src.badgePalette ?? [],
       badgeFontSize: src.badgeFontSize ?? d.BADGE.FONT_SIZE,
+      badgeScaleWithNode: src.badgeScaleWithNode ?? d.BADGE.SCALE_WITH_NODE,
     }
   }
 

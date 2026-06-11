@@ -794,6 +794,7 @@ describe("badge attribute mapping", () => {
       badges: BADGES,
       badgePalette: ["#112233", "#445566"],
       badgeFontSize: 10,
+      badgeScaleFactor: 1,
     });
   });
 
@@ -826,6 +827,48 @@ describe("badge attribute mapping", () => {
 
     expect(attrs.badgePalette).toEqual(["#112233", DEFAULTS.NODE.BADGE.COLOR]);
     expect(attrs.badgeFontSize).toBe(DEFAULTS.NODE.BADGE.FONT_SIZE);
+    expect(attrs.badgeScaleFactor).toBe(1); // scale-with-node defaults off
+  });
+
+  it("emits badgeScaleFactor from the node's model size when badgeScaleWithNode is on", () => {
+    const attrs = nodeAttributesFromStyle({
+      badge: true,
+      badges: [BADGES[0]],
+      badgeScaleWithNode: true,
+      size: DEFAULTS.NODE.SIZE * 2,
+    });
+
+    expect(attrs.badgeScaleFactor).toBe(2);
+  });
+
+  it("supports [w, h] array sizes for badgeScaleFactor", () => {
+    const attrs = nodeAttributesFromStyle({
+      badge: true,
+      badges: [BADGES[0]],
+      badgeScaleWithNode: true,
+      size: [DEFAULTS.NODE.SIZE / 2, DEFAULTS.NODE.SIZE / 2],
+    });
+
+    expect(attrs.badgeScaleFactor).toBe(0.5);
+  });
+
+  it("keeps badgeScaleFactor at 1 when badgeScaleWithNode is on but size is missing or invalid", () => {
+    const base = { badge: true, badges: [BADGES[0]], badgeScaleWithNode: true };
+
+    expect(nodeAttributesFromStyle(base).badgeScaleFactor).toBe(1);
+    expect(nodeAttributesFromStyle({ ...base, size: NaN }).badgeScaleFactor).toBe(1);
+    expect(nodeAttributesFromStyle({ ...base, size: 0 }).badgeScaleFactor).toBe(1);
+  });
+
+  it("keeps badgeScaleFactor at 1 when badgeScaleWithNode is explicitly off (toggle-off path)", () => {
+    const attrs = nodeAttributesFromStyle({
+      badge: true,
+      badges: [BADGES[0]],
+      badgeScaleWithNode: false,
+      size: DEFAULTS.NODE.SIZE * 3,
+    });
+
+    expect(attrs.badgeScaleFactor).toBe(1);
   });
 
   it("propagates badge attrs into the built graph", () => {

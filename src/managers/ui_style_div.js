@@ -139,6 +139,12 @@ function createStyleDiv(cache) {
       case "Node Label Placement":
         await cache.gcm.updateNodes({style: {labelPlacement: value}}, commands);
         break;
+      case "Node Badge Font Size":
+        await cache.gcm.updateNodes({style: {badgeFontSize: value}}, commands);
+        break;
+      case "Node Badge Scale With Node":
+        await cache.gcm.updateNodes({style: {badgeScaleWithNode: value}}, commands);
+        break;
       case "Edge Color":
         await cache.gcm.updateEdges({style: {stroke: value}}, commands);
         break;
@@ -857,6 +863,17 @@ function createStyleDiv(cache) {
     const rowEleven = createNewRow(nodeDiv);
     appendLabel(rowEleven, "Badges", "Add Badges to the selected nodes.");
     createNodeBadgeControls(rowEleven);
+
+    const rowTwelve = createNewRow(nodeDiv);
+    appendLabel(rowTwelve, "Badge Size", "Defines the font size (and pill size) of the selected nodes badges.");
+    createNumericalSlider(rowTwelve, "Node Badge Font Size", cache.DEFAULTS.NODE.BADGE.FONT_SIZE,
+      {min: 4, max: 32, step: 1}, "Defines the font size (and pill size) of the selected nodes badges.");
+
+    const rowThirteen = createNewRow(nodeDiv);
+    appendLabel(rowThirteen, "Badge Scale With Node",
+      "Scale badges proportionally with each node's size (relative to the default node size).");
+    createBooleanControls(rowThirteen, "Node Badge Scale With Node",
+      "Scale badges proportionally with each node's size (relative to the default node size).");
   }
 
   function createEdgeConfigCard() {
