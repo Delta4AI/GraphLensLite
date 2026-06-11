@@ -10,12 +10,18 @@
 import { bubblesets } from "../lib/graphology.bundle.mjs";
 
 // PointPath post-processing per the bubblesets-js README: sample the raw
-// marching-squares outline, B-spline it and drop collinear points. 8 px
-// sampling is the library's own example default and keeps point counts in
-// the low hundreds. Scaled with opts.scale (an 8 px step would flatten a
-// zoomed-out outline whose features are ~2 px) but never below 1 px.
-const OUTLINE_SAMPLE_PX = 8;
-const OUTLINE_SAMPLE_MIN_PX = 1;
+// marching-squares outline, B-spline it and drop collinear points. 8 is the
+// library's own example default and keeps point counts in the low hundreds.
+// Scaled with opts.scale (a step of 8 would flatten a zoomed-out outline
+// whose features are ~2 points) but never below 1.
+//
+// NOTE: bubblesets-js sample(step) treats `step` as an array INDEX stride
+// (points.get(i += step)), NOT a pixel distance. PointPath.get() does
+// `this.points[step]`, so a FRACTIONAL stride indexes between elements and
+// returns undefined, which then crashes bSplines()/simplify() with
+// "Cannot read properties of undefined". The stride must stay an integer.
+const OUTLINE_SAMPLE_STEP = 8;
+const OUTLINE_SAMPLE_MIN_STEP = 1;
 
 // bubblesets-js influence-field defaults (the library's own pixel-tuned
 // constants). They are absolute pixel radii, so the caller must scale them
@@ -72,8 +78,19 @@ function computeOutlinePoints(memberRects, avoidRects = [], opts = {}) {
     morphBuffer: FIELD_MORPH_BUFFER * s,
     pixelGroup: Math.max(FIELD_PIXEL_GROUP_MIN, FIELD_PIXEL_GROUP * s),
   });
-  const samplePx = Math.max(OUTLINE_SAMPLE_MIN_PX, OUTLINE_SAMPLE_PX * s);
-  const sampled = path.sample(samplePx).simplify(0).bSplines().simplify(0);
+  // Integer stride only (see OUTLINE_SAMPLE_STEP note): Math.round keeps the
+  // ~8-point cadence proportional to zoom without ever passing a fractional
+  // index into bubblesets-js' PointPath.get().
+  const sampleStep = Math.max(OUTLINE_SAMPLE_MIN_STEP, Math.round(OUTLINE_SAMPLE_STEP * s));
+  let sampled;
+  try {
+    sampled = path.sample(sampleStep).simplify(0).bSplines().simplify(0);
+  } catch {
+    // Boundary guard for bubblesets-js: a degenerate/collapsed outline must
+    // resolve to "no outline" (this function's documented contract) rather
+    // than throwing into the render loop and freezing the bubble canvas.
+    return [];
+  }
   const points = [];
   for (let i = 0; i < sampled.length; i++) {
     const p = sampled.get(i);

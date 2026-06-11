@@ -84,6 +84,24 @@ describe("computeOutlinePoints", () => {
       expect(pointInPolygon({ x: 150 * s, y: 100 * s }, outline)).toBe(false);
     });
 
+    // Regression: bubblesets-js sample(step) uses `step` as an array index
+    // stride, so a fractional OUTLINE_SAMPLE_STEP * scale used to index between
+    // points and return undefined, crashing bSplines()/simplify() with
+    // "Cannot read properties of undefined". These scales are the real zoom
+    // field factors (1/sqrt(camera.ratio)) that produce fractional 8*scale
+    // strides (e.g. 8*0.354 = 2.83) — the exact ones that froze the bubble
+    // canvas on zoom. They must produce a valid outline, never throw.
+    it.each([0.354, 0.2, 0.7, 1.58, 2.3, 5])(
+      "does not throw and returns a hull at fractional-step scale %f",
+      (s) => {
+        const members = [rectAt(0, 0, 20 * s), rectAt(20 * s, 0, 20 * s), rectAt(10 * s, 20 * s, 20 * s)];
+        let outline;
+        expect(() => { outline = computeOutlinePoints(members, [], { scale: s }); }).not.toThrow();
+        expect(outline.length).toBeGreaterThan(3);
+        expect(outline.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))).toBe(true);
+      },
+    );
+
     it("keeps a dense zoomed-out group intact where unscaled constants lose it", () => {
       // Zoomed-out screen geometry: two 1 px members 6 px apart inside two
       // rings of 32 avoid nodes (the dense-graph repro for the vanishing
