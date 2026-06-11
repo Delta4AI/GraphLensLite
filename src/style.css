@@ -824,30 +824,69 @@ h5 {
 }
 
 #loadingOverlay {
-    /* Initially shown */
-    flex-direction: column;
+    /* Full-screen layer: transparent (no dimming) but blocks interaction
+       while loading. The visible indicator is a compact bottom-right card. */
     position: fixed;
+    inset: 0;
     opacity: 0;
     display: none;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.2);
+    /* anchor the card to the top-center (clear of the bottom-right minimap
+       and the top-right selected-elements panel) */
+    justify-content: center;
+    align-items: flex-start;
+    padding: 16px;
+    background: transparent;
     color: var(--text);
     z-index: 10001;
-    text-align: center;
-    font-size: 30px;
-    /*transition: opacity 0.2s ease;*/
-    transition: none !important;
-    animation: none !important;
+    transition: opacity 0.18s ease;
 }
 
 #loadingInnerContent {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    max-width: 440px;
+    padding: 14px 18px;
     border: 1px solid var(--border-strong);
-    border-radius: 20px;
+    border-radius: 12px;
     background: var(--input-bg);
-    padding: 20px 80px 20px 80px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+    text-align: left;
+    animation: loaderCardIn 0.2s ease both;
+}
+
+#loadingTextGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+#loadingHeader {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+#loadingText {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+    /* wrap long messages (incl. unbroken URLs) instead of truncating */
+    overflow-wrap: anywhere;
+}
+
+@keyframes loaderCardIn {
+    from {
+        opacity: 0;
+        transform: translateY(-12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .container {
@@ -1011,6 +1050,23 @@ h5 {
     100% {
         transform: rotate(.5turn)
     }
+}
+
+/* Compact inline spinner for the loading card */
+#loadingInnerContent .loader {
+    width: 20px;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+#loadingInnerContent .loader::before,
+#loadingInnerContent .loader::after {
+    background-size: 5px 5px;
+}
+
+#loadingInnerContent .loader::before {
+    margin: 2px;
+    background-size: 3px 3px;
 }
 
 .tooltip {
