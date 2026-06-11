@@ -219,6 +219,19 @@ describe("buildGraphologyGraph — population", () => {
     expect(graph.getNodeAttribute("h", "shape")).toBe("hexagon");
   });
 
+  it("propagates node-border attrs for bordered circles into the built graph", () => {
+    const cache = createMockCache({
+      nodes: [makeNode("bc", { stroke: "#C33D35", lineWidth: 2 }, "circle")],
+    });
+
+    const graph = buildGraphologyGraph(cache);
+
+    expect(graph.getNodeAttribute("bc", "type")).toBe("borderCircle");
+    expect(graph.getNodeAttribute("bc", "borderColor")).toBe("#C33D35");
+    expect(graph.getNodeAttribute("bc", "borderRatio")).toBe(0.2);
+    expect(graph.getNodeAttribute("bc", "image")).toBeNull();
+  });
+
   it("assigns edge programs from the G6 type", () => {
     const cache = createMockCache({
       nodes: [makeNode("a"), makeNode("b")],
@@ -374,14 +387,143 @@ describe("attribute mapping helpers", () => {
     expect(attrs.color).toBe(DEFAULTS.NODE.FILL_COLOR);
   });
 
-  it("bordered circle/rect route through the texture program (native programs cannot draw borders)", () => {
+  it("bordered circle routes through the node-border program with clean texture attrs", () => {
     const attrs = nodeAttributesFromStyle(
       { fill: "#403C53", stroke: "#C33D35", lineWidth: 2, size: 20 },
       "circle",
     );
 
-    expect(attrs.type).toBe("shape");
-    expect(attrs.image).toContain(ACCENT_URI);
+    expect(attrs.type).toBe("borderCircle");
+    expect(attrs.borderColor).toBe("#C33D35");
+    expect(attrs.borderSize).toBe(2);
+    expect(attrs.borderRatio).toBe(2 / 10); // lineWidth / radius (size 20 diameter → 10)
+    expect(attrs.color).toBe("#403C53"); // fill layer reads `color`
+    expect(attrs.fillColor).toBeNull();
+    expect(attrs.image).toBeNull();
+  });
+
+  it("bordered circle uses the default node size for the border ratio when size is absent", () => {
+    const attrs = nodeAttributesFromStyle({ stroke: "#C33D35", lineWidth: 1 }, "circle");
+
+    expect(attrs.type).toBe("borderCircle");
+    expect(attrs.borderRatio).toBe(1 / (DEFAULTS.NODE.SIZE / 2));
+  });
+
+  it("clamps the border ratio to 1 when the border is wider than the radius", () => {
+    const attrs = nodeAttributesFromStyle(
+      { stroke: "#C33D35", lineWidth: 50, size: 20 },
+      "circle",
+    );
+
+    expect(attrs.borderRatio).toBe(1);
+    expect(nodeAttributesFromStyle({ stroke: "#C33D35", lineWidth: 2, size: 0 }, "circle").borderRatio).toBe(1);
+  });
+
+  it("bordered rect (and texture-only shapes with borders) stay on the texture program", () => {
+    const style = { fill: "#403C53", stroke: "#C33D35", lineWidth: 2, size: 20 };
+    for (const shape of ["rect", "diamond", "hexagon", "triangle", "star"]) {
+      const attrs = nodeAttributesFromStyle(style, shape);
+      expect(attrs.type).toBe("shape");
+      expect(attrs.image).toContain(ACCENT_URI);
+      expect(attrs.borderRatio).toBe(0);
+    }
+  });
+
+  it("zero lineWidth or missing stroke keeps circles on the native program", () => {
+    expect(nodeAttributesFromStyle({ stroke: "#C33D35", lineWidth: 0 }, "circle").type).toBe("circle");
+    expect(nodeAttributesFromStyle({ lineWidth: 2 }, "circle").type).toBe("circle");
+    expect(nodeAttributesFromStyle({ stroke: null, lineWidth: 2 }, "circle").type).toBe("circle");
+  });
+
+  // The adapter applies style updates via mergeNodeAttributes, so every
+  // program transition must overwrite/clear exactly what the previous branch
+  // set. Simulated here as a literal merge of the two attribute sets.
+  describe("program-transition attribute hygiene (merge matrix)", () => {
+    const BORDER = { stroke: "#C33D35", lineWidth: 2 };
+    const BASE = { fill: "#403C53", size: 20 };
+    const attrsFor = (style, type) => nodeAttributesFromStyle(style, type);
+    const merge = (from, to) => ({ ...from, ...to });
+
+    it("native circle → borderCircle (border added)", () => {
+      const res = merge(attrsFor(BASE, "circle"), attrsFor({ ...BASE, ...BORDER }, "circle"));
+
+      expect(res.type).toBe("borderCircle");
+      expect(res.color).toBe("#403C53");
+      expect(res.fillColor).toBeNull();
+      expect(res.image).toBeNull();
+      expect(res.borderColor).toBe("#C33D35");
+      expect(res.borderSize).toBe(2);
+      expect(res.borderRatio).toBe(0.2);
+    });
+
+    it("borderCircle → native circle (border removed) clears border attrs", () => {
+      const res = merge(
+        attrsFor({ ...BASE, ...BORDER }, "circle"),
+        attrsFor({ ...BASE, stroke: null, lineWidth: 0 }, "circle"),
+      );
+
+      expect(res.type).toBe("circle");
+      expect(res.color).toBe("#403C53"); // never left at the texture TRANSPARENT
+      expect(res.fillColor).toBeNull();
+      expect(res.image).toBeNull();
+      expect(res.borderColor).toBeNull();
+      expect(res.borderSize).toBe(0);
+      expect(res.borderRatio).toBe(0);
+    });
+
+    it("borderCircle → native circle via lineWidth-only delta clears stale borderColor", () => {
+      // No-nodeRef fallback path: the style delta drops the border without an
+      // explicit stroke key, so nodeAttributesFromStyle never emits
+      // borderColor — the program branch must clear it unconditionally or
+      // applyNodeState bakes the phantom stroke into halo textures.
+      const res = merge(
+        attrsFor({ ...BASE, ...BORDER }, "circle"),
+        attrsFor({ ...BASE, lineWidth: 0 }, "circle"),
+      );
+
+      expect(res.type).toBe("circle");
+      expect(res.borderColor).toBeNull();
+      expect(res.borderSize).toBe(0);
+      expect(res.borderRatio).toBe(0);
+    });
+
+    it("texture → borderCircle (bordered hexagon becomes bordered circle)", () => {
+      const res = merge(
+        attrsFor({ ...BASE, ...BORDER }, "hexagon"),
+        attrsFor({ ...BASE, ...BORDER }, "circle"),
+      );
+
+      expect(res.type).toBe("borderCircle");
+      expect(res.shape).toBe("circle");
+      expect(res.color).toBe("#403C53"); // stale TRANSPARENT would blank the fill ring
+      expect(res.fillColor).toBeNull(); // stale fillColor corrupts state textures
+      expect(res.image).toBeNull(); // stale texture cleared
+      expect(res.borderRatio).toBe(0.2);
+    });
+
+    it("borderCircle → texture (bordered circle becomes bordered hexagon)", () => {
+      const res = merge(
+        attrsFor({ ...BASE, ...BORDER }, "circle"),
+        attrsFor({ ...BASE, ...BORDER }, "hexagon"),
+      );
+
+      expect(res.type).toBe("shape");
+      expect(res.shape).toBe("hexagon");
+      expect(res.color).toBe("#00000000");
+      expect(res.fillColor).toBe("#403C53");
+      expect(res.image).toMatch(/^data:image\/svg\+xml,/);
+      expect(res.borderRatio).toBe(0);
+    });
+
+    it("borderCircle → borderCircle (restyle) recomputes the ratio", () => {
+      const res = merge(
+        attrsFor({ ...BASE, ...BORDER }, "circle"),
+        attrsFor({ ...BASE, ...BORDER, lineWidth: 4, size: 40 }, "circle"),
+      );
+
+      expect(res.borderRatio).toBe(4 / 20);
+      expect(res.borderSize).toBe(4);
+    });
   });
 
   it("sigmaEdgeType maps the full type × arrows matrix", () => {
@@ -468,8 +610,8 @@ describe("badge attribute mapping", () => {
 });
 
 describe("reducers — states and hidden handling", () => {
-  function reducerFixture({ nodeType } = {}) {
-    const nodes = [makeNode("a", {}, nodeType), makeNode("b", {}, nodeType)];
+  function reducerFixture({ nodeType, nodeStyle = {} } = {}) {
+    const nodes = [makeNode("a", nodeStyle, nodeType), makeNode("b", nodeStyle, nodeType)];
     const edges = [makeEdge("e1", "a", "b")];
     const cache = createMockCache({ nodes, edges });
     cache.graphData = buildGraphologyGraph(cache);
@@ -547,6 +689,47 @@ describe("reducers — states and hidden handling", () => {
     expect(res.type).toBe("shape");
     expect(res.image).not.toBe(base.image);
     expect(res.image).toContain(encodeURIComponent(STATE_DIM_COLOR));
+    expect(res.size).toBe(base.size);
+  });
+
+  // Halos stay on the texture path for ALL shapes (single halo
+  // implementation): borderCircle nodes switch to a halo texture transiently
+  // in the reducer output, with their own fill and border baked in.
+  it("node: selected borderCircle renders a halo texture keeping fill and border", () => {
+    const { cache, nodeReducer, elementStates } = reducerFixture({
+      nodeType: "circle",
+      nodeStyle: { stroke: "#112233", lineWidth: 2 },
+    });
+    const base = { ...cache.graphData.getNodeAttributes("a") };
+    expect(base.type).toBe("borderCircle");
+    elementStates.set("a", ["selected"]);
+
+    const res = nodeReducer("a", { ...base, zIndex: 0 });
+
+    expect(res.type).toBe("shape");
+    expect(res.image).toContain(ACCENT_URI); // accent halo ring
+    expect(res.image).toContain(encodeURIComponent("#403C53")); // own fill kept
+    expect(res.image).toContain(encodeURIComponent("#112233")); // own border kept
+    expect(res.size).toBe(base.size + HALO_EXTRA_PX);
+    expect(res.color).toBe("#00000000");
+    expect(res.zIndex).toBe(1);
+  });
+
+  it("node: dim borderCircle swaps the fill color only, border attrs untouched", () => {
+    const { cache, nodeReducer, elementStates } = reducerFixture({
+      nodeType: "circle",
+      nodeStyle: { stroke: "#112233", lineWidth: 2 },
+    });
+    const base = { ...cache.graphData.getNodeAttributes("a") };
+    elementStates.set("a", ["dim"]);
+
+    const res = nodeReducer("a", { ...base });
+
+    expect(res.type).toBe("borderCircle"); // no texture round-trip for dim
+    expect(res.color).toBe(STATE_DIM_COLOR);
+    expect(res.borderColor).toBe("#112233"); // old G6 spec: dim keeps the border
+    expect(res.borderRatio).toBe(base.borderRatio);
+    expect(res.image).toBeNull();
     expect(res.size).toBe(base.size);
   });
 

@@ -34,9 +34,10 @@ function flipY(y) {
  * Map a G6 node style + type to sigma node attributes.
  * Only emits keys that are actually present on the style; shape-program
  * attributes (`type`/`shape`/`image`/...) are only emitted when `type` is
- * given. Shapes without a native sigma program — and any shape with a
- * border, which the native circle/square programs cannot draw — render
- * through the SVG texture program ("shape").
+ * given. Shapes without a native sigma program — and any non-circle shape
+ * with a border, which the native circle/square programs cannot draw —
+ * render through the SVG texture program ("shape"); bordered circles render
+ * through the @sigma/node-border GLSL program ("borderCircle").
  *
  * @param {object} style  G6 node style ({x, y, size, fill, stroke, lineWidth, label*, visibility, ...})
  * @param {string} [type] G6 node type (circle|diamond|hexagon|rect|triangle|star)
@@ -93,16 +94,28 @@ function badgeAttributes(style) {
 /**
  * Shape-program attributes for a node: which sigma program draws it, plus
  * the texture data-URI when the SVG shape program is needed.
+ *
+ * Three programs and their attribute sets (the adapter applies updates via
+ * mergeNodeAttributes, so every branch must overwrite/clear exactly what the
+ * other branches set — a stale fillColor corrupts state textures on hover, a
+ * stale TRANSPARENT color makes the node invisible, a stale image would
+ * matter if the texture program saw it; the image program skips non-string
+ * images, so null is safe):
+ *   - "shape"        texture (fillColor, TRANSPARENT color, image, borderRatio 0)
+ *   - "borderCircle" @sigma/node-border GLSL rings — bordered circles only
+ *                    (color=fill, borderRatio, fillColor/image cleared)
+ *   - native circle/square (color=fill, fillColor/image cleared, borderRatio 0)
  */
 function nodeProgramAttributes(style = {}, type) {
   const fill = style.fill ?? DEFAULTS.NODE.FILL_COLOR;
   const stroke = style.stroke ?? null;
   const lineWidth = style.lineWidth ?? 0;
   const hasBorder = Boolean(stroke) && lineWidth > 0;
+  const size = Array.isArray(style.size) ? style.size[0] : style.size;
+  const radius = (size ?? DEFAULTS.NODE.SIZE) / 2;
   const attrs = { shape: type };
 
-  if (isTextureOnlyShape(type) || hasBorder) {
-    const size = Array.isArray(style.size) ? style.size[0] : style.size;
+  if (isTextureOnlyShape(type) || (hasBorder && type !== "circle")) {
     attrs.type = "shape";
     attrs.fillColor = fill;
     attrs.color = TRANSPARENT;
@@ -111,18 +124,33 @@ function nodeProgramAttributes(style = {}, type) {
       fill,
       stroke: hasBorder ? stroke : null,
       lineWidth: hasBorder ? lineWidth : 0,
-      size: (size ?? DEFAULTS.NODE.SIZE) / 2,
+      size: radius,
     });
-  } else {
-    attrs.type = type === "rect" ? "square" : "circle";
-    // Texture→native transitions (e.g. border removed) merge over the old
-    // attrs, so clear exactly what the shape branch sets: a stale fillColor
-    // corrupts state textures on hover and a stale TRANSPARENT color makes
-    // the node invisible. The image program skips non-string images, so
-    // null is safe.
+    attrs.borderRatio = 0;
+  } else if (hasBorder) {
+    // Bordered circle: the node-border program draws border + fill as GLSL
+    // rings (crisp at all zooms, no texture atlas churn). The border ring is
+    // a fraction of the radius so it scales with zoom exactly like the baked
+    // textures (and G6) did. State halos still go through the texture path —
+    // applyNodeState reads fillColor ?? color / borderColor / borderSize,
+    // all coherent here.
+    attrs.type = "borderCircle";
     attrs.color = fill;
     attrs.fillColor = null;
     attrs.image = null;
+    attrs.borderRatio = radius > 0 ? Math.min(lineWidth / radius, 1) : 1;
+  } else {
+    attrs.type = type === "rect" ? "square" : "circle";
+    attrs.color = fill;
+    attrs.fillColor = null;
+    attrs.image = null;
+    attrs.borderRatio = 0;
+    // Unconditionally clear border attrs: a style delta that drops the border
+    // without an explicit stroke key (e.g. {lineWidth: 0} on the no-nodeRef
+    // fallback path) would otherwise leave a stale borderColor in graphology,
+    // which applyNodeState bakes into halo textures.
+    attrs.borderColor = null;
+    attrs.borderSize = 0;
   }
   return attrs;
 }
@@ -249,7 +277,13 @@ function buildGraphologyGraph(cache) {
  *   dim       → dim fill
  * Halo states render through the texture program (the only sigma mechanism
  * that draws a ring around non-circular shapes); the node grows by
- * HALO_EXTRA_PX so the halo bleeds outward like G6's did.
+ * HALO_EXTRA_PX so the halo bleeds outward like G6's did. Halos stay on the
+ * texture path for ALL shapes — including borderCircle nodes — so there is a
+ * single halo implementation; a node-border halo ring for circles would have
+ * to visually match the SVG halo on the other five shapes forever. This works
+ * unchanged for borderCircle data because its branch keeps fillColor ?? color,
+ * borderColor and borderSize coherent (reducers never write to graphology, so
+ * the transient type switch needs no merge hygiene).
  */
 function applyNodeState(data, state) {
   const res = { ...data };

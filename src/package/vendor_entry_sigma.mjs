@@ -12,6 +12,7 @@ export {
   drawDiscNodeHover,
 } from 'sigma/rendering';
 export {NodeSquareProgram} from '@sigma/node-square';
+export {createNodeBorderProgram} from '@sigma/node-border';
 export * as nodeImage from '@sigma/node-image';
 export * as edgeCurve from '@sigma/edge-curve';
 export * as exportImage from '@sigma/export-image';

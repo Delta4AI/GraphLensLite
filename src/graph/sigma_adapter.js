@@ -17,6 +17,7 @@ import {
   createEdgeCompoundProgram,
   drawDiscNodeHover,
   NodeSquareProgram,
+  createNodeBorderProgram,
   nodeImage,
   edgeCurve,
 } from "../lib/sigma.bundle.mjs";
@@ -60,8 +61,9 @@ function guardHoverDrawer(drawer, getDraggedNode) {
 
 /**
  * Node/edge program registry (G6 type vocabulary → sigma programs).
- * Nodes: circle native, square via @sigma/node-square; every other shape —
- * and any bordered/haloed node — uses the SVG texture program ("shape").
+ * Nodes: circle native, square via @sigma/node-square, bordered circles via
+ * @sigma/node-border ("borderCircle"); every other shape — and any bordered
+ * non-circle or haloed node — uses the SVG texture program ("shape").
  * Edges: straight programs are sigma built-ins; curved ones come from
  * @sigma/edge-curve (cubic/quadratic/polyline all map to one curve type).
  *
@@ -101,6 +103,20 @@ function buildProgramRegistry(getDraggedNode) {
       this.drawHover = guardHoverDrawer(this.drawHover, getDraggedNode);
     }
   }
+  // Bordered circles: outer ring reads borderColor/borderRatio (graph_model
+  // emits borderRatio = lineWidth / radius so the border scales with zoom
+  // like the baked textures did), the rest is filled with the node color.
+  // No hover guard needed: the program leaves its instance drawHover
+  // undefined, so sigma falls back to the guarded defaultDrawNodeHover.
+  const borderCircleProgram = createNodeBorderProgram({
+    borders: [
+      {
+        size: { attribute: "borderRatio", defaultValue: 0, mode: "relative" },
+        color: { attribute: "borderColor" },
+      },
+      { size: { fill: true }, color: { attribute: "color" } },
+    ],
+  });
   const curveOptions = (extremity) => ({
     arrowHead: extremity
       ? { ...edgeCurve.DEFAULT_EDGE_CURVE_PROGRAM_OPTIONS.arrowHead, extremity }
@@ -111,6 +127,7 @@ function buildProgramRegistry(getDraggedNode) {
     nodeProgramClasses: {
       square: GuardedSquareProgram,
       shape: shapeProgram,
+      borderCircle: borderCircleProgram,
     },
     edgeProgramClasses: {
       line: EdgeRectangleProgram,

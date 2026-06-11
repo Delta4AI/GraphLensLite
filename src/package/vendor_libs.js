@@ -63,7 +63,7 @@ const bundles = [
   {
     entry: path.join(__dirname, 'vendor_entry_sigma.mjs'),
     out: path.join(libDir, 'sigma.bundle.mjs'),
-    pkgs: ['sigma', '@sigma/node-square', '@sigma/node-image', '@sigma/edge-curve', '@sigma/export-image'],
+    pkgs: ['sigma', '@sigma/node-square', '@sigma/node-image', '@sigma/node-border', '@sigma/edge-curve', '@sigma/export-image'],
   },
 ];
 
