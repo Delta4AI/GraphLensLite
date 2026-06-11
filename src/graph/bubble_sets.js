@@ -1,4 +1,5 @@
 import {StaticUtilities} from "../utilities/static.js";
+import {detectCommunities as computeCommunityAssignments} from "./communities.js";
 
 class GraphBubbleSetManager {
   constructor(cache) {
@@ -321,6 +322,41 @@ class GraphBubbleSetManager {
 
     // Force bubble set redraw to fix positioning
     await this.redrawBubbleSets();
+  }
+
+  async detectCommunities() {
+    const groups = [...this.traverseBubbleSets()];
+    const result = computeCommunityAssignments(this.cache, groups);
+
+    if (!result) {
+      this.cache.ui.warning("Community detection needs at least one visible edge");
+      return;
+    }
+
+    // Replace the manual members of all groups for the current layout with
+    // the detected communities (largest community → first group).
+    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
+    for (const group of groups) {
+      currentLayout[`${group}ManualMembers`] = result.assignments.get(group) ?? new Set();
+    }
+
+    // Same post-change choreography as toggleSelectedNodesInManualGroup
+    this.updateManualGroupButtonState();
+    this.updateManualGroupStatus();
+    this.refreshBubbleStyleElements();
+
+    this.cache.bubbleSetChanged = true;
+    await this.updateBubbleSetIfChanged();
+    await this.cache.graph.draw();
+    await this.redrawBubbleSets();
+
+    const assignedText = result.communityCount <= groups.length
+      ? `all ${result.communityCount}`
+      : `largest ${groups.length}`;
+    this.cache.ui.info(
+      `Detected ${result.communityCount} communities (modularity ${result.modularity.toFixed(2)}); ` +
+      `assigned ${assignedText} to bubble groups`
+    );
   }
 
   updateManualGroupButtonState() {

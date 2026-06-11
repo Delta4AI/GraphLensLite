@@ -20,3 +20,6 @@ export {default as eigenvectorCentrality} from 'graphology-metrics/centrality/ei
 export {default as pagerank} from 'graphology-metrics/centrality/pagerank.js';
 export {density} from 'graphology-metrics/graph/density.js';
 export {default as diameter} from 'graphology-metrics/graph/diameter.js';
+export {default as modularity} from 'graphology-metrics/graph/modularity.js';
+// Louvain community detection (pure JS, node-safe).
+export {default as louvain} from 'graphology-communities-louvain';

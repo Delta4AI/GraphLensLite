@@ -1,6 +1,6 @@
 import {Popup} from "../utilities/popup.js";
+import {buildVisibleGraph} from "../graph/visible_graph.js";
 import {
-  Graph,
   betweennessCentrality,
   closenessCentrality,
   degreeCentrality,
@@ -322,27 +322,6 @@ class NetworkMetrics {
       }
     }
   }
-}
-
-/**
- * Builds a temporary undirected multigraph from the currently visible
- * subgraph so graphology-metrics can run on it. Multi because every visible
- * parallel edge counts toward degree, matching the previous behaviour.
- * @param {object} cache
- * @returns {Graph}
- */
-function buildVisibleGraph(cache) {
-  const {nodeIDsToBeShown: nodes, edgeIDsToBeShown: edges, edgeRef} = cache;
-  const graph = new Graph({type: 'undirected', multi: true});
-
-  for (const id of nodes) graph.addNode(id);
-  for (const edgeId of edges) {
-    const {source, target} = edgeRef.get(edgeId) ?? {};
-    if (graph.hasNode(source) && graph.hasNode(target)) {
-      graph.addEdgeWithKey(edgeId, source, target);
-    }
-  }
-  return graph;
 }
 
 /** Maps a graphology-metrics result object to [{id, value}] sorted desc. */
