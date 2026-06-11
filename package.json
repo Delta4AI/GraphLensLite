@@ -89,6 +89,7 @@
     "graphology": "^0.26.0",
     "graphology-layout": "^0.6.1",
     "graphology-layout-forceatlas2": "^0.10.1",
+    "graphology-metrics": "^2.4.0",
     "marked": "^18.0.2",
     "sigma": "^3.0.3"
   }

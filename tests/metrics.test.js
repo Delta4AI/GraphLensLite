@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   calculateDegreeCentrality,
   calculateBetweennessCentrality,
@@ -9,21 +9,23 @@ import {
 
 // ==========================================================================
 // Network metrics — unit tests with known graph topologies
+// (algorithm cores delegated to graphology-metrics)
 // ==========================================================================
 
 const PRECISION = 5
 
-// Helper: build a minimal cache-like object for the metric functions
+// Helper: build a minimal cache-like object for the metric functions.
+// Edge ids carry an index suffix so parallel (multi) edges stay distinct.
 function makeCache(nodeIds, edges) {
   const nodeIDsToBeShown = new Set(nodeIds)
   const edgeRef = new Map()
   const edgeIDsToBeShown = new Set()
 
-  for (const [source, target] of edges) {
-    const id = `${source}::${target}`
+  edges.forEach(([source, target], i) => {
+    const id = `${source}::${target}::${i}`
     edgeIDsToBeShown.add(id)
     edgeRef.set(id, { source, target })
-  }
+  })
 
   return { nodeIDsToBeShown, edgeIDsToBeShown, edgeRef }
 }
@@ -116,6 +118,62 @@ describe('Degree Centrality', () => {
     // B has degree 3 (highest)
     expect(glm['Maximum Degree Centrality']).toBe(3)
   })
+
+  it('counts parallel (multi) edges toward degree', async () => {
+    // A == B (two parallel edges), C connected once
+    const cache = makeCache(
+      ['A', 'B', 'C'],
+      [['A', 'B'], ['A', 'B'], ['B', 'C']]
+    )
+    const result = await calculateDegreeCentrality(cache)
+
+    // A has degree 2 of 2 possible → 1.0; B degree 3 → 1.5
+    expect(result.nodeValues.get('A')).toBe(1.0)
+    expect(result.nodeValues.get('B')).toBe(1.5)
+    expect(result.nodeValues.get('C')).toBe(0.5)
+    expect(result.scores[0].text).toContain('Degree 3')
+  })
+
+  it('counts a visible self-loop twice toward degree (unchanged semantics)', async () => {
+    // Old accumulation (`if has(source) +1; if has(target) +1`) counted a
+    // self-loop twice — identical to graphology undirected multigraph degree.
+    const cache = makeCache(['A', 'B', 'C'], [['A', 'A'], ['A', 'B']])
+    const result = await calculateDegreeCentrality(cache)
+
+    // A: self-loop (2) + edge to B (1) = degree 3 → centrality 3/(n-1) = 1.5
+    expect(result.nodeValues.get('A')).toBe(1.5)
+    expect(result.scores[0].text).toContain('Degree 3')
+    expect(result.nodeValues.get('B')).toBe(0.5)
+  })
+
+  it('ignores edges whose endpoint is not visible', async () => {
+    const cache = makeCache(['A', 'B'], [['A', 'B'], ['A', 'ghost']])
+    const result = await calculateDegreeCentrality(cache)
+
+    expect(result.nodeValues.get('A')).toBe(1.0)
+    expect(result.nodeValues.has('ghost')).toBe(false)
+  })
+
+  it('reports real graph density (2m / n(n-1))', async () => {
+    // Star K1,4: density = 2*4 / (5*4) = 0.4
+    const star = makeCache(
+      ['center', 'A', 'B', 'C', 'D'],
+      [['center', 'A'], ['center', 'B'], ['center', 'C'], ['center', 'D']]
+    )
+    const starResult = await calculateDegreeCentrality(star)
+    expect(starResult.graphLevelMetrics['Graph Density']).toBe(0.4)
+
+    // Path A-B-C: density = 2*2 / (3*2) = 0.66667
+    const path = makeCache(['A', 'B', 'C'], [['A', 'B'], ['B', 'C']])
+    const pathResult = await calculateDegreeCentrality(path)
+    expect(pathResult.graphLevelMetrics['Graph Density']).toBeCloseTo(2 / 3, PRECISION)
+  })
+
+  it('formats score text with degree, centrality, and percent of max', async () => {
+    const cache = makeCache(['A', 'B', 'C'], [['A', 'B'], ['B', 'C']])
+    const result = await calculateDegreeCentrality(cache)
+    expect(result.scores[0].text).toBe('Degree 2 | Centrality 1.00000 (100 %)')
+  })
 })
 
 // --------------------------------------------------------------------------
@@ -189,6 +247,36 @@ describe('Betweenness Centrality', () => {
     expect(result.nodeValues.get('A')).toBe(0)
     expect(result.nodeValues.get('E')).toBe(0)
   })
+
+  it('star center has exactly 1.0 normalized betweenness', async () => {
+    // K1,3: center lies on all 3 leaf pairs; normalization (n-1)(n-2)/2 = 3
+    const cache = makeCache(
+      ['center', 'A', 'B', 'C'],
+      [['center', 'A'], ['center', 'B'], ['center', 'C']]
+    )
+    const result = await calculateBetweennessCentrality(cache)
+    expect(result.nodeValues.get('center')).toBe(1.0)
+  })
+
+  it('computes exact normalized values on a 5-path', async () => {
+    // A-B-C-D-E: B(B)=3 pairs, B(C)=4 pairs, normalization (4*3)/2 = 6
+    const cache = makeCache(
+      ['A', 'B', 'C', 'D', 'E'],
+      [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'E']]
+    )
+    const result = await calculateBetweennessCentrality(cache)
+    expect(result.nodeValues.get('B')).toBeCloseTo(3 / 6, PRECISION)
+    expect(result.nodeValues.get('C')).toBeCloseTo(4 / 6, PRECISION)
+  })
+
+  it('returns finite zeros for two-node graphs (no NaN)', async () => {
+    // Previous hand-rolled code divided by ((n-1)(n-2))/2 = 0 → NaN here.
+    const cache = makeCache(['A', 'B'], [['A', 'B']])
+    const result = await calculateBetweennessCentrality(cache)
+    expect(result.nodeValues.get('A')).toBe(0)
+    expect(result.nodeValues.get('B')).toBe(0)
+    expect(result.graphLevelMetrics['Centralization']).toBe(0)
+  })
 })
 
 // --------------------------------------------------------------------------
@@ -252,6 +340,50 @@ describe('Closeness Centrality', () => {
     const maxIdx = scores.indexOf(Math.max(...scores))
     expect(maxIdx).toBe(2)
   })
+
+  it('computes exact Wasserman-Faust values on a 3-path', async () => {
+    // A-B-C: B reaches 2 nodes at total distance 2 → 2²/(2·2) = 1.0
+    //        A reaches 2 nodes at total distance 3 → 2²/(2·3) = 2/3
+    const cache = makeCache(['A', 'B', 'C'], [['A', 'B'], ['B', 'C']])
+    const result = await calculateClosenessCentrality(cache)
+    expect(result.nodeValues.get('B')).toBeCloseTo(1.0, PRECISION)
+    expect(result.nodeValues.get('A')).toBeCloseTo(2 / 3, PRECISION)
+    expect(result.nodeValues.get('C')).toBeCloseTo(2 / 3, PRECISION)
+  })
+
+  it('applies the reachable-fraction correction on disconnected graphs', async () => {
+    // A-B plus isolated C (n=3): A reaches 1 node at distance 1
+    // → WF closeness = 1²/((3-1)·1) = 0.5
+    const cache = makeCache(['A', 'B', 'C'], [['A', 'B']])
+    const result = await calculateClosenessCentrality(cache)
+    expect(result.nodeValues.get('A')).toBeCloseTo(0.5, PRECISION)
+    expect(result.nodeValues.get('B')).toBeCloseTo(0.5, PRECISION)
+    expect(result.nodeValues.get('C')).toBe(0)
+  })
+
+  it('reports graph diameter for connected graphs', async () => {
+    // Path A..E: diameter 4
+    const path = makeCache(
+      ['A', 'B', 'C', 'D', 'E'],
+      [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'E']]
+    )
+    const pathResult = await calculateClosenessCentrality(path)
+    expect(pathResult.graphLevelMetrics['Graph Diameter']).toBe(4)
+
+    // K4: diameter 1
+    const k4 = makeCache(
+      ['A', 'B', 'C', 'D'],
+      [['A', 'B'], ['A', 'C'], ['A', 'D'], ['B', 'C'], ['B', 'D'], ['C', 'D']]
+    )
+    const k4Result = await calculateClosenessCentrality(k4)
+    expect(k4Result.graphLevelMetrics['Graph Diameter']).toBe(1)
+  })
+
+  it('reports infinite diameter for disconnected graphs', async () => {
+    const cache = makeCache(['A', 'B', 'C'], [['A', 'B']])
+    const result = await calculateClosenessCentrality(cache)
+    expect(result.graphLevelMetrics['Graph Diameter']).toBe('∞ (disconnected)')
+  })
 })
 
 // --------------------------------------------------------------------------
@@ -313,6 +445,42 @@ describe('Eigenvector Centrality', () => {
     expect(result.graphLevelMetrics).toHaveProperty('Variance Eigenvector Centrality')
     expect(result.graphLevelMetrics).toHaveProperty('Centralization')
   })
+
+  it('converges to the exact principal eigenvector on a star (bipartite) graph', async () => {
+    // K1,4 principal eigenvector (L2-normalized): center 1/√2, leaves 1/(2√2).
+    // The old plain power iteration oscillated on bipartite graphs and
+    // silently returned a non-converged iterate after 100 iterations.
+    const cache = makeCache(
+      ['center', 'A', 'B', 'C', 'D'],
+      [['center', 'A'], ['center', 'B'], ['center', 'C'], ['center', 'D']]
+    )
+    const result = await calculateEigenvectorCentrality(cache)
+    expect(result.nodeValues.get('center')).toBeCloseTo(Math.SQRT1_2, 4)
+    expect(result.nodeValues.get('A')).toBeCloseTo(1 / (2 * Math.SQRT2), 4)
+  })
+
+  it('surfaces a clear error when the power iteration fails to converge', async () => {
+    vi.resetModules()
+    vi.doMock('../src/lib/graphology.bundle.mjs', async (importOriginal) => {
+      const actual = await importOriginal()
+      return {
+        ...actual,
+        eigenvectorCentrality: () => {
+          throw new Error('graphology-metrics/centrality/eigenvector: failed to converge.')
+        },
+      }
+    })
+
+    try {
+      const mocked = await import('../src/managers/metrics.js')
+      const cache = makeCache(['A', 'B'], [['A', 'B']])
+      await expect(mocked.calculateEigenvectorCentrality(cache))
+        .rejects.toThrow(/did not converge/)
+    } finally {
+      vi.doUnmock('../src/lib/graphology.bundle.mjs')
+      vi.resetModules()
+    }
+  })
 })
 
 // --------------------------------------------------------------------------
@@ -364,14 +532,6 @@ describe('PageRank', () => {
     expect(sum).toBeCloseTo(1.0, 2)
   })
 
-  it('handles single isolated node', async () => {
-    const cache = makeCache(['A'], [])
-    const result = await calculatePageRank(cache)
-
-    // Single node gets all the probability mass
-    expect(result.nodeValues.get('A')).toBeCloseTo(1.0, 4)
-  })
-
   it('returns correct graph-level metrics', async () => {
     const cache = makeCache(
       ['A', 'B', 'C'],
@@ -394,6 +554,85 @@ describe('PageRank', () => {
     const result = await calculatePageRank(cache)
 
     expect(result.nodeValues.get('A')).toBeCloseTo(result.nodeValues.get('C'), PRECISION)
+  })
+
+  it('matches the reference value for a star graph hub', async () => {
+    // K1,4 with d=0.85 converges to hub ≈ 0.47568 (NetworkX reference)
+    const cache = makeCache(
+      ['center', 'A', 'B', 'C', 'D'],
+      [['center', 'A'], ['center', 'B'], ['center', 'C'], ['center', 'D']]
+    )
+    const result = await calculatePageRank(cache)
+    expect(result.nodeValues.get('center')).toBeCloseTo(0.47568, 4)
+  })
+
+  it('reports degree statistics from the visible multigraph', async () => {
+    const cache = makeCache(['A', 'B', 'C'], [['A', 'B'], ['A', 'B'], ['B', 'C']])
+    const result = await calculatePageRank(cache)
+    const glm = result.graphLevelMetrics
+
+    expect(glm['Maximum Degree']).toBe(3)
+    expect(glm['Minimum Degree']).toBe(1)
+    expect(glm['Mean Degree']).toBe(2)
+  })
+})
+
+// --------------------------------------------------------------------------
+// Degenerate visible graphs (n <= 1 guard, all-zero percentage guard)
+// --------------------------------------------------------------------------
+
+const ALL_METRICS = [
+  ['degree', calculateDegreeCentrality],
+  ['betweenness', calculateBetweennessCentrality],
+  ['closeness', calculateClosenessCentrality],
+  ['eigenvector', calculateEigenvectorCentrality],
+  ['pagerank', calculatePageRank],
+]
+
+describe('Single visible node (n <= 1 guard)', () => {
+  it.each(ALL_METRICS)('%s returns empty results for a single visible node', async (_name, calc) => {
+    const result = await calc(makeCache(['A'], []))
+    expect(result.scores).toEqual([])
+    expect(result.graphLevelMetrics).toEqual({})
+  })
+})
+
+describe('Isolated nodes (n >= 2, no visible edges)', () => {
+  it('degree renders "(0 %)" instead of NaN when all scores are zero', async () => {
+    const result = await calculateDegreeCentrality(makeCache(['A', 'B', 'C'], []))
+    expect(result.scores).toHaveLength(3)
+    for (const s of result.scores) {
+      expect(s.text).toContain('(0 %)')
+      expect(s.text).not.toContain('NaN')
+    }
+  })
+
+  it('betweenness renders "(0%)" instead of NaN when all scores are zero', async () => {
+    const result = await calculateBetweennessCentrality(makeCache(['A', 'B', 'C'], []))
+    expect(result.scores).toHaveLength(3)
+    for (const s of result.scores) {
+      expect(s.text).toContain('(0%)')
+      expect(s.text).not.toContain('NaN')
+    }
+  })
+
+  it('closeness renders "(0%)" instead of NaN when all scores are zero', async () => {
+    const result = await calculateClosenessCentrality(makeCache(['A', 'B', 'C'], []))
+    expect(result.scores).toHaveLength(3)
+    for (const s of result.scores) {
+      expect(s.text).toContain('(0%)')
+      expect(s.text).not.toContain('NaN')
+    }
+  })
+
+  it.each(ALL_METRICS)('%s renders no NaN in score texts on edgeless graphs', async (_name, calc) => {
+    // eigenvector/pagerank distribute uniform non-zero mass here, so only
+    // the NaN absence is universal.
+    const result = await calc(makeCache(['A', 'B', 'C'], []))
+    expect(result.scores).toHaveLength(3)
+    for (const s of result.scores) {
+      expect(s.text).not.toContain('NaN')
+    }
   })
 })
 
