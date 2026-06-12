@@ -39,6 +39,7 @@ import { executeLayout } from "./layout_algorithms.js";
 import { drawNodeLabel, drawEdgeLabel, BAKED_DEFAULT_LABEL_COLOR } from "./label_renderers.js";
 import { InteractionManager } from "./interactions.js";
 import { BubbleSetLayer } from "./bubble_layer.js";
+import { HeatmapLayer } from "./heatmap_layer.js";
 import { Minimap } from "./minimap.js";
 
 // Rasterization resolution for the SVG shape textures. 512 px keeps shapes
@@ -342,6 +343,11 @@ class SigmaAdapter {
     });
     this.resizeObserver.observe(containerEl);
     this.interactions = new InteractionManager(this, cache, hoverIds, containerEl);
+    // Created BEFORE BubbleSetLayer on purpose: both register with
+    // beforeLayer: "edges", and the earliest-created canvas sits deepest
+    // (see the layer-ordering note in heatmap_layer.js), keeping the
+    // atmospheric field under the bubble bodies.
+    this.heatmapLayer = new HeatmapLayer(this);
     this.bubbleLayer = new BubbleSetLayer(this, cache);
     this.minimap = new Minimap(this, containerEl);
     this.flowAnimator = new FlowAnimator(this);
@@ -417,6 +423,7 @@ class SigmaAdapter {
     clearTimeout(this.resizeDebounce);
     this.resizeObserver.disconnect();
     this.flowAnimator.destroy();
+    this.heatmapLayer.destroy();
     this.bubbleLayer.destroy();
     this.minimap.destroy();
     this.interactions.destroy();

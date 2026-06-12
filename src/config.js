@@ -65,6 +65,37 @@ const DEFAULTS = {
     EDGE_HALO_WIDTH: 6,        // px, emphasis width budget on selected edges
     HALO_OPACITY: 0.4,
   },
+  // Atmospheric canvas layer (heatmap_layer.js): node-density heatmap below
+  // the bubble-set canvas. Off by default; toggled from the workspace toolbar.
+  HEATMAP: {
+    ENABLED: false,
+    MAX_RESOLUTION: 1024,  // offscreen splat canvas long-side px cap
+    BANDWIDTH: 0,          // splat radius in graph units; 0 → auto (heatBandwidth)
+    OPACITY: 0.55,         // fixed layer alpha — keeps the field atmospheric
+    // Density ramps (transparent → cool → warm), one per theme. First-stop
+    // alpha 00 on the cool hue so low densities fade out without graying.
+    RAMP_LIGHT: [
+      { t: 0, color: "#8CA6D900" },
+      { t: 0.35, color: "#8CA6D9" },
+      { t: 0.7, color: "#EFB0AA" },
+      { t: 1, color: "#C33D35" },
+    ],
+    // Dark theme: brighter, slightly desaturated edges so the haze reads on
+    // a dark background without neon saturation.
+    RAMP_DARK: [
+      { t: 0, color: "#7C90C200" },
+      { t: 0.35, color: "#7C90C2" },
+      { t: 0.7, color: "#D89A90" },
+      { t: 1, color: "#F0867B" },
+    ],
+  },
+  // Selection-glow pass on the same layer: accent halo gradient behind
+  // selected nodes, radius = node screen radius × RADIUS_MULTIPLIER.
+  GLOW: {
+    ENABLED: false,
+    RADIUS_MULTIPLIER: 2.5,
+    OPACITY: 0.35,
+  },
   LAYOUT: "force",
   // Keys define the layout template vocabulary (workspace-creation dropdown).
   // Option objects ride into the headless @antv/layout classes for
