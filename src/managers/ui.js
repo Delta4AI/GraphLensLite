@@ -5,6 +5,11 @@ import {Popup} from "../utilities/popup.js";
 import {applyTheme, currentTheme, nodeLabelColorForTheme} from "../utilities/theme.js";
 import {EXPORT_SCALES} from "../utilities/export_scale.js";
 
+// Persisted preference: whether the filter panel reveals exact numeric inputs
+// and the per-row group / selection actions. Off keeps rows scannable when a
+// dataset has 30-50 properties.
+const FILTER_DETAILS_KEY = "gll.filterDetails";
+
 class UIManager {
   constructor(cache, debugEnabled = false) {
     this.cache = cache;
@@ -605,8 +610,15 @@ class UIManager {
       div.classList.remove('locked');
     }
 
-    let sectionsCreated = new Set();
-    let subSectionsCreated = new Set();
+    // A single "Details" toggle reveals exact numeric inputs and per-row
+    // group / selection actions. Compact by default so dense property sets
+    // (30-50 properties) stay scannable. It rides on the first section header.
+    const detailsToggle = this.createFilterDetailsToggle(div);
+
+    // Each section (and sub-group) is a collapsible accordion so large
+    // property sets can be folded down to just the groups in use.
+    const sectionBodies = new Map();
+    const subBodies = new Map();
     const sortedPropIDs = this.cache.CFG.SORT_FILTERS ?
       [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()].sort() :
       [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()];
@@ -614,8 +626,10 @@ class UIManager {
     for (let propID of sortedPropIDs) {
       let [section, subSection, prop] = StaticUtilities.decodePropHashId(propID);
       let isCategoricalProperty = this.cache.data.filterDefaults.get(propID).isCategory;
-      if (!sectionsCreated.has(section)) {
-        if (sectionsCreated.size > 0) div.appendChild(document.createElement("hr"));
+
+      if (!sectionBodies.has(section)) {
+        const sectionWrap = document.createElement("div");
+        sectionWrap.className = "filter-section";
         const headerDiv = document.createElement("div");
         headerDiv.className = "header-card";
         const header = document.createElement("h4");
@@ -625,11 +639,27 @@ class UIManager {
         headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(false, section));
         headerDiv.appendChild(this.cache.uiComponents.createSectionResetButton(section));
         headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(true, section));
-        div.appendChild(headerDiv);
-        div.appendChild(document.createElement("br"));
-        sectionsCreated.add(section);
+        const sectionBody = document.createElement("div");
+        sectionBody.className = "filter-section-body";
+        this.makeFilterGroupCollapsible(sectionWrap, headerDiv);
+        if (sectionBodies.size === 0) {
+          // Pair the first section header with the panel-level Details toggle.
+          const headerRow = document.createElement("div");
+          headerRow.className = "filter-section-headerrow";
+          headerRow.append(headerDiv, detailsToggle);
+          sectionWrap.append(headerRow, sectionBody);
+        } else {
+          sectionWrap.append(headerDiv, sectionBody);
+        }
+        div.appendChild(sectionWrap);
+        sectionBodies.set(section, sectionBody);
       }
-      if (!subSectionsCreated.has(`${section}::${subSection}`)) {
+      const sectionBody = sectionBodies.get(section);
+
+      const subKey = `${section}::${subSection}`;
+      if (!subBodies.has(subKey)) {
+        const subWrap = document.createElement("div");
+        subWrap.className = "filter-subgroup";
         const subHeaderDiv = document.createElement("div");
         subHeaderDiv.className = "sub-header-card";
         const subHeader = document.createElement("h5");
@@ -639,9 +669,15 @@ class UIManager {
         subHeaderDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(false, section, subSection));
         subHeaderDiv.appendChild(this.cache.uiComponents.createSectionResetButton(section, subSection));
         subHeaderDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(true, section, subSection));
-        div.appendChild(subHeaderDiv);
-        subSectionsCreated.add(`${section}::${subSection}`);
+        const subBody = document.createElement("div");
+        subBody.className = "filter-subgroup-body";
+        this.makeFilterGroupCollapsible(subWrap, subHeaderDiv);
+        subWrap.append(subHeaderDiv, subBody);
+        sectionBody.appendChild(subWrap);
+        subBodies.set(subKey, subBody);
       }
+      const subBody = subBodies.get(subKey);
+
       const row = document.createElement('div');
       row.className = "filter-row";
       const col1 = document.createElement('div');
@@ -668,12 +704,66 @@ class UIManager {
       }
       col3.appendChild(this.cache.uiComponents.createAddOrRemoveToSelectionGroup(propID));
       row.appendChild(col3);
-      div.append(row);
+      subBody.append(row);
       sliderOrDropdown.appendListeners();
     }
 
     this.manageDynamicWidgets();
     this.cache.qm.updateQueryTextArea();
+  }
+
+  // Builds the panel-level "Details" toggle button. Adding/removing
+  // `show-details` on the filter container drives input/action visibility
+  // purely via CSS. Returned button is mounted on the first section header.
+  createFilterDetailsToggle(container) {
+    const detailsBtn = document.createElement('button');
+    detailsBtn.type = 'button';
+    detailsBtn.className = 'filter-details-toggle';
+    detailsBtn.textContent = '⚙ Details';
+
+    const apply = (on) => {
+      container.classList.toggle('show-details', on);
+      detailsBtn.classList.toggle('active', on);
+      detailsBtn.setAttribute('aria-pressed', String(on));
+      detailsBtn.title = on
+        ? 'Hide exact value inputs and per-row group / selection actions'
+        : 'Show exact value inputs and per-row group / selection actions';
+    };
+
+    detailsBtn.addEventListener('click', () => {
+      const on = !container.classList.contains('show-details');
+      try {
+        window.localStorage.setItem(FILTER_DETAILS_KEY, on ? '1' : '0');
+      } catch (err) {
+        this.debug(`Could not persist filter-details preference: ${err.message}`);
+      }
+      apply(on);
+    });
+
+    let stored = '0';
+    try {
+      stored = window.localStorage.getItem(FILTER_DETAILS_KEY) ?? '0';
+    } catch (err) {
+      this.debug(`Could not read filter-details preference: ${err.message}`);
+    }
+    apply(stored === '1');
+
+    return detailsBtn;
+  }
+
+  // Prepends a chevron and wires a click on the group header to fold the group
+  // body. Clicks on the header's action badges are ignored so they still fire.
+  makeFilterGroupCollapsible(wrapper, headerDiv) {
+    const chevron = document.createElement('span');
+    chevron.className = 'filter-group-chevron';
+    chevron.textContent = '▾';
+    headerDiv.insertBefore(chevron, headerDiv.firstChild);
+    headerDiv.classList.add('collapsible-filter-header');
+    headerDiv.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      const collapsed = wrapper.classList.toggle('collapsed');
+      chevron.textContent = collapsed ? '▸' : '▾';
+    });
   }
 
   showUI(show) {

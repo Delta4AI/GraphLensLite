@@ -303,13 +303,33 @@ class InvertibleRangeSlider {
     this.thumbEnd = document.getElementById(this.thumbEndId);
     this.labelStart = document.getElementById(this.labelStartId);
     this.labelEnd = document.getElementById(this.labelEndId);
+    // The value bubbles ([sign]) and their track parent — positioned with
+    // position:fixed (see positionSigns) so they can extend past the sidebar's
+    // clipped edges into the canvas; z-index alone cannot escape overflow.
+    this.signLeft = this.labelStart ? this.labelStart.parentElement : null;
+    this.signRight = this.labelEnd ? this.labelEnd.parentElement : null;
+    this.track = this.range ? this.range.parentElement : null;
+  }
+
+  // Pins the hover value bubbles to the track ends in viewport coordinates so
+  // they render above everything and are not clipped by the sidebar's
+  // overflow. Recomputed on hover and on scroll/resize while hovered.
+  positionSigns() {
+    if (!this.track || !this.signLeft || !this.signRight) return;
+    const r = this.track.getBoundingClientRect();
+    if (r.width === 0) return; // not laid out yet
+    const midY = r.top + r.height / 2;
+    const lw = this.signLeft.offsetWidth, lh = this.signLeft.offsetHeight;
+    const rw = this.signRight.offsetWidth, rh = this.signRight.offsetHeight;
+    this.signLeft.style.top = `${midY - lh / 2}px`;
+    this.signLeft.style.left = `${Math.max(2, r.left - lw - 8)}px`;
+    this.signRight.style.top = `${midY - rh / 2}px`;
+    this.signRight.style.left = `${Math.min(window.innerWidth - rw - 2, r.right + 8)}px`;
   }
 
   createSliderInput(id, initialValue, relatedSliderId) {
     const input = document.createElement("input");
     input.id = id;
-    input.style.height = '18px';
-    input.style.boxSizing = 'border-box';
     input.value = initialValue;
     input.addEventListener('keydown', (ev) => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
@@ -380,10 +400,10 @@ class InvertibleRangeSlider {
                  right:${100 - this.calcPercentage(this.currentMax)}%;"></div>
           <span id="${this.thumbStartId}" thumb style="left:${this.calcPercentage(this.currentMin)}%;"></span>
           <span id="${this.thumbEndId}" thumb style="left:${this.calcPercentage(this.currentMax)}%;"></span>
-          <div sign class="left" style="left:0%;">
+          <div sign class="left">
             <span id="${this.labelStartId}">${StaticUtilities.formatNumber(this.currentMin, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION)}</span>
           </div>
-          <div sign class="right" style="left:100%; margin-left: 24px;">
+          <div sign class="right">
             <span id="${this.labelEndId}">${StaticUtilities.formatNumber(this.currentMax, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION)}</span>
           </div>
         </div>
@@ -398,6 +418,19 @@ class InvertibleRangeSlider {
   appendListeners() {
     if (!this.isValidSlider) return;
     this.getDOMReferences();
+
+    // Position the fixed value bubbles on hover; keep them pinned while the
+    // sidebar scrolls or the window resizes during the hover.
+    const reposition = () => this.positionSigns();
+    this.slider.addEventListener('mouseenter', () => {
+      this.positionSigns();
+      window.addEventListener('scroll', reposition, true);
+      window.addEventListener('resize', reposition);
+    });
+    this.slider.addEventListener('mouseleave', () => {
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    });
 
     this.slider.addEventListener('dblclick', () => {
       this.reset();

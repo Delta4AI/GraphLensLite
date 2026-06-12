@@ -1387,41 +1387,169 @@ h5 {
     margin-right: 6px;
 }
 
+/* The sub-group body is a 3-column grid [label | control | actions]; each row
+   contributes its three cells via display:contents. This aligns every control
+   in a sub-group to the same x and gives them equal width (dropdowns, sliders,
+   and the slider's min/max inputs all line up). */
+.filter-subgroup-body {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    column-gap: 8px;
+    row-gap: 6px;
+    align-items: start;
+}
+
 .filter-row {
-    display: flex;
-    align-items: center;
-    margin-bottom: 4px;
+    display: contents;
 }
 
 .filter-row-col1 {
-    flex: 1 1 auto;
+    /* Label column: shared auto width across the sub-group. Nudged down to sit
+       level with the control's first line (slider / dropdown). */
     min-width: 0;
+    padding-top: 2px;
 }
 
 .filter-row-col2 {
-    flex: 0 0 180px;
+    /* Control fills the 1fr column. In detail mode col3 reappears in the third
+       column and this one shrinks to make room. */
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 3px;
-    margin-right: 10px;
 }
 
-/* Always-visible min/max threshold inputs under the range slider. */
+/* Always-visible min/max threshold inputs under the range slider, styled as a
+   single paired control (lower – upper) instead of two bare full-width boxes. */
 .filter-input-row {
+    position: relative;
     display: flex;
-    justify-content: space-between;
-    gap: 4px;
+    align-items: center;
+    gap: 14px;
+    margin-top: 2px;
+}
+
+.filter-input-row::before {
+    content: "–";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--text-muted);
+    font-size: 11px;
+    pointer-events: none;
 }
 
 .filter-input-row input {
     flex: 1 1 0;
     min-width: 0;
+    height: 20px;
+    padding: 0 6px;
+    font-size: 11px;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    background: var(--surface-3);
+    color: var(--text-strong);
+    box-sizing: border-box;
+}
+
+.filter-input-row input:first-child {
+    text-align: left;
+}
+
+.filter-input-row input:last-child {
+    text-align: right;
+}
+
+.filter-input-row input:focus {
+    outline: none;
+    border-color: var(--accent-text);
+    box-shadow: 0 0 0 2px rgba(195, 61, 53, 0.25);
 }
 
 .filter-row-col3 {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
+}
+
+/* Panel-level "Details" toggle: compact-by-default keeps dense property sets
+   (30-50 properties) scannable; the exact value inputs and per-row group /
+   selection actions are revealed on demand. The toggle rides on the first
+   section header row, right-aligned. */
+.filter-section-headerrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 2px;
+}
+
+.filter-details-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 9px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-strong);
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.filter-details-toggle:hover {
+    border-color: var(--accent-text);
+}
+
+.filter-details-toggle.active {
+    background: var(--accent-text);
+    color: #fff;
+    border-color: var(--accent-text);
+}
+
+/* Compact mode: numeric inputs and the circle / +- actions are hidden so the
+   control uses the full row width. Hiding col3 drops the grid to two columns
+   so the remaining cells stay aligned (a 3-col grid would pull the next row's
+   label into the empty third cell). The hover value bubbles overflow into the
+   canvas via position:fixed, so no right inset is needed. */
+#filterContainer:not(.show-details) .filter-subgroup-body {
+    grid-template-columns: auto minmax(0, 1fr);
+}
+
+#filterContainer:not(.show-details) .filter-input-row,
+#filterContainer:not(.show-details) .filter-row-col3 {
+    display: none;
+}
+
+/* Collapsible filter sections and sub-groups (accordion). Properties within a
+   sub-group stay compact (grid row-gap); sub-groups get a bottom margin so
+   they read as distinct blocks. */
+.filter-section {
+    margin-bottom: 6px;
+}
+
+.filter-subgroup {
+    margin-bottom: 12px;
+}
+
+.collapsible-filter-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.filter-group-chevron {
+    display: inline-block;
+    font-size: 9px;
+    margin-left: 4px;
+    margin-right: 1px;
+    opacity: 0.85;
+}
+
+.filter-section.collapsed > .filter-section-body,
+.filter-subgroup.collapsed > .filter-subgroup-body {
+    display: none;
 }
 
 /* Filter lock status bar */
@@ -2618,10 +2746,12 @@ div[slider] > input[type=range]::-ms-tooltip {
 
 [slider] > div > [sign] {
     opacity: 0;
-    position: absolute;
-    margin-left: -56px; /* controls horizontal position of left tooltip */
-    top: -8px;
-    z-index: 3;
+    /* Fixed so the bubble escapes the sidebar's three overflow-clipping
+       ancestors and can extend into the canvas. JS (positionSigns) sets
+       top/left in viewport coordinates on hover. */
+    position: fixed;
+    margin-left: 0;
+    z-index: 9999;
     background-color: #C33D35;
     border: 1px solid var(--brand-border);
     color: #E4E3EA;
@@ -2638,12 +2768,10 @@ div[slider] > input[type=range]::-ms-tooltip {
 }
 
 [slider] > div > [sign].left {
-    position: absolute;
     white-space: nowrap;
 }
 
 [slider] > div > [sign].right {
-    position: absolute;
     white-space: nowrap;
 }
 
