@@ -120,6 +120,8 @@
           <button id="removeOverlapsBtn" class="small-btn" title="Remove overlaps: minimally spread overlapping nodes apart (applies to all nodes in this workspace)" onclick="cache.lm.removeNodeOverlaps()">↔️</button>
           <button id="hideDisconnectedBtn" class="small-btn red" title="Hide all nodes and edges that are not connected to any other node or edge" onclick="cache.gcm.toggleCleanUpDanglingElements(this)">🚫</button>
           <button id="hoverToggleBtn" class="small-btn green highlight" title="Disable hover highlight effect (H)" onclick="cache.ui.toggleHoverEffect(this)">✨</button>
+          <button id="heatmapToggleBtn" class="small-btn red" title="Enable density heatmap" onclick="cache.ui.toggleDensityHeatmap(this)">🌡️</button>
+          <button id="glowToggleBtn" class="small-btn red" title="Enable selection glow" onclick="cache.ui.toggleSelectionGlow(this)">🔆</button>
           <div id="debugDiv" class="inline"></div>
           <br>
           <h5 class="purple">Shown:

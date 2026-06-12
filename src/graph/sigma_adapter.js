@@ -29,6 +29,8 @@ import {
 import { clampExportScale, MAX_CANVAS_SIDE } from "../utilities/export_scale.js";
 import { webglMaxCanvasSide } from "./webgl_support.js";
 import { buildGraphSvg } from "./export_svg.js";
+import { EdgeFlowProgram, createCurveFlowProgram } from "./edge_flow_programs.js";
+import { FlowAnimator } from "./flow_animator.js";
 import {
   nodeAttributesFromStyle,
   edgeAttributesFromStyle,
@@ -39,6 +41,7 @@ import { executeLayout } from "./layout_algorithms.js";
 import { drawNodeLabel, drawEdgeLabel, BAKED_DEFAULT_LABEL_COLOR } from "./label_renderers.js";
 import { InteractionManager } from "./interactions.js";
 import { BubbleSetLayer } from "./bubble_layer.js";
+import { HeatmapLayer } from "./heatmap_layer.js";
 import { Minimap } from "./minimap.js";
 
 // Rasterization resolution for the SVG shape textures. 512 px keeps shapes
@@ -102,11 +105,16 @@ function guardHoverDrawer(drawer, getDraggedNode) {
  * non-circle or haloed node — uses the SVG texture program ("shape").
  * Edges: two parametric programs per curvature (graph_model.sigmaEdgeType
  * routes): "line"/"curve" are the plain fast paths for unstyled edges;
- * "styledLine"/"styledCurve" compose halo-under → body → marker heads
- * (compound programs draw in array order) and are fully parameterized by
- * per-edge attrs (startMarker/endMarker enum + sizes, haloWidth/haloColor) —
- * no registry growth per marker shape or halo toggle. Off states collapse to
- * degenerate geometry in the custom programs (see edge_programs.js).
+ * "styledLine"/"styledCurve" compose halo-under → body → flow overlay →
+ * marker heads (compound programs draw in array order: the flow pattern rides
+ * on the body, marker heads stay crisp on top) and are fully parameterized by
+ * per-edge attrs (startMarker/endMarker enum + sizes, haloWidth/haloColor,
+ * flowMode/flowSpeed/flowColor) — no registry growth per marker shape or
+ * halo/flow toggle. Off states collapse to degenerate geometry in the custom
+ * programs (see edge_programs.js / edge_flow_programs.js). styledCurve's flow
+ * sub-program forks the @sigma/edge-curve shaders via string patches
+ * (edge_flow_glsl.js); on anchor drift after a sigma upgrade it is dropped
+ * with a warning and curves render without animation.
  *
  * @param {() => string|null} getDraggedNode  hover-guard input (see
  *   guardHoverDrawer); NodeSquareProgram carries its own instance drawHover
@@ -183,6 +191,16 @@ function buildProgramRegistry(getDraggedNode) {
     arrowHead: null,
     drawLabel: drawCurvedEdgeLabelWithSize,
   });
+  // Curve flow overlay: forked @sigma/edge-curve shaders (edge_flow_glsl.js
+  // string patches). The patchers throw when a sigma upgrade moves their GLSL
+  // anchors — degrade to curves WITHOUT animation rather than break curve
+  // rendering; straight-edge flow is unaffected.
+  let curveFlowProgram = null;
+  try {
+    curveFlowProgram = createCurveFlowProgram(curveProgram);
+  } catch (error) {
+    console.warn("buildProgramRegistry: curve flow overlay disabled:", error);
+  }
   return {
     nodeProgramClasses: {
       square: GuardedSquareProgram,
@@ -195,6 +213,7 @@ function buildProgramRegistry(getDraggedNode) {
       styledLine: createEdgeCompoundProgram([
         EdgeHaloProgram,
         EdgeRectangleProgram,
+        EdgeFlowProgram,
         createEdgeMarkerHeadProgram({ extremity: "source" }),
         createEdgeMarkerHeadProgram({ extremity: "target" }),
       ]),
@@ -203,6 +222,8 @@ function buildProgramRegistry(getDraggedNode) {
         [
           createCurveHaloProgram(curveProgram),
           curveProgram,
+          // Flow overlay rides on the body, marker heads stay crisp on top.
+          ...(curveFlowProgram ? [curveFlowProgram] : []),
           createEdgeMarkerHeadProgram({ extremity: "source", curved: true }),
           createEdgeMarkerHeadProgram({ extremity: "target", curved: true }),
         ],
@@ -351,8 +372,14 @@ class SigmaAdapter {
     });
     this.resizeObserver.observe(containerEl);
     this.interactions = new InteractionManager(this, cache, hoverIds, containerEl);
+    // Created BEFORE BubbleSetLayer on purpose: both register with
+    // beforeLayer: "edges", and the earliest-created canvas sits deepest
+    // (see the layer-ordering note in heatmap_layer.js), keeping the
+    // atmospheric field under the bubble bodies.
+    this.heatmapLayer = new HeatmapLayer(this);
     this.bubbleLayer = new BubbleSetLayer(this, cache);
     this.minimap = new Minimap(this, containerEl);
+    this.flowAnimator = new FlowAnimator(this);
     this.#syncLabelVisibility();
   }
 
@@ -424,6 +451,8 @@ class SigmaAdapter {
     this.layoutTransitionCancel = null;
     clearTimeout(this.resizeDebounce);
     this.resizeObserver.disconnect();
+    this.flowAnimator.destroy();
+    this.heatmapLayer.destroy();
     this.bubbleLayer.destroy();
     this.minimap.destroy();
     this.interactions.destroy();

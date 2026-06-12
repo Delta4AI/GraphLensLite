@@ -49,6 +49,11 @@ const DEFAULTS = {
     },
     HALO: {
       ENABLED: false, COLOR: "#403C53", WIDTH: 3,
+    },
+    // Animated source→target flow overlay (edge_flow_programs.js). COLOR null
+    // → derived from the edge stroke (lightened, see graph_model.edgeMarkerHaloAttributes).
+    FLOW: {
+      ENABLED: false, TYPE: "dash", SPEED: 1, COLOR: null,
     }
   },
   // Element interaction-state spec (former G6 node/edge state config in
@@ -59,6 +64,37 @@ const DEFAULTS = {
     NODE_HALO_WIDTH: 12,       // px, halo ring stroke width on nodes
     EDGE_HALO_WIDTH: 6,        // px, emphasis width budget on selected edges
     HALO_OPACITY: 0.4,
+  },
+  // Atmospheric canvas layer (heatmap_layer.js): node-density heatmap below
+  // the bubble-set canvas. Off by default; toggled from the workspace toolbar.
+  HEATMAP: {
+    ENABLED: false,
+    MAX_RESOLUTION: 1024,  // offscreen splat canvas long-side px cap
+    BANDWIDTH: 0,          // splat radius in graph units; 0 → auto (heatBandwidth)
+    OPACITY: 0.55,         // fixed layer alpha — keeps the field atmospheric
+    // Density ramps (transparent → cool → warm), one per theme. First-stop
+    // alpha 00 on the cool hue so low densities fade out without graying.
+    RAMP_LIGHT: [
+      { t: 0, color: "#8CA6D900" },
+      { t: 0.35, color: "#8CA6D9" },
+      { t: 0.7, color: "#EFB0AA" },
+      { t: 1, color: "#C33D35" },
+    ],
+    // Dark theme: brighter, slightly desaturated edges so the haze reads on
+    // a dark background without neon saturation.
+    RAMP_DARK: [
+      { t: 0, color: "#7C90C200" },
+      { t: 0.35, color: "#7C90C2" },
+      { t: 0.7, color: "#D89A90" },
+      { t: 1, color: "#F0867B" },
+    ],
+  },
+  // Selection-glow pass on the same layer: accent halo gradient behind
+  // selected nodes, radius = node screen radius × RADIUS_MULTIPLIER.
+  GLOW: {
+    ENABLED: false,
+    RADIUS_MULTIPLIER: 2.5,
+    OPACITY: 0.35,
   },
   LAYOUT: "force",
   // Keys define the layout template vocabulary (workspace-creation dropdown).
@@ -210,6 +246,9 @@ const DEFAULTS = {
     // "tee" (⊣ inhibition bar). Legacy G6 names (triangle/vee/...) still load
     // via aliases but are no longer offered in the UI.
     EDGE_ARROW_TYPES: ["arrow", "rect", "diamond", "circle", "tee"],
+    // Flow overlay vocabulary (graph_model.FLOW_MODES): marching dashes vs
+    // travelling dots, both moving source → target.
+    EDGE_FLOW_TYPES: ["dash", "pulse"],
     EDGE_ARROW_COLORS: {red: "#C33D35", purple: "#403C53", blue: "#8CA6D9", pink: "#EFB0AA", grey: "#ABACBD"},
     EDGE_ARROW_BORDER_COLORS: {
       red: "#C33D35", purple: "#403C53", blue: "#8CA6D9", pink: "#EFB0AA", grey: "#ABACBD", none: "#00000000"

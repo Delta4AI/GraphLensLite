@@ -220,6 +220,18 @@ function createStyleDiv(cache) {
       case "Edge Halo Color":
         await cache.gcm.updateEdges({style: {haloStroke: value}}, commands);
         break;
+      case "Edge Flow":
+        await cache.gcm.updateEdges({style: {flow: value}}, commands);
+        break;
+      case "Edge Flow Type":
+        await cache.gcm.updateEdges({style: {flowType: value}}, commands);
+        break;
+      case "Edge Flow Speed":
+        await cache.gcm.updateEdges({style: {flowSpeed: value}}, commands);
+        break;
+      case "Edge Flow Color":
+        await cache.gcm.updateEdges({style: {flowStroke: value}}, commands);
+        break;
       default:
         break;
     }
@@ -1058,6 +1070,32 @@ function createStyleDiv(cache) {
     appendLabel(rowTwentyTwo, "Halo Width", "Define the halo width for the selected edges.");
     createNumericalSlider(rowTwentyTwo, "Edge Halo Width", cache.DEFAULTS.EDGE.HALO.WIDTH,
       {min: 1, max: 30, step: 1}, "Define the halo width for the selected edges.");
+
+    appendHorizontalRule(edgeDiv);
+
+    const rowTwentyThree = createNewRow(edgeDiv);
+    appendLabel(rowTwentyThree, "Flow",
+      "Animate a directional flow along the selected edges (source → target).");
+    createBooleanControls(rowTwentyThree, "Edge Flow",
+      "Animate a directional flow along the selected edges (source → target).");
+
+    const rowTwentyFour = createNewRow(edgeDiv);
+    appendLabel(rowTwentyFour, "Flow Type", "dash = marching dashes, pulse = travelling dots.");
+    createCategoricalControls(rowTwentyFour, "Edge Flow Type", cache.DEFAULTS.EDGE.FLOW.TYPE,
+      cache.DEFAULTS.STYLES.EDGE_FLOW_TYPES, "dash = marching dashes, pulse = travelling dots.");
+
+    const rowTwentyFive = createNewRow(edgeDiv);
+    appendLabel(rowTwentyFive, "Flow Speed", "Speed multiplier for the flow animation.");
+    createNumericalSlider(rowTwentyFive, "Edge Flow Speed", cache.DEFAULTS.EDGE.FLOW.SPEED,
+      {min: 0.2, max: 5, step: 0.2}, "Speed multiplier for the flow animation.", true);
+
+    const rowTwentySix = createNewRow(edgeDiv);
+    appendLabel(rowTwentySix, "Flow Color",
+      "Color of the flow overlay. Leave unset to derive a lighter shade of the edge color.");
+    // Swatch stand-in only (FLOW.COLOR is null = "derive from the stroke") —
+    // same convention as the arrow-color rows defaulting to EDGE.COLOR.
+    createColorControls(rowTwentySix, "Edge Flow Color", cache.DEFAULTS.EDGE.COLOR,
+      cache.DEFAULTS.STYLES.EDGE_COLORS);
   }
 
   function createBubbleSetConfigCard() {

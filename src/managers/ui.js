@@ -443,6 +443,44 @@ class UIManager {
     this.info(enable ? "Hover highlight effect enabled" : "Hover highlight effect disabled");
   }
 
+  toggleDensityHeatmap(btn) {
+    const layer = this.cache.graph?.heatmapLayer;
+    if (!layer) return;
+    const enable = !layer.heatmapEnabled;
+    layer.setHeatmapEnabled(enable);
+
+    if (enable) {
+      btn.classList.remove("red");
+      btn.classList.add("green", "highlight");
+      btn.title = "Disable density heatmap";
+    } else {
+      btn.classList.remove("green", "highlight");
+      btn.classList.add("red");
+      btn.title = "Enable density heatmap";
+    }
+
+    this.info(enable ? "Density heatmap enabled" : "Density heatmap disabled");
+  }
+
+  toggleSelectionGlow(btn) {
+    const layer = this.cache.graph?.heatmapLayer;
+    if (!layer) return;
+    const enable = !layer.glowEnabled;
+    layer.setGlowEnabled(enable);
+
+    if (enable) {
+      btn.classList.remove("red");
+      btn.classList.add("green", "highlight");
+      btn.title = "Disable selection glow";
+    } else {
+      btn.classList.remove("green", "highlight");
+      btn.classList.add("red");
+      btn.title = "Enable selection glow";
+    }
+
+    this.info(enable ? "Selection glow enabled" : "Selection glow disabled");
+  }
+
   toggleDarkMode() {
     const next = currentTheme(document) === "dark" ? "light" : "dark";
     applyTheme(document, next);

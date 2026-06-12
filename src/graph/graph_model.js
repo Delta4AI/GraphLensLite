@@ -239,32 +239,87 @@ function edgeHaloWidth(style) {
 }
 
 /**
- * Sigma edge program key for a G6 edge type + marker/halo styling.
+ * Edge flow-overlay vocabulary. The numeric codes are the `flowMode` float
+ * attr consumed by the WebGL flow program (edge_flow_programs.js), which
+ * selects the pattern in its fragment shader: dash (marching dash segments)
+ * or pulse (discrete travelling dots). 0 = no flow (the program collapses the
+ * quad to zero fragments, like disabled halos/markers).
+ */
+const FLOW_MODES = { dash: 1, pulse: 2 };
+
+/** @returns {number} flow mode code: 0 unless flow is enabled (unknown type → dash) */
+function edgeFlowMode(style) {
+  if (!style.flow) return 0;
+  return FLOW_MODES[style.flowType ?? DEFAULTS.EDGE.FLOW.TYPE] ?? FLOW_MODES.dash;
+}
+
+// Default flow color = the edge stroke mixed this far toward white, so the
+// overlay contrasts with the body it travels on without a config color.
+const FLOW_LIGHTEN_AMOUNT = 0.45;
+
+/**
+ * Mix a hex color toward white in RGB space, preserving alpha. Accepts
+ * #rgb/#rgba/#rrggbb/#rrggbbaa; anything else (named colors, rgb() strings)
+ * is returned unchanged — lightening is best-effort for the flow default,
+ * not a general color parser.
+ *
+ * @param {string} hex
+ * @param {number} amount  0 = identity (normalized to long form), 1 = white
+ * @returns {string} #rrggbb or #rrggbbaa (lowercase)
+ */
+function lightenHexColor(hex, amount) {
+  if (typeof hex !== "string" || !/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(hex)) {
+    return hex;
+  }
+  let digits = hex.slice(1);
+  if (digits.length <= 4) {
+    digits = [...digits].map((d) => d + d).join("");
+  }
+  const t = Math.min(Math.max(amount, 0), 1);
+  const channel = (i) => {
+    const value = parseInt(digits.slice(i, i + 2), 16);
+    return Math.round(value + (255 - value) * t)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  const alpha = digits.length === 8 ? digits.slice(6, 8).toLowerCase() : "";
+  return `#${channel(0)}${channel(2)}${channel(4)}${alpha}`;
+}
+
+/**
+ * Sigma edge program key for a G6 edge type + marker/halo/flow styling.
  * Two parametric programs per curvature: the plain fast path ("line"/"curve")
- * for the unstyled majority, and the compound halo+line+marker-heads program
- * ("styledLine"/"styledCurve") whenever any end marker or halo is active —
- * the per-edge attrs (start/endMarker, haloWidth, ...) parameterize it, so
- * the registry never grows with the marker vocabulary.
+ * for the unstyled majority, and the compound halo+line+flow+marker-heads
+ * program ("styledLine"/"styledCurve") whenever any end marker, halo or flow
+ * is active — the per-edge attrs (start/endMarker, haloWidth, flowMode, ...)
+ * parameterize it, so the registry never grows with the marker vocabulary.
+ * Flow on curved edges routes to "styledCurve", whose flow sub-program forks
+ * the @sigma/edge-curve shaders (createCurveFlowProgram + edge_flow_glsl.js).
  * Degradations (documented in API.md §5): `polyline` renders as a curve,
  * `lineDash` is dropped.
  */
 function sigmaEdgeType(type, style = {}) {
   const curved = type === "cubic" || type === "quadratic" || type === "polyline";
-  const styled = Boolean(style.startArrow) || Boolean(style.endArrow) || edgeHaloWidth(style) > 0;
+  const styled =
+    Boolean(style.startArrow) ||
+    Boolean(style.endArrow) ||
+    edgeHaloWidth(style) > 0 ||
+    edgeFlowMode(style) > 0;
   if (curved) return styled ? "styledCurve" : "curve";
   return styled ? "styledLine" : "line";
 }
 
 /**
- * Marker + halo attrs read by the custom edge programs. Always emits the
- * FULL set (off → 0/null): the adapter applies updates via
+ * Marker + halo + flow attrs read by the custom edge programs. Always emits
+ * the FULL set (off → 0/null): the adapter applies updates via
  * mergeEdgeAttributes, so every toggle must overwrite what the previous
- * style set or stale markers/halos survive a disable. Sizes are graph-space
- * px (G6 arrow-size heritage); 0 means "derive from edge thickness" (sigma
- * stock-arrow proportions).
+ * style set or stale markers/halos/flows survive a disable. Sizes are
+ * graph-space px (G6 arrow-size heritage); 0 means "derive from edge
+ * thickness" (sigma stock-arrow proportions).
  */
 function edgeMarkerHaloAttributes(style) {
   const haloWidth = edgeHaloWidth(style);
+  const flowMode = edgeFlowMode(style);
   return {
     startMarker: style.startArrow ? edgeMarkerCode(style.startArrowType) : 0,
     startMarkerSize:
@@ -288,17 +343,32 @@ function edgeMarkerHaloAttributes(style) {
         : 0,
     haloWidth,
     haloColor: haloWidth > 0 ? (style.haloStroke ?? DEFAULTS.EDGE.HALO.COLOR) : null,
+    flowMode,
+    // Speed is a unitless multiplier on the shader's base px/s; non-finite or
+    // non-positive values fall back to the default rather than freezing/reversing.
+    flowSpeed:
+      flowMode > 0
+        ? Number.isFinite(style.flowSpeed) && style.flowSpeed > 0
+          ? style.flowSpeed
+          : DEFAULTS.EDGE.FLOW.SPEED
+        : 0,
+    // Explicit flow color wins; unset derives a lighter shade of the stroke
+    // so the overlay contrasts with the body without configuration.
+    flowColor:
+      flowMode > 0
+        ? (style.flowStroke ?? lightenHexColor(style.stroke ?? DEFAULTS.EDGE.COLOR, FLOW_LIGHTEN_AMOUNT))
+        : null,
   };
 }
 
 /**
  * Map a G6 edge style + type to sigma edge attributes.
  *
- * Like the node mapper, the program-dependent attrs (type + marker/halo set)
- * are only emitted when `type` is given — the adapter always maps from the
- * merged ref (full style), so the set is complete and coherent there.
+ * Like the node mapper, the program-dependent attrs (type + marker/halo/flow
+ * set) are only emitted when `type` is given — the adapter always maps from
+ * the merged ref (full style), so the set is complete and coherent there.
  *
- * @param {object} style  G6 edge style ({lineWidth, stroke, *Arrow*, halo*, label*, visibility, ...})
+ * @param {object} style  G6 edge style ({lineWidth, stroke, *Arrow*, halo*, flow*, label*, visibility, ...})
  * @param {string} [type] G6 edge type (line|cubic|quadratic|polyline)
  * @returns {object} partial sigma attrs
  */
@@ -566,6 +636,9 @@ export {
   sigmaEdgeType,
   edgeMarkerCode,
   EDGE_MARKERS,
+  FLOW_MODES,
+  edgeFlowMode,
+  lightenHexColor,
   flipY,
   hoverNeighborhood,
   makeNodeReducer,
