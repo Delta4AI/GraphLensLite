@@ -88,6 +88,25 @@ describe("BubbleSetLayer — malformed-fit guard", () => {
     expect(layer.outlines.get("groupOne").graphPoints).toEqual(CLEAN);
   });
 
+  it("exportOutlines falls back to the cached outline when the fresh fit self-intersects", () => {
+    const camera = { x: 0, y: 0, ratio: 1, angle: 0 };
+    const { sigma } = makeSigma(camera);
+    const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
+
+    // First fit at ratio 1 → clean square, cached by the on-screen paint.
+    vi.mocked(computeOutlinePoints).mockReturnValue(CLEAN);
+    layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
+    flush();
+
+    // The export's exact re-fit comes back malformed → reprojected cache wins
+    // (projection is identity in this harness, so the points compare equal).
+    vi.mocked(computeOutlinePoints).mockReturnValue(BOWTIE);
+    const groups = layer.exportOutlines();
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].points).toEqual(CLEAN);
+  });
+
   it("accepts a clean refit (replaces the cached outline)", () => {
     const camera = { x: 0, y: 0, ratio: 1, angle: 0 };
     const { sigma, emit } = makeSigma(camera);

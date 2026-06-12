@@ -536,6 +536,18 @@ class UIManager {
     }
     popover.appendChild(row);
 
+    // Vector output has no resolution to pick — one button, below the PNG
+    // scales. SVG never participates in the remembered scale (PNG-only).
+    const svgBtn = document.createElement("button");
+    svgBtn.className = "export-res-option export-res-svg";
+    svgBtn.textContent = "Vector (SVG)";
+    svgBtn.title = "Export as resolution-independent SVG vector graphic";
+    svgBtn.addEventListener("click", () => {
+      this.#closeExportResolutionPopover();
+      this.cache.io.exportSVG();
+    });
+    popover.appendChild(svgBtn);
+
     document.body.appendChild(popover);
     this._exportPopover = popover;
     return popover;

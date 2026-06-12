@@ -26,7 +26,9 @@ import {
   createCurveHaloProgram,
   createEdgeMarkerHeadProgram,
 } from "./edge_programs.js";
-import { clampExportScale } from "../utilities/export_scale.js";
+import { clampExportScale, MAX_CANVAS_SIDE } from "../utilities/export_scale.js";
+import { webglMaxCanvasSide } from "./webgl_support.js";
+import { buildGraphSvg } from "./export_svg.js";
 import {
   nodeAttributesFromStyle,
   edgeAttributesFromStyle,
@@ -258,6 +260,33 @@ function overrideDevicePixelRatio(value) {
     if (original) Object.defineProperty(window, "devicePixelRatio", original);
     else delete window.devicePixelRatio;
   };
+}
+
+// Downsample target for the blank-render probe: big enough that a couple of
+// nodes anywhere in a huge frame still land a non-zero-alpha sample, small
+// enough that getImageData stays negligible next to the export itself.
+const BLANK_PROBE_SIDE = 32;
+
+/**
+ * Whether an exported sigma frame came back fully transparent. WebGL
+ * framebuffer allocation can fail without throwing (driver memory pressure,
+ * over-limit canvases), in which case export-image hands back a valid but
+ * empty PNG — detectable only by looking at the pixels.
+ *
+ * @param {ImageBitmap} bitmap
+ * @returns {boolean} true when every sampled pixel has alpha 0
+ */
+function bitmapLooksBlank(bitmap) {
+  const probe = document.createElement("canvas");
+  probe.width = BLANK_PROBE_SIDE;
+  probe.height = BLANK_PROBE_SIDE;
+  const ctx = probe.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(bitmap, 0, 0, BLANK_PROBE_SIDE, BLANK_PROBE_SIDE);
+  const { data } = ctx.getImageData(0, 0, BLANK_PROBE_SIDE, BLANK_PROBE_SIDE);
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] !== 0) return false;
+  }
+  return true;
 }
 
 class SigmaAdapter {
@@ -823,16 +852,20 @@ class SigmaAdapter {
   /**
    * PNG data URL of the current viewport. @sigma/export-image re-renders the
    * scene on a temp renderer, which only carries sigma's own layers, so the
-   * bubble-set canvases are composited here in their on-screen z-order: the
+   * bubble-set hulls and group labels are re-painted here at the export
+   * resolution (BubbleSetLayer.drawExport*) in their on-screen z-order: the
    * body/outline UNDER the sigma image, the group labels OVER it. An opaque
    * stage-background fill goes down first (export-image renders sigma
    * transparent). The minimap is a viewport control and stays out of exports.
    *
    * `scale` raises the export resolution by bumping the device pixel ratio
    * (see overrideDevicePixelRatio), so node/label proportions match the live
-   * view exactly at any factor. It is clamped to the canvas size limits;
-   * returns the data URL plus the scale actually applied so callers can warn
-   * on a clamp.
+   * view exactly at any factor. It is clamped to the WebGL framebuffer
+   * ceiling (a render past it fails SILENTLY — blank canvas, no exception,
+   * the old "8× exports nothing" bug) and, as a final safety net against
+   * driver memory pressure inside the claimed limits, a blank render steps
+   * the scale down and retries. Returns the data URL plus the scale actually
+   * applied so callers can warn on a clamp.
    *
    * @param {{ scale?: number }} [opts]
    * @returns {Promise<{ url: string, requestedScale: number, appliedScale: number }>}
@@ -840,28 +873,24 @@ class SigmaAdapter {
   async toDataURL({ scale = 1 } = {}) {
     const dims = this.sigma.getDimensions();
     const dpr = window.devicePixelRatio || 1;
-    const appliedScale = clampExportScale(scale, dims, dpr);
+    // The composite canvas is 2D (16384/side, ~268 MP ceilings baked into
+    // clampExportScale), but sigma renders through WebGL first — its
+    // framebuffer limit governs when it is lower.
+    const maxSide = Math.min(webglMaxCanvasSide() ?? Infinity, MAX_CANVAS_SIDE);
+    let appliedScale = clampExportScale(scale, dims, dpr, { maxSide });
     const background = this.#stageBackgroundColor();
+    const hasVisibleNodes = this.graph.someNode((_, attrs) => !attrs.hidden);
 
-    // High-res export = the SAME framing at higher pixel density. Growing the
-    // temp renderer's CSS dimensions (export-image's width/height) scales node
-    // positions with the viewport but leaves node/label sizes in absolute px,
-    // so nodes shrink relative to the frame (2x → half size, 8x → invisible).
-    // Bumping the device pixel ratio instead scales the WHOLE pipeline
-    // uniformly — positions, radii, label fonts, edge widths, paddings — so
-    // the output is a true DPI multiple of the on-screen view. export-image
-    // reads window.devicePixelRatio once while building its own temp renderer
-    // and never re-renders the live one, so the override is invisible outside
-    // this call and always restored.
-    const restoreDpr = appliedScale !== 1 ? overrideDevicePixelRatio(dpr * appliedScale) : null;
-    let blob;
-    try {
-      blob = await exportImage.toBlob(this.sigma, { format: "png" });
-    } finally {
-      restoreDpr?.();
+    let sigmaImage = await this.#renderExportBitmap(dpr, appliedScale);
+    // Silent-failure net: a within-limits allocation can still fail under GPU
+    // memory pressure, yielding a fully transparent render. Halve and retry —
+    // a smaller correct export beats a giant empty one.
+    while (hasVisibleNodes && appliedScale > 1 && bitmapLooksBlank(sigmaImage)) {
+      sigmaImage.close();
+      appliedScale = Math.max(1, appliedScale / 2);
+      sigmaImage = await this.#renderExportBitmap(dpr, appliedScale);
     }
 
-    const sigmaImage = await createImageBitmap(blob);
     try {
       const out = document.createElement("canvas");
       out.width = sigmaImage.width;
@@ -872,26 +901,76 @@ class SigmaAdapter {
       // behind alpha (which reads as "dark mode" regardless of the theme).
       ctx.fillStyle = background;
       ctx.fillRect(0, 0, out.width, out.height);
-      const bubbleCanvas = this.bubbleLayer.canvas;
-      if (bubbleCanvas?.width > 0 && bubbleCanvas?.height > 0) {
-        // Both canvases are viewport-aligned, so the stretch to the (DPR-
-        // scaled) output is geometry-preserving — worst case is resolution
-        // blur on the bubble body, never an offset.
-        ctx.drawImage(bubbleCanvas, 0, 0, out.width, out.height);
-      }
+      // Re-fit + re-paint the hulls at the export resolution (the on-screen
+      // canvases are screen-resolution bitmaps — stretching them is what made
+      // scaled exports blurry, and their zoom-bucketed outlines drift from
+      // the freshly rendered nodes after a zoom).
+      const bubbleGroups = this.bubbleLayer.exportOutlines();
+      this.bubbleLayer.drawExportBodies(ctx, bubbleGroups, dpr * appliedScale);
       ctx.drawImage(sigmaImage, 0, 0);
       // Group labels sit above sigma's node labels on screen (their own canvas
       // at afterLayer "labels"); composite them last to keep that z-order.
-      const labelCanvas = this.bubbleLayer.labelCanvas;
-      if (labelCanvas?.width > 0 && labelCanvas?.height > 0) {
-        ctx.drawImage(labelCanvas, 0, 0, out.width, out.height);
-      }
+      this.bubbleLayer.drawExportLabels(ctx, bubbleGroups, dpr * appliedScale);
       return { url: out.toDataURL("image/png"), requestedScale: scale, appliedScale };
     } catch (error) {
       throw new Error(`Graph image export failed: ${error?.message ?? error}`);
     } finally {
       sigmaImage.close();
     }
+  }
+
+  /**
+   * One sigma re-render at `dpr × scale` density, as an ImageBitmap.
+   *
+   * High-res export = the SAME framing at higher pixel density. Growing the
+   * temp renderer's CSS dimensions (export-image's width/height) scales node
+   * positions with the viewport but leaves node/label sizes in absolute px,
+   * so nodes shrink relative to the frame (2x → half size, 8x → invisible).
+   * Bumping the device pixel ratio instead scales the WHOLE pipeline
+   * uniformly — positions, radii, label fonts, edge widths, paddings — so
+   * the output is a true DPI multiple of the on-screen view. export-image
+   * reads window.devicePixelRatio once while building its own temp renderer
+   * and never re-renders the live one, so the override is invisible outside
+   * this call and always restored.
+   *
+   * @param {number} dpr  the real device pixel ratio
+   * @param {number} scale  export multiplier (already clamped)
+   * @returns {Promise<ImageBitmap>}
+   */
+  async #renderExportBitmap(dpr, scale) {
+    const restoreDpr = scale !== 1 ? overrideDevicePixelRatio(dpr * scale) : null;
+    let blob;
+    try {
+      blob = await exportImage.toBlob(this.sigma, { format: "png" });
+    } finally {
+      restoreDpr?.();
+    }
+    return createImageBitmap(blob);
+  }
+
+  /**
+   * Standalone SVG document of the current viewport — true vector output
+   * (nodes, edges, labels, bubble hulls), so there is no resolution knob and
+   * no canvas ceiling to negotiate. Framing matches the live view 1:1.
+   *
+   * @returns {{ svg: string, width: number, height: number }}
+   */
+  toSVG() {
+    const dims = this.sigma.getDimensions();
+    const measureCtx = document.createElement("canvas").getContext("2d");
+    const measureText = (text, font) => {
+      measureCtx.font = font;
+      return measureCtx.measureText(text).width;
+    };
+    const svg = buildGraphSvg({
+      sigma: this.sigma,
+      graph: this.graph,
+      dims,
+      background: this.#stageBackgroundColor(),
+      bubbleGroups: this.bubbleLayer.exportOutlines(),
+      measureText,
+    });
+    return { svg, width: dims.width, height: dims.height };
   }
 
   /**

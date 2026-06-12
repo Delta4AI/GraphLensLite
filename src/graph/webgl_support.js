@@ -34,6 +34,41 @@ export function isWebGL2Available(doc = globalThis.document) {
   }
 }
 
+// Probe result is per-GPU, not per-call: cache it for the session.
+let cachedMaxSide = null;
+
+/**
+ * Largest canvas side (device px) the WebGL2 driver claims to render to.
+ * Sigma draws through WebGL framebuffers, whose ceiling
+ * (MAX_RENDERBUFFER_SIZE / MAX_TEXTURE_SIZE) is what actually governs
+ * high-resolution exports — Chrome's 2D-canvas limits are often higher, and
+ * exceeding the GL ceiling fails SILENTLY (blank render, no exception).
+ *
+ * @param {Document} [doc] injectable for tests; defaults to the global document
+ * @returns {number|null} the probed side limit, or null when no context exists
+ */
+export function webglMaxCanvasSide(doc = globalThis.document) {
+  if (cachedMaxSide !== null) return cachedMaxSide;
+  if (!doc) return null;
+  try {
+    const gl = doc.createElement("canvas").getContext("webgl2");
+    if (!gl) return null;
+    const side = Math.min(
+      gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
+      gl.getParameter(gl.MAX_TEXTURE_SIZE),
+    );
+    if (Number.isFinite(side) && side > 0) cachedMaxSide = side;
+    return cachedMaxSide;
+  } catch {
+    return null;
+  }
+}
+
+/** Test hook: forget the cached probe so a fake document can be re-probed. */
+export function resetWebglMaxCanvasSideCache() {
+  cachedMaxSide = null;
+}
+
 /**
  * Renders the WebGL2-unavailable message into the graph container. The
  * renderer is permanently dead in this session, so a transient toast is not

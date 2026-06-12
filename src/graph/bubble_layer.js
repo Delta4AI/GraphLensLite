@@ -192,13 +192,102 @@ class BubbleSetLayer {
     this.#prepareCanvas(this.labelCanvas, this.labelCtx, width, height, dpr);
 
     for (const [group, state] of active) {
-      const points = this.#drawGroup(this.ctx, group, state);
+      // Reprojection assumes camera.angle === 0 (the app never rotates the camera).
+      const points = this.outlines
+        .get(group)
+        .graphPoints.map((p) => sigma.graphToViewport(p));
+      const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {};
+      const drawn = this.#drawGroup(this.ctx, points, state, defaults);
       // Labels paint on the top canvas (afterLayer: "labels") so they read
       // over member-node labels; the body/outline stayed on the bottom one.
-      if (points && state.opts.label) {
-        const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {};
+      if (drawn && state.opts.label) {
         this.#drawLabel(this.labelCtx, points, state.opts, defaults);
       }
+    }
+  }
+
+  // ---------------------------------------------------------------- export
+
+  /**
+   * Exact-fit outlines for export, in viewport CSS px at the CURRENT camera.
+   * The on-screen cache quantizes zoom into buckets and merely reprojects
+   * between crossings — close enough live, but visibly adrift next to a
+   * freshly re-rendered export frame. Falls back to the cached (reprojected)
+   * outline when the fresh fit self-intersects, mirroring #syncGroupOutline.
+   *
+   * @returns {Array<{group: string, points: Array<{x: number, y: number}>,
+   *   opts: object, defaults: object}>}
+   */
+  exportOutlines() {
+    const graph = this.adapter.graph;
+    const sigma = this.adapter.sigma;
+    const out = [];
+    for (const [group, state] of this.groups) {
+      if (state.members.size === 0) continue;
+      const visibleMembers = [];
+      for (const id of state.members.keys()) {
+        if (!graph.hasNode(id)) continue;
+        const attrs = graph.getNodeAttributes(id);
+        if (!attrs.hidden) visibleMembers.push({ id, attrs });
+      }
+      if (visibleMembers.length === 0) continue;
+
+      let points = this.#fitViewportPoints(state, visibleMembers);
+      const cached = this.outlines.get(group);
+      if (cached?.graphPoints.length && polygonSelfIntersects(points)) {
+        points = cached.graphPoints.map((p) => sigma.graphToViewport(p));
+      }
+      if (points.length < 2) continue;
+      out.push({
+        group,
+        points,
+        opts: state.opts,
+        defaults: this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {},
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Paint the groups' bodies/outlines onto an export context at `scale`
+   * device px per CSS px. Geometry is in CSS px (same numbers the screen
+   * uses), so the transform re-renders it crisp at the export resolution —
+   * this replaces the old bitmap stretch of the on-screen canvas, which
+   * blurred hulls at 2×+ exports.
+   *
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {ReturnType<BubbleSetLayer["exportOutlines"]>} groups
+   * @param {number} scale
+   */
+  drawExportBodies(ctx, groups, scale) {
+    ctx.save();
+    try {
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      for (const { points, opts, defaults } of groups) {
+        this.#drawGroup(ctx, points, { opts }, defaults);
+      }
+    } finally {
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Paint the groups' labels onto an export context at `scale` device px per
+   * CSS px (composited ABOVE the sigma image, like the live label canvas).
+   *
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {ReturnType<BubbleSetLayer["exportOutlines"]>} groups
+   * @param {number} scale
+   */
+  drawExportLabels(ctx, groups, scale) {
+    ctx.save();
+    try {
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      for (const { points, opts, defaults } of groups) {
+        if (opts.label) this.#drawLabel(ctx, points, opts, defaults);
+      }
+    } finally {
+      ctx.restore();
     }
   }
 
@@ -252,6 +341,37 @@ class BubbleSetLayer {
       return cached !== undefined;
     }
 
+    const viewportPoints = this.#fitViewportPoints(state, visibleMembers);
+    // When members spread apart faster than the influence field grows (deep
+    // zoom-in), bubblesets' bSpline smoothing loops the contour over itself —
+    // it paints as rough edges / a phantom lobe in empty space. A reprojection
+    // is affine, so the previous *good* outline can never become malformed:
+    // keep it (under the new key, so we don't refit every frame) until a zoom
+    // bucket yields a clean fit again. The group stays a smooth single blob.
+    if (cached?.graphPoints.length && polygonSelfIntersects(viewportPoints)) {
+      this.outlines.set(group, { key, graphPoints: cached.graphPoints });
+      return true;
+    }
+    this.outlines.set(group, {
+      key,
+      // Round-trip assumes camera.angle === 0 (the app never rotates the camera).
+      graphPoints: viewportPoints.map((p) => this.adapter.sigma.viewportToGraph(p)),
+    });
+    return true;
+  }
+
+  /**
+   * Fit a group's outline against the CURRENT camera, in viewport CSS px.
+   * Shared by the cached on-screen path (#syncGroupOutline) and the export
+   * path (exportOutlines), which must re-fit exactly — exports composited
+   * from the zoom-bucketed cache visibly drift from the re-rendered nodes.
+   *
+   * @param {object} state  group state (avoidMembers, opts)
+   * @param {Array<{id: string, attrs: object}>} visibleMembers
+   * @returns {Array<{x: number, y: number}>} outline points (may be empty)
+   */
+  #fitViewportPoints(state, visibleMembers) {
+    const graph = this.adapter.graph;
     const sigma = this.adapter.sigma;
     const toRect = ({ attrs }) => {
       const p = sigma.graphToViewport({ x: attrs.x, y: attrs.y });
@@ -282,36 +402,16 @@ class BubbleSetLayer {
     if (viewportPoints.length === 0 && avoidRects.length > 0) {
       viewportPoints = computeOutlinePoints(memberRects, [], outlineOpts);
     }
-    // When members spread apart faster than the influence field grows (deep
-    // zoom-in), bubblesets' bSpline smoothing loops the contour over itself —
-    // it paints as rough edges / a phantom lobe in empty space. A reprojection
-    // is affine, so the previous *good* outline can never become malformed:
-    // keep it (under the new key, so we don't refit every frame) until a zoom
-    // bucket yields a clean fit again. The group stays a smooth single blob.
-    if (cached?.graphPoints.length && polygonSelfIntersects(viewportPoints)) {
-      this.outlines.set(group, { key, graphPoints: cached.graphPoints });
-      return true;
-    }
-    this.outlines.set(group, {
-      key,
-      // Round-trip assumes camera.angle === 0 (the app never rotates the camera).
-      graphPoints: viewportPoints.map((p) => sigma.viewportToGraph(p)),
-    });
-    return true;
+    return viewportPoints;
   }
 
   /**
-   * Paint one group's body + outline on the bottom canvas. Returns the
-   * viewport-projected outline points so the caller can draw the label on the
-   * top canvas (or null when the outline is too small to paint).
+   * Paint one group's body + outline from viewport-projected points. Returns
+   * true when something was painted (false when the outline is too small),
+   * so the caller knows whether a label belongs on the top canvas.
    */
-  #drawGroup(ctx, group, state) {
-    const sigma = this.adapter.sigma;
-    // Reprojection assumes camera.angle === 0 (the app never rotates the camera).
-    const points = this.outlines.get(group).graphPoints.map((p) => sigma.graphToViewport(p));
-    if (!points || points.length < 2) return null;
-    const opts = state.opts;
-    const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {};
+  #drawGroup(ctx, points, { opts }, defaults) {
+    if (!points || points.length < 2) return false;
 
     const path = new Path2D();
     path.moveTo(points[0].x, points[0].y);
@@ -331,7 +431,7 @@ class BubbleSetLayer {
     } finally {
       ctx.restore();
     }
-    return points;
+    return true;
   }
 
   /**

@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import {
   isWebGL2Available,
   renderWebGLUnavailableMessage,
+  webglMaxCanvasSide,
+  resetWebglMaxCanvasSideCache,
   WEBGL2_ERROR_MESSAGE,
   WEBGL2_ERROR_HINT,
 } from "../src/graph/webgl_support.js";
@@ -51,6 +53,58 @@ describe("isWebGL2Available", () => {
     });
     expect(isWebGL2Available(doc)).toBe(false);
     expect(requested).toEqual(["webgl2"]);
+  });
+});
+
+// Minimal GL stand-in: getParameter answers the two size queries the probe
+// makes; the enum constants just need to be distinct keys.
+function fakeGl(renderbufferSize, textureSize) {
+  return {
+    MAX_RENDERBUFFER_SIZE: "MAX_RENDERBUFFER_SIZE",
+    MAX_TEXTURE_SIZE: "MAX_TEXTURE_SIZE",
+    getParameter: (key) =>
+      key === "MAX_RENDERBUFFER_SIZE" ? renderbufferSize : textureSize,
+  };
+}
+
+describe("webglMaxCanvasSide", () => {
+  beforeEach(() => resetWebglMaxCanvasSideCache());
+
+  it("returns the smaller of the renderbuffer and texture limits", () => {
+    const doc = fakeDocument(() => fakeGl(16384, 8192));
+    expect(webglMaxCanvasSide(doc)).toBe(8192);
+  });
+
+  it("caches the probe so later calls skip context creation", () => {
+    let contexts = 0;
+    const doc = fakeDocument(() => {
+      contexts += 1;
+      return fakeGl(4096, 4096);
+    });
+    expect(webglMaxCanvasSide(doc)).toBe(4096);
+    expect(webglMaxCanvasSide(doc)).toBe(4096);
+    expect(contexts).toBe(1);
+  });
+
+  it("returns null when no webgl2 context exists (caller falls back)", () => {
+    expect(webglMaxCanvasSide(fakeDocument(() => null))).toBeNull();
+  });
+
+  it("returns null when context creation throws", () => {
+    const doc = fakeDocument(() => {
+      throw new Error("blocked");
+    });
+    expect(webglMaxCanvasSide(doc)).toBeNull();
+  });
+
+  it("returns null without a document (non-browser environment)", () => {
+    expect(webglMaxCanvasSide(null)).toBeNull();
+  });
+
+  it("rejects nonsensical driver answers instead of caching them", () => {
+    expect(webglMaxCanvasSide(fakeDocument(() => fakeGl(0, 0)))).toBeNull();
+    resetWebglMaxCanvasSideCache();
+    expect(webglMaxCanvasSide(fakeDocument(() => fakeGl(NaN, NaN)))).toBeNull();
   });
 });
 

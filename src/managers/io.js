@@ -4,6 +4,10 @@ import { buildDataTable } from "../utilities/data_editor.js";
 import { EXPORT_SCALES } from "../utilities/export_scale.js";
 
 const EXPORT_SCALE_KEY = "gll.exportScale";
+// Grace period before revoking an SVG download's blob URL: long enough for
+// any browser to start (and realistically finish) fetching the blob, short
+// enough not to pin big documents in memory for the whole session.
+const SVG_URL_REVOKE_DELAY_MS = 60_000;
 
 function readExportScale() {
   try {
@@ -1880,6 +1884,39 @@ class IOManager {
           `Image too large at ${requestedScale}× — exported at the maximum supported resolution instead.`,
         );
       }
+    } catch (errorMsg) {
+      await this.cache.ui.hideLoading();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      this.cache.ui.error(errorMsg);
+    }
+  }
+
+  /**
+   * Export the current viewport as SVG — resolution-independent vector output
+   * (publication figures, editable in Inkscape/Illustrator), so there is no
+   * scale factor and no canvas size ceiling involved.
+   */
+  async exportSVG() {
+    try {
+      await this.cache.ui.showLoading("Loading", "Generating vector data");
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const { svg } = this.cache.graph.toSVG();
+
+      const objectUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+      // The download fetches the blob AFTER click() returns (asynchronously),
+      // so revoking on this tick races it — Firefox reliably saves an empty
+      // file. Defer the revoke; a data URI is no alternative because large
+      // graphs exceed browsers' data-URI navigation limits.
+      setTimeout(() => URL.revokeObjectURL(objectUrl), SVG_URL_REVOKE_DELAY_MS);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = this.buildExportFilename("svg");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      await this.cache.ui.hideLoading();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
     } catch (errorMsg) {
       await this.cache.ui.hideLoading();
       await new Promise((resolve) => requestAnimationFrame(resolve));

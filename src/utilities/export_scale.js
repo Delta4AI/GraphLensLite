@@ -11,7 +11,7 @@
 
 export const EXPORT_SCALES = [1, 2, 4, 8];
 
-const MAX_CANVAS_SIDE = 16384;
+export const MAX_CANVAS_SIDE = 16384;
 const MAX_CANVAS_AREA = 268_000_000;
 
 /**
