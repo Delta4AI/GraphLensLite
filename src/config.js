@@ -49,6 +49,11 @@ const DEFAULTS = {
     },
     HALO: {
       ENABLED: false, COLOR: "#403C53", WIDTH: 3,
+    },
+    // Animated source→target flow overlay (edge_flow_programs.js). COLOR null
+    // → derived from the edge stroke (lightened, see graph_model.edgeMarkerHaloAttributes).
+    FLOW: {
+      ENABLED: false, TYPE: "dash", SPEED: 1, COLOR: null,
     }
   },
   // Element interaction-state spec (former G6 node/edge state config in
@@ -210,6 +215,9 @@ const DEFAULTS = {
     // "tee" (⊣ inhibition bar). Legacy G6 names (triangle/vee/...) still load
     // via aliases but are no longer offered in the UI.
     EDGE_ARROW_TYPES: ["arrow", "rect", "diamond", "circle", "tee"],
+    // Flow overlay vocabulary (graph_model.FLOW_MODES): marching dashes vs
+    // travelling dots, both moving source → target.
+    EDGE_FLOW_TYPES: ["dash", "pulse"],
     EDGE_ARROW_COLORS: {red: "#C33D35", purple: "#403C53", blue: "#8CA6D9", pink: "#EFB0AA", grey: "#ABACBD"},
     EDGE_ARROW_BORDER_COLORS: {
       red: "#C33D35", purple: "#403C53", blue: "#8CA6D9", pink: "#EFB0AA", grey: "#ABACBD", none: "#00000000"

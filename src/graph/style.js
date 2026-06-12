@@ -119,6 +119,11 @@ class GraphStyleManager {
       halo           : src.halo           ?? d.HALO.ENABLED,
       haloStroke     : src.haloStroke     ?? d.HALO.COLOR,
       haloLineWidth  : src.haloLineWidth  ?? d.HALO.WIDTH,
+
+      flow           : src.flow           ?? d.FLOW.ENABLED,
+      flowType       : src.flowType       ?? d.FLOW.TYPE,
+      flowSpeed      : src.flowSpeed      ?? d.FLOW.SPEED,
+      flowStroke     : src.flowStroke     ?? d.FLOW.COLOR,
     }
   };
 

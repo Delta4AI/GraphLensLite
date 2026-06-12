@@ -7,6 +7,9 @@ import {
   sigmaEdgeType,
   edgeMarkerCode,
   EDGE_MARKERS,
+  FLOW_MODES,
+  edgeFlowMode,
+  lightenHexColor,
   flipY,
   hoverNeighborhood,
   makeNodeReducer,
@@ -574,6 +577,40 @@ describe("attribute mapping helpers", () => {
     expect(edgeMarkerCode("unknown-future-type")).toBe(EDGE_MARKERS.arrow);
     expect(edgeMarkerCode(undefined)).toBe(EDGE_MARKERS.arrow);
   });
+
+  it("edgeFlowMode is 0 unless flow is enabled (flowType alone never activates)", () => {
+    expect(edgeFlowMode({})).toBe(0);
+    expect(edgeFlowMode({ flow: false })).toBe(0);
+    expect(edgeFlowMode({ flow: false, flowType: "pulse" })).toBe(0);
+  });
+
+  it("edgeFlowMode maps the type vocabulary, defaulting unknowns to dash", () => {
+    expect(edgeFlowMode({ flow: true })).toBe(FLOW_MODES.dash);
+    expect(edgeFlowMode({ flow: true, flowType: "dash" })).toBe(FLOW_MODES.dash);
+    expect(edgeFlowMode({ flow: true, flowType: "pulse" })).toBe(FLOW_MODES.pulse);
+    expect(edgeFlowMode({ flow: true, flowType: "sparkle" })).toBe(FLOW_MODES.dash);
+  });
+
+  it("sigmaEdgeType routes flow-only styles to the styled compound programs", () => {
+    expect(sigmaEdgeType("line", { flow: true })).toBe("styledLine");
+    expect(sigmaEdgeType("quadratic", { flow: true })).toBe("styledCurve");
+    // Disabled flow with leftover flow keys stays on the fast path.
+    expect(sigmaEdgeType("line", { flow: false, flowType: "pulse", flowSpeed: 2 })).toBe("line");
+  });
+
+  it("lightenHexColor expands #rgb, preserves #rrggbbaa alpha and clamps the ends", () => {
+    // #rgb expansion + identity at amount 0 (normalized to the long form).
+    expect(lightenHexColor("#0af", 0)).toBe("#00aaff");
+    // amount 1 → white; alpha digits ride along untouched.
+    expect(lightenHexColor("#403C53", 1)).toBe("#ffffff");
+    expect(lightenHexColor("#403C5390", 1)).toBe("#ffffff90");
+    // mid mix in RGB space: each channel moves halfway to 255.
+    expect(lightenHexColor("#000000", 0.5)).toBe("#808080");
+    // Short-alpha form: #rgba expands per digit, alpha preserved.
+    expect(lightenHexColor("#f0f8", 0)).toBe("#ff00ff88");
+    // Unparseable input is returned unchanged (best-effort helper).
+    expect(lightenHexColor("red", 0.5)).toBe("red");
+  });
 });
 
 describe("edge marker + halo attribute mapping", () => {
@@ -593,6 +630,9 @@ describe("edge marker + halo attribute mapping", () => {
     endMarkerBorderSize: 0,
     haloWidth: 0,
     haloColor: null,
+    flowMode: 0,
+    flowSpeed: 0,
+    flowColor: null,
   };
 
   it("emits the full marker/halo set (all off) for a bare typed edge", () => {
@@ -803,6 +843,65 @@ describe("edge marker + halo attribute mapping", () => {
       expect(curved.type).toBe("styledCurve");
       expect(curved.startMarker).toBe(EDGE_MARKERS.rect);
       expect(curved.haloWidth).toBe(5);
+    });
+  });
+
+  describe("flow overlay attrs (full-set invariant like markers/halo)", () => {
+    it("flow off emits flowMode 0, flowSpeed 0 and a null flowColor", () => {
+      const attrs = edgeAttributesFromStyle(
+        { flow: false, flowType: "pulse", flowSpeed: 3, flowStroke: "#C33D35" },
+        "line",
+      );
+
+      expect(attrs.flowMode).toBe(0);
+      expect(attrs.flowSpeed).toBe(0);
+      expect(attrs.flowColor).toBeNull();
+    });
+
+    it("enabled flow defaults the speed and derives a lightened stroke color", () => {
+      const attrs = edgeAttributesFromStyle({ flow: true, stroke: "#403C5390" }, "line");
+
+      expect(attrs.flowMode).toBe(FLOW_MODES.dash);
+      expect(attrs.flowSpeed).toBe(DEFAULTS.EDGE.FLOW.SPEED);
+      expect(attrs.flowColor).toBe(lightenHexColor("#403C5390", 0.45));
+    });
+
+    it("maps an explicit speed and falls back on invalid speeds", () => {
+      const explicit = edgeAttributesFromStyle({ flow: true, flowSpeed: 2.4 }, "line");
+      expect(explicit.flowSpeed).toBe(2.4);
+
+      for (const flowSpeed of [0, -1, NaN, "fast"]) {
+        const attrs = edgeAttributesFromStyle({ flow: true, flowSpeed }, "line");
+        expect(attrs.flowSpeed).toBe(DEFAULTS.EDGE.FLOW.SPEED);
+      }
+    });
+
+    it("an explicit flowStroke wins over the derived color", () => {
+      const attrs = edgeAttributesFromStyle(
+        { flow: true, stroke: "#403C53", flowStroke: "#8CA6D9" },
+        "line",
+      );
+
+      expect(attrs.flowColor).toBe("#8CA6D9");
+    });
+
+    it("derives from the default edge color when the style has no stroke", () => {
+      const attrs = edgeAttributesFromStyle({ flow: true }, "line");
+
+      expect(attrs.flowColor).toBe(lightenHexColor(DEFAULTS.EDGE.COLOR, 0.45));
+    });
+
+    it("flow on → off merge clears the overlay and routes back to the fast path", () => {
+      const on = edgeAttributesFromStyle({ flow: true, flowType: "pulse", flowSpeed: 2 }, "line");
+      expect(on.type).toBe("styledLine");
+      expect(on.flowMode).toBe(FLOW_MODES.pulse);
+
+      const res = { ...on, ...edgeAttributesFromStyle({ flow: false, flowType: "pulse" }, "line") };
+
+      expect(res.type).toBe("line");
+      expect(res.flowMode).toBe(0);
+      expect(res.flowSpeed).toBe(0);
+      expect(res.flowColor).toBeNull();
     });
   });
 

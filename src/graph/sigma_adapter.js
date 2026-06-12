@@ -26,6 +26,8 @@ import {
   createCurveHaloProgram,
   createEdgeMarkerHeadProgram,
 } from "./edge_programs.js";
+import { EdgeFlowProgram } from "./edge_flow_programs.js";
+import { FlowAnimator } from "./flow_animator.js";
 import { clampExportScale } from "../utilities/export_scale.js";
 import {
   nodeAttributesFromStyle,
@@ -100,11 +102,15 @@ function guardHoverDrawer(drawer, getDraggedNode) {
  * non-circle or haloed node — uses the SVG texture program ("shape").
  * Edges: two parametric programs per curvature (graph_model.sigmaEdgeType
  * routes): "line"/"curve" are the plain fast paths for unstyled edges;
- * "styledLine"/"styledCurve" compose halo-under → body → marker heads
- * (compound programs draw in array order) and are fully parameterized by
- * per-edge attrs (startMarker/endMarker enum + sizes, haloWidth/haloColor) —
- * no registry growth per marker shape or halo toggle. Off states collapse to
- * degenerate geometry in the custom programs (see edge_programs.js).
+ * "styledLine"/"styledCurve" compose halo-under → body → flow overlay →
+ * marker heads (compound programs draw in array order: the flow pattern rides
+ * on the body, marker heads stay crisp on top) and are fully parameterized by
+ * per-edge attrs (startMarker/endMarker enum + sizes, haloWidth/haloColor,
+ * flowMode/flowSpeed/flowColor) — no registry growth per marker shape or
+ * halo/flow toggle. Off states collapse to degenerate geometry in the custom
+ * programs (see edge_programs.js / edge_flow_programs.js). styledCurve has no
+ * flow sub-program yet — curved edges render normally with flow enabled until
+ * the curve-shader fork lands.
  *
  * @param {() => string|null} getDraggedNode  hover-guard input (see
  *   guardHoverDrawer); NodeSquareProgram carries its own instance drawHover
@@ -193,6 +199,7 @@ function buildProgramRegistry(getDraggedNode) {
       styledLine: createEdgeCompoundProgram([
         EdgeHaloProgram,
         EdgeRectangleProgram,
+        EdgeFlowProgram,
         createEdgeMarkerHeadProgram({ extremity: "source" }),
         createEdgeMarkerHeadProgram({ extremity: "target" }),
       ]),
@@ -324,6 +331,7 @@ class SigmaAdapter {
     this.interactions = new InteractionManager(this, cache, hoverIds, containerEl);
     this.bubbleLayer = new BubbleSetLayer(this, cache);
     this.minimap = new Minimap(this, containerEl);
+    this.flowAnimator = new FlowAnimator(this);
     this.#syncLabelVisibility();
   }
 
@@ -395,6 +403,7 @@ class SigmaAdapter {
     this.layoutTransitionCancel = null;
     clearTimeout(this.resizeDebounce);
     this.resizeObserver.disconnect();
+    this.flowAnimator.destroy();
     this.bubbleLayer.destroy();
     this.minimap.destroy();
     this.interactions.destroy();
