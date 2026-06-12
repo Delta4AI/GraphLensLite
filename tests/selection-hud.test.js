@@ -92,11 +92,12 @@ describe("SelectionHud", () => {
     expect(dom.restoreBtn.classList.contains("sel-hud-mc")).toBe(true);
   });
 
-  it("defaults to top-left for an unknown or stale stored cell", () => {
+  it("defaults to top-right for an unknown or stale stored cell", () => {
     window.localStorage.setItem("gll.selHud.corner", "br"); // retired corner
     const dom = buildDom();
     new SelectionHud(dom);
-    expect(dom.container.classList.contains("sel-hud-tl")).toBe(true);
+    expect(dom.container.classList.contains("sel-hud-tr")).toBe(true);
+    expect(dom.container.classList.contains("sel-hud-tl")).toBe(false);
   });
 
   it("starts hidden when the stored flag is set", () => {
@@ -165,6 +166,6 @@ describe("SelectionHud", () => {
     dom.hideBtn.dispatchEvent(pointerEvent("pointerdown", { clientX: 20, clientY: 20, pointerId: 1 }));
     dom.handle.dispatchEvent(pointerEvent("pointermove", { clientX: 950, clientY: 760, pointerId: 1 }));
     dom.handle.dispatchEvent(pointerEvent("pointerup", { clientX: 950, clientY: 760, pointerId: 1 }));
-    expect(dom.container.classList.contains("sel-hud-tl")).toBe(true);
+    expect(dom.container.classList.contains("sel-hud-tr")).toBe(true); // unchanged default
   });
 });

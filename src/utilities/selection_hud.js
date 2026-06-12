@@ -77,7 +77,7 @@ export class SelectionHud {
     this.elH = 0;
 
     const stored = readStored(STORAGE_CELL);
-    this.#applyCell(CELLS.includes(stored) ? stored : "tl");
+    this.#applyCell(CELLS.includes(stored) ? stored : "tr");
     if (readStored(STORAGE_HIDDEN) === "1") this.hide();
 
     this.#bind();
