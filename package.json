@@ -27,7 +27,7 @@
     "dist-linux": "npm run dist:prep:linux && electron-builder --linux --publish=never && npm run substitute-gll end",
     "dist-mac": "npm run dist:prep && electron-builder --mac --publish=never && npm run substitute-gll end",
     "dist": "npm run dist-linux && npm run dist-windows",
-    "serve": "npm run vendor-libs && npx http-server src -p 8000 --cors -o /graph_lens_lite.html ",
+    "serve": "npm run vendor-libs && npx http-server src -p 8000 --cors -c-1 -o /graph_lens_lite.html ",
     "serve:api": "npm run vendor-libs && node --env-file-if-exists=.env server/index.js",
     "version": "npm run inject-version && git add src/config.js",
     "test": "vitest run",

@@ -1,6 +1,13 @@
 const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('path');
 
+// In development the asset cache only ever serves stale JS/CSS — there is nothing
+// worth caching from local files. Disable it so every reload pulls fresh bytes.
+// Packaged builds are immutable, so they keep the default cache untouched.
+if (!app.isPackaged) {
+  app.commandLine.appendSwitch('disable-http-cache');
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
@@ -15,6 +22,11 @@ function createWindow() {
   });
 
   win.loadFile(path.join(__dirname, '..', 'graph_lens_lite.html'));
+
+  // Clear any entries left over from a previous run before the switch took effect.
+  if (!app.isPackaged) {
+    win.webContents.session.clearCache();
+  }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
