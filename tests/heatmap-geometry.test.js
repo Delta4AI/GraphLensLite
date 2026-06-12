@@ -7,6 +7,7 @@ import {
   buildRampLut,
   applyRampToAlpha,
 } from "../src/graph/heatmap_geometry.js";
+import { DEFAULTS } from "../src/config.js";
 
 // ==========================================================================
 // Density-heatmap geometry — pure math feeding the atmospheric canvas layer
@@ -327,5 +328,95 @@ describe("applyRampToAlpha", () => {
     expect([...image.data.slice(0, 4)]).toEqual([10, 7, 9, 10]);
     expect([...image.data.slice(4, 8)]).toEqual([0, 0, 0, 0]);
     expect([...image.data.slice(8, 12)]).toEqual([250, 7, 9, 250]);
+  });
+
+  it("clears pixels below the density threshold", () => {
+    // Arrange: alpha 51 → density 0.2, below a 0.25 floor
+    const image = makeImage([[0, 0, 0, 51]]);
+
+    // Act
+    applyRampToAlpha(image, makeLut(), 1, 0.25);
+
+    // Assert: fully transparent, not just dimmed
+    expect([...image.data]).toEqual([0, 0, 0, 0]);
+  });
+
+  it("renormalizes surviving densities over the full ramp", () => {
+    // Arrange: density just above the floor (alpha 64 → 0.251) → ramp start;
+    // density 1 → ramp end
+    const image = makeImage([
+      [0, 0, 0, Math.round(0.25 * 255)],
+      [0, 0, 0, 255],
+    ]);
+
+    // Act
+    applyRampToAlpha(image, makeLut(), 1, 0.25);
+
+    // Assert: (0.251-0.25)/0.75 → index ~0; (1-0.25)/0.75 → index 255
+    expect(image.data[0]).toBeLessThanOrEqual(1);
+    expect([...image.data.slice(4, 8)]).toEqual([255, 7, 9, 255]);
+  });
+
+  it("clears the exact 8-bit boundary just below the floor (threshold is exclusive)", () => {
+    // Arrange: alpha 63 → density 0.247, the last quantization step under 0.25
+    const image = makeImage([[0, 0, 0, Math.floor(0.25 * 255)]]);
+
+    // Act
+    applyRampToAlpha(image, makeLut(), 1, 0.25);
+
+    // Assert
+    expect([...image.data]).toEqual([0, 0, 0, 0]);
+  });
+
+  it("threshold 0 (default) leaves the mapping unchanged", () => {
+    const a = makeImage([[0, 0, 0, 128]]);
+    const b = makeImage([[0, 0, 0, 128]]);
+
+    applyRampToAlpha(a, makeLut(), 0.7);
+    applyRampToAlpha(b, makeLut(), 0.7, 0);
+
+    expect([...a.data]).toEqual([...b.data]);
+  });
+
+  it("applies the threshold remap before gamma", () => {
+    // Arrange: density 0.625 with floor 0.25 → renormalized 0.5, gamma 2 → 0.25
+    const image = makeImage([[0, 0, 0, Math.round(0.625 * 255)]]);
+
+    // Act
+    applyRampToAlpha(image, makeLut(), 2, 0.25);
+
+    // Assert: index ≈ 255 * 0.25 (±1 for the 8-bit density quantization)
+    expect(Math.abs(image.data[0] - 255 * 0.25)).toBeLessThanOrEqual(1);
+  });
+
+  it("threshold >= 1 degenerates to a fully transparent field", () => {
+    const image = makeImage([[0, 0, 0, 255]]);
+
+    applyRampToAlpha(image, makeLut(), 1, 1);
+
+    expect([...image.data]).toEqual([0, 0, 0, 0]);
+  });
+});
+
+describe("config RAMPS presets", () => {
+  // Every preset the styling-panel dropdown offers must survive buildRampLut
+  // (it throws on malformed stops) — this pins typos in config.js at test
+  // time instead of as a blank heatmap at runtime.
+  it("every preset builds a valid LUT for both themes", () => {
+    const presets = Object.entries(DEFAULTS.HEATMAP.RAMPS);
+    expect(presets.length).toBeGreaterThanOrEqual(2);
+
+    for (const [name, ramps] of presets) {
+      for (const theme of ["light", "dark"]) {
+        expect(ramps[theme], `${name}.${theme}`).toBeDefined();
+        expect(() => buildRampLut(ramps[theme]), `${name}.${theme}`).not.toThrow();
+        // First stop transparent so sparse regions fade out instead of graying.
+        expect(parseHexColor(ramps[theme][0].color)[3], `${name}.${theme} first stop`).toBe(0);
+      }
+    }
+  });
+
+  it("the default RAMP key points at an existing preset", () => {
+    expect(DEFAULTS.HEATMAP.RAMPS[DEFAULTS.HEATMAP.RAMP]).toBeDefined();
   });
 });

@@ -560,6 +560,19 @@ function hoverStateFor(id, hoverIds) {
 }
 
 /**
+ * Heatmap dim-graph companion: while the density heatmap is on with its
+ * "dim graph" setting, every element without an explicit/hover state dims so
+ * the field reads through (the heatmap canvas sits BELOW nodes and edges —
+ * no ramp tuning can fix occlusion; de-emphasizing the occluders can).
+ * Selection, highlight and hover all keep their normal treatment. Read live
+ * off the cache each reducer call: the layer toggles trigger sigma.refresh.
+ */
+function heatmapDimActive(cache) {
+  const layer = cache.graph?.heatmapLayer;
+  return !!(layer?.heatmapEnabled && layer.settings?.dimGraph);
+}
+
+/**
  * Sigma nodeReducer factory. Reads the graphology `hidden` attribute, the
  * app-level element-states Map (selected/highlight/dim, formerly G6 states)
  * and the hover layer (see hoverStateFor).
@@ -582,6 +595,7 @@ function makeNodeReducer(cache, elementStates, hoverIds = new Set()) {
       return applyNodeState(data, "highlight");
     }
     if (states.includes("dim") || hoverState === "dim") return applyNodeState(data, "dim");
+    if (heatmapDimActive(cache)) return applyNodeState(data, "dim");
     return data;
   };
 }
@@ -613,7 +627,9 @@ function makeEdgeReducer(cache, elementStates, hoverIds = new Set()) {
     }
     const states = elementStates.get(edge) ?? [];
     const hoverState = hoverStateFor(edge, hoverIds);
-    if (states.length === 0 && hoverState === null) return data;
+    if (states.length === 0 && hoverState === null) {
+      return heatmapDimActive(cache) ? { ...data, color: STATE_DIM_COLOR } : data;
+    }
     const res = { ...data };
     if (states.includes("selected")) {
       res.color = STATE_ACCENT_COLOR;

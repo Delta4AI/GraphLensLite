@@ -180,20 +180,39 @@ function buildRampLut(stops) {
  * PLACE (the one deliberate mutation in this module: the ImageData buffer is
  * the output surface). Pixels with alpha 0 stay fully transparent.
  *
+ * Threshold semantics: densities below `threshold` clear entirely and the
+ * surviving range renormalizes to [0, 1] before gamma, so the ramp keeps its
+ * full sweep above the cutoff. Splat accumulation is alpha compositing
+ * (1 − (1 − intensity)ⁿ for n overlaps), so a lone node peaks at exactly the
+ * splat intensity — a threshold just above it shows only real clusters.
+ *
  * @param {{data: Uint8ClampedArray}} imageData  canvas ImageData (or a
  *   node-side stand-in with a `data` buffer)
  * @param {Uint8ClampedArray} lut  buildRampLut output
  * @param {number} [gamma]  density exponent before the lookup (> 1 thins
  *   low-density haze, < 1 boosts it)
+ * @param {number} [threshold]  density floor in [0, 1); <= 0 → no floor,
+ *   >= 1 degenerates to a fully transparent field
  * @returns {{data: Uint8ClampedArray}} the same imageData
  */
-function applyRampToAlpha(imageData, lut, gamma = 1) {
+function applyRampToAlpha(imageData, lut, gamma = 1, threshold = 0) {
   const data = imageData.data;
+  const span = 1 - threshold;
   for (let i = 0; i < data.length; i += 4) {
     const alpha = data[i + 3];
     if (alpha === 0) continue;
-    const idx =
-      4 * Math.min(LUT_SIZE - 1, Math.round((LUT_SIZE - 1) * Math.pow(alpha / 255, gamma)));
+    let density = alpha / 255;
+    if (threshold > 0) {
+      if (density < threshold || !(span > 0)) {
+        data[i] = 0;
+        data[i + 1] = 0;
+        data[i + 2] = 0;
+        data[i + 3] = 0;
+        continue;
+      }
+      density = (density - threshold) / span;
+    }
+    const idx = 4 * Math.min(LUT_SIZE - 1, Math.round((LUT_SIZE - 1) * Math.pow(density, gamma)));
     data[i] = lut[idx];
     data[i + 1] = lut[idx + 1];
     data[i + 2] = lut[idx + 2];

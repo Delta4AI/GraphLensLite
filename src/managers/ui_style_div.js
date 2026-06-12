@@ -1283,18 +1283,152 @@ function createStyleDiv(cache) {
     if (startCollapsed) card.classList.add("collapsed");
   }
 
+  // Workspace-level density-heatmap overlay (heatmap_layer.js). NOT a
+  // per-selection style: the controls drive the live layer's runtime
+  // settings directly, are never persisted into layout styles, and reset
+  // with the adapter on a data reload. Sliders update on `input` (live
+  // preview while dragging is the point of these knobs), unlike the
+  // persisted style sliders which commit on `change`.
+  function createHeatmapConfigCard() {
+    const card = createCard("Density Heatmap");
+    const layer = () => cache.graph?.heatmapLayer;
+    const D = cache.DEFAULTS.HEATMAP;
+    // Build-time fallback for the (startup) window where no adapter exists
+    // yet — mirrors heatmap_layer.js defaultSettings().
+    const settings = () =>
+      layer()?.settings ?? {
+        opacity: D.OPACITY,
+        intensity: D.INTENSITY,
+        gamma: D.GAMMA,
+        threshold: D.THRESHOLD,
+        bandwidthScale: D.BANDWIDTH_SCALE,
+        ramp: D.RAMP,
+        dimGraph: D.DIM_GRAPH,
+      };
+    const syncFns = [];
+    const syncControls = () => syncFns.forEach((fn) => fn());
+
+    function appendHeatmapSlider(parent, key, { min, max, step }, tooltip) {
+      const container = document.createElement("div");
+      container.className = "style-slider-container";
+      if (tooltip) container.title = tooltip;
+
+      const slider = document.createElement("input");
+      slider.type = "range";
+      slider.min = min;
+      slider.max = max;
+      slider.step = step;
+      slider.classList.add("style-slider");
+
+      const valueInput = document.createElement("input");
+      valueInput.type = "number";
+      valueInput.min = min;
+      valueInput.max = max;
+      valueInput.step = step;
+      valueInput.classList.add("style-input-sm");
+
+      const apply = (raw) => {
+        const value = parseFloat(raw);
+        if (!Number.isFinite(value)) return;
+        layer()?.updateSettings({ [key]: value });
+      };
+      slider.oninput = () => {
+        valueInput.value = slider.value;
+        apply(slider.value);
+      };
+      valueInput.onchange = () => {
+        slider.value = valueInput.value;
+        apply(valueInput.value);
+      };
+
+      const sync = () => {
+        slider.value = String(settings()[key]);
+        valueInput.value = String(settings()[key]);
+      };
+      sync();
+      syncFns.push(sync);
+
+      container.appendChild(slider);
+      container.appendChild(valueInput);
+      parent.appendChild(container);
+    }
+
+    const rowSwitches = createNewRow(card);
+    appendLabel(rowSwitches, "Enable",
+      "Render a density field under the graph showing where nodes crowd together.");
+    const enableSwitch = createSwitch(() => {
+      layer()?.setHeatmapEnabled(enableSwitch.isChecked());
+    }, "heatmapEnabledSwitch", layer()?.heatmapEnabled ?? D.ENABLED);
+    rowSwitches.appendChild(enableSwitch);
+    appendVerticalRule(rowSwitches);
+    appendLabel(rowSwitches, "Dim graph",
+      "De-emphasize nodes and edges while the heatmap is on, so the density field reads through.");
+    const dimSwitch = createSwitch(() => {
+      layer()?.updateSettings({ dimGraph: dimSwitch.isChecked() });
+    }, "heatmapDimGraphSwitch", settings().dimGraph);
+    rowSwitches.appendChild(dimSwitch);
+    syncFns.push(() => dimSwitch.setChecked(settings().dimGraph));
+
+    // min/max are UI guardrails, not physical limits: intensity beyond 0.5
+    // saturates with 2 overlaps, contrast beyond 2 crushes everything but
+    // peaks, and a threshold above 0.5 hides all but the densest cores.
+    const sliders = [
+      ["Intensity", "intensity", { min: 0.05, max: 0.5, step: 0.01 },
+        "Per-node splat strength — how quickly overlapping nodes climb the color ramp."],
+      ["Opacity", "opacity", { min: 0.1, max: 1, step: 0.05 },
+        "Overall transparency of the heatmap layer."],
+      ["Radius", "bandwidthScale", { min: 0.25, max: 3, step: 0.05 },
+        "Splat radius, as a multiple of the auto-derived bandwidth."],
+      ["Contrast", "gamma", { min: 0.3, max: 2, step: 0.05 },
+        "Density exponent: lower boosts faint regions, higher emphasizes dense peaks."],
+      ["Threshold", "threshold", { min: 0, max: 0.5, step: 0.01 },
+        "Density floor: clears everything below it, so only overlapping nodes show. "
+        + "A single node peaks at the Intensity value — set this just above it to hide isolated nodes."],
+    ];
+    for (const [label, key, params, tooltip] of sliders) {
+      const row = createNewRow(card);
+      appendLabel(row, label, tooltip);
+      appendHeatmapSlider(row, key, params, tooltip);
+    }
+
+    const rowRamp = createNewRow(card);
+    appendLabel(rowRamp, "Colors", "Color ramp the density maps through.");
+    const rampSelect = document.createElement("select");
+    rampSelect.className = "style-inner-button";
+    rampSelect.title = "Color ramp the density maps through.";
+    for (const name of Object.keys(D.RAMPS)) {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+      rampSelect.appendChild(option);
+    }
+    rampSelect.value = settings().ramp;
+    rampSelect.onchange = () => layer()?.updateSettings({ ramp: rampSelect.value });
+    rowRamp.appendChild(rampSelect);
+    syncFns.push(() => { rampSelect.value = settings().ramp; });
+
+    const rowReset = createNewRow(card);
+    appendButton(rowReset, "Reset", "Restore the heatmap appearance defaults.", () => {
+      layer()?.resetSettings();
+      syncControls();
+    });
+  }
+
   createFocusCard();
   createSelectCard();
   createArrangeNodesCard();
   createNodeConfigCard();
   createEdgeConfigCard();
   createBubbleSetConfigCard();
+  createHeatmapConfigCard();
 
   // Node stays open (most common); Edge is the largest section so it starts
   // folded; bubble styling only matters once groups exist, so fold it too.
+  // The heatmap overlay is an occasional set-and-leave feature — folded.
   makeCollapsible("Node Configuration");
   makeCollapsible("Edge Configuration", true);
   makeCollapsible("Bubble Sets", true);
+  makeCollapsible("Density Heatmap", true);
 
   return root;
 }

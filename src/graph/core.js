@@ -771,6 +771,9 @@ class GraphCoreManager {
   }
 
   async destroyGraphAndRollBackUI() {
+    // Anchored popovers hold document-level outside-click listeners and may
+    // reference the adapter being destroyed — close them with the graph.
+    this.cache.ui?.closeAnchoredPopovers?.();
     await this.cache.graph?.destroy();
     this.cache.graph = null;
     // Drop renderer-cycle state with the instance: the graphology model is

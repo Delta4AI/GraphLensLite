@@ -67,34 +67,101 @@ const DEFAULTS = {
   },
   // Atmospheric canvas layer (heatmap_layer.js): node-density heatmap below
   // the bubble-set canvas. Off by default; toggled from the workspace toolbar.
+  // OPACITY/INTENSITY/GAMMA/BANDWIDTH_SCALE/DIM_GRAPH are the runtime knobs
+  // exposed in the toolbar settings popover — these are the initial values.
   HEATMAP: {
     ENABLED: false,
     MAX_RESOLUTION: 1024,  // offscreen splat canvas long-side px cap
     BANDWIDTH: 0,          // splat radius in graph units; 0 → auto (heatBandwidth)
-    OPACITY: 0.55,         // fixed layer alpha — keeps the field atmospheric
-    // Density ramps (transparent → cool → warm), one per theme. First-stop
-    // alpha 00 on the cool hue so low densities fade out without graying.
-    RAMP_LIGHT: [
-      { t: 0, color: "#8CA6D900" },
-      { t: 0.35, color: "#8CA6D9" },
-      { t: 0.7, color: "#EFB0AA" },
-      { t: 1, color: "#C33D35" },
-    ],
-    // Dark theme: brighter, slightly desaturated edges so the haze reads on
-    // a dark background without neon saturation.
-    RAMP_DARK: [
-      { t: 0, color: "#7C90C200" },
-      { t: 0.35, color: "#7C90C2" },
-      { t: 0.7, color: "#D89A90" },
-      { t: 1, color: "#F0867B" },
-    ],
-  },
-  // Selection-glow pass on the same layer: accent halo gradient behind
-  // selected nodes, radius = node screen radius × RADIUS_MULTIPLIER.
-  GLOW: {
-    ENABLED: false,
-    RADIUS_MULTIPLIER: 2.5,
-    OPACITY: 0.35,
+    BANDWIDTH_SCALE: 1,    // multiplier on the (auto or explicit) bandwidth
+    OPACITY: 0.55,         // layer alpha — keeps the field atmospheric
+    INTENSITY: 0.18,       // per-splat center alpha; densities saturate at ~1/INTENSITY overlaps
+    GAMMA: 0.7,            // density exponent before the ramp; < 1 boosts low-density haze
+    // Density floor: pixels below this density clear entirely, the rest
+    // renormalizes over the ramp. A lone node peaks at exactly INTENSITY, so
+    // a value just above it shows only overlapping nodes (clusters).
+    THRESHOLD: 0,
+    RAMP: "default",       // active RAMPS preset (styling-panel dropdown)
+    // Density ramp presets, one stop list per theme. First-stop alpha 00 so
+    // low densities fade out without graying. viridis/magma are perceptually
+    // uniform and read on either background, so both themes share the stops.
+    RAMPS: {
+      // transparent → cool → warm; dark variant brighter and slightly
+      // desaturated so the haze reads on a dark background without neon.
+      default: {
+        light: [
+          { t: 0, color: "#8CA6D900" },
+          { t: 0.35, color: "#8CA6D9" },
+          { t: 0.7, color: "#EFB0AA" },
+          { t: 1, color: "#C33D35" },
+        ],
+        dark: [
+          { t: 0, color: "#7C90C200" },
+          { t: 0.35, color: "#7C90C2" },
+          { t: 0.7, color: "#D89A90" },
+          { t: 1, color: "#F0867B" },
+        ],
+      },
+      viridis: {
+        light: [
+          { t: 0, color: "#44015400" },
+          { t: 0.25, color: "#3B528B" },
+          { t: 0.5, color: "#21918C" },
+          { t: 0.75, color: "#5EC962" },
+          { t: 1, color: "#FDE725" },
+        ],
+        dark: [
+          { t: 0, color: "#44015400" },
+          { t: 0.25, color: "#3B528B" },
+          { t: 0.5, color: "#21918C" },
+          { t: 0.75, color: "#5EC962" },
+          { t: 1, color: "#FDE725" },
+        ],
+      },
+      magma: {
+        light: [
+          { t: 0, color: "#51127C00" },
+          { t: 0.35, color: "#B73779" },
+          { t: 0.7, color: "#FC8961" },
+          { t: 1, color: "#FCFDBF" },
+        ],
+        dark: [
+          { t: 0, color: "#51127C00" },
+          { t: 0.35, color: "#B73779" },
+          { t: 0.7, color: "#FC8961" },
+          { t: 1, color: "#FCFDBF" },
+        ],
+      },
+      // Single hue on the app accent — selection-styling adjacency.
+      accent: {
+        light: [
+          { t: 0, color: "#C33D3500" },
+          { t: 0.5, color: "#E0928D" },
+          { t: 1, color: "#C33D35" },
+        ],
+        dark: [
+          { t: 0, color: "#F0867B00" },
+          { t: 0.5, color: "#D86A60" },
+          { t: 1, color: "#F0867B" },
+        ],
+      },
+      // Neutral: darkens toward ink on light, lightens toward paper on dark.
+      grayscale: {
+        light: [
+          { t: 0, color: "#BBBBBB00" },
+          { t: 0.5, color: "#999999" },
+          { t: 1, color: "#333333" },
+        ],
+        dark: [
+          { t: 0, color: "#77777700" },
+          { t: 0.5, color: "#AAAAAA" },
+          { t: 1, color: "#EEEEEE" },
+        ],
+      },
+    },
+    // Dim every non-emphasized node/edge while the heatmap is on, so the
+    // density field reads through the graph (the layer sits below everything).
+    DIM_GRAPH: false,
   },
   LAYOUT: "force",
   // Keys define the layout template vocabulary (workspace-creation dropdown).

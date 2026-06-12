@@ -1340,6 +1340,115 @@ describe("hover layer (Phase 3) — hoverNeighborhood + reducer composition", ()
   });
 });
 
+describe("heatmap dim-graph companion — reducer integration", () => {
+  // Reducers read the live layer state off cache.graph.heatmapLayer (the
+  // toolbar toggles trigger sigma.refresh); the stub mirrors that shape.
+  function heatmapFixture({ heatmapEnabled = true, dimGraph = true, layer } = {}) {
+    const nodes = [makeNode("a"), makeNode("b")];
+    const edges = [makeEdge("e1", "a", "b")];
+    const cache = createMockCache({ nodes, edges });
+    cache.graphData = buildGraphologyGraph(cache);
+    cache.graph =
+      layer === null ? {} : { heatmapLayer: { heatmapEnabled, settings: { dimGraph } } };
+    const elementStates = new Map();
+    const hoverIds = new Set();
+    return {
+      cache,
+      elementStates,
+      hoverIds,
+      nodeReducer: makeNodeReducer(cache, elementStates, hoverIds),
+      edgeReducer: makeEdgeReducer(cache, elementStates, hoverIds),
+    };
+  }
+
+  it("dims stateless nodes and edges while heatmap + dimGraph are on", () => {
+    const { nodeReducer, edgeReducer } = heatmapFixture();
+
+    const node = nodeReducer("a", { color: "#403C53", size: 10, hidden: false });
+    expect(node.color).toBe(STATE_DIM_COLOR);
+    expect(node.size).toBe(10);
+
+    const edge = edgeReducer("e1", { color: "#403C5390", hidden: false });
+    expect(edge.color).toBe(STATE_DIM_COLOR);
+  });
+
+  it("does not mutate the incoming edge data when dimming", () => {
+    const { edgeReducer } = heatmapFixture();
+    const data = { color: "#403C5390", hidden: false };
+
+    const res = edgeReducer("e1", data);
+
+    expect(res).not.toBe(data);
+    expect(data.color).toBe("#403C5390");
+  });
+
+  it("does not mutate the incoming node data when dimming", () => {
+    const { nodeReducer } = heatmapFixture();
+    const data = { color: "#403C53", size: 10, hidden: false };
+
+    const res = nodeReducer("a", data);
+
+    expect(res).not.toBe(data);
+    expect(data.color).toBe("#403C53");
+  });
+
+  it("selection wins over the heatmap dim", () => {
+    const { nodeReducer, edgeReducer, elementStates } = heatmapFixture();
+    elementStates.set("a", ["selected"]);
+    elementStates.set("e1", ["selected"]);
+
+    const node = nodeReducer("a", { color: "#403C53", size: 10, hidden: false, zIndex: 0 });
+    expect(node.image).toContain(ACCENT_URI);
+    expect(node.zIndex).toBe(1);
+
+    const edge = edgeReducer("e1", { color: "#403C5390", size: 1, hidden: false, zIndex: 0 });
+    expect(edge.color).toBe(STATE_ACCENT_COLOR);
+  });
+
+  it("hover highlight wins over the heatmap dim", () => {
+    const { nodeReducer, hoverIds } = heatmapFixture();
+    hoverIds.add("a");
+
+    const res = nodeReducer("a", { color: "#403C53", size: 10, hidden: false });
+
+    expect(res.type).toBe("shape");
+    expect(res.image).toContain(ACCENT_URI);
+  });
+
+  it("hidden elements stay untouched", () => {
+    const { nodeReducer } = heatmapFixture();
+    const data = { color: "#403C53", hidden: true };
+
+    expect(nodeReducer("a", data)).toBe(data);
+  });
+
+  it("passes data through when the heatmap is off", () => {
+    const { nodeReducer, edgeReducer } = heatmapFixture({ heatmapEnabled: false });
+    const nodeData = { color: "#403C53", hidden: false };
+    const edgeData = { color: "#403C5390", hidden: false };
+
+    expect(nodeReducer("a", nodeData)).toBe(nodeData);
+    expect(edgeReducer("e1", edgeData)).toBe(edgeData);
+  });
+
+  it("passes data through when dimGraph is off", () => {
+    const { nodeReducer, edgeReducer } = heatmapFixture({ dimGraph: false });
+    const nodeData = { color: "#403C53", hidden: false };
+    const edgeData = { color: "#403C5390", hidden: false };
+
+    expect(nodeReducer("a", nodeData)).toBe(nodeData);
+    expect(edgeReducer("e1", edgeData)).toBe(edgeData);
+  });
+
+  it("tolerates a cache without an adapter or layer (headless/tests)", () => {
+    const { nodeReducer, edgeReducer } = heatmapFixture({ layer: null });
+    const nodeData = { color: "#403C53", hidden: false };
+
+    expect(nodeReducer("a", nodeData)).toBe(nodeData);
+    expect(edgeReducer("e1", { color: "#403C5390", hidden: false }).color).toBe("#403C5390");
+  });
+});
+
 // --------------------------------------------------------------------------
 // buildLayoutTransitionTargets — pure target map for the workspace-switch
 // position tween (sigma/utils animateNodes). The browser-only adapter owns
