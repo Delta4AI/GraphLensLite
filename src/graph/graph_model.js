@@ -241,11 +241,12 @@ function edgeHaloWidth(style) {
 /**
  * Edge flow-overlay vocabulary. The numeric codes are the `flowMode` float
  * attr consumed by the WebGL flow program (edge_flow_programs.js), which
- * selects the pattern in its fragment shader: dash (marching dash segments)
- * or pulse (discrete travelling dots). 0 = no flow (the program collapses the
+ * selects the pattern in its fragment shader: dash (marching dash segments),
+ * pulse (discrete travelling dots), comet (sharp head with a fading tail) or
+ * chevron (travelling arrow shapes). 0 = no flow (the program collapses the
  * quad to zero fragments, like disabled halos/markers).
  */
-const FLOW_MODES = { dash: 1, pulse: 2 };
+const FLOW_MODES = { dash: 1, pulse: 2, comet: 3, chevron: 4 };
 
 /** @returns {number} flow mode code: 0 unless flow is enabled (unknown type → dash) */
 function edgeFlowMode(style) {
@@ -284,6 +285,32 @@ function lightenHexColor(hex, amount) {
   };
   const alpha = digits.length === 8 ? digits.slice(6, 8).toLowerCase() : "";
   return `#${channel(0)}${channel(2)}${channel(4)}${alpha}`;
+}
+
+/**
+ * Multiply a hex color's alpha channel by `opacity` (flow-overlay prominence
+ * knob — the programs alpha-blend, so opacity folds into the color CPU-side
+ * with zero shader cost). Same best-effort contract as lightenHexColor:
+ * non-hex strings and opacity ≥ 1 return the input unchanged.
+ *
+ * @param {string} hex
+ * @param {number} opacity  clamped to [0, 1]
+ * @returns {string} #rrggbbaa (lowercase) when applied, else the input
+ */
+function applyHexOpacity(hex, opacity) {
+  if (!(Number.isFinite(opacity) && opacity < 1)) return hex;
+  if (typeof hex !== "string" || !/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(hex)) {
+    return hex;
+  }
+  let digits = hex.slice(1).toLowerCase();
+  if (digits.length <= 4) {
+    digits = [...digits].map((d) => d + d).join("");
+  }
+  const baseAlpha = digits.length === 8 ? parseInt(digits.slice(6, 8), 16) : 255;
+  const alpha = Math.round(baseAlpha * Math.max(opacity, 0))
+    .toString(16)
+    .padStart(2, "0");
+  return `#${digits.slice(0, 6)}${alpha}`;
 }
 
 /**
@@ -353,11 +380,21 @@ function edgeMarkerHaloAttributes(style) {
           : DEFAULTS.EDGE.FLOW.SPEED
         : 0,
     // Explicit flow color wins; unset derives a lighter shade of the stroke
-    // so the overlay contrasts with the body without configuration.
+    // so the overlay contrasts with the body without configuration. The
+    // opacity knob multiplies into the color's alpha (no shader involvement).
     flowColor:
       flowMode > 0
-        ? (style.flowStroke ?? lightenHexColor(style.stroke ?? DEFAULTS.EDGE.COLOR, FLOW_LIGHTEN_AMOUNT))
+        ? applyHexOpacity(
+            style.flowStroke ?? lightenHexColor(style.stroke ?? DEFAULTS.EDGE.COLOR, FLOW_LIGHTEN_AMOUNT),
+            Number.isFinite(style.flowOpacity) ? style.flowOpacity : DEFAULTS.EDGE.FLOW.OPACITY,
+          )
         : null,
+    // Pattern-period multiplier (higher = sparser). Neutral 1 when off or
+    // invalid — the shaders divide by it, so it must stay positive.
+    flowDensity:
+      flowMode > 0 && Number.isFinite(style.flowDensity) && style.flowDensity > 0
+        ? style.flowDensity
+        : 1,
   };
 }
 
@@ -655,6 +692,7 @@ export {
   FLOW_MODES,
   edgeFlowMode,
   lightenHexColor,
+  applyHexOpacity,
   flipY,
   hoverNeighborhood,
   makeNodeReducer,

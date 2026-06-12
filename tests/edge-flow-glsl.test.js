@@ -205,6 +205,10 @@ const PATTERN_CONSTANT_NAMES = [
   "DASH_PERIOD_PX",
   "DASH_DUTY",
   "PULSE_PERIOD_PX",
+  "COMET_PERIOD_PX",
+  "CHEVRON_PERIOD_PX",
+  "CHEVRON_SLOPE_PX",
+  "CHEVRON_DUTY",
   "DOT_RADIUS_PX",
   "DASH_AA_PX",
 ];
@@ -261,12 +265,17 @@ describe("patchCurveFragmentForFlow", () => {
   it("injects the flow varyings, u_time and the pattern constants", () => {
     expect(patched).toContain("varying float v_flow;");
     expect(patched).toContain("varying float v_flowSpeed;");
+    expect(patched).toContain("varying float v_flowDensity;");
     expect(patched).toContain("varying float v_flowArcLenPx;");
     expect(patched).toContain("uniform float u_time;");
     expect(patched).toContain("const float SPEED_PX_PER_S = 40.0;");
     expect(patched).toContain("const float DASH_PERIOD_PX = 16.0;");
     expect(patched).toContain("const float DASH_DUTY = 0.5;");
     expect(patched).toContain("const float PULSE_PERIOD_PX = 48.0;");
+    expect(patched).toContain("const float COMET_PERIOD_PX = 48.0;");
+    expect(patched).toContain("const float CHEVRON_PERIOD_PX = 24.0;");
+    expect(patched).toContain("const float CHEVRON_SLOPE_PX = 4.0;");
+    expect(patched).toContain("const float CHEVRON_DUTY = 0.25;");
     expect(patched).toContain("const float DOT_RADIUS_PX = 3.0;");
     expect(patched).toContain("const float DASH_AA_PX = 1.0;");
   });
@@ -277,6 +286,10 @@ describe("patchCurveFragmentForFlow", () => {
     expect(countOccurrences(patched, "gl_FragColor = mix(v_color, transparent, t);")).toBe(0);
     expect(patched).toContain("float alongPx = curveT * v_flowArcLenPx;");
     expect(patched).toContain("u_time * v_flowSpeed * SPEED_PX_PER_S / period");
+    // Density stretches the per-mode period; all four pattern branches exist.
+    expect(patched).toContain("float period = basePeriod * v_flowDensity;");
+    expect(patched).toContain("alpha = phase * phase;");
+    expect(patched).toContain("CHEVRON_SLOPE_PX / period");
     expect(patched).toContain("gl_FragColor = mix(transparent, v_color, alpha * (1.0 - t));");
     // Picking keeps the parent's id output (coverage identical to the body).
     expect(patched).toContain("#ifdef PICKING_MODE");
@@ -325,8 +338,10 @@ describe("patchCurveVertexForFlow", () => {
   it("adds the per-edge flow attributes and varyings", () => {
     expect(patched).toContain("attribute float a_flow;");
     expect(patched).toContain("attribute float a_flowSpeed;");
+    expect(patched).toContain("attribute float a_flowDensity;");
     expect(patched).toContain("varying float v_flow;");
     expect(patched).toContain("varying float v_flowSpeed;");
+    expect(patched).toContain("varying float v_flowDensity;");
     expect(patched).toContain("varying float v_flowArcLenPx;");
   });
 
@@ -344,6 +359,8 @@ describe("patchCurveVertexForFlow", () => {
   it("computes the projected arc length after the control points, in CSS px", () => {
     expect(patched).toContain("v_flow = a_flow;");
     expect(patched).toContain("v_flowSpeed = a_flowSpeed;");
+    // Clamp mirrors the straight program's vertex copy (period divisor).
+    expect(patched).toContain("v_flowDensity = max(a_flowDensity, 0.05);");
     expect(patched).toContain("for (int i = 1; i <= 8; i++) {");
     expect(patched).toContain("v_flowArcLenPx = flowArcLen / u_pixelRatio;");
     const controlPointsAt = patched.indexOf("v_cpC = viewportTarget;");

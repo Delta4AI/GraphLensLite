@@ -78,6 +78,11 @@ const float SPEED_PX_PER_S = 40.0;
 const float DASH_PERIOD_PX = 16.0;
 const float DASH_DUTY = 0.5;
 const float PULSE_PERIOD_PX = 48.0;
+const float COMET_PERIOD_PX = 48.0;
+const float CHEVRON_PERIOD_PX = 24.0;
+// Chevron band: along-the-curve backsweep at the rim + filled period fraction.
+const float CHEVRON_SLOPE_PX = 4.0;
+const float CHEVRON_DUTY = 0.25;
 // Pulse dot half-length along the edge.
 const float DOT_RADIUS_PX = 3.0;
 // Dash-end smoothing in screen px.
@@ -86,6 +91,7 @@ const float DASH_AA_PX = 1.0;`;
 // language=GLSL
 const FRAG_FLOW_INPUTS = /*glsl*/ `varying float v_flow;
 varying float v_flowSpeed;
+varying float v_flowDensity;
 varying float v_flowArcLenPx;
 
 uniform float u_time;
@@ -100,22 +106,39 @@ ${FLOW_PATTERN_CONSTANTS}`;
 // language=GLSL
 const FRAG_FLOW_MASK = /*glsl*/ `// Flow mask instead of the body color (v_color carries the flow color,
     // substituted CPU-side like the curve halo does). curveT x arc length =
-    // distance along the curve in px; the dash/pulse expressions mirror the
-    // straight program's (edge_flow_programs.js FLOW_FRAGMENT_SHADER).
+    // distance along the curve in px; the pattern expressions mirror the
+    // straight program's (edge_flow_programs.js FLOW_FRAGMENT_SHADER), with
+    // the per-edge density multiplier stretching the period.
     float alongPx = curveT * v_flowArcLenPx;
-    float period = v_flow < 1.5 ? DASH_PERIOD_PX : PULSE_PERIOD_PX;
+    float basePeriod = v_flow < 1.5 ? DASH_PERIOD_PX
+      : v_flow < 2.5 ? PULSE_PERIOD_PX
+      : v_flow < 3.5 ? COMET_PERIOD_PX
+      : CHEVRON_PERIOD_PX;
+    float period = basePeriod * v_flowDensity;
+    float crossNorm = dist / halfThickness;
     float phase = fract(alongPx / period - fract(u_time * v_flowSpeed * SPEED_PX_PER_S / period));
     float alpha;
     if (v_flow < 1.5) {
       // Dash: filled for phase in [0, duty), ends feathered in phase units.
-      float aa = DASH_AA_PX / DASH_PERIOD_PX;
+      float aa = DASH_AA_PX / period;
       float dashDist = min(phase, DASH_DUTY - phase);
       alpha = smoothstep(-0.5 * aa, 0.5 * aa, dashDist);
-    } else {
+    } else if (v_flow < 2.5) {
       // Pulse: circular-ish dot — along-distance normalized to the dot
       // radius, cross-distance to the half-thickness, soft radial falloff.
-      vec2 q = vec2((phase - 0.5) * PULSE_PERIOD_PX / DOT_RADIUS_PX, dist / halfThickness);
+      vec2 q = vec2((phase - 0.5) * period / DOT_RADIUS_PX, crossNorm);
       alpha = 1.0 - smoothstep(0.8, 1.0, length(q));
+    } else if (v_flow < 3.5) {
+      // Comet: alpha ramps over the period — fading tail behind the sharp
+      // head at the fract() wrap.
+      alpha = phase * phase;
+    } else {
+      // Chevron: dash band swept back with the cross-axis distance, tip
+      // leading at the spine — a > pointing along the travel direction.
+      float chevPhase = fract(phase + (CHEVRON_SLOPE_PX / period) * crossNorm);
+      float aa = DASH_AA_PX / period;
+      float chevDist = min(chevPhase, CHEVRON_DUTY - chevPhase);
+      alpha = smoothstep(-0.5 * aa, 0.5 * aa, chevDist);
     }
     gl_FragColor = mix(transparent, v_color, alpha * (1.0 - t));`;
 
@@ -132,6 +155,7 @@ const VERT_FLOW_COLLAPSE = /*glsl*/ `if (a_flow < 0.5) {
     v_cpC = vec2(0.0);
     v_flow = 0.0;
     v_flowSpeed = 0.0;
+    v_flowDensity = 1.0;
     v_flowArcLenPx = 0.0;
     return;
   }
@@ -141,6 +165,8 @@ const VERT_FLOW_COLLAPSE = /*glsl*/ `if (a_flow < 0.5) {
 const VERT_ARC_LENGTH = /*glsl*/ `
   v_flow = a_flow;
   v_flowSpeed = a_flowSpeed;
+  // Clamp must match the straight program's vertex copy (period divisor).
+  v_flowDensity = max(a_flowDensity, 0.05);
   // Arc length of the projected bezier (chord sum, 8 segments — well under
   // 1% short at the app's fixed 0.25 curvature). The control points are in
   // DEVICE px (gl_FragCoord space); divide by u_pixelRatio so the fragment's
@@ -254,10 +280,10 @@ function patchCurveFragmentForFlow(fragmentSource) {
 }
 
 /**
- * Fork the @sigma/edge-curve VERTEX shader: add the a_flow/a_flowSpeed
- * attributes (the flow color rides the parent's a_color slot, substituted
- * CPU-side), the flow-off vertex collapse, and the projected arc-length
- * varying the fragment scales curveT by.
+ * Fork the @sigma/edge-curve VERTEX shader: add the a_flow/a_flowSpeed/
+ * a_flowDensity attributes (the flow color rides the parent's a_color slot,
+ * substituted CPU-side), the flow-off vertex collapse, and the projected
+ * arc-length varying the fragment scales curveT by.
  *
  * @param {string} vertexSource
  * @returns {string}
@@ -272,7 +298,8 @@ function patchCurveVertexForFlow(vertexSource) {
     VERT_ATTRIBUTES_END,
     `${VERT_ATTRIBUTES_END}
 attribute float a_flow;
-attribute float a_flowSpeed;`,
+attribute float a_flowSpeed;
+attribute float a_flowDensity;`,
     name,
   );
   source = replaceOnce(
@@ -281,6 +308,7 @@ attribute float a_flowSpeed;`,
     `${VERT_VARYINGS_END}
 varying float v_flow;
 varying float v_flowSpeed;
+varying float v_flowDensity;
 varying float v_flowArcLenPx;`,
     name,
   );

@@ -4,9 +4,10 @@
  *
  * EdgeFlowProgram draws a moving source→target pattern OVER the straight
  * edge body (composed into "styledLine" after EdgeRectangleProgram, before
- * the marker heads — see sigma_adapter.buildProgramRegistry). Two patterns,
+ * the marker heads — see sigma_adapter.buildProgramRegistry). Four patterns,
  * selected by the per-edge `flowMode` float attr (FLOW_MODES in
- * graph_model.js): marching dashes (1) or travelling pulse dots (2);
+ * graph_model.js): marching dashes (1), travelling pulse dots (2), fading
+ * comet tails (3) or travelling chevron arrows (4);
  * 0 collapses the quad in the vertex shader → zero fragments, so edges
  * without flow cost (almost) nothing, same trick as the halo program.
  *
@@ -72,6 +73,7 @@ attribute float a_positionCoef;
 attribute float a_edgeLength;
 attribute float a_flow;
 attribute float a_flowSpeed;
+attribute float a_flowDensity;
 
 uniform mat3 u_matrix;
 uniform float u_sizeRatio;
@@ -88,6 +90,7 @@ varying float v_thickness;
 varying float v_feather;
 varying float v_flow;
 varying float v_phase;
+varying float v_flowDensity;
 
 const float bias = 255.0 / 254.0;
 // Base flow velocity in screen px per second (× per-edge a_flowSpeed).
@@ -98,6 +101,8 @@ const float SPEED_PX_PER_S = 40.0;
 // animates side by side with this one).
 const float DASH_PERIOD_PX = 16.0;
 const float PULSE_PERIOD_PX = 48.0;
+const float COMET_PERIOD_PX = 48.0;
+const float CHEVRON_PERIOD_PX = 24.0;
 
 void main() {
   vec2 normal = a_normal * a_normalCoef;
@@ -112,6 +117,7 @@ void main() {
     v_feather = 1.0;
     v_flow = 0.0;
     v_phase = 0.0;
+    v_flowDensity = 1.0;
     return;
   }
 
@@ -129,7 +135,15 @@ void main() {
   // Phase in pattern periods: along-the-edge screen px / period, minus the
   // periods travelled so far (fract'd per edge here in highp; the fragment's
   // mediump fract then only ever sees |phase| ≲ edge length / period).
-  float periodPx = a_flow < 1.5 ? DASH_PERIOD_PX : PULSE_PERIOD_PX;
+  // The density multiplier stretches the period (sparser pattern) — the
+  // fragment rebuilds the same periodPx from v_flow x v_flowDensity, so the
+  // max() clamp must match its copy.
+  float basePeriodPx = a_flow < 1.5 ? DASH_PERIOD_PX
+    : a_flow < 2.5 ? PULSE_PERIOD_PX
+    : a_flow < 3.5 ? COMET_PERIOD_PX
+    : CHEVRON_PERIOD_PX;
+  v_flowDensity = max(a_flowDensity, 0.05);
+  float periodPx = basePeriodPx * v_flowDensity;
   float alongPx = a_positionCoef * a_edgeLength / (2.0 * u_correctionRatio);
   float travelled = fract(u_time * a_flowSpeed * SPEED_PX_PER_S / periodPx);
   v_phase = alongPx / periodPx - travelled;
@@ -154,6 +168,7 @@ varying float v_thickness;
 varying float v_feather;
 varying float v_flow;
 varying float v_phase;
+varying float v_flowDensity;
 
 const vec4 transparent = vec4(0.0, 0.0, 0.0, 0.0);
 // ALL pattern constants below must stay equal to the VERTEX shader's copies
@@ -161,6 +176,12 @@ const vec4 transparent = vec4(0.0, 0.0, 0.0, 0.0);
 const float DASH_PERIOD_PX = 16.0;
 const float DASH_DUTY = 0.5;
 const float PULSE_PERIOD_PX = 48.0;
+const float COMET_PERIOD_PX = 48.0;
+const float CHEVRON_PERIOD_PX = 24.0;
+// Chevron band: along-the-edge backsweep at the rim and filled fraction of
+// the period (a "wide dash" swept into a > pointing at the target).
+const float CHEVRON_SLOPE_PX = 4.0;
+const float CHEVRON_DUTY = 0.25;
 // Pulse dot half-length along the edge (≈6 px dot at default zoom).
 const float DOT_RADIUS_PX = 3.0;
 // Dash-end smoothing in screen px (the cross-section reuses v_feather).
@@ -181,14 +202,28 @@ void main(void) {
   if (v_flow < 1.5) {
     // Dash: filled for f ∈ [0, duty), ends feathered in phase units so the
     // marching segments aren't aliased along the edge.
-    float aa = DASH_AA_PX / DASH_PERIOD_PX;
+    float aa = DASH_AA_PX / (DASH_PERIOD_PX * v_flowDensity);
     float d = min(f, DASH_DUTY - f); // signed distance to the dash band edge
     alpha = smoothstep(-0.5 * aa, 0.5 * aa, d);
-  } else {
+  } else if (v_flow < 2.5) {
     // Pulse: circular-ish dot — along-distance normalized to the dot radius,
-    // cross-distance to the half-thickness, soft radial falloff.
-    vec2 q = vec2((f - 0.5) * PULSE_PERIOD_PX / DOT_RADIUS_PX, length(v_normal));
+    // cross-distance to the half-thickness, soft radial falloff. Density
+    // stretches the spacing; the dot itself stays DOT_RADIUS_PX.
+    vec2 q = vec2((f - 0.5) * PULSE_PERIOD_PX * v_flowDensity / DOT_RADIUS_PX, length(v_normal));
     alpha = 1.0 - smoothstep(0.8, 1.0, length(q));
+  } else if (v_flow < 3.5) {
+    // Comet: alpha ramps up over the period — a tail fading in behind the
+    // sharp head sitting at the fract() wrap.
+    alpha = f * f;
+  } else {
+    // Chevron: a dash band whose phase is swept back with the cross-axis
+    // distance (length(v_normal) is 0 at the spine, 1 at the rim) — the
+    // band's tip leads at the spine, forming a > toward the target.
+    float periodPx = CHEVRON_PERIOD_PX * v_flowDensity;
+    float fc = fract(v_phase + (CHEVRON_SLOPE_PX / periodPx) * length(v_normal));
+    float aa = DASH_AA_PX / periodPx;
+    float d = min(fc, CHEVRON_DUTY - fc);
+    alpha = smoothstep(-0.5 * aa, 0.5 * aa, d);
   }
 
   gl_FragColor = mix(transparent, v_color, alpha * crossSection);
@@ -211,6 +246,7 @@ class EdgeFlowProgram extends EdgeRectangleProgram {
         { name: "a_edgeLength", size: 1, type: FLOAT },
         { name: "a_flow", size: 1, type: FLOAT },
         { name: "a_flowSpeed", size: 1, type: FLOAT },
+        { name: "a_flowDensity", size: 1, type: FLOAT },
         ...definition.ATTRIBUTES.filter(({ name }) => name === "a_color" || name === "a_id"),
       ],
     };
@@ -249,6 +285,7 @@ class EdgeFlowProgram extends EdgeRectangleProgram {
     array[startIndex++] = edgeLength;
     array[startIndex++] = flowMode;
     array[startIndex++] = data.flowSpeed || 0;
+    array[startIndex++] = data.flowDensity > 0 ? data.flowDensity : 1;
     array[startIndex++] = color;
     array[startIndex++] = edgeIndex;
   }
@@ -264,8 +301,8 @@ class EdgeFlowProgram extends EdgeRectangleProgram {
 // the edge_flow_glsl.js string patchers (out-param t from the bezier distance
 // function × a projected arc-length varying drive the same dash/pulse masks).
 // The flow color rides the parent's a_color slot (CPU-side substitution, like
-// the curve halo); only a_flow/a_flowSpeed are appended after the parent's
-// attributes.
+// the curve halo); only a_flow/a_flowSpeed/a_flowDensity are appended after
+// the parent's attributes.
 // ---------------------------------------------------------------------------
 
 /**
@@ -308,7 +345,7 @@ function createCurveFlowProgram(CurveProgramClass) {
   );
   const vertexSource = patchCurveVertexForFlow(parentDefinition.VERTEX_SHADER_SOURCE);
   const fragmentSource = patchCurveFragmentForFlow(parentDefinition.FRAGMENT_SHADER_SOURCE);
-  // a_flow/a_flowSpeed live right after the parent's per-edge floats.
+  // a_flow/a_flowSpeed/a_flowDensity live right after the parent's per-edge floats.
   const parentStrideFloats = attributeFloatCount(parentDefinition.ATTRIBUTES);
 
   return class CurveFlowProgram extends CurveProgramClass {
@@ -323,6 +360,7 @@ function createCurveFlowProgram(CurveProgramClass) {
           ...definition.ATTRIBUTES,
           { name: "a_flow", size: 1, type: FLOAT },
           { name: "a_flowSpeed", size: 1, type: FLOAT },
+          { name: "a_flowDensity", size: 1, type: FLOAT },
         ],
       };
     }
@@ -339,6 +377,7 @@ function createCurveFlowProgram(CurveProgramClass) {
       });
       this.array[startIndex + parentStrideFloats] = flowMode;
       this.array[startIndex + parentStrideFloats + 1] = flowMode > 0 ? data.flowSpeed || 0 : 0;
+      this.array[startIndex + parentStrideFloats + 2] = data.flowDensity > 0 ? data.flowDensity : 1;
     }
 
     setUniforms(params, programInfo) {

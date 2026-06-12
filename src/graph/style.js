@@ -124,6 +124,8 @@ class GraphStyleManager {
       flowType       : src.flowType       ?? d.FLOW.TYPE,
       flowSpeed      : src.flowSpeed      ?? d.FLOW.SPEED,
       flowStroke     : src.flowStroke     ?? d.FLOW.COLOR,
+      flowOpacity    : src.flowOpacity    ?? d.FLOW.OPACITY,
+      flowDensity    : src.flowDensity    ?? d.FLOW.DENSITY,
     }
   };
 

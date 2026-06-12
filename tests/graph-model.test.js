@@ -10,6 +10,7 @@ import {
   FLOW_MODES,
   edgeFlowMode,
   lightenHexColor,
+  applyHexOpacity,
   flipY,
   hoverNeighborhood,
   makeNodeReducer,
@@ -588,6 +589,8 @@ describe("attribute mapping helpers", () => {
     expect(edgeFlowMode({ flow: true })).toBe(FLOW_MODES.dash);
     expect(edgeFlowMode({ flow: true, flowType: "dash" })).toBe(FLOW_MODES.dash);
     expect(edgeFlowMode({ flow: true, flowType: "pulse" })).toBe(FLOW_MODES.pulse);
+    expect(edgeFlowMode({ flow: true, flowType: "comet" })).toBe(FLOW_MODES.comet);
+    expect(edgeFlowMode({ flow: true, flowType: "chevron" })).toBe(FLOW_MODES.chevron);
     expect(edgeFlowMode({ flow: true, flowType: "sparkle" })).toBe(FLOW_MODES.dash);
   });
 
@@ -611,6 +614,22 @@ describe("attribute mapping helpers", () => {
     // Unparseable input is returned unchanged (best-effort helper).
     expect(lightenHexColor("red", 0.5)).toBe("red");
   });
+
+  it("applyHexOpacity multiplies the alpha channel, best-effort like lighten", () => {
+    // Opaque base gains an alpha pair; existing alpha is multiplied.
+    expect(applyHexOpacity("#403c53", 0.5)).toBe("#403c5380");
+    expect(applyHexOpacity("#403c5380", 0.5)).toBe("#403c5340");
+    // Short forms expand; case normalizes.
+    expect(applyHexOpacity("#0AF", 0.5)).toBe("#00aaff80");
+    expect(applyHexOpacity("#f0f8", 0.5)).toBe("#ff00ff44");
+    // Opacity ≥ 1 and invalid opacities are the identity (no needless rewrite).
+    expect(applyHexOpacity("#403c53", 1)).toBe("#403c53");
+    expect(applyHexOpacity("#403c53", NaN)).toBe("#403c53");
+    // Floor clamps to fully transparent.
+    expect(applyHexOpacity("#403c53", -2)).toBe("#403c5300");
+    // Unparseable input is returned unchanged (best-effort helper).
+    expect(applyHexOpacity("red", 0.5)).toBe("red");
+  });
 });
 
 describe("edge marker + halo attribute mapping", () => {
@@ -633,6 +652,8 @@ describe("edge marker + halo attribute mapping", () => {
     flowMode: 0,
     flowSpeed: 0,
     flowColor: null,
+    // Neutral 1, not 0 — the shaders divide the pattern period by it.
+    flowDensity: 1,
   };
 
   it("emits the full marker/halo set (all off) for a bare typed edge", () => {
@@ -883,6 +904,35 @@ describe("edge marker + halo attribute mapping", () => {
       );
 
       expect(attrs.flowColor).toBe("#8CA6D9");
+    });
+
+    it("flowOpacity folds into the color's alpha (explicit and derived)", () => {
+      const explicit = edgeAttributesFromStyle(
+        { flow: true, flowStroke: "#8CA6D9", flowOpacity: 0.5 },
+        "line",
+      );
+      expect(explicit.flowColor).toBe("#8ca6d980");
+
+      const derived = edgeAttributesFromStyle(
+        { flow: true, stroke: "#403C53", flowOpacity: 0.5 },
+        "line",
+      );
+      expect(derived.flowColor).toBe(applyHexOpacity(lightenHexColor("#403C53", 0.45), 0.5));
+
+      // Full opacity (the default) leaves the color untouched.
+      const opaque = edgeAttributesFromStyle({ flow: true, flowStroke: "#8CA6D9" }, "line");
+      expect(opaque.flowColor).toBe("#8CA6D9");
+    });
+
+    it("flowDensity maps through and falls back to neutral 1 when off or invalid", () => {
+      expect(edgeAttributesFromStyle({ flow: true, flowDensity: 2.5 }, "line").flowDensity).toBe(2.5);
+
+      for (const flowDensity of [0, -1, NaN, "sparse", undefined]) {
+        expect(edgeAttributesFromStyle({ flow: true, flowDensity }, "line").flowDensity).toBe(1);
+      }
+
+      // Off-state stays neutral (shaders divide by it), never 0.
+      expect(edgeAttributesFromStyle({ flow: false, flowDensity: 2 }, "line").flowDensity).toBe(1);
     });
 
     it("derives from the default edge color when the style has no stroke", () => {

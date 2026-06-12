@@ -232,6 +232,12 @@ function createStyleDiv(cache) {
       case "Edge Flow Color":
         await cache.gcm.updateEdges({style: {flowStroke: value}}, commands);
         break;
+      case "Edge Flow Opacity":
+        await cache.gcm.updateEdges({style: {flowOpacity: value}}, commands);
+        break;
+      case "Edge Flow Density":
+        await cache.gcm.updateEdges({style: {flowDensity: value}}, commands);
+        break;
       default:
         break;
     }
@@ -1079,10 +1085,12 @@ function createStyleDiv(cache) {
     createBooleanControls(rowTwentyThree, "Edge Flow",
       "Animate a directional flow along the selected edges (source → target).");
 
+    const flowTypeTooltip =
+      "dash = marching dashes, pulse = travelling dots, comet = fading tails, chevron = travelling arrows.";
     const rowTwentyFour = createNewRow(edgeDiv);
-    appendLabel(rowTwentyFour, "Flow Type", "dash = marching dashes, pulse = travelling dots.");
+    appendLabel(rowTwentyFour, "Flow Type", flowTypeTooltip);
     createCategoricalControls(rowTwentyFour, "Edge Flow Type", cache.DEFAULTS.EDGE.FLOW.TYPE,
-      cache.DEFAULTS.STYLES.EDGE_FLOW_TYPES, "dash = marching dashes, pulse = travelling dots.");
+      cache.DEFAULTS.STYLES.EDGE_FLOW_TYPES, flowTypeTooltip);
 
     const rowTwentyFive = createNewRow(edgeDiv);
     appendLabel(rowTwentyFive, "Flow Speed", "Speed multiplier for the flow animation.");
@@ -1096,6 +1104,18 @@ function createStyleDiv(cache) {
     // same convention as the arrow-color rows defaulting to EDGE.COLOR.
     createColorControls(rowTwentySix, "Edge Flow Color", cache.DEFAULTS.EDGE.COLOR,
       cache.DEFAULTS.STYLES.EDGE_COLORS);
+
+    const rowTwentySeven = createNewRow(edgeDiv);
+    appendLabel(rowTwentySeven, "Flow Opacity",
+      "Opacity of the flow overlay — lower to make it less prominent.");
+    createNumericalSlider(rowTwentySeven, "Edge Flow Opacity", cache.DEFAULTS.EDGE.FLOW.OPACITY,
+      {min: 0.1, max: 1, step: 0.05}, "Opacity of the flow overlay — lower to make it less prominent.", true);
+
+    const rowTwentyEight = createNewRow(edgeDiv);
+    appendLabel(rowTwentyEight, "Flow Density",
+      "Pattern spacing multiplier — higher spreads the dashes/dots further apart.");
+    createNumericalSlider(rowTwentyEight, "Edge Flow Density", cache.DEFAULTS.EDGE.FLOW.DENSITY,
+      {min: 0.5, max: 3, step: 0.25}, "Pattern spacing multiplier — higher spreads the dashes/dots further apart.", true);
   }
 
   function createBubbleSetConfigCard() {
