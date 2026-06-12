@@ -293,8 +293,8 @@ function lightenHexColor(hex, amount) {
  * program ("styledLine"/"styledCurve") whenever any end marker, halo or flow
  * is active — the per-edge attrs (start/endMarker, haloWidth, flowMode, ...)
  * parameterize it, so the registry never grows with the marker vocabulary.
- * Flow on curved edges routes to "styledCurve" but draws no overlay yet (the
- * curve-shader fork is a later phase); the body keeps rendering normally.
+ * Flow on curved edges routes to "styledCurve", whose flow sub-program forks
+ * the @sigma/edge-curve shaders (createCurveFlowProgram + edge_flow_glsl.js).
  * Degradations (documented in API.md §5): `polyline` renders as a curve,
  * `lineDash` is dropped.
  */

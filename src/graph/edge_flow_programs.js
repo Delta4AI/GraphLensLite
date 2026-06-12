@@ -10,14 +10,20 @@
  * 0 collapses the quad in the vertex shader → zero fragments, so edges
  * without flow cost (almost) nothing, same trick as the halo program.
  *
- * Animation: the program is stateless — FlowAnimator advances the module
+ * Animation: the programs are stateless — FlowAnimator advances the module
  * `flowClock` and triggers redraw-only refreshes; setUniforms re-reads the
- * clock each frame (buffers untouched). Curved edges have NO flow overlay
- * yet (the @sigma/edge-curve shader fork is a later phase).
+ * clock each frame (buffers untouched).
+ *
+ * Curved edges get the same overlay from createCurveFlowProgram, a
+ * @sigma/edge-curve subclass whose shaders are forked by the string patchers
+ * in edge_flow_glsl.js (composed into "styledCurve" the same way). The
+ * patchers throw on GLSL anchor drift — buildProgramRegistry catches and
+ * degrades to non-animated curves.
  */
 import { EdgeRectangleProgram, floatColor } from "../lib/sigma.bundle.mjs";
+import { patchCurveFragmentForFlow, patchCurveVertexForFlow } from "./edge_flow_glsl.js";
 
-const { FLOAT } = WebGLRenderingContext;
+const { UNSIGNED_BYTE, FLOAT } = WebGLRenderingContext;
 
 const TRANSPARENT = "#00000000";
 
@@ -87,7 +93,9 @@ const float bias = 255.0 / 254.0;
 // Base flow velocity in screen px per second (× per-edge a_flowSpeed).
 const float SPEED_PX_PER_S = 40.0;
 // Pattern periods — must stay equal to the same constants in the FRAGMENT
-// shader (GLSL stages can't share consts; both fold px into period units).
+// shader (GLSL stages can't share consts; both fold px into period units)
+// AND to FLOW_PATTERN_CONSTANTS in edge_flow_glsl.js (the curve overlay
+// animates side by side with this one).
 const float DASH_PERIOD_PX = 16.0;
 const float PULSE_PERIOD_PX = 48.0;
 
@@ -148,7 +156,8 @@ varying float v_flow;
 varying float v_phase;
 
 const vec4 transparent = vec4(0.0, 0.0, 0.0, 0.0);
-// DASH/PULSE_PERIOD_PX must stay equal to the VERTEX shader's copies.
+// ALL pattern constants below must stay equal to the VERTEX shader's copies
+// and to FLOW_PATTERN_CONSTANTS in edge_flow_glsl.js (curve overlay).
 const float DASH_PERIOD_PX = 16.0;
 const float DASH_DUTY = 0.5;
 const float PULSE_PERIOD_PX = 48.0;
@@ -250,4 +259,93 @@ class EdgeFlowProgram extends EdgeRectangleProgram {
   }
 }
 
-export { EdgeFlowProgram, flowClock };
+// ---------------------------------------------------------------------------
+// Curved-edge flow: @sigma/edge-curve subclass whose shaders are forked by
+// the edge_flow_glsl.js string patchers (out-param t from the bezier distance
+// function × a projected arc-length varying drive the same dash/pulse masks).
+// The flow color rides the parent's a_color slot (CPU-side substitution, like
+// the curve halo); only a_flow/a_flowSpeed are appended after the parent's
+// attributes.
+// ---------------------------------------------------------------------------
+
+/**
+ * Floats one edge occupies in an instanced program's array (sigma's
+ * getAttributesItemsCount convention): FLOAT attrs contribute their size,
+ * UNSIGNED_BYTE×4-normalized color/id attrs pack into a single float slot.
+ *
+ * With arrowHead: null the parent layout is a_source:2 a_target:2
+ * a_thickness:1 a_curvature:1 a_color:1 a_id:1 = 8 floats — cross-check
+ * against the bundle after a sigma upgrade.
+ *
+ * @param {Array<{name: string, size: number, type: number, normalized?: boolean}>} attributes
+ * @returns {number}
+ * @throws {Error} on an attribute layout this convention doesn't cover
+ *   (caught by buildProgramRegistry's fallback, like the GLSL anchors)
+ */
+function attributeFloatCount(attributes) {
+  return attributes.reduce((count, { name, size, type, normalized }) => {
+    if (type === FLOAT) return count + size;
+    if (type === UNSIGNED_BYTE && normalized && size === 4) return count + 1;
+    throw new Error(`edge_flow_programs: unsupported attribute layout for "${name}"`);
+  }, 0);
+}
+
+/**
+ * Build the curve flow sub-program for the "styledCurve" compound. Patches
+ * the parent's GLSL EAGERLY, so anchor drift after a sigma upgrade throws
+ * HERE (where buildProgramRegistry can catch it and drop the sub-program)
+ * instead of later inside sigma's render loop.
+ *
+ * @param {typeof EdgeRectangleProgram} CurveProgramClass  a created @sigma/edge-curve program class
+ * @returns {typeof EdgeRectangleProgram}
+ * @throws {Error} when the bundled curve GLSL no longer matches the patchers' anchors
+ */
+function createCurveFlowProgram(CurveProgramClass) {
+  // The created curve program's getDefinition is closure-pure (no `this`);
+  // a bare prototype-derived receiver keeps this honest if that changes.
+  const parentDefinition = CurveProgramClass.prototype.getDefinition.call(
+    Object.create(CurveProgramClass.prototype),
+  );
+  const vertexSource = patchCurveVertexForFlow(parentDefinition.VERTEX_SHADER_SOURCE);
+  const fragmentSource = patchCurveFragmentForFlow(parentDefinition.FRAGMENT_SHADER_SOURCE);
+  // a_flow/a_flowSpeed live right after the parent's per-edge floats.
+  const parentStrideFloats = attributeFloatCount(parentDefinition.ATTRIBUTES);
+
+  return class CurveFlowProgram extends CurveProgramClass {
+    getDefinition() {
+      const definition = super.getDefinition();
+      return {
+        ...definition,
+        VERTEX_SHADER_SOURCE: vertexSource,
+        FRAGMENT_SHADER_SOURCE: fragmentSource,
+        UNIFORMS: [...definition.UNIFORMS, "u_time"],
+        ATTRIBUTES: [
+          ...definition.ATTRIBUTES,
+          { name: "a_flow", size: 1, type: FLOAT },
+          { name: "a_flowSpeed", size: 1, type: FLOAT },
+        ],
+      };
+    }
+
+    processVisibleItem(edgeIndex, startIndex, sourceData, targetData, data) {
+      const flowMode = data.flowMode > 0 ? data.flowMode : 0;
+      // Flow color rides the parent's color slot; size stays the body's
+      // (post-reducer) size so the overlay widens with a selected edge.
+      // The a_flow < 0.5 vertex collapse makes the off-state values inert —
+      // TRANSPARENT is belt and braces.
+      super.processVisibleItem(edgeIndex, startIndex, sourceData, targetData, {
+        ...data,
+        color: flowMode > 0 ? (data.flowColor ?? data.color) : TRANSPARENT,
+      });
+      this.array[startIndex + parentStrideFloats] = flowMode;
+      this.array[startIndex + parentStrideFloats + 1] = flowMode > 0 ? data.flowSpeed || 0 : 0;
+    }
+
+    setUniforms(params, programInfo) {
+      super.setUniforms(params, programInfo);
+      programInfo.gl.uniform1f(programInfo.uniformLocations.u_time, flowClock.time);
+    }
+  };
+}
+
+export { EdgeFlowProgram, createCurveFlowProgram, flowClock };

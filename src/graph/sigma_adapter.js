@@ -26,7 +26,7 @@ import {
   createCurveHaloProgram,
   createEdgeMarkerHeadProgram,
 } from "./edge_programs.js";
-import { EdgeFlowProgram } from "./edge_flow_programs.js";
+import { EdgeFlowProgram, createCurveFlowProgram } from "./edge_flow_programs.js";
 import { FlowAnimator } from "./flow_animator.js";
 import { clampExportScale } from "../utilities/export_scale.js";
 import {
@@ -108,9 +108,10 @@ function guardHoverDrawer(drawer, getDraggedNode) {
  * per-edge attrs (startMarker/endMarker enum + sizes, haloWidth/haloColor,
  * flowMode/flowSpeed/flowColor) — no registry growth per marker shape or
  * halo/flow toggle. Off states collapse to degenerate geometry in the custom
- * programs (see edge_programs.js / edge_flow_programs.js). styledCurve has no
- * flow sub-program yet — curved edges render normally with flow enabled until
- * the curve-shader fork lands.
+ * programs (see edge_programs.js / edge_flow_programs.js). styledCurve's flow
+ * sub-program forks the @sigma/edge-curve shaders via string patches
+ * (edge_flow_glsl.js); on anchor drift after a sigma upgrade it is dropped
+ * with a warning and curves render without animation.
  *
  * @param {() => string|null} getDraggedNode  hover-guard input (see
  *   guardHoverDrawer); NodeSquareProgram carries its own instance drawHover
@@ -187,6 +188,16 @@ function buildProgramRegistry(getDraggedNode) {
     arrowHead: null,
     drawLabel: drawCurvedEdgeLabelWithSize,
   });
+  // Curve flow overlay: forked @sigma/edge-curve shaders (edge_flow_glsl.js
+  // string patches). The patchers throw when a sigma upgrade moves their GLSL
+  // anchors — degrade to curves WITHOUT animation rather than break curve
+  // rendering; straight-edge flow is unaffected.
+  let curveFlowProgram = null;
+  try {
+    curveFlowProgram = createCurveFlowProgram(curveProgram);
+  } catch (error) {
+    console.warn("buildProgramRegistry: curve flow overlay disabled:", error);
+  }
   return {
     nodeProgramClasses: {
       square: GuardedSquareProgram,
@@ -208,6 +219,8 @@ function buildProgramRegistry(getDraggedNode) {
         [
           createCurveHaloProgram(curveProgram),
           curveProgram,
+          // Flow overlay rides on the body, marker heads stay crisp on top.
+          ...(curveFlowProgram ? [curveFlowProgram] : []),
           createEdgeMarkerHeadProgram({ extremity: "source", curved: true }),
           createEdgeMarkerHeadProgram({ extremity: "target", curved: true }),
         ],
