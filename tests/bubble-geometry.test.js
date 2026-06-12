@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   nodeViewportRect,
   computeOutlinePoints,
+  polygonSelfIntersects,
   outlineLabelAnchor,
   idsKey,
   positionsChecksum,
@@ -23,6 +24,38 @@ describe("nodeViewportRect", () => {
 
   it("handles zero radius (degenerate rect at the position)", () => {
     expect(nodeViewportRect(5, 5, 0)).toEqual({ x: 5, y: 5, width: 0, height: 0 });
+  });
+});
+
+describe("polygonSelfIntersects (phantom-outline detector)", () => {
+  it("returns false for a simple convex quad", () => {
+    expect(polygonSelfIntersects([
+      { x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 },
+    ])).toBe(false);
+  });
+
+  it("returns false for a simple concave polygon", () => {
+    // arrow/chevron — concave but non-self-crossing
+    expect(polygonSelfIntersects([
+      { x: 0, y: 0 }, { x: 10, y: 5 }, { x: 0, y: 10 }, { x: 3, y: 5 },
+    ])).toBe(false);
+  });
+
+  it("detects a bow-tie (figure-eight) crossing", () => {
+    // classic self-intersecting quad: edges (0→1) and (2→3) cross
+    expect(polygonSelfIntersects([
+      { x: 0, y: 0 }, { x: 10, y: 10 }, { x: 10, y: 0 }, { x: 0, y: 10 },
+    ])).toBe(true);
+  });
+
+  it("ignores shared vertices of adjacent edges (no false positive)", () => {
+    expect(polygonSelfIntersects([
+      { x: 0, y: 0 }, { x: 5, y: 0 }, { x: 10, y: 0 }, { x: 5, y: 8 },
+    ])).toBe(false);
+  });
+
+  it("returns false for fewer than 4 points", () => {
+    expect(polygonSelfIntersects([{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 0 }])).toBe(false);
   });
 });
 

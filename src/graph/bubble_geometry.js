@@ -91,12 +91,54 @@ function computeOutlinePoints(memberRects, avoidRects = [], opts = {}) {
     // than throwing into the render loop and freezing the bubble canvas.
     return [];
   }
+  // The bSpline smoothing can loop the curve over itself when members spread
+  // apart faster than the influence field grows (deep zoom-in): a
+  // self-intersecting fill paints as rough edges / a phantom lobe. The layer
+  // detects that (polygonSelfIntersects) and reprojects the last good outline
+  // instead, so callers always receive the smoothed contour here.
+  return pointPathToArray(sampled);
+}
+
+/** Materialize a bubblesets-js PointPath into a plain {x,y} array. */
+function pointPathToArray(pointPath) {
   const points = [];
-  for (let i = 0; i < sampled.length; i++) {
-    const p = sampled.get(i);
+  for (let i = 0; i < pointPath.length; i++) {
+    const p = pointPath.get(i);
     points.push({ x: p.x, y: p.y });
   }
   return points;
+}
+
+/** Do two segments (p1→p2, p3→p4) cross at an interior point of both? */
+function segmentsCross(p1, p2, p3, p4) {
+  const d = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x);
+  if (Math.abs(d) < 1e-9) return false; // parallel/collinear
+  const t = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / d;
+  const u = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / d;
+  // Strict interiors so shared vertices of adjacent edges don't count.
+  return t > 1e-6 && t < 1 - 1e-6 && u > 1e-6 && u < 1 - 1e-6;
+}
+
+/**
+ * Whether a closed polygon's edges cross each other (ignoring shared vertices
+ * of adjacent edges). O(n²) — only called once per outline refit, never per
+ * frame. Short-circuits on the first crossing.
+ *
+ * @param {Array<{x: number, y: number}>} points  closed polygon ring
+ * @returns {boolean}
+ */
+function polygonSelfIntersects(points) {
+  const n = points.length;
+  if (n < 4) return false;
+  for (let i = 0; i < n; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue; // last edge shares vertex 0 with first
+      if (segmentsCross(a, b, points[j], points[(j + 1) % n])) return true;
+    }
+  }
+  return false;
 }
 
 // Extreme-point comparators per placement (viewport space is y-down, so
@@ -231,6 +273,7 @@ function styleKey(opts = {}) {
 export {
   nodeViewportRect,
   computeOutlinePoints,
+  polygonSelfIntersects,
   outlineLabelAnchor,
   idsKey,
   positionsChecksum,

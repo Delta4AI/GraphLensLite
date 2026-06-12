@@ -21,6 +21,7 @@ function makeSigma(camera, dims) {
   const ctxOps = [];
   const filledPaths = [];
   const strokedPaths = [];
+  const bodyTexts = [];
 
   const ctx = {
     setTransform: () => {},
@@ -30,7 +31,7 @@ function makeSigma(camera, dims) {
     beginPath: () => {},
     roundRect: () => {},
     measureText: () => ({ width: 10 }),
-    fillText: () => {},
+    fillText: (t, x, y) => bodyTexts.push({ t, x, y }),
     translate: () => {},
     rotate: () => {},
     fill: (path) => { if (path) filledPaths.push(path.points.slice()); },
@@ -48,11 +49,20 @@ function makeSigma(camera, dims) {
     getContext: () => ctx,
     remove: () => {},
   };
+  // Group labels paint on their own canvas (afterLayer: "labels"); a separate
+  // context records label fillText calls so tests can assert label placement.
+  const labelTexts = [];
+  const labelCtx = { ...ctx, fillText: (t, x, y) => labelTexts.push({ t, x, y }) };
+  const labelCanvas = {
+    width: 0, height: 0,
+    getContext: () => labelCtx,
+    remove: () => {},
+  };
 
   const sigma = {
     pixelRatio: 1,
     createCanvasContext: () => sigma,
-    getCanvases: () => ({ bubbleSets: canvas }),
+    getCanvases: () => ({ bubbleSets: canvas, bubbleSetsLabels: labelCanvas }),
     getDimensions: () => ({ width: dims.width, height: dims.height }),
     getCamera: () => ({ getState: () => ({ ...camera }) }),
     graphToViewport: (g) => ({
@@ -68,7 +78,7 @@ function makeSigma(camera, dims) {
     off: () => {},
     emit: (ev) => handlers.get(ev)?.(),
   };
-  return { sigma, canvas, ctx, filledPaths, strokedPaths };
+  return { sigma, canvas, ctx, labelCanvas, labelCtx, labelTexts, bodyTexts, filledPaths, strokedPaths };
 }
 
 function makeGraph(nodes) {
@@ -192,6 +202,41 @@ describe("BubbleSetLayer — re-add after clearing (symptom 5)", () => {
     expect(layer.outlines.has("groupOne"), "outline should come back after re-add").toBe(true);
     expect(layer.outlines.get("groupOne").graphPoints.length).toBeGreaterThan(2);
     expect(filledPaths.length, "a hull must be filled again after re-add").toBeGreaterThan(drawnFirst);
+  });
+});
+
+describe("BubbleSetLayer — label z-order (group labels over node labels)", () => {
+  it("paints the group label on the dedicated top canvas, never the body canvas", () => {
+    const camera = { x: 1, y: 1, ratio: 1, angle: 0 };
+    const { sigma, labelTexts, bodyTexts, filledPaths } = makeSigma(camera, { width: 800, height: 600 });
+    const layer = new BubbleSetLayer({ sigma, graph: makeGraph(TRI) }, makeCache());
+
+    layer.getGroupHandle("groupOne").update({
+      members: ["a", "b", "c"],
+      ...STYLE,
+      label: true,
+      labelText: "Group A",
+      labelPlacement: "center",
+    });
+    flushRaf();
+
+    // Body still painted on the bottom canvas ...
+    expect(filledPaths.length, "outline drawn on the body canvas").toBeGreaterThan(0);
+    // ... but the label text lands only on the label canvas, so a member
+    // node's own label (sigma's "labels" layer, below this one) can't cover it.
+    expect(labelTexts.map((e) => e.t)).toContain("Group A");
+    expect(bodyTexts.map((e) => e.t)).not.toContain("Group A");
+  });
+
+  it("draws no label when the group label is disabled", () => {
+    const camera = { x: 1, y: 1, ratio: 1, angle: 0 };
+    const { sigma, labelTexts } = makeSigma(camera, { width: 800, height: 600 });
+    const layer = new BubbleSetLayer({ sigma, graph: makeGraph(TRI) }, makeCache());
+
+    layer.getGroupHandle("groupOne").update({ members: ["a", "b", "c"], ...STYLE, label: false });
+    flushRaf();
+
+    expect(labelTexts.length).toBe(0);
   });
 });
 

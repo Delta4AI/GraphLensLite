@@ -1,8 +1,11 @@
 /**
  * Browser-only bubble-set rendering layer (MIGRATION.md Phase 4).
  *
- * One 2d canvas registered with sigma BELOW its edge/node layers
- * (createCanvasContext + beforeLayer: "edges"); all four bubble groups paint
+ * Two 2d canvases registered with sigma: the fill/outline canvas sits BELOW
+ * its edge/node layers (createCanvasContext + beforeLayer: "edges") so nodes
+ * paint over the translucent body; the group-LABEL canvas sits ABOVE sigma's
+ * node-label layer (afterLayer: "labels") so a member node's own label can
+ * never obscure the group name (a primary read). All four bubble groups paint
  * in a single pass. GraphBubbleSetManager keeps talking to per-group
  * "plugin instances" — those are thin handles into this layer's group state
  * (see getGroupHandle), so the manager's member/filter/style logic survives
@@ -25,6 +28,7 @@ import { DEFAULTS } from "../config.js";
 import {
   nodeViewportRect,
   computeOutlinePoints,
+  polygonSelfIntersects,
   outlineLabelAnchor,
   idsKey,
   positionsChecksum,
@@ -32,6 +36,7 @@ import {
 } from "./bubble_geometry.js";
 
 const LAYER_NAME = "bubbleSets";
+const LABEL_LAYER_NAME = "bubbleSetsLabels";
 const OUTLINE_STROKE_WIDTH = 2;
 // Zoom drift before an outline re-fit: log2(camera.ratio) is quantized into
 // buckets of this width inside the outline cache key (node screen radii
@@ -72,6 +77,15 @@ class BubbleSetLayer {
     this.canvas = sigma.getCanvases()[LAYER_NAME];
     this.ctx = this.canvas.getContext("2d");
 
+    // Group labels paint on their own canvas stacked above sigma's node-label
+    // layer so they always win the z-order contest against member labels.
+    sigma.createCanvasContext(LABEL_LAYER_NAME, {
+      afterLayer: "labels",
+      style: { pointerEvents: "none" },
+    });
+    this.labelCanvas = sigma.getCanvases()[LABEL_LAYER_NAME];
+    this.labelCtx = this.labelCanvas.getContext("2d");
+
     this.renderHandler = () => this.scheduleRedraw();
     sigma.on("afterRender", this.renderHandler);
   }
@@ -106,6 +120,7 @@ class BubbleSetLayer {
     // sigma.kill() may or may not remove custom layer canvases; remove() on
     // an already-detached node is a no-op, so drop ours defensively.
     this.canvas?.remove();
+    this.labelCanvas?.remove();
   }
 
   scheduleRedraw() {
@@ -173,18 +188,28 @@ class BubbleSetLayer {
     if (!outlinesChanged && signature === this.lastPaintSignature) return;
     this.lastPaintSignature = signature;
 
-    const canvas = this.canvas;
+    this.#prepareCanvas(this.canvas, this.ctx, width, height, dpr);
+    this.#prepareCanvas(this.labelCanvas, this.labelCtx, width, height, dpr);
+
+    for (const [group, state] of active) {
+      const points = this.#drawGroup(this.ctx, group, state);
+      // Labels paint on the top canvas (afterLayer: "labels") so they read
+      // over member-node labels; the body/outline stayed on the bottom one.
+      if (points && state.opts.label) {
+        const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {};
+        this.#drawLabel(this.labelCtx, points, state.opts, defaults);
+      }
+    }
+  }
+
+  /** Resize (if needed) and clear a layer canvas, scaled to the device ratio. */
+  #prepareCanvas(canvas, ctx, width, height, dpr) {
     if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
       canvas.width = width * dpr;
       canvas.height = height * dpr;
     }
-    const ctx = this.ctx;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
-
-    for (const [group, state] of active) {
-      this.#drawGroup(ctx, group, state);
-    }
   }
 
   /**
@@ -257,6 +282,16 @@ class BubbleSetLayer {
     if (viewportPoints.length === 0 && avoidRects.length > 0) {
       viewportPoints = computeOutlinePoints(memberRects, [], outlineOpts);
     }
+    // When members spread apart faster than the influence field grows (deep
+    // zoom-in), bubblesets' bSpline smoothing loops the contour over itself —
+    // it paints as rough edges / a phantom lobe in empty space. A reprojection
+    // is affine, so the previous *good* outline can never become malformed:
+    // keep it (under the new key, so we don't refit every frame) until a zoom
+    // bucket yields a clean fit again. The group stays a smooth single blob.
+    if (cached?.graphPoints.length && polygonSelfIntersects(viewportPoints)) {
+      this.outlines.set(group, { key, graphPoints: cached.graphPoints });
+      return true;
+    }
     this.outlines.set(group, {
       key,
       // Round-trip assumes camera.angle === 0 (the app never rotates the camera).
@@ -265,11 +300,16 @@ class BubbleSetLayer {
     return true;
   }
 
+  /**
+   * Paint one group's body + outline on the bottom canvas. Returns the
+   * viewport-projected outline points so the caller can draw the label on the
+   * top canvas (or null when the outline is too small to paint).
+   */
   #drawGroup(ctx, group, state) {
     const sigma = this.adapter.sigma;
     // Reprojection assumes camera.angle === 0 (the app never rotates the camera).
     const points = this.outlines.get(group).graphPoints.map((p) => sigma.graphToViewport(p));
-    if (!points || points.length < 2) return;
+    if (!points || points.length < 2) return null;
     const opts = state.opts;
     const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {};
 
@@ -288,11 +328,10 @@ class BubbleSetLayer {
       ctx.lineWidth = OUTLINE_STROKE_WIDTH;
       ctx.stroke(path);
       ctx.globalAlpha = 1;
-
-      if (opts.label) this.#drawLabel(ctx, points, opts, defaults);
     } finally {
       ctx.restore();
     }
+    return points;
   }
 
   /**
