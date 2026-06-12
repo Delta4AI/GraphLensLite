@@ -203,6 +203,26 @@ const FIT_PADDING_PX = 80;
 // viewport to 100x — same UX guard as the old G6 fitViewToNodes.
 const MAX_FIT_ZOOM = 4;
 
+/**
+ * Temporarily override `window.devicePixelRatio`, returning a restore fn.
+ * @sigma/export-image reads it once to size its export canvas, so raising it
+ * for the duration of a single export yields a higher-DPI render of the live
+ * view with proportions intact. Defining an own property shadows the (often
+ * accessor-based, prototype-level) browser ratio; restore reinstates the
+ * original descriptor, or deletes the shadow when there wasn't one.
+ *
+ * @param {number} value
+ * @returns {() => void} restore
+ */
+function overrideDevicePixelRatio(value) {
+  const original = Object.getOwnPropertyDescriptor(window, "devicePixelRatio");
+  Object.defineProperty(window, "devicePixelRatio", { configurable: true, value });
+  return () => {
+    if (original) Object.defineProperty(window, "devicePixelRatio", original);
+    else delete window.devicePixelRatio;
+  };
+}
+
 class SigmaAdapter {
   /**
    * @param {object} cache  app cache; cache.graphData must hold the graphology graph
@@ -695,15 +715,17 @@ class SigmaAdapter {
 
   /**
    * PNG data URL of the current viewport. @sigma/export-image re-renders the
-   * scene on a temp renderer, which only carries sigma's own layers — the
-   * bubble-set canvas is composited UNDER it here (matching its on-screen
-   * z-order; export-image's default transparent background lets it show
-   * through). The minimap is a viewport control and stays out of exports.
+   * scene on a temp renderer, which only carries sigma's own layers, so the
+   * bubble-set canvases are composited here in their on-screen z-order: the
+   * body/outline UNDER the sigma image, the group labels OVER it. An opaque
+   * stage-background fill goes down first (export-image renders sigma
+   * transparent). The minimap is a viewport control and stays out of exports.
    *
-   * `scale` re-renders at a multiple of the viewport size for crisp high-res
-   * output (sigma redraws at the larger dimensions, so labels/nodes stay
-   * sharp). The factor is clamped to the canvas size limits. Returns the data
-   * URL plus the scale actually applied so callers can warn on a clamp.
+   * `scale` raises the export resolution by bumping the device pixel ratio
+   * (see overrideDevicePixelRatio), so node/label proportions match the live
+   * view exactly at any factor. It is clamped to the canvas size limits;
+   * returns the data URL plus the scale actually applied so callers can warn
+   * on a clamp.
    *
    * @param {{ scale?: number }} [opts]
    * @returns {Promise<{ url: string, requestedScale: number, appliedScale: number }>}
@@ -712,31 +734,76 @@ class SigmaAdapter {
     const dims = this.sigma.getDimensions();
     const dpr = window.devicePixelRatio || 1;
     const appliedScale = clampExportScale(scale, dims, dpr);
-    const blob = await exportImage.toBlob(this.sigma, {
-      format: "png",
-      width: dims.width * appliedScale,
-      height: dims.height * appliedScale,
-    });
+    const background = this.#stageBackgroundColor();
+
+    // High-res export = the SAME framing at higher pixel density. Growing the
+    // temp renderer's CSS dimensions (export-image's width/height) scales node
+    // positions with the viewport but leaves node/label sizes in absolute px,
+    // so nodes shrink relative to the frame (2x → half size, 8x → invisible).
+    // Bumping the device pixel ratio instead scales the WHOLE pipeline
+    // uniformly — positions, radii, label fonts, edge widths, paddings — so
+    // the output is a true DPI multiple of the on-screen view. export-image
+    // reads window.devicePixelRatio once while building its own temp renderer
+    // and never re-renders the live one, so the override is invisible outside
+    // this call and always restored.
+    const restoreDpr = appliedScale !== 1 ? overrideDevicePixelRatio(dpr * appliedScale) : null;
+    let blob;
+    try {
+      blob = await exportImage.toBlob(this.sigma, { format: "png" });
+    } finally {
+      restoreDpr?.();
+    }
+
     const sigmaImage = await createImageBitmap(blob);
     try {
       const out = document.createElement("canvas");
       out.width = sigmaImage.width;
       out.height = sigmaImage.height;
       const ctx = out.getContext("2d");
+      // Opaque stage background first: export-image renders sigma transparent,
+      // so without this the PNG shows through to whatever the viewer paints
+      // behind alpha (which reads as "dark mode" regardless of the theme).
+      ctx.fillStyle = background;
+      ctx.fillRect(0, 0, out.width, out.height);
       const bubbleCanvas = this.bubbleLayer.canvas;
       if (bubbleCanvas?.width > 0 && bubbleCanvas?.height > 0) {
-        // Both canvases are viewport-aligned (export-image renders at
-        // window.devicePixelRatio over the live CSS dimensions), so the
-        // stretch is geometry-preserving at any DPR — worst case is
-        // resolution blur, never an offset.
+        // Both canvases are viewport-aligned, so the stretch to the (DPR-
+        // scaled) output is geometry-preserving — worst case is resolution
+        // blur on the bubble body, never an offset.
         ctx.drawImage(bubbleCanvas, 0, 0, out.width, out.height);
       }
       ctx.drawImage(sigmaImage, 0, 0);
+      // Group labels sit above sigma's node labels on screen (their own canvas
+      // at afterLayer "labels"); composite them last to keep that z-order.
+      const labelCanvas = this.bubbleLayer.labelCanvas;
+      if (labelCanvas?.width > 0 && labelCanvas?.height > 0) {
+        ctx.drawImage(labelCanvas, 0, 0, out.width, out.height);
+      }
       return { url: out.toDataURL("image/png"), requestedScale: scale, appliedScale };
     } catch (error) {
       throw new Error(`Graph image export failed: ${error?.message ?? error}`);
     } finally {
       sigmaImage.close();
+    }
+  }
+
+  /**
+   * The live stage background (the `--bg` token painted on the graph
+   * container). Falls back to opaque white so an export is never see-through.
+   *
+   * @returns {string} a CSS color usable as a 2d fillStyle
+   */
+  #stageBackgroundColor() {
+    const fallback = "#ffffff";
+    try {
+      const el = this.sigma.getContainer?.();
+      if (!el || typeof getComputedStyle !== "function") return fallback;
+      const bg = getComputedStyle(el).backgroundColor;
+      // Transparent container → fall back (otherwise we'd re-introduce alpha).
+      if (!bg || bg === "transparent" || bg === "rgba(0, 0, 0, 0)") return fallback;
+      return bg;
+    } catch {
+      return fallback;
     }
   }
 }
