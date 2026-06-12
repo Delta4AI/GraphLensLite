@@ -144,10 +144,6 @@ body, html {
     opacity: 1;
 }
 
-#stylingPanelContent {
-    padding-top: 3px;
-}
-
 #closeStylingPanelBtn {
     margin-left: auto;
 }
@@ -1187,10 +1183,10 @@ h5 {
     font-size: 12px;
     line-height: 1.4;
     padding: 8px 10px;
-    /* Flush to the panel header on top; a wide gap below sets the status apart
-       from the config stack, which is itself tightly spaced (cards: 8px). */
-    margin-top: 0;
-    margin-bottom: 14px;
+    /* Match the 8px card rhythm on all sides so the status sits evenly within
+       the config stack instead of hugging the top and floating far above it. */
+    margin-top: 8px;
+    margin-bottom: 8px;
     border-radius: 6px;
     background: var(--surface-3);
     color: var(--text-strong);
