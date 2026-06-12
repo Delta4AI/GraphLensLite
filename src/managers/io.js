@@ -1,6 +1,26 @@
 import { DEFAULTS, CFG } from "../config.js";
 import { StaticUtilities } from "../utilities/static.js";
 import { buildDataTable } from "../utilities/data_editor.js";
+import { EXPORT_SCALES } from "../utilities/export_scale.js";
+
+const EXPORT_SCALE_KEY = "gll.exportScale";
+
+function readExportScale() {
+  try {
+    const stored = Number(window.localStorage.getItem(EXPORT_SCALE_KEY));
+    return EXPORT_SCALES.includes(stored) ? stored : 1;
+  } catch {
+    return 1;
+  }
+}
+
+function writeExportScale(scale) {
+  try {
+    window.localStorage.setItem(EXPORT_SCALE_KEY, String(scale));
+  } catch {
+    /* storage unavailable — resolution choice just won't persist */
+  }
+}
 
 // @formatter:off
 let excelData = {"s":{"readme":{"d":[[0,0,"Color Codes Explained"],[0,1,"Description"],[1,0,"Required"],[1,1,"Strictly required property"],[2,0,"Optional"],[2,1,"Optional property; Column name can not be re-used for user-defined data"],[3,0,"User Data [group]"],[3,1,"Add custom properties in new columns. Use [brackets] for grouping (e.g., \"Temperature [Celsius] [Physics]\"). The last [bracket] becomes the group name."],[5,0,"Data Types Explained"],[5,1,"Description"],[6,0,"text"],[6,1,"any text"],[7,0,"number"],[7,1,"whole decimal numbers or floating point numbers"],[8,0,"boolean"],[8,1,"true or TRUE or 1, false or FALSE or 0"],[9,0,"RGBA"],[9,1,"RGBA hex color code (e.g. #C33D3580 for 50% opacity) (last 2 digits are optional)"],[10,0,"value 1 | value 2"],[10,1,"List of categorical values of which one must be matched (excluding optional information in brackets)"],[11,0,"any"],[11,1,"Categorical view when text is given, slider-based view when numerical input is given"],[13,0,"Node Properties Explained"],[13,1,"Description"],[13,2,"Default Value"],[13,3,"Type"],[14,0,"ID"],[14,1,"Unique identifier for a node"],[14,2,"-"],[14,3,"text (unique)"],[15,0,"Label"],[15,1,"Label of the node; if no Label is given, the ID is displayed per default"],[15,2,"-"],[15,3,"text"],[16,0,"Description"],[16,1,"Description of the node, displayed in the tooltip text"],[16,2,"-"],[16,3,"text"],[17,0,"Shape"],[17,1,"The shape of the node"],[17,2,"hexagon"],[17,3,"circle (●) | diamond (◆) | hexagon (⬢) | rect (■) | triangle (▲) | star (★)"],[18,0,"Size"],[18,1,"The size of the node"],[18,2,"20"],[18,3,"number"],[19,0,"Fill Color"],[19,1,"The fill color of the node in RGBA format (e.g. #FF000080 for a red node with 50% opacity)"],[19,2,"#C33D35"],[19,3,"rgba"],[20,0,"Border Size"],[20,1,"The stroke width"],[20,2,"1"],[20,3,"number"],[21,0,"Border Color"],[21,1,"The stroke color of the node in RGBA format"],[21,2,"-"],[21,3,"rgba"],[22,0,"Label Font Size"],[22,1,"Label font size"],[22,2,"12"],[22,3,"number"],[23,0,"Label Placement"],[23,1,"Label position relative to the main shape of the node"],[23,2,"bottom"],[23,3,"left | right | top | bottom | left-top | left-bottom | right-top | right-bottom | top-left | top-right | bottom-left | bottom-right | center"],[24,0,"Label Color"],[24,1,"The color of the nodes label"],[24,2,"-"],[24,3,"rgba"],[25,0,"Label Background Color"],[25,1,"Label background fill color"],[25,2,"-"],[25,3,"rgba"],[26,0,"X Coordinate"],[26,1,"The x coordinate of the node"],[26,2,"-"],[26,3,"number"],[27,0,"Y Coordinate"],[27,1,"The y coordinate of the node"],[27,2,"-"],[27,3,"number"],[28,0,"property A [group A]"],[28,1,"User-defined custom node properties"],[28,2,"-"],[28,3,"any"],[30,0,"Edge Properties Explained"],[30,1,"Description"],[30,2,"Default Value"],[30,3,"Type"],[31,0,"Source ID"],[31,1,"The ID of the source node"],[31,2,"-"],[31,3,"text"],[32,0,"Target ID"],[32,1,"The ID of the target node"],[32,2,"-"],[32,3,"text"],[33,0,"Label"],[33,1,"Label of the edge; if no Label is given, the edge is only visible as line without any text"],[33,2,"-"],[33,3,"text"],[34,0,"Description"],[34,1,"Description of the edge, displayed in the tooltip text"],[34,2,"-"],[34,3,"text"],[35,0,"Type"],[35,1,"The edge type"],[35,2,"line"],[35,3,"line | cubic | quadratic | polyline"],[36,0,"Line Width"],[36,1,"The border width of the edge"],[36,2,"0.75"],[36,3,"number"],[37,0,"Line Dash"],[37,1,"The dash offset of the edge line"],[37,2,"0"],[37,3,"number"],[38,0,"Color"],[38,1,"The stroke color of the edge in RGBA format"],[38,2,"#403C5390"],[38,3,"rgba"],[39,0,"Label Font Size"],[39,1,"The font size of the edges label"],[39,2,"center"],[39,3,"number"],[40,0,"Label Placement"],[40,1,"The position of the label relative to the edge"],[40,2,"#000000"],[40,3,"start | center | end"],[41,0,"Label Auto Rotate"],[41,1,"Whether to automatically rotate the label to match the edge’s direction"],[41,2,"1"],[41,3,"boolean"],[42,0,"Label Offset X"],[42,1,"The offset of the label on the X-Axis"],[42,2,"0"],[42,3,"number"],[43,0,"Label Offset Y"],[43,1,"The offset of the label on the Y-Axis"],[43,2,"0"],[43,3,"number"],[44,0,"Label Color"],[44,1,"The color of the edges label text"],[44,2,"-"],[44,3,"rgba"],[45,0,"Label Background Color"],[45,1,"The color for the edge label’s background"],[45,2,"#E4E3EA"],[45,3,"rgba"],[46,0,"Start Arrow"],[46,1,"Whether to display the start arrow on the edge"],[46,2,{"formula":"FALSE()"}],[46,3,"boolean"],[47,0,"Start Arrow Size"],[47,1,"The size of the start arrow"],[47,2,"8"],[47,3,"number"],[48,0,"Start Arrow Type"],[48,1,"The type of the start arrow"],[48,2,"triangle"],[48,3,"triangle | circle | diamond | vee | rect | triangleRect | simple"],[49,0,"End Arrow"],[49,1,"Whether to display the end arrow on the edge"],[49,2,{"formula":"FALSE()"}],[49,3,"boolean"],[50,0,"End Arrow Size"],[50,1,"The size of the end arrow"],[50,2,"8"],[50,3,"number"],[51,0,"End Arrow Type"],[51,1,"The type of the end arrow"],[51,2,"triangle"],[51,3,"triangle | circle | diamond | vee | rect | triangleRect | simple"]],"st":{"A1":0,"B1":0,"C1":1,"D1":2,"A2":3,"B2":2,"C2":1,"D2":2,"A3":4,"B3":2,"C3":1,"D3":2,"A4":5,"B4":2,"C4":1,"D4":2,"A5":2,"B5":2,"C5":1,"D5":2,"A6":0,"B6":0,"C6":6,"D6":7,"A7":8,"B7":2,"C7":1,"D7":2,"A8":8,"B8":2,"C8":1,"D8":2,"A9":8,"B9":2,"C9":1,"D9":2,"A10":8,"B10":2,"C10":1,"D10":2,"A11":9,"B11":2,"C11":1,"D11":2,"A12":8,"B12":2,"C12":1,"D12":2,"A13":2,"B13":2,"C13":1,"D13":2,"A14":10,"B14":10,"C14":11,"D14":10,"A15":3,"B15":2,"C15":1,"D15":2,"A16":4,"B16":2,"C16":1,"D16":2,"A17":4,"B17":2,"C17":1,"D17":2,"A18":4,"B18":2,"C18":1,"D18":12,"A19":4,"B19":2,"C19":1,"D19":2,"A20":4,"B20":2,"C20":1,"D20":2,"A21":4,"B21":2,"C21":1,"D21":2,"A22":4,"B22":2,"C22":1,"D22":2,"A23":4,"B23":2,"C23":1,"D23":2,"A24":4,"B24":2,"C24":1,"D24":12,"A25":4,"B25":2,"C25":1,"D25":2,"A26":4,"B26":2,"C26":1,"D26":2,"A27":4,"B27":2,"C27":1,"D27":2,"A28":4,"B28":2,"C28":1,"D28":2,"A29":5,"B29":2,"C29":1,"D29":2,"A30":2,"B30":2,"C30":1,"D30":2,"A31":10,"B31":10,"C31":11,"D31":10,"A32":3,"B32":2,"C32":1,"D32":2,"A33":3,"B33":2,"C33":1,"D33":2,"A34":4,"B34":2,"C34":1,"D34":2,"A35":4,"B35":2,"C35":1,"D35":2,"A36":4,"B36":2,"C36":1,"D36":12,"A37":4,"B37":2,"C37":1,"D37":2,"A38":4,"B38":2,"C38":1,"D38":2,"A39":4,"B39":2,"C39":1,"D39":2,"A40":4,"B40":2,"C40":1,"D40":2,"A41":4,"B41":2,"C41":1,"D41":12,"A42":4,"B42":2,"C42":13,"D42":2,"A43":4,"B43":2,"C43":1,"D43":2,"A44":4,"B44":2,"C44":1,"D44":2,"A45":4,"B45":2,"C45":1,"D45":2,"A46":4,"B46":2,"C46":13,"D46":2,"A47":4,"B47":2,"C47":13,"D47":2,"A48":4,"B48":2,"C48":1,"D48":2,"A49":4,"B49":2,"C49":13,"D49":12,"A50":4,"B50":2,"C50":13,"D50":2,"A51":4,"B51":2,"C51":1,"D51":14,"A52":4,"B52":2,"C52":13,"D52":12},"dim":[52,4]},"nodes":{"d":[[0,0,"ID"],[0,1,"Label"],[0,2,"Description"],[0,3,"Shape"],[0,4,"Size"],[0,5,"Fill Color"],[0,6,"Border Color"],[0,7,"Feature X [group A]"],[0,8,"Feature Y [nm] [group A]"],[0,9,"Feature Z [group B]"],[1,0,"A"],[1,1,"Node 1"],[1,2,"The first node"],[1,3,"circle"],[1,4,"60"],[1,5,"#403C53"],[1,6,"#C33D35"],[1,7,"1"],[1,8,"foo"],[1,9,"1"],[2,0,"B"],[2,1,"Node 2"],[2,2,"The second node"],[2,7,"0.5"],[2,8,"foo"],[2,9,"2"],[3,0,"C"],[3,1,"Node 3"],[3,2,"The third node"],[3,7,"1.1"],[3,8,"foo"],[3,9,"1"],[4,0,"D"],[4,1,"Node 4"],[4,2,"The fourth node"],[4,7,"1.3"],[4,8,"bar"],[4,9,"0"],[5,0,"E"],[5,7,"0"],[5,8,"bar"],[5,9,"-1"],[6,0,"F"],[6,1,"Lonely Node"],[6,7,"-1"]],"st":{"A1":3,"B1":4,"C1":4,"D1":4,"E1":4,"F1":4,"G1":4,"H1":5,"I1":5,"J1":5,"A2":15,"B2":16,"C2":16,"D2":16,"E2":16,"F2":16,"G2":16,"H2":17,"I2":17,"J2":17,"A3":15,"B3":16,"C3":16,"D3":16,"E3":16,"F3":16,"G3":16,"H3":17,"I3":17,"J3":17,"A4":15,"B4":16,"C4":16,"D4":16,"E4":16,"F4":16,"G4":16,"H4":17,"I4":17,"J4":17,"A5":15,"B5":16,"C5":16,"D5":16,"E5":16,"F5":16,"G5":16,"H5":17,"I5":17,"J5":17,"A6":15,"B6":16,"C6":16,"D6":16,"E6":16,"F6":16,"G6":16,"H6":17,"I6":17,"J6":17,"A7":15,"B7":16,"C7":16,"D7":16,"E7":16,"F7":16,"G7":16,"H7":17,"I7":17,"J7":17},"dim":[7,10]},"edges":{"d":[[0,0,"Source ID"],[0,1,"Target ID"],[0,2,"Color"],[0,3,"Line Width"],[0,4,"Label"],[0,5,"Feature EX [group X]"],[0,6,"Feature EY [group X]"],[0,7,"Feature EZ [group Y]"],[1,0,"A"],[1,1,"B"],[1,2,"#FF0000"],[1,3,"0.75"],[1,4,"foo"],[1,5,"1"],[1,6,"Dummy Category 1"],[1,7,"1"],[2,0,"A"],[2,1,"C"],[2,5,"0.5"],[2,6,"Dummy Category 2"],[2,7,"2"],[3,0,"C"],[3,1,"D"],[3,5,"1.1"],[3,6,"Dummy Category 3"],[3,7,"1"],[4,0,"D"],[4,1,"E"],[4,5,"1.3"],[4,6,"Dummy Category 4"],[4,7,"0"]],"st":{"A1":3,"B1":3,"C1":4,"D1":4,"E1":4,"F1":5,"G1":5,"H1":5,"A2":15,"B2":15,"C2":16,"D2":16,"E2":16,"F2":17,"G2":17,"H2":17,"A3":15,"B3":15,"C3":16,"D3":16,"E3":16,"F3":17,"G3":17,"H3":17,"A4":15,"B4":15,"C4":16,"D4":16,"E4":16,"F4":17,"G4":17,"H4":17,"A5":15,"B5":15,"C5":16,"D5":16,"E5":16,"F5":17,"G5":17,"H5":17},"dim":[5,8]}},"st":{"0":{"f":{"b":1,"sz":12,"n":"Arial"},"fill":{"fg":"E4E3EA","bg":"FEFFE1"},"b":{"t":["thin","000000"],"b":["thin","000000"],"l":["thin","000000"],"r":["thin","000000"]},"a":{"h":"general","v":"bottom"},"nf":"General"},"1":{"f":{"sz":10,"n":"Arial"},"fill":{"p":"none"},"a":{"h":"left","v":"bottom"},"nf":"General"},"2":{"f":{"sz":10,"n":"Arial"},"fill":{"p":"none"},"a":{"h":"general","v":"bottom"},"nf":"General"},"3":{"f":{"b":1,"sz":10,"n":"Arial"},"fill":{"fg":"FF9A9A","bg":"FF8080"},"b":{"t":["thin","000000"],"b":["thin","000000"],"l":["thin","000000"],"r":["thin","000000"]},"a":{"h":"general","v":"bottom"},"nf":"General"},"4":{"f":{"b":1,"sz":10,"n":"Arial"},"fill":{"fg":"FEFFE1","bg":"FFFFFF"},"b":{"t":["thin","000000"],"b":["thin","000000"],"l":["thin","000000"],"r":["thin","000000"]},"a":{"h":"general","v":"bottom"},"nf":"General"},"5":{"f":{"b":1,"sz":10,"n":"Arial"},"fill":{"fg":"81D41A","bg":"969696"},"b":{"t":["thin","000000"],"b":["thin","000000"],"l":["thin","000000"],"r":["thin","000000"]},"a":{"h":"general","v":"bottom"},"nf":"General"},"6":{"f":{"b":1,"sz":12,"n":"Arial"},"fill":{"p":"none"},"a":{"h":"left","v":"bottom"},"nf":"General"},"7":{"f":{"b":1,"sz":12,"n":"Arial"},"fill":{"p":"none"},"a":{"h":"general","v":"bottom"},"nf":"General"},"8":{"f":{"b":1,"sz":10,"n":"Arial"},"fill":{"fg":"E4E3EA","bg":"FEFFE1"},"b":{"t":["thin","000000"],"b":["thin","000000"],"l":["thin","000000"],"r":["thin","000000"]},"a":{"h":"general","v":"bottom"},"nf":"General"},"9":{"f":{"b":1,"i":1,"sz":10,"n":"Arial"},"fill":{"fg":"E4E3EA","bg":"FEFFE1"},"b":{"t":["thin","000000"],"b":["thin","000000"],"l":["thin","000000"],"r":["thin","000000"]},"a":{"h":"general","v":"bottom"},"nf":"General"},"10":{"f":{"b":1,"sz":12,"n":"Arial"},"fill":{"fg":"E4E3EA","bg":"FEFFE1"},"b":{"t":["thin","000000"],"b":["thin","000000"]},"a":{"h":"general","v":"bottom"},"nf":"General"},"11":{"f":{"b":1,"sz":12,"n":"Arial"},"fill":{"fg":"E4E3EA","bg":"FEFFE1"},"b":{"t":["thin","000000"],"b":["thin","000000"]},"a":{"h":"left","v":"bottom"},"nf":"General"},"12":{"f":{"i":1,"sz":10,"n":"Arial"},"fill":{"p":"none"},"a":{"h":"general","v":"bottom"},"nf":"General"},"13":{"f":{"sz":10,"n":"Arial"},"fill":{"p":"none"},"a":{"h":"left","v":"bottom"},"nf":"\"TRUE\";\"TRUE\";\"FALSE\""},"14":{"f":{"u":1,"sz":10,"n":"Arial"},"fill":{"p":"none"},"a":{"h":"general","v":"bottom"},"nf":"General"},"15":{"f":{"sz":10,"n":"Arial"},"fill":{"fg":"FF9A9A","bg":"FF8080"},"b":{"t":["thin","000000"],"b":["thin","000000"],"l":["thin","000000"],"r":["thin","000000"]},"a":{"h":"general","v":"bottom"},"nf":"General"},"16":{"f":{"sz":10,"n":"Arial"},"fill":{"fg":"FEFFE1","bg":"FFFFFF"},"b":{"t":["thin","000000"],"b":["thin","000000"],"l":["thin","000000"],"r":["thin","000000"]},"a":{"h":"general","v":"bottom"},"nf":"General"},"17":{"f":{"sz":10,"n":"Arial"},"fill":{"fg":"81D41A","bg":"969696"},"b":{"t":["thin","000000"],"b":["thin","000000"],"l":["thin","000000"],"r":["thin","000000"]},"a":{"h":"general","v":"bottom"},"nf":"General"}},"sc":18};
@@ -543,6 +563,7 @@ class ExcelTemplate {
 class IOManager {
   constructor(cache) {
     this.cache = cache;
+    this.exportScale = readExportScale();
   }
 
   parseJSON(file) {
@@ -1824,18 +1845,28 @@ class IOManager {
       });
   }
 
-  async exportPNG() {
+  /**
+   * Export the current viewport as PNG. An explicit `scale` (1/2/4/8) updates
+   * and persists the remembered resolution; calling without one (keyboard "P")
+   * reuses it. The renderer clamps the factor to canvas limits — if the final
+   * resolution fell short of the request, the user is told.
+   */
+  async exportPNG(scale) {
+    if (typeof scale === "number") {
+      this.exportScale = scale;
+      writeExportScale(scale);
+    }
+    const useScale = this.exportScale || 1;
 
     try {
       await this.cache.ui.showLoading("Loading", "Generating picture data");
       await new Promise((resolve) => requestAnimationFrame(resolve));
-      const imageData = await this.cache.graph.toDataURL({
-        type: "image/png",
-        mode: "viewport",
+      const { url, requestedScale, appliedScale } = await this.cache.graph.toDataURL({
+        scale: useScale,
       });
 
       const link = document.createElement("a");
-      link.href = imageData;
+      link.href = url;
       link.download = this.buildExportFilename("png");
       document.body.appendChild(link);
       link.click();
@@ -1843,6 +1874,12 @@ class IOManager {
 
       await this.cache.ui.hideLoading();
       await new Promise((resolve) => requestAnimationFrame(resolve));
+
+      if (appliedScale < requestedScale - 1e-6) {
+        this.cache.ui.warning(
+          `Image too large at ${requestedScale}× — exported at the maximum supported resolution instead.`,
+        );
+      }
     } catch (errorMsg) {
       await this.cache.ui.hideLoading();
       await new Promise((resolve) => requestAnimationFrame(resolve));

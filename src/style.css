@@ -402,10 +402,6 @@ body, html {
  **************************/
 #selectedElementsContainer {
     position: absolute !important;
-    top: 10px !important;
-    left: 10px !important;
-    right: auto !important;
-    bottom: auto !important;
     width: 256px;
     box-sizing: border-box;
     border: 1px solid var(--brand-border);
@@ -433,13 +429,112 @@ body, html {
     box-shadow: 0 8px 20px rgba(64, 60, 83, 0.22);
 }
 
-/* --- HUD header: title + tools toggle --- */
+/* --- Grid snapping: drag the header, release to one of the 3×3 grid slots.
+   The bottom-right corner is reserved for the minimap (200×120 @ bottom/right
+   10px), so that region offers two slots flanking it instead: "abm" above and
+   "blm" left of the minimap. Generic classes — shared by the panel, the
+   restore pill, and the drag preview. --- */
+.sel-hud-tl  { top: 10px;    left: 10px; }
+.sel-hud-tc  { top: 10px;    left: 50%;  transform: translateX(-50%); }
+.sel-hud-tr  { top: 10px;    right: 10px; }
+.sel-hud-ml  { top: 50%;     left: 10px; transform: translateY(-50%); }
+.sel-hud-mc  { top: 50%;     left: 50%;  transform: translate(-50%, -50%); }
+.sel-hud-mr  { top: 50%;     right: 10px; transform: translateY(-50%); }
+.sel-hud-bl  { bottom: 10px; left: 10px; }
+.sel-hud-bc  { bottom: 10px; left: 50%;  transform: translateX(-50%); }
+.sel-hud-abm { bottom: 140px; right: 10px; }
+.sel-hud-blm { bottom: 10px;  right: 220px; }
+
+#selectedElementsContainer.sel-hud-dragging {
+    transition: none;
+    box-shadow: 0 12px 28px rgba(64, 60, 83, 0.30);
+    opacity: 0.96;
+    user-select: none;
+}
+
+/* Dashed skeleton showing where the panel will snap on release. */
+.sel-hud-snap-preview {
+    position: absolute;
+    display: none;
+    box-sizing: border-box;
+    border: 2px dashed var(--accent-text);
+    border-radius: 8px;
+    background: rgba(64, 60, 83, 0.08);
+    pointer-events: none;
+    z-index: 999;
+}
+
+.sel-hud-snap-preview.visible {
+    display: block;
+}
+
+/* --- HUD header: title + tools toggle (doubles as the drag handle) --- */
 .sel-hud-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    cursor: grab;
+    touch-action: none;
 }
+
+.sel-hud-dragging .sel-hud-header {
+    cursor: grabbing;
+}
+
+.sel-hud-header-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.sel-hud-hide-btn {
+    font: inherit;
+    font-size: 12px;
+    line-height: 1;
+    color: var(--text-faint);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 2px 6px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.sel-hud-hide-btn:hover {
+    color: #fff;
+    background: var(--accent-text);
+    border-color: var(--accent-text);
+}
+
+/* --- Floating restore pill, shown only while the HUD is hidden --- */
+.sel-hud-restore {
+    position: absolute;
+    display: none;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-strong);
+    background: var(--surface-translucent);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--brand-border);
+    border-radius: 8px;
+    padding: 4px 10px;
+    cursor: pointer;
+    z-index: 1000;
+    box-shadow: 0 4px 14px rgba(64, 60, 83, 0.14);
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.sel-hud-restore.visible {
+    display: inline-flex;
+}
+
+.sel-hud-restore:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
 
 .sel-hud-title {
     font-weight: 700;
@@ -723,6 +818,59 @@ body, html {
 
 .community-popover-detect {
     align-self: flex-end;
+}
+
+/* Export resolution picker, anchored to the 📷 header button. */
+.export-resolution-popover {
+    position: fixed;
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    color: var(--text);
+    font-size: 12px;
+}
+
+.export-resolution-popover.open {
+    display: flex;
+}
+
+.export-res-title {
+    font-weight: bold;
+    color: var(--text-strong);
+}
+
+.export-res-row {
+    display: flex;
+    gap: 4px;
+}
+
+.export-res-option {
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-strong);
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.export-res-option:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+.export-res-option.active {
+    background: var(--accent-text);
+    color: #fff;
+    border-color: var(--accent-text);
 }
 
 h4 {
@@ -1779,6 +1927,13 @@ hr {
     display: flex;
     flex-direction: column;
     min-width: 0;
+}
+
+.header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
 }
 
 .header-row h3 {

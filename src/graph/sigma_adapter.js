@@ -23,6 +23,7 @@ import {
   createCurveHaloProgram,
   createEdgeMarkerHeadProgram,
 } from "./edge_programs.js";
+import { clampExportScale } from "../utilities/export_scale.js";
 import { nodeAttributesFromStyle, edgeAttributesFromStyle, flipY } from "./graph_model.js";
 import { executeLayout } from "./layout_algorithms.js";
 import { drawNodeLabel, drawEdgeLabel, BAKED_DEFAULT_LABEL_COLOR } from "./label_renderers.js";
@@ -698,9 +699,24 @@ class SigmaAdapter {
    * bubble-set canvas is composited UNDER it here (matching its on-screen
    * z-order; export-image's default transparent background lets it show
    * through). The minimap is a viewport control and stays out of exports.
+   *
+   * `scale` re-renders at a multiple of the viewport size for crisp high-res
+   * output (sigma redraws at the larger dimensions, so labels/nodes stay
+   * sharp). The factor is clamped to the canvas size limits. Returns the data
+   * URL plus the scale actually applied so callers can warn on a clamp.
+   *
+   * @param {{ scale?: number }} [opts]
+   * @returns {Promise<{ url: string, requestedScale: number, appliedScale: number }>}
    */
-  async toDataURL() {
-    const blob = await exportImage.toBlob(this.sigma, { format: "png" });
+  async toDataURL({ scale = 1 } = {}) {
+    const dims = this.sigma.getDimensions();
+    const dpr = window.devicePixelRatio || 1;
+    const appliedScale = clampExportScale(scale, dims, dpr);
+    const blob = await exportImage.toBlob(this.sigma, {
+      format: "png",
+      width: dims.width * appliedScale,
+      height: dims.height * appliedScale,
+    });
     const sigmaImage = await createImageBitmap(blob);
     try {
       const out = document.createElement("canvas");
@@ -716,7 +732,7 @@ class SigmaAdapter {
         ctx.drawImage(bubbleCanvas, 0, 0, out.width, out.height);
       }
       ctx.drawImage(sigmaImage, 0, 0);
-      return out.toDataURL("image/png");
+      return { url: out.toDataURL("image/png"), requestedScale: scale, appliedScale };
     } catch (error) {
       throw new Error(`Graph image export failed: ${error?.message ?? error}`);
     } finally {

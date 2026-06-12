@@ -83,15 +83,16 @@
           </h3>
           <span id="dataSourceLabel" class="data-source-label"></span>
         </div>
-        <button id="darkModeToggleBtn" class="medium-btn" title="Switch to dark mode" onclick="cache.ui.toggleDarkMode()">🌙</button>
+        <div class="header-actions">
+          <button id="exportImage" class="showOnLoad medium-btn" title="Save image (P)" onclick="cache.ui.toggleExportResolutionPopover()">📷</button>
+          <button id="exportModel" class="showOnLoad medium-btn" title="Save model (S)" onclick="cache.io.exportGraphAsJSON()">💾</button>
+          <button id="darkModeToggleBtn" class="medium-btn" title="Switch to dark mode" onclick="cache.ui.toggleDarkMode()">🌙</button>
+        </div>
       </div>
       <div class="showOnLoad app-toolbar">
         <button id="metricsToggleBtn" class="showOnLoad toolbar-pill" title="Toggle network metrics panel (M)" onclick="cache.metrics.toggleUI()">📊 Metrics</button>
         <button id="dataToggleBtn" class="showOnLoad toolbar-pill" title="Toggle data editor (D)" onclick="cache.ui.toggleDataEditor()">🔢 Data</button>
         <button id="queryToggleBtn" class="showOnLoad toolbar-pill" title="Toggle query editor (Q)" onclick="cache.ui.toggleQueryEditor()">📝 Query</button>
-        <span class="toolbar-sep"></span>
-        <button id="exportImage" class="showOnLoad toolbar-pill" onclick="cache.io.exportPNG()" title="Save image (P)">📷 Image</button>
-        <button id="exportModel" class="showOnLoad toolbar-pill" onclick="cache.io.exportGraphAsJSON()" title="Save model (S)">💾 Model</button>
         <span class="toolbar-sep"></span>
         <button id="assistantToggleBtn" class="toolbar-pill" title="Toggle Graph Assistant (A)" onclick="cache.assistant.togglePanel()">🤖 Assistant</button>
       </div>
@@ -134,12 +135,15 @@
     <div id="sidebarStatusContainer"></div>
   </div>
   <div id="outerGraphContainer">
-    <div id="selectedElementsContainer" class="showOnLoad">
-      <div class="sel-hud-header">
+    <div id="selectedElementsContainer" class="showOnLoad sel-hud-tl">
+      <div class="sel-hud-header" title="Drag to move — releases to the nearest corner">
         <span class="sel-hud-title">Selection</span>
-        <button class="sel-hud-tools-toggle" id="selectionEditorToggleBtn"
-                title="Show selection tools: select by name, neighbours, or arrange the selection"
-                aria-expanded="false" onclick="cache.ui.toggleSelectionEditor()">Tools ▾</button>
+        <span class="sel-hud-header-tools">
+          <button class="sel-hud-tools-toggle" id="selectionEditorToggleBtn"
+                  title="Show selection tools: select by name, neighbours, or arrange the selection"
+                  aria-expanded="false" onclick="cache.ui.toggleSelectionEditor()">Tools ▾</button>
+          <button class="sel-hud-hide-btn" id="selHudHideBtn" title="Hide the selection panel (e.g. for a screenshot)" aria-label="Hide selection panel">✕</button>
+        </span>
       </div>
 
       <div class="sel-hud-toolbar">
@@ -193,6 +197,7 @@
 
       <div id="selectionEditorPanel" class="selection-editor-panel"></div>
     </div>
+    <button id="selHudRestoreBtn" class="sel-hud-restore sel-hud-tl showOnLoad" title="Show the selection panel" aria-label="Show selection panel">▸ Selection</button>
     <div id="innerGraphContainer"></div>
   </div>
   <div id="rightSidebar">

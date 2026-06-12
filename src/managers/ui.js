@@ -3,6 +3,7 @@ import {DropdownChecklist, InvertibleRangeSlider} from "./ui_components.js";
 import {createStyleDiv} from "./ui_style_div.js";
 import {Popup} from "../utilities/popup.js";
 import {applyTheme, currentTheme, nodeLabelColorForTheme} from "../utilities/theme.js";
+import {EXPORT_SCALES} from "../utilities/export_scale.js";
 
 class UIManager {
   constructor(cache, debugEnabled = false) {
@@ -457,6 +458,81 @@ class UIManager {
     const isDark = currentTheme(document) === "dark";
     btn.textContent = isDark ? "☀️" : "🌙";
     btn.title = isDark ? "Switch to light mode" : "Switch to dark mode";
+  }
+
+  /**
+   * Resolution picker anchored to the 📷 button: choose 1×/2×/4×/8× and export
+   * immediately at that scale. The chosen factor is remembered (and reused by
+   * the "P" shortcut). Built lazily on first open.
+   */
+  toggleExportResolutionPopover() {
+    if (this._exportPopover?.classList.contains("open")) {
+      this.#closeExportResolutionPopover();
+      return;
+    }
+    this.#openExportResolutionPopover();
+  }
+
+  #closeExportResolutionPopover() {
+    this._exportPopover?.classList.remove("open");
+    if (this._exportOutsideHandler) {
+      document.removeEventListener("pointerdown", this._exportOutsideHandler, true);
+      this._exportOutsideHandler = null;
+    }
+  }
+
+  #openExportResolutionPopover() {
+    const anchor = document.getElementById("exportImage");
+    if (!anchor) return;
+
+    const popover = this.#ensureExportResolutionPopover();
+    const current = this.cache.io.exportScale || 1;
+    popover.querySelectorAll(".export-res-option").forEach((btn) => {
+      btn.classList.toggle("active", Number(btn.dataset.scale) === current);
+    });
+
+    const rect = anchor.getBoundingClientRect();
+    popover.classList.add("open");
+    // Anchor below the button, clamped to the viewport's right edge.
+    popover.style.top = `${rect.bottom + 6}px`;
+    popover.style.left = `${Math.min(rect.left, window.innerWidth - popover.offsetWidth - 8)}px`;
+
+    this._exportOutsideHandler = (e) => {
+      if (!popover.contains(e.target) && e.target !== anchor) this.#closeExportResolutionPopover();
+    };
+    document.addEventListener("pointerdown", this._exportOutsideHandler, true);
+  }
+
+  #ensureExportResolutionPopover() {
+    if (this._exportPopover) return this._exportPopover;
+    const popover = document.createElement("div");
+    popover.className = "export-resolution-popover";
+    popover.id = "exportResolutionPopover";
+
+    const title = document.createElement("div");
+    title.className = "export-res-title";
+    title.textContent = "Export image resolution";
+    popover.appendChild(title);
+
+    const row = document.createElement("div");
+    row.className = "export-res-row";
+    for (const scale of EXPORT_SCALES) {
+      const btn = document.createElement("button");
+      btn.className = "export-res-option";
+      btn.dataset.scale = String(scale);
+      btn.textContent = `${scale}×`;
+      btn.title = `Export at ${scale}× viewport resolution`;
+      btn.addEventListener("click", () => {
+        this.#closeExportResolutionPopover();
+        this.cache.io.exportPNG(scale);
+      });
+      row.appendChild(btn);
+    }
+    popover.appendChild(row);
+
+    document.body.appendChild(popover);
+    this._exportPopover = popover;
+    return popover;
   }
 
   updateHoverToggleButton() {

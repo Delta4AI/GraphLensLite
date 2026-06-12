@@ -24,6 +24,7 @@ import {StaticUtilities} from "./utilities/static.js";
 import {generateTourData, GuidedTour} from "./utilities/tour.js";
 import {initApiClient} from "./managers/api_client.js";
 import {initTheme} from "./utilities/theme.js";
+import {initSelectionHud} from "./utilities/selection_hud.js";
 
 
 // Stores all reference objects
@@ -467,6 +468,7 @@ window.addEventListener("DOMContentLoaded", () => {
   initTheme(document, window);
   cache.reset();
   cache.ui.updateDarkModeButton();
+  initSelectionHud();
   // cache.initialize();
 
   // Display version info
