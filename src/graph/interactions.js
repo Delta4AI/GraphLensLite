@@ -213,7 +213,10 @@ class InteractionManager {
         await this.cache.sm.selectElements([id], this.#combinedRefMap());
       }
     }
-    if (this.enabled.tooltip) this.showTooltip(id, isEdge);
+    // Tooltip means "inspect this one thing"; a shift+click is a
+    // selection-building gesture, so don't flash a tooltip on each one.
+    const shiftHeld = Boolean(event?.original?.shiftKey);
+    if (this.enabled.tooltip && !shiftHeld) this.showTooltip(id, isEdge);
   }
 
   async #onClickStage() {
