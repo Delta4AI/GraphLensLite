@@ -361,6 +361,8 @@ class GraphSelectionManager {
         if (selectedEdgesCount) parts.push(`${selectedEdgesCount} edge${selectedEdgesCount === 1 ? "" : "s"}`);
         stylingStatus.textContent = `Styling ${parts.join(" · ")}`;
         stylingStatus.classList.remove("empty");
+        // Open the config card(s) matching the selection (additive).
+        this.cache.ui.syncStylingCardsToSelection(atLeastOneNodeSelected, atLeastOneEdgeSelected);
       } else {
         stylingStatus.textContent = "Nothing selected — select nodes or edges to style them. Bubble-group styling below works without a selection.";
         stylingStatus.classList.add("empty");

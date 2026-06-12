@@ -680,6 +680,26 @@ body, html {
     color: var(--text-strong);
 }
 
+/* Inline actionable words in the empty-state hint: clicking jumps straight to
+   the named tool (lasso mode / Tools drawer / query editor). */
+.sel-hud-link {
+    font: inherit;
+    font-weight: 600;
+    color: var(--accent-text);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.sel-hud-link:hover,
+.sel-hud-link:focus-visible {
+    color: var(--text-strong);
+    text-decoration: none;
+}
+
 /* --- active state (has selection) --- */
 .sel-hud-active {
     display: none;
@@ -735,6 +755,7 @@ body, html {
 .sel-hud-groups {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 5px;
     margin-top: 6px;
     min-height: 0;
@@ -1166,7 +1187,10 @@ h5 {
     font-size: 12px;
     line-height: 1.4;
     padding: 8px 10px;
-    margin-bottom: 4px;
+    /* Flush to the panel header on top; a wide gap below sets the status apart
+       from the config stack, which is itself tightly spaced (cards: 8px). */
+    margin-top: 0;
+    margin-bottom: 14px;
     border-radius: 6px;
     background: var(--surface-3);
     color: var(--text-strong);
@@ -2948,6 +2972,55 @@ input:checked + .slider:before {
 }
 
 .manual-group-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* One clickable badge per active manual group: ●count in the group colour,
+   with an ✕ that fades in on hover to signal it clears just that group. */
+.manual-group-badge {
+    font: inherit;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 5px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.manual-group-badge:hover,
+.manual-group-badge:focus-visible {
+    border-color: var(--border-soft);
+    background: var(--input-bg);
+}
+
+.mg-badge-x {
+    font-size: 10px;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.manual-group-badge:hover .mg-badge-x,
+.manual-group-badge:focus-visible .mg-badge-x {
+    opacity: 1;
+}
+
+/* Red text-button variant (e.g. "Clear all"). */
+.sel-hud-btn.red {
+    color: var(--danger-text);
+}
+
+.sel-hud-btn.red:hover {
+    border-color: var(--danger-text);
+    color: var(--danger-text);
 }
 
 .quadrant {

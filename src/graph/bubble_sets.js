@@ -569,22 +569,55 @@ class GraphBubbleSetManager {
 
       if (visibleMembers.length > 0) {
         const color = this.cache.data.layouts[this.cache.data.selectedLayout].bubbleSetStyle[group].fill;
-        activeGroups.push(`<span style="color: ${color}; font-weight: bold;">●${visibleMembers.length}</span>`);
+        activeGroups.push(this.buildManualGroupBadge(group, visibleMembers.length, color));
       }
     }
 
     // Show/hide elements based on active groups
     if (activeGroups.length > 0) {
-      statusSpan.innerHTML = activeGroups.join(' ');
-      statusSpan.style.display = 'inline';
-      if (clearButton) clearButton.style.display = 'inline';
+      statusSpan.replaceChildren(...activeGroups);
+      statusSpan.style.display = 'inline-flex';
+      if (clearButton) clearButton.style.display = 'inline-flex';
       if (separator) separator.style.display = 'inline-block';
+      // A group now exists worth styling — surface the Bubble Sets card.
+      this.cache.ui?.expandStylingCard?.('Bubble Sets');
     } else {
-      statusSpan.innerHTML = '';
+      statusSpan.replaceChildren();
       statusSpan.style.display = 'none';
       if (clearButton) clearButton.style.display = 'none';
       if (separator) separator.style.display = 'none';
     }
+  }
+
+  // One clickable badge per active group: shows the colored ●count and clears
+  // just that group on click (✕ revealed on hover). Lets users drop a single
+  // group without nuking all of them via "Clear all".
+  buildManualGroupBadge(group, count, color) {
+    const badge = document.createElement('button');
+    badge.type = 'button';
+    badge.className = 'manual-group-badge';
+    badge.style.color = color;
+    badge.title = `Clear this group (${count} node${count === 1 ? '' : 's'})`;
+    const dot = document.createElement('span');
+    dot.textContent = `●${count}`;
+    const x = document.createElement('span');
+    x.className = 'mg-badge-x';
+    x.textContent = '✕';
+    badge.append(dot, x);
+    badge.addEventListener('click', () => this.clearManualGroup(group));
+    return badge;
+  }
+
+  async clearManualGroup(group) {
+    const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`];
+    if (manualMembers) manualMembers.clear();
+
+    this.updateManualGroupButtonState();
+    this.updateManualGroupStatus();
+
+    this.cache.bubbleSetChanged = true;
+    await this.updateBubbleSetIfChanged();
+    await this.cache.graph.draw();
   }
 
   cleanupManualGroupMembers() {

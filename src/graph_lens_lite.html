@@ -9,7 +9,7 @@
         type="image/svg+xml">
   <script inline src="lib/exceljs.min.js"></script>
   <script type="module" src="gll.js"></script>
-  <link inline rel="stylesheet" href="style.css?v=1" />
+  <link inline rel="stylesheet" href="style.css" />
 </head>
 <body>
 <div id="landingPage">
@@ -149,8 +149,6 @@
       <div class="sel-hud-toolbar">
         <div id="lassoWrapper" class="showOnLoad"><button id="lassoToggleBtn" class="sel-hud-btn" title="Toggle lasso selection: drag to select elements (L)" onclick="cache.ui.toggleLassoSelection()">➰ Lasso</button></div>
         <button id="styleToggleBtn" class="sel-hud-btn showOnLoad" title="Open styling panel (Y)" onclick="cache.ui.toggleStylingPanel()">🎨 Style</button>
-        <button id="detectCommunitiesBtn" class="sel-hud-btn" title="Detect communities (Louvain): choose edge weighting and resolution, then assign the largest ones to bubble groups"
-                onclick="cache.bs.toggleCommunityDetectionPopover()">🧩 Detect</button>
         <span class="sel-hud-toolbar-spacer"></span>
         <button class="sel-hud-icon-btn disabled" title="Undo selection" id="undoSelectionBtn"
                 onclick="cache.sm.undoSelection()">↩</button>
@@ -160,7 +158,7 @@
 
       <div class="sel-hud-empty">
         <div class="sel-hud-empty-title">Nothing selected</div>
-        <div class="sel-hud-empty-hint">Click an element, drag a <strong>lasso</strong> (L), or open <strong>Tools</strong> to select by name or neighbours. A query can also select by property.</div>
+        <div class="sel-hud-empty-hint">Click an element, drag a <button type="button" class="sel-hud-link" onclick="cache.ui.toggleLassoSelection()">lasso</button> (L), or use <button type="button" class="sel-hud-link" onclick="cache.ui.toggleSelectionEditor()">Tools</button> to select by name or neighbours. The <button type="button" class="sel-hud-link" onclick="cache.ui.toggleQueryEditor()">query editor</button> allows selection by properties.</div>
       </div>
 
       <div class="sel-hud-active">
@@ -189,10 +187,13 @@
       </div>
 
       <div class="sel-hud-groups">
+        <span class="sel-group-label">Groups:</span>
+        <button id="detectCommunitiesBtn" class="sel-hud-btn" title="Auto-group by community (Louvain): pick edge weighting & resolution, then assign the largest communities to bubble groups"
+                onclick="cache.bs.toggleCommunityDetectionPopover()">🧩 Auto</button>
         <span id="manualGroupSeparator" class="button-separator" style="display: none;"></span>
         <span id="manualBubbleGroupStatus" class="manual-group-status" style="display: none;"></span>
-        <button id="clearManualGroupsBtn" class="sel-hud-icon-btn red" title="Clear all manual bubble groups"
-                onclick="cache.bs.clearAllManualGroups()" style="display: none;">×</button>
+        <button id="clearManualGroupsBtn" class="sel-hud-btn red" title="Clear all manual bubble groups"
+                onclick="cache.bs.clearAllManualGroups()" style="display: none;">Clear all</button>
       </div>
 
       <div id="selectionEditorPanel" class="selection-editor-panel"></div>

@@ -933,6 +933,27 @@ class UIManager {
       if (card) selectionPanel.appendChild(card);
     });
   }
+
+  // Additively open a collapsible styling card by its label (never closes one).
+  // Driven by the current selection so the relevant card is already open when
+  // the user reaches for it, without fighting cards they toggled themselves.
+  expandStylingCard(label) {
+    const content = document.getElementById("stylingPanelContent");
+    const card = content?.querySelector(`[data-label="${label}"]`);
+    if (!card || !card.classList.contains("collapsed")) return;
+    card.classList.remove("collapsed");
+    const header = card.querySelector(".card-collapse-header");
+    const chevron = card.querySelector(".card-collapse-chevron");
+    if (header) header.setAttribute("aria-expanded", "true");
+    if (chevron) chevron.textContent = "▾";
+  }
+
+  // Mirror the live selection onto the styling cards: open Node/Edge config for
+  // whatever is selected. Additive only — see expandStylingCard.
+  syncStylingCardsToSelection(hasNodes, hasEdges) {
+    if (hasNodes) this.expandStylingCard("Node Configuration");
+    if (hasEdges) this.expandStylingCard("Edge Configuration");
+  }
 }
 
 export {UIManager};
