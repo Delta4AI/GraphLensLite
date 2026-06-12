@@ -1,5 +1,6 @@
 import {StaticUtilities} from "../utilities/static.js";
 import {detectCommunities as computeCommunityAssignments} from "./communities.js";
+import {clampPopoverLeft} from "../utilities/popover_position.js";
 
 class GraphBubbleSetManager {
   constructor(cache) {
@@ -439,11 +440,12 @@ class GraphBubbleSetManager {
     const popover = this.#ensureCommunityDetectionPopover();
     this.#populateCommunityDetectionPopover(numericProps);
 
-    // Anchor below the button, clamped to the viewport's right edge.
+    // Open first so offsetWidth is measurable, then anchor below the button
+    // and clamp to the viewport so the right edge never truncates.
+    popover.classList.add("open");
     const rect = anchor.getBoundingClientRect();
     popover.style.top = `${rect.bottom + 6}px`;
-    popover.style.left = `${Math.min(rect.left, window.innerWidth - 260)}px`;
-    popover.classList.add("open");
+    popover.style.left = `${clampPopoverLeft(rect.left, popover.offsetWidth, window.innerWidth)}px`;
 
     // Close on outside click (capture so it beats inner handlers).
     this._communityOutsideHandler = (e) => {

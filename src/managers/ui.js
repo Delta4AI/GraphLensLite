@@ -4,6 +4,7 @@ import {createStyleDiv} from "./ui_style_div.js";
 import {Popup} from "../utilities/popup.js";
 import {applyTheme, currentTheme, nodeLabelColorForTheme} from "../utilities/theme.js";
 import {EXPORT_SCALES} from "../utilities/export_scale.js";
+import {clampPopoverLeft} from "../utilities/popover_position.js";
 
 // Persisted preference: whether the filter panel reveals exact numeric inputs
 // and the per-row group / selection actions. Off keeps rows scannable when a
@@ -500,7 +501,7 @@ class UIManager {
     popover.classList.add("open");
     // Anchor below the button, clamped to the viewport's right edge.
     popover.style.top = `${rect.bottom + 6}px`;
-    popover.style.left = `${Math.min(rect.left, window.innerWidth - popover.offsetWidth - 8)}px`;
+    popover.style.left = `${clampPopoverLeft(rect.left, popover.offsetWidth, window.innerWidth)}px`;
 
     this._exportOutsideHandler = (e) => {
       if (!popover.contains(e.target) && e.target !== anchor) this.#closeExportResolutionPopover();
