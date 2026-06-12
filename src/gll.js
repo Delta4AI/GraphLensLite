@@ -17,6 +17,7 @@ import {AssistantManager} from './managers/assistant/index.js';
 
 import {ColorScalePicker} from './utilities/color_scale_picker.js';
 import {NumericScalePicker} from './utilities/numeric_scale_picker.js';
+import {PieChartPicker} from './utilities/pie_chart_picker.js';
 import {DataTable, buildDataTable} from "./utilities/data_editor.js";
 import {StringDemoDataLoader} from "./utilities/demo_loader.js";
 import {Popup} from "./utilities/popup.js";
@@ -90,6 +91,7 @@ class Cache {
     this.style = new GraphStyleManager(this);
     this.picker = new ColorScalePicker(this);
     this.numericPicker = new NumericScalePicker(this);
+    this.piePicker = new PieChartPicker(this);
     this.dataTable = new DataTable(this);
     this.metrics = new NetworkMetrics(this);
     this.assistant = new AssistantManager(this);

@@ -157,6 +157,43 @@ describe("executeLayout — concentric", () => {
   });
 });
 
+describe("executeLayout — dagre (layered/hierarchical)", () => {
+  /** Linear chain a→b→c→d: four distinct ranks. */
+  function chainGraph() {
+    const graph = new Graph();
+    ["a", "b", "c", "d"].forEach((id) => graph.addNode(id, { x: 0, y: 0 }));
+    [["a", "b"], ["b", "c"], ["c", "d"]].forEach(([s, t]) => graph.addEdge(s, t));
+    return graph;
+  }
+
+  it("orders ranks top-to-bottom for rankdir TB (graphology y-up: source above target)", async () => {
+    // Arrange
+    const graph = chainGraph();
+
+    // Act
+    await executeLayout(graph, specFor("dagre"));
+
+    // Assert: each edge's source sits strictly higher (greater y) than its
+    // target — the negateY flip makes a TB tree read root-at-top on screen.
+    const y = (id) => graph.getNodeAttribute(id, "y");
+    expect(y("a")).toBeGreaterThan(y("b"));
+    expect(y("b")).toBeGreaterThan(y("c"));
+    expect(y("c")).toBeGreaterThan(y("d"));
+  });
+
+  it("separates ranks by roughly ranksep (distinct y per rank)", async () => {
+    // Arrange
+    const graph = chainGraph();
+
+    // Act
+    await executeLayout(graph, specFor("dagre"));
+
+    // Assert: four chain nodes land on four distinct y levels.
+    const levels = new Set(["a", "b", "c", "d"].map((id) => graph.getNodeAttribute(id, "y")));
+    expect(levels.size).toBe(4);
+  });
+});
+
 describe("executeLayout — force worker supervisor (browser path)", () => {
   // Star graph order 12 → budget = min(5000, 500 + 12*2) = 524 ms.
   const STAR_BUDGET_MS = 524;
@@ -456,7 +493,7 @@ describe("executeLayout — edge cases", () => {
     });
   });
 
-  it.each(["radial", "concentric", "mds"])(
+  it.each(["radial", "concentric", "mds", "dagre"])(
     "%s: disconnected graph yields finite positions",
     async (type) => {
       // Arrange

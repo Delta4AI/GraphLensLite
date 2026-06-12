@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildGraphologyGraph,
+  buildLayoutTransitionTargets,
   nodeAttributesFromStyle,
   edgeAttributesFromStyle,
   sigmaEdgeType,
@@ -1237,5 +1238,144 @@ describe("hover layer (Phase 3) — hoverNeighborhood + reducer composition", ()
     const data = { color: "#403C53", hidden: true };
 
     expect(nodeReducer("d", data)).toBe(data);
+  });
+});
+
+// --------------------------------------------------------------------------
+// buildLayoutTransitionTargets — pure target map for the workspace-switch
+// position tween (sigma/utils animateNodes). The browser-only adapter owns
+// the actual animation; this is the node-safe, y-flipping core.
+// --------------------------------------------------------------------------
+describe("buildLayoutTransitionTargets", () => {
+  const always = () => true;
+
+  /** Map<id, {style:{x,y}}> from a plain {id: [x,y]} spec. */
+  function posMap(spec) {
+    return new Map(Object.entries(spec).map(([id, [x, y]]) => [id, { style: { x, y } }]));
+  }
+
+  it("flips app-model y-down to graphology y-up and counts every node", () => {
+    // Arrange
+    const positions = posMap({ a: [10, 20], b: [-5, -8] });
+
+    // Act
+    const { targets, count } = buildLayoutTransitionTargets(positions, always);
+
+    // Assert: x unchanged, y negated (mirror of buildGraphologyGraph's flip).
+    expect(count).toBe(2);
+    expect(targets).toEqual({ a: { x: 10, y: -20 }, b: { x: -5, y: 8 } });
+  });
+
+  it("skips ids absent from the graph (stale persisted positions)", () => {
+    // Arrange
+    const positions = posMap({ keep: [1, 2], gone: [3, 4] });
+    const hasNode = (id) => id === "keep";
+
+    // Act
+    const { targets, count } = buildLayoutTransitionTargets(positions, hasNode);
+
+    // Assert
+    expect(count).toBe(1);
+    expect(targets).toEqual({ keep: { x: 1, y: -2 } });
+  });
+
+  it("skips non-finite coordinates without corrupting the target map", () => {
+    // Arrange
+    const positions = new Map([
+      ["good", { style: { x: 7, y: 9 } }],
+      ["nanx", { style: { x: NaN, y: 1 } }],
+      ["infy", { style: { x: 1, y: Infinity } }],
+      ["nostyle", {}],
+    ]);
+
+    // Act
+    const { targets, count } = buildLayoutTransitionTargets(positions, always);
+
+    // Assert
+    expect(count).toBe(1);
+    expect(targets).toEqual({ good: { x: 7, y: -9 } });
+  });
+
+  it("returns an empty result for a null/empty positions map", () => {
+    // Act + Assert
+    expect(buildLayoutTransitionTargets(null, always)).toEqual({ targets: {}, count: 0 });
+    expect(buildLayoutTransitionTargets(new Map(), always)).toEqual({ targets: {}, count: 0 });
+  });
+});
+
+// --------------------------------------------------------------------------
+// Pie-chart node mapping (feature #1) — style.pieSlices routes the node to the
+// @sigma/node-piechart program (type "pie") regardless of its shape.
+// --------------------------------------------------------------------------
+describe("nodeAttributesFromStyle — pie chart", () => {
+  const MAX = DEFAULTS.NODE.PIE.MAX_SLICES;
+
+  it("emits type 'pie' with fixed pieValueK/pieColorK slots from pieSlices", () => {
+    const attrs = nodeAttributesFromStyle(
+      { size: 20, fill: "#403C53", pieSlices: [
+        { value: 1, color: "#aa0000" },
+        { value: 1, color: "#00aa00" },
+      ] },
+      "circle",
+    );
+
+    expect(attrs.type).toBe("pie");
+    expect(attrs.pieValue0).toBe(1);
+    expect(attrs.pieColor0).toBe("#aa0000");
+    expect(attrs.pieColor1).toBe("#00aa00");
+    // Every program slot is populated (unused tail zeroed/transparent).
+    expect(attrs.pieValue2).toBe(0);
+    expect(Object.keys(attrs).filter((k) => k.startsWith("pieValue"))).toHaveLength(MAX);
+  });
+
+  it("nulls stale texture attrs so a shape→pie switch carries no leftover image", () => {
+    // A star is a texture-only shape (emits image + fillColor); pie must clear them.
+    const attrs = nodeAttributesFromStyle(
+      { size: 20, fill: "#403C53", pieSlices: [{ value: 1, color: "#aa0000" }] },
+      "star",
+    );
+
+    expect(attrs.type).toBe("pie");
+    expect(attrs.image).toBeNull();
+    expect(attrs.fillColor).toBeNull();
+    expect(attrs.borderRatio).toBe(0);
+  });
+
+  it("leaves the shape in force when pieSlices is empty or absent", () => {
+    const emptyPie = nodeAttributesFromStyle({ size: 20, fill: "#403C53", pieSlices: [] }, "diamond");
+    const noPie = nodeAttributesFromStyle({ size: 20, fill: "#403C53" }, "diamond");
+
+    expect(emptyPie.type).not.toBe("pie");
+    expect(emptyPie.pieValue0).toBeUndefined();
+    expect(noPie.type).not.toBe("pie");
+  });
+});
+
+describe("makeNodeReducer — pie node states", () => {
+  function reducerFixture() {
+    const elementStates = new Map();
+    const cache = { edgeRef: new Map(), graphData: null };
+    return { nodeReducer: makeNodeReducer(cache, elementStates), elementStates };
+  }
+
+  it("keeps a selected pie node as a pie (size pop, not a texture halo)", () => {
+    const { nodeReducer, elementStates } = reducerFixture();
+    elementStates.set("p", ["selected"]);
+    const data = { type: "pie", size: 10, pieValue0: 1, pieColor0: "#aa0000" };
+
+    const out = nodeReducer("p", data);
+
+    expect(out.type).toBe("pie"); // not converted to "shape"
+    expect(out.size).toBeGreaterThan(10); // emphasis pop
+    expect(out.zIndex).toBe(1);
+    expect(out.pieColor0).toBe("#aa0000"); // slices intact
+  });
+
+  it("leaves a dimmed pie node unchanged (slice colors carry the data)", () => {
+    const { nodeReducer, elementStates } = reducerFixture();
+    elementStates.set("p", ["dim"]);
+    const data = { type: "pie", size: 10, pieValue0: 1, pieColor0: "#aa0000" };
+
+    expect(nodeReducer("p", data)).toBe(data);
   });
 });

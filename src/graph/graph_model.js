@@ -9,6 +9,7 @@
 import { Graph } from "../lib/graphology.bundle.mjs";
 import { DEFAULTS } from "../config.js";
 import { shapeTextureURI, isTextureOnlyShape, HALO_EXTRA_PX } from "./shape_textures.js";
+import { pieAttributesFromSlices } from "./pie_slices.js";
 
 // Element interaction-state colors (former G6 state spec) live in config so
 // the styling UI and the reducers share one source.
@@ -67,6 +68,21 @@ function nodeAttributesFromStyle(style = {}, type = undefined) {
   }
 
   if (type !== undefined) Object.assign(attrs, nodeProgramAttributes(style, type));
+
+  // Pie-chart override: orthogonal to the shape vocabulary — a non-empty
+  // pieSlices list routes the node to the @sigma/node-piechart program
+  // (type "pie") regardless of its underlying shape. Clearing pie (empty/absent
+  // pieSlices) leaves the shape attrs above in force. The stale texture attrs
+  // are nulled so a shape→pie switch can't smuggle a leftover image quad.
+  if (Array.isArray(style.pieSlices) && style.pieSlices.length > 0) {
+    Object.assign(
+      attrs,
+      pieAttributesFromSlices(style.pieSlices, DEFAULTS.NODE.PIE.MAX_SLICES, DEFAULTS.NODE.PIE.DEFAULT_COLOR),
+    );
+    attrs.image = null;
+    attrs.fillColor = null;
+    attrs.borderRatio = 0;
+  }
   return attrs;
 }
 
@@ -318,6 +334,32 @@ function placeholderPosition(index, total) {
 }
 
 /**
+ * Build the graph-space target map for a workspace-switch position tween
+ * (consumed by sigma/utils animateNodes via SigmaAdapter.runLayoutTransition).
+ * Persisted positions are app-model (y-down) → flipped into graphology's
+ * y-up frame. Nodes absent from the graph or carrying non-finite coordinates
+ * are skipped (a stale persisted id must not animate a missing node).
+ *
+ * @param {Map<string, {style?: {x:number, y:number}}>|null|undefined} positionsMap
+ * @param {(id: string) => boolean} hasNode  graph membership predicate
+ * @returns {{targets: Record<string, {x:number, y:number}>, count: number}}
+ */
+function buildLayoutTransitionTargets(positionsMap, hasNode) {
+  const targets = {};
+  let count = 0;
+  if (!positionsMap) return { targets, count };
+  for (const [id, pos] of positionsMap) {
+    const x = pos?.style?.x;
+    const y = pos?.style?.y;
+    if (hasNode(id) && Number.isFinite(x) && Number.isFinite(y)) {
+      targets[id] = { x, y: flipY(y) };
+      count++;
+    }
+  }
+  return { targets, count };
+}
+
+/**
  * Build a graphology Graph from cache.nodeRef/edgeRef. Positions come from
  * the selected layout's persisted positions Map when present (app-model
  * y-down → flipped), else from the node style (flipped by the mapper), else
@@ -380,6 +422,16 @@ function buildGraphologyGraph(cache) {
  * the transient type switch needs no merge hygiene).
  */
 function applyNodeState(data, state) {
+  // Pie nodes have no texture/halo path (the SVG halo draws a single-fill
+  // shape, which would erase the slices). Emphasis is a size pop for
+  // selected/highlight; dim is a no-op — the slice colors carry the data, so
+  // there is no flat fill to dim toward. (Known limitation: pie nodes don't
+  // de-emphasize on hover-dim; selection/hover still raise them via zIndex.)
+  if (data.type === "pie") {
+    if (state === "dim") return data;
+    return { ...data, size: (data.size ?? DEFAULTS.NODE.SIZE / 2) + HALO_EXTRA_PX };
+  }
+
   const res = { ...data };
   const shape = data.shape ?? "circle";
   const baseSize = data.size ?? DEFAULTS.NODE.SIZE / 2;
@@ -508,6 +560,7 @@ function makeEdgeReducer(cache, elementStates, hoverIds = new Set()) {
 
 export {
   buildGraphologyGraph,
+  buildLayoutTransitionTargets,
   nodeAttributesFromStyle,
   edgeAttributesFromStyle,
   sigmaEdgeType,

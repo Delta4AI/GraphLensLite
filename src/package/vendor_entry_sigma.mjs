@@ -9,9 +9,10 @@ export {
   createEdgeCompoundProgram,
   drawDiscNodeHover,
 } from 'sigma/rendering';
-export {floatColor} from 'sigma/utils';
+export {floatColor, animateNodes} from 'sigma/utils';
 export {NodeSquareProgram} from '@sigma/node-square';
 export {createNodeBorderProgram} from '@sigma/node-border';
+export {createNodePiechartProgram} from '@sigma/node-piechart';
 export * as nodeImage from '@sigma/node-image';
 export * as edgeCurve from '@sigma/edge-curve';
 export * as exportImage from '@sigma/export-image';

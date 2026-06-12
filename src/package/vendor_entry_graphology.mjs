@@ -12,7 +12,7 @@ export {default as FA2Layout} from 'graphology-layout-forceatlas2/worker';
 // Anti-collision post-pass. Node-safe at module scope: the worker helper in
 // the package only touches window/Worker when called, and we never call it.
 export {default as noverlap} from 'graphology-layout-noverlap';
-export {RadialLayout, ConcentricLayout, MDSLayout} from '@antv/layout';
+export {RadialLayout, ConcentricLayout, MDSLayout, DagreLayout} from '@antv/layout';
 export * as bubblesets from 'bubblesets-js';
 // Network metrics (graphology-metrics; pure JS, node-safe). Subpath imports
 // keep hits/modularity/layout-quality out of the bundle.

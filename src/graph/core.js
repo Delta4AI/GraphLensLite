@@ -554,6 +554,15 @@ class GraphCoreManager {
       }
     }
 
+    let pieResult = null;
+    if (commands.includes("set_pie_chart")) {
+      pieResult = await this.cache.piePicker.pickPie();
+      if (!pieResult) {
+        this.cache.ui.info("Aborted pie chart picker");
+        return;
+      }
+    }
+
     const badgesToAdd = overrides.style?.badges;
     const badgePaletteToAdd = overrides.style?.badgePalette;
 
@@ -601,6 +610,11 @@ class GraphCoreManager {
           node.style.label = true;
           node.style.labelText = node.label;
         }
+        if (command === "clear_pie_chart") {
+          delete node.style.pieSlices;
+          delete node.style.pieMode;
+          delete node.style.pieProperties;
+        }
       }
 
       // apply overrides
@@ -612,6 +626,15 @@ class GraphCoreManager {
         replaceNumericScale(overridesCopy, nodeID, numericScaleMap);
       }
       StaticUtilities.deepMerge(node, overridesCopy);
+
+      // Pie chart: bake the per-node resolved slices (and the config, for
+      // re-edit/persistence) onto the style. Empty slices for a node means it
+      // carries none of the chosen values — it falls back to its shape.
+      if (pieResult) {
+        node.style.pieSlices = pieResult.sliceByNode.get(nodeID) ?? [];
+        node.style.pieMode = pieResult.mode;
+        node.style.pieProperties = pieResult.properties;
+      }
       this.cache.nodeRef.set(nodeID, node);
 
       // Save to current layout's style map (including type)

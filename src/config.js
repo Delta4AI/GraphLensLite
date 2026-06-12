@@ -9,6 +9,22 @@ const DEFAULTS = {
     BADGE: {
       FONT_SIZE: 8, COLOR: "#C33D35", SCALE_WITH_NODE: false
     },
+    // Pie-chart nodes (@sigma/node-piechart). The program is created with a
+    // FIXED slice count (slice K reads pieValueK/pieColorK per node), so
+    // MAX_SLICES caps how many categories/numeric columns one node can show;
+    // overflow is dropped with a UI warning (no silent truncation). Unused
+    // slices carry value 0 + a transparent color, collapsing to nothing.
+    //
+    // HARD CAP 6: the program consumes 4 base + 2 vertex attributes per slice
+    // (per-node color + value), and WebGL2 only guarantees MAX_VERTEX_ATTRIBS
+    // = 16 (4 + 2·6 = 16). The program is built eagerly for every graph and
+    // throws above the limit, so a larger value would break ALL rendering on
+    // 16-attribute GPUs — not just pie nodes.
+    PIE: {
+      MAX_SLICES: 6,
+      DEFAULT_COLOR: "#ABACBD", // fallback fill when a slice color is missing
+      SLICE_PALETTE: ["#C33D35", "#403C53", "#8CA6D9", "#EFB0AA", "#5B8C5A", "#E0A458"],
+    },
     LABEL: {
       FOREGROUND_COLOR: "#000000", BACKGROUND: false, BACKGROUND_COLOR: null, BACKGROUND_RADIUS: 5,
       PADDING: 2, PLACEMENT: "bottom", FONT_SIZE: 12, CURSOR: "default", LINE_SPACING: 0, MAX_LINES: 1,
@@ -47,8 +63,8 @@ const DEFAULTS = {
   LAYOUT: "force",
   // Keys define the layout template vocabulary (workspace-creation dropdown).
   // Option objects ride into the headless @antv/layout classes for
-  // radial/concentric/mds; force (forceAtlas2.inferSettings), circular and
-  // grid are self-tuning/geometric and take no options.
+  // radial/concentric/mds/dagre; force (forceAtlas2.inferSettings), circular
+  // and grid are self-tuning/geometric and take no options.
   LAYOUT_INTERNALS: {
     "force": {},
     "circular": {},
@@ -56,6 +72,10 @@ const DEFAULTS = {
     "concentric": {nodeSize: 32, maxLevelDiff: 0.5, sortBy: 'degree', preventOverlap: true},
     "grid": {},
     "mds": {nodeSize: 32, linkDistance: 100},
+    // Layered/hierarchical (Sugiyama). rankdir TB → ranks flow top-to-bottom
+    // (y negated into graphology's y-up frame in layout_algorithms.js);
+    // nodesep/ranksep are graph-space px between same-rank / adjacent ranks.
+    "dagre": {rankdir: "TB", nodesep: 40, ranksep: 90},
   },
   CUSTOM_LAYOUT_NAME: "custom",
   BUBBLE_GROUP_STYLE: {

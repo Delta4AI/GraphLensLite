@@ -20,44 +20,68 @@ class GraphLayoutManager {
 
     const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
 
-    // Apply per-view node and edge styles
-    await this.applyLayoutStyles(currentLayout);
+    // Animate node positions from the outgoing workspace to this one when it
+    // carries persisted positions. The adapter leaves positions in place
+    // through the render (pendingLayoutTransition) and tweens them once the
+    // loading overlay clears (runLayoutTransition, last step below). A
+    // position-less view (fresh template) has nothing to tween from/to and
+    // takes the normal snap path.
+    const animatePositions = currentLayout.positions?.size > 0;
+    this.cache.graph.pendingLayoutTransition = animatePositions;
 
-    // All layouts are now position-based, no need to re-apply layout algorithms
-    this.cache.ui.buildFilterUI();
+    // finally: never leave pendingLayoutTransition stuck on. If any step below
+    // throws before runLayoutTransition consumes it, every later render would
+    // otherwise skip #applyPersistedPositions and freeze nodes at the outgoing
+    // workspace for the adapter's lifetime.
+    try {
+      // Apply per-view node and edge styles (positions held at the outgoing
+      // view's when animating, so the tween starts from what's on screen).
+      await this.applyLayoutStyles(currentLayout, animatePositions);
 
-    // Update filter lock state based on whether this layout has a custom query
-    this.cache.qm.updateQueryTextArea();
-    if (currentLayout["query"]) {
-      this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
-    } else {
-      this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;
+      // All layouts are now position-based, no need to re-apply layout algorithms
+      this.cache.ui.buildFilterUI();
+
+      // Update filter lock state based on whether this layout has a custom query
+      this.cache.qm.updateQueryTextArea();
+      if (currentLayout["query"]) {
+        this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
+      } else {
+        this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;
+      }
+      this.cache.ui.updateFilterLockState();
+      this.cache.ui.clearActivePropsCacheOnLayoutChange();
+
+      await this.cache.metrics.updateMetricUI();
+
+      this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED = false;
+
+      await this.cache.gcm.decideToRenderOrDraw(true);
+
+      // Restore hide disconnected nodes state for this workspace
+      await this.cache.gcm.applyHideDisconnectedState();
+
+      // Force bubble group sync - recalculate which nodes should be in groups for this view
+      this.cache.bubbleSetChanged = true;
+      await this.cache.bs.updateBubbleSetIfChanged();
+
+      // Update manual bubble group status after layout change
+      this.cache.bs.updateManualGroupStatus();
+      this.cache.bs.updateManualGroupButtonState();
+      this.cache.bs.refreshBubbleStyleElements();
+
+      // Last: tween node positions from the outgoing view to this one (no-op
+      // when there was nothing to animate; consumes pendingLayoutTransition).
+      if (animatePositions) {
+        await this.cache.graph.runLayoutTransition(currentLayout.positions);
+      }
+
+      this.cache.ui.info(`Switched to workspace: ${this.cache.data.selectedLayout}`);
+    } finally {
+      if (this.cache.graph) this.cache.graph.pendingLayoutTransition = false;
     }
-    this.cache.ui.updateFilterLockState();
-    this.cache.ui.clearActivePropsCacheOnLayoutChange();
-
-    await this.cache.metrics.updateMetricUI();
-
-    this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED = false;
-
-    await this.cache.gcm.decideToRenderOrDraw(true);
-
-    // Restore hide disconnected nodes state for this workspace
-    await this.cache.gcm.applyHideDisconnectedState();
-
-    // Force bubble group sync - recalculate which nodes should be in groups for this view
-    this.cache.bubbleSetChanged = true;
-    await this.cache.bs.updateBubbleSetIfChanged();
-
-    // Update manual bubble group status after layout change
-    this.cache.bs.updateManualGroupStatus();
-    this.cache.bs.updateManualGroupButtonState();
-    this.cache.bs.refreshBubbleStyleElements();
-
-    this.cache.ui.info(`Switched to workspace: ${this.cache.data.selectedLayout}`);
   }
 
-  async applyLayoutStyles(layout) {
+  async applyLayoutStyles(layout, animatePositions = false) {
     // Apply per-view node styles - reset ALL nodes, not just styled ones
     const nodeUpdates = [];
     for (const [nodeID, node] of this.cache.nodeRef.entries()) {
@@ -82,11 +106,19 @@ class GraphLayoutManager {
         newType = node.originalType || node.type;
       }
 
-      // Apply positions from the layout's position map (positions are stored separately)
-      const position = layout.positions.get(nodeID);
-      if (position && position.style) {
-        newStyle.x = position.style.x;
-        newStyle.y = position.style.y;
+      // Apply positions from the layout's position map (positions are stored
+      // separately). While animating a workspace switch, keep each node at its
+      // current (outgoing) position so the tween starts from what's on screen;
+      // runLayoutTransition moves it to the target afterwards.
+      if (animatePositions) {
+        newStyle.x = node.style.x;
+        newStyle.y = node.style.y;
+      } else {
+        const position = layout.positions.get(nodeID);
+        if (position && position.style) {
+          newStyle.x = position.style.x;
+          newStyle.y = position.style.y;
+        }
       }
 
       nodeUpdates.push({id: nodeID, type: newType, style: newStyle});
@@ -259,6 +291,17 @@ class GraphLayoutManager {
       // Process filters to determine which nodes should be visible
       await this.cache.gcm.preRenderEvent();
 
+      // Snapshot the on-screen (outgoing-workspace) positions so the new
+      // template layout animates IN from them instead of snapping — same
+      // effect as switching between existing workspaces. graphData is y-up
+      // graphology, which is exactly what runLayoutTransition tweens toward.
+      const fromPositions = new Map();
+      this.cache.graphData?.forEachNode((id, attrs) => {
+        if (Number.isFinite(attrs.x) && Number.isFinite(attrs.y)) {
+          fromPositions.set(id, { x: attrs.x, y: attrs.y });
+        }
+      });
+
       // Apply the layout algorithm once
       await this.cache.graph.setLayout({type: result.templateType, ...this.cache.DEFAULTS.LAYOUT_INTERNALS[result.templateType]});
       await this.cache.graph.layout();
@@ -266,25 +309,50 @@ class GraphLayoutManager {
       // Persist the positions so they're stored permanently
       await this.cache.lm.persistNodePositions();
 
-      // Render with the full pipeline
-      this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED = false;
-      await this.cache.gcm.decideToRenderOrDraw(true);
+      // Restore the outgoing positions and hand the move to the animated
+      // transition: render paints them in place (pendingLayoutTransition skips
+      // the snap), then runLayoutTransition tweens to the persisted target.
+      const animateNewWorkspace = fromPositions.size > 0;
+      if (animateNewWorkspace) {
+        for (const [id, p] of fromPositions) {
+          if (this.cache.graphData.hasNode(id)) {
+            this.cache.graphData.mergeNodeAttributes(id, { x: p.x, y: p.y });
+          }
+        }
+        this.cache.graph.pendingLayoutTransition = true;
+      }
 
-      // Reset hide disconnected state for new workspace
-      await this.cache.gcm.applyHideDisconnectedState();
+      // finally: never leave pendingLayoutTransition stuck on (see changeLayout).
+      try {
+        // Render with the full pipeline
+        this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED = false;
+        await this.cache.gcm.decideToRenderOrDraw(true);
 
-      // Ensure bubble groups are properly cleared and synced for this new view
-      this.cache.bubbleSetChanged = true;
-      await this.cache.bs.updateBubbleSetIfChanged();
+        // Reset hide disconnected state for new workspace
+        await this.cache.gcm.applyHideDisconnectedState();
 
-      // Update metrics and bubble group status
-      await this.cache.metrics.updateMetricUI();
-      this.cache.bs.updateManualGroupStatus();
-      this.cache.bs.updateManualGroupButtonState();
-      this.cache.bs.refreshBubbleStyleElements();
+        // Ensure bubble groups are properly cleared and synced for this new view
+        this.cache.bubbleSetChanged = true;
+        await this.cache.bs.updateBubbleSetIfChanged();
 
-      await this.cache.ui.hideLoading();
-      this.cache.ui.info(`Created Workspace: ${result.name} (${result.templateType})`);
+        // Update metrics and bubble group status
+        await this.cache.metrics.updateMetricUI();
+        this.cache.bs.updateManualGroupStatus();
+        this.cache.bs.updateManualGroupButtonState();
+        this.cache.bs.refreshBubbleStyleElements();
+
+        await this.cache.ui.hideLoading();
+
+        // Tween the new layout in from the outgoing positions, once the overlay
+        // has cleared (no-op when there was nothing on screen to animate from).
+        if (animateNewWorkspace) {
+          await this.cache.graph.runLayoutTransition(this.cache.data.layouts[result.name].positions);
+        }
+
+        this.cache.ui.info(`Created Workspace: ${result.name} (${result.templateType})`);
+      } finally {
+        if (this.cache.graph) this.cache.graph.pendingLayoutTransition = false;
+      }
     }
   }
 

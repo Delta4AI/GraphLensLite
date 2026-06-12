@@ -829,6 +829,12 @@ function createStyleDiv(cache) {
     const rowOne = createNewRow(nodeDiv);
     appendLabel(rowOne, "Shape");
     createNodeShapeControls(rowOne);
+    appendVerticalRule(rowOne);
+    appendButton(rowOne, "Pie…",
+      "Render the selected nodes as pie charts: map categorical values (equal slices) or numeric properties (sized slices) to wedges.",
+      async () => await cache.gcm.updateNodes({}, ["set_pie_chart"]));
+    appendButton(rowOne, "Clear pie", "Remove pie-chart rendering and restore the nodes' shape.",
+      async () => await cache.gcm.updateNodes({}, ["clear_pie_chart"]));
 
     const rowTwo = createNewRow(nodeDiv);
     appendLabel(rowTwo, "Size");

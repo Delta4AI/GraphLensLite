@@ -84,6 +84,7 @@
     "@sigma/export-image": "^3.0.0",
     "@sigma/node-border": "^3.0.0",
     "@sigma/node-image": "^3.0.0",
+    "@sigma/node-piechart": "3.0.1",
     "@sigma/node-square": "^3.0.0",
     "bubblesets-js": "^3.0.1",
     "dompurify": "^3.4.1",

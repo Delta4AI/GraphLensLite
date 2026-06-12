@@ -2,7 +2,7 @@
  * Node-safe layout execution (MIGRATION.md Phase 5).
  *
  * Maps the app's layout vocabulary (config LAYOUT_INTERNALS: force, circular,
- * radial, concentric, grid, mds) onto graphology layouts and headless
+ * radial, concentric, grid, mds, dagre) onto graphology layouts and headless
  * @antv/layout v2 instances. Writes x/y straight into the graphology graph —
  * no DOM/WebGL, so the whole module is unit-testable under vitest.
  */
@@ -14,6 +14,7 @@ import {
   RadialLayout,
   ConcentricLayout,
   MDSLayout,
+  DagreLayout,
 } from "../lib/graphology.bundle.mjs";
 
 const FORCE_ITERATIONS = 200;
@@ -68,10 +69,16 @@ async function executeForceAnimated(graph, Supervisor) {
   }
 }
 
+// @antv/layout v2 classes the app exposes. `negateY` flips the layout's y on
+// the way into graphology: radial/concentric/mds are rotationally symmetric so
+// orientation is irrelevant, but Dagre emits rank depth as increasing y
+// (root at y=0), and graphology is y-up — without the flip a "TB" tree would
+// render root-at-bottom. Negating y makes rankdir "TB" read top-to-bottom.
 const ANTV_LAYOUTS = {
-  radial: RadialLayout,
-  concentric: ConcentricLayout,
-  mds: MDSLayout,
+  radial: { Layout: RadialLayout, negateY: false },
+  concentric: { Layout: ConcentricLayout, negateY: false },
+  mds: { Layout: MDSLayout, negateY: false },
+  dagre: { Layout: DagreLayout, negateY: true },
 };
 
 /**
@@ -79,9 +86,10 @@ const ANTV_LAYOUTS = {
  * back into the graphology graph. The instance mutates an internal model;
  * results are read via forEachNode (flat {id, x, y} fields, no data wrapper).
  * Layout failures reject and propagate to the render pipeline.
+ * @param {boolean} [negateY]  flip the layout's y into graphology's y-up frame
  * @returns {Promise<void>}
  */
-async function executeAntvLayout(graph, LayoutClass, options) {
+async function executeAntvLayout(graph, LayoutClass, options, negateY = false) {
   const data = {
     nodes: graph.mapNodes((id) => ({ id })),
     edges: graph.mapEdges((id, _attrs, source, target) => ({ id, source, target })),
@@ -93,7 +101,7 @@ async function executeAntvLayout(graph, LayoutClass, options) {
       // Non-finite output leaves the node at its pre-layout position
       // (deliberate: a partial layout beats NaN coords corrupting the graph).
       if (Number.isFinite(x) && Number.isFinite(y)) {
-        graph.mergeNodeAttributes(id, { x, y });
+        graph.mergeNodeAttributes(id, { x, y: negateY ? -y : y });
       }
     });
   } finally {
@@ -158,9 +166,9 @@ async function executeBaseLayout(graph, spec, testOverrides) {
     return;
   }
   if (graph.order < 2) return; // FA2/inferSettings and @antv layouts need ≥2 nodes
-  const AntvLayout = ANTV_LAYOUTS[type];
-  if (AntvLayout) {
-    await executeAntvLayout(graph, AntvLayout, options);
+  const antv = ANTV_LAYOUTS[type];
+  if (antv) {
+    await executeAntvLayout(graph, antv.Layout, options, antv.negateY);
     return;
   }
   // 'force' and everything else → forceAtlas2. Where Worker exists (browser,

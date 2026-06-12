@@ -17,14 +17,22 @@ import {
   createNodeBorderProgram,
   nodeImage,
   edgeCurve,
+  animateNodes,
+  createNodePiechartProgram,
 } from "../lib/sigma.bundle.mjs";
+import { DEFAULTS } from "../config.js";
 import {
   EdgeHaloProgram,
   createCurveHaloProgram,
   createEdgeMarkerHeadProgram,
 } from "./edge_programs.js";
 import { clampExportScale } from "../utilities/export_scale.js";
-import { nodeAttributesFromStyle, edgeAttributesFromStyle, flipY } from "./graph_model.js";
+import {
+  nodeAttributesFromStyle,
+  edgeAttributesFromStyle,
+  flipY,
+  buildLayoutTransitionTargets,
+} from "./graph_model.js";
 import { executeLayout } from "./layout_algorithms.js";
 import { drawNodeLabel, drawEdgeLabel, BAKED_DEFAULT_LABEL_COLOR } from "./label_renderers.js";
 import { InteractionManager } from "./interactions.js";
@@ -41,6 +49,17 @@ const ATLAS_REGEN_DEBOUNCE_MS = 50;
 // Trailing-edge debounce for container ResizeObserver → this.resize();
 // rides out the 0.3 s CSS panel transitions without a resize per frame.
 const RESIZE_DEBOUNCE_MS = 50;
+// Node-position tween when switching workspaces (sigma/utils animateNodes):
+// long enough to read the motion, short enough not to gate interaction.
+const LAYOUT_TRANSITION_MS = 450;
+// Above this node count the per-frame attribute writes + refresh stop being
+// free; snap instead of animating so big graphs never pay the tween cost.
+const LAYOUT_TRANSITION_MAX_NODES = 2000;
+
+/** @returns {boolean} whether the user asked the OS to minimize motion */
+function prefersReducedMotion() {
+  return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+}
 
 /**
  * Sigma's hover layer (drawDiscNodeHover and per-program drawHover) paints a
@@ -137,6 +156,23 @@ function buildProgramRegistry(getDraggedNode) {
       { size: { fill: true }, color: { attribute: "color" } },
     ],
   });
+  // Pie-chart nodes: one program with a fixed slice count, each slice reading
+  // its angle/color from the per-node pieValue{k}/pieColor{k} attrs emitted by
+  // graph_model (pieAttributesFromSlices). Unused slots carry value 0 + a
+  // transparent color, so a node with fewer categories than MAX_SLICES draws
+  // only its real wedges. Reuses the custom node-label drawer and the
+  // drag-guarded hover so pie nodes behave like every other node type.
+  const pie = DEFAULTS.NODE.PIE;
+  const pieProgram = createNodePiechartProgram({
+    defaultColor: pie.DEFAULT_COLOR,
+    offset: { value: 0 },
+    slices: Array.from({ length: pie.MAX_SLICES }, (_, k) => ({
+      color: { attribute: `pieColor${k}`, defaultValue: "#00000000" },
+      value: { attribute: `pieValue${k}` },
+    })),
+    drawLabel: drawNodeLabel,
+    drawHover: guardHoverDrawer(drawDiscNodeHover, getDraggedNode),
+  });
   // One curve class serves both the plain "curve" type and the body/halo
   // sub-programs of "styledCurve" (each gets its own instance + buffers).
   // arrowHead stays null: end markers are drawn by the parametric marker-head
@@ -150,6 +186,7 @@ function buildProgramRegistry(getDraggedNode) {
       square: GuardedSquareProgram,
       shape: shapeProgram,
       borderCircle: borderCircleProgram,
+      pie: pieProgram,
     },
     edgeProgramClasses: {
       line: EdgeRectangleProgram,
@@ -238,6 +275,12 @@ class SigmaAdapter {
     this.graph = cache.graphData;
     this.elementStates = elementStates;
     this.pendingLayout = null;
+    // When set, the next render() leaves node positions untouched: a workspace
+    // switch is mid-flight and runLayoutTransition() owns the positions (it
+    // tweens them from the outgoing view to the incoming one once the loading
+    // overlay clears). See GraphLayoutManager.changeLayout.
+    this.pendingLayoutTransition = false;
+    this.layoutTransitionCancel = null;
     this.killed = false;
 
     const containerEl =
@@ -348,6 +391,8 @@ class SigmaAdapter {
   destroy() {
     if (this.killed) return;
     this.killed = true;
+    this.layoutTransitionCancel?.();
+    this.layoutTransitionCancel = null;
     clearTimeout(this.resizeDebounce);
     this.resizeObserver.disconnect();
     this.bubbleLayer.destroy();
@@ -391,6 +436,9 @@ class SigmaAdapter {
    * authored payloads with empty positions are force-laid-out).
    */
   async #applyPersistedPositions() {
+    // A workspace switch is animating its own positions — don't snap them out
+    // from under the tween (runLayoutTransition consumes the flag).
+    if (this.pendingLayoutTransition) return;
     const layout = this.cache.data.layouts?.[this.cache.data.selectedLayout];
     if (!layout) return;
 
@@ -682,6 +730,65 @@ class SigmaAdapter {
     const spec = this.pendingLayout ?? { type: this.cache.DEFAULTS.LAYOUT };
     this.pendingLayout = null;
     await executeLayout(this.graph, spec);
+  }
+
+  /**
+   * Tween node positions from wherever they currently sit (the outgoing
+   * workspace, left in place because render() skipped its snap while
+   * pendingLayoutTransition was set) to the incoming workspace's persisted
+   * positions. Consumes the flag. Reduced-motion users and large graphs get
+   * an instant snap instead — both still end at the exact target positions, so
+   * the rest of the switch (nodeRef sync, bubble redraw) is identical.
+   *
+   * @param {Map<string, {style?: {x:number, y:number}}>} positionsMap  the
+   *   incoming layout's persisted positions (app-model y-down).
+   * @returns {Promise<void>} resolves once nodes are settled at the targets.
+   */
+  async runLayoutTransition(positionsMap) {
+    this.pendingLayoutTransition = false;
+    if (this.killed || !positionsMap) return;
+
+    // Build graph-space targets (y-flipped) only for nodes that still exist.
+    const { targets, count } = buildLayoutTransitionTargets(positionsMap, (id) =>
+      this.graph.hasNode(id),
+    );
+    if (count === 0) return;
+
+    const snap = () => {
+      for (const [id, target] of Object.entries(targets)) {
+        this.graph.mergeNodeAttributes(id, target);
+      }
+    };
+
+    if (count > LAYOUT_TRANSITION_MAX_NODES || prefersReducedMotion()) {
+      snap();
+      this.sigma.refresh({ skipIndexation: true });
+    } else {
+      // A prior tween still running (rapid switches): cancel before starting a
+      // new one so they don't fight over the same node attributes.
+      this.layoutTransitionCancel?.();
+      await new Promise((resolve) => {
+        this.layoutTransitionCancel = animateNodes(
+          this.graph,
+          targets,
+          { duration: LAYOUT_TRANSITION_MS, easing: "cubicInOut" },
+          resolve,
+        );
+      });
+      this.layoutTransitionCancel = null;
+    }
+
+    // Mirror the settled positions back into the nodeRef cache (the app-model
+    // store the rest of the code reads), then redraw bubble hulls at the
+    // final positions (they were last drawn at the outgoing view's layout).
+    for (const [id, pos] of positionsMap) {
+      const ref = this.cache.nodeRef.get(id);
+      if (ref && Number.isFinite(pos?.style?.x) && Number.isFinite(pos?.style?.y)) {
+        ref.style.x = pos.style.x;
+        ref.style.y = pos.style.y;
+      }
+    }
+    if (!this.killed) await this.cache.bs?.redrawBubbleSets?.();
   }
 
   // ------------------------------------------------------------- interactions
