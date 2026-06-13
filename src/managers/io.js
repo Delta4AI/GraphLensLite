@@ -1,4 +1,4 @@
-import { DEFAULTS, CFG } from "../config.js";
+import { DEFAULTS, CFG, VERSION } from "../config.js";
 import { StaticUtilities } from "../utilities/static.js";
 import { buildDataTable } from "../utilities/data_editor.js";
 import { EXPORT_SCALES } from "../utilities/export_scale.js";
@@ -580,6 +580,7 @@ class IOManager {
             this.cache.ui.error("File does not contain edges or nodes.");
             resolve(null);
           } else {
+            this.noteFileVersion(jsonContent);
             // Convert arrays back to Sets for specific properties
             this.restoreSetsFromJSON(jsonContent);
             resolve(jsonContent);
@@ -1555,6 +1556,59 @@ class IOManager {
     return `${ts}_GLL_${basename}.${ext}`;
   }
 
+  /**
+   * Record the producing version of a loaded file (for diagnostics and any
+   * future targeted migration) and warn — softly — when the file was saved by
+   * a NEWER app than the one loading it, where forward compatibility is not
+   * guaranteed. Older or version-less files load silently: the importer is
+   * backward-tolerant by defaulting every missing key.
+   */
+  noteFileVersion(jsonContent) {
+    // Validate at the boundary: keep only a string version, else null — never
+    // store an arbitrary JSON value (number/object) as the producing version.
+    const raw = jsonContent?.version;
+    const version = typeof raw === "string" ? raw : null;
+    this.cache.loadedFileVersion = version;
+    if (version && StaticUtilities.isVersionNewer(version, VERSION)) {
+      this.cache.ui.info(
+        `This file was saved by a newer version (v${version}) than this app ` +
+          `(v${VERSION}). Some settings may not load correctly.`,
+      );
+    }
+  }
+
+  /**
+   * The serialized save: the live graph state plus a top-level `version` stamp
+   * and the workspace heatmap overlay (held on the adapter, not in cache.data,
+   * so it must be folded in explicitly). Pure — does not mutate cache.data.
+   */
+  buildExportPayload() {
+    // version last so the current app stamp always wins, even if a stale
+    // version key ever rode in on cache.data.
+    const payload = { ...this.cache.data, version: VERSION };
+    const heatmap = this.cache.graph?.heatmapLayer;
+    if (heatmap) {
+      payload.heatmap = {
+        enabled: !!heatmap.heatmapEnabled,
+        settings: { ...heatmap.settings },
+      };
+    }
+    return payload;
+  }
+
+  /**
+   * Restore the heatmap overlay from a loaded file onto the freshly-created
+   * adapter. Settings first, then enabled, so the dim-graph refresh in
+   * setHeatmapEnabled sees the final settings. No-op for files without a
+   * heatmap block (backward compatible) or before the graph exists.
+   */
+  restoreHeatmapFromImport(fileData) {
+    const heatmap = this.cache.graph?.heatmapLayer;
+    if (!heatmap || !fileData?.heatmap) return;
+    if (fileData.heatmap.settings) heatmap.updateSettings(fileData.heatmap.settings);
+    heatmap.setHeatmapEnabled(!!fileData.heatmap.enabled);
+  }
+
   async exportGraphAsJSON() {
     if (this.cache.data === null) {
       this.cache.ui.error("No graph data to save.");
@@ -1640,7 +1694,7 @@ class IOManager {
       }
     }
 
-    const blob = new Blob([JSON.stringify(this.cache.data, replacer)], {
+    const blob = new Blob([JSON.stringify(this.buildExportPayload(), replacer)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -1831,6 +1885,7 @@ class IOManager {
         }
         await this.cache.graph.render();
         await this.cache.gcm.fitViewToVisibleNodes();
+        this.cache.io.restoreHeatmapFromImport(fileData);
         this.cache.ui.debug("Initial graph rendered.");
 
         // Update UI lock state if query was applied

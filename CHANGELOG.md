@@ -15,6 +15,10 @@
 * **SVG export** — graphs can now be exported as SVG in addition to JSON and PNG.
 * Bubble-group label **placement, close-to-path and auto-rotate** knobs are now
   honoured by the Sigma renderer (previously no-ops).
+* JSON saves now carry a top-level **`version`** stamp; loading a file saved by
+  a newer app surfaces a soft notice (older and version-less files load as before).
+* The **density-heatmap** overlay (enabled state + appearance settings) is now
+  saved into the JSON export and restored on load.
 
 ### Fixes
 
