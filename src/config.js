@@ -390,8 +390,6 @@ const CFG = {
 // false uses defaults (non-inverted) and min/max
   QUERY_BTN_USE_CURRENT_FILTER: true,
 
-// Set to true to reset positions of selected elements when clicking the reset selection button in the top right selection frame
-  RESET_SELECTION_BUTTON_RESETS_POSITIONS: true,
   INVISIBLE_CHAR: "\u200B",
 
   // AI Assistant configuration lives entirely in localStorage (key

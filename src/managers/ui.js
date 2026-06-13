@@ -604,10 +604,6 @@ class UIManager {
 
     this.buildStylingPanelUI();
 
-    document.getElementById("resetSelectedElementsStyleBtn").title = this.cache.CFG.RESET_SELECTION_BUTTON_RESETS_POSITIONS
-      ? "Reset the visual appearance and positions of the selected elements to their defaults"
-      : "Reset the visual appearance of the selected elements to their defaults";
-
     this.showUI(true);
 
     this.cache.query.lastGoodWidth = this.cache.query.editorDiv.offsetWidth;

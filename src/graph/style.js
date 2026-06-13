@@ -13,10 +13,6 @@ class GraphStyleManager {
       if (currentLayout.nodeStyles.has(nodeId)) {
         currentLayout.nodeStyles.delete(nodeId);
       }
-      // Reset positions if configured
-      if (this.cache.CFG.RESET_SELECTION_BUTTON_RESETS_POSITIONS && currentLayout.positions.has(nodeId)) {
-        currentLayout.positions.delete(nodeId);
-      }
     }
 
     // Remove selected edges from the current layout's custom styles
