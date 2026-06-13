@@ -200,7 +200,7 @@ An edge is an object. `source` and `target` are required and must match node
 | `style`       | object | —                      | Visual styling — see below.                               |
 | `D4Data`      | object | —                      | Data attributes that define filters — see §6.             |
 
-### `edge.style` — line, arrows, halo
+### `edge.style` — line, arrows, halo, flow
 
 | Path             | Type    | Default       | Meaning                                              |
 | ---------------- | ------- | ------------- | ---------------------------------------------------- |
@@ -210,12 +210,24 @@ An edge is an object. `source` and `target` are required and must match node
 | `startArrow`     | boolean | `false`       | End marker at the source end.                        |
 | `startArrowType` | string  | `"arrow"`     | `arrow`/`rect`/`diamond`/`circle`/`tee` (⊣ inhibition bar). Legacy G6 names still load and round-trip unchanged (`triangle`/`vee`/`simple` → arrow, `triangleRect`/`square` → rect). |
 | `startArrowSize` | number  | `8`           | Source marker length (graph px). Unset/0 → sized proportionally to the line width. |
+| `startArrowColor`       | hex    | `null` | Source marker fill. `null` → inherits the edge stroke colour. |
+| `startArrowBorderColor` | hex    | `null` | Source marker border colour. `null` → no border (transparent). |
+| `startArrowBorderSize`  | number | `0`    | Source marker border thickness (px). `0` → auto (~20% of the marker). |
 | `endArrow`       | boolean | `false`       | End marker at the target end.                        |
 | `endArrowType`   | string  | `"arrow"`     | Same enum as `startArrowType`.                       |
 | `endArrowSize`   | number  | `8`           | Target marker length (graph px).                     |
+| `endArrowColor`       | hex    | `null` | Target marker fill. `null` → inherits the edge stroke colour. |
+| `endArrowBorderColor` | hex    | `null` | Target marker border colour. `null` → no border (transparent). |
+| `endArrowBorderSize`  | number | `0`    | Target marker border thickness (px). `0` → auto (~20% of the marker). |
 | `halo`           | boolean | `false`       | Glow drawn under the edge (total width = line + 2 × `haloLineWidth`), on straight and curved edges. Selecting an edge widens line and halo together. |
 | `haloStroke`     | hex     | `"#403C53"`   | Halo colour.                                         |
 | `haloLineWidth`  | number  | `3`           | Halo thickness (px).                                 |
+| `flow`           | boolean | `false`       | Enable the animated source→target flow overlay.      |
+| `flowType`       | string  | `"dash"`      | `dash` / `pulse` / `comet` / `chevron`.              |
+| `flowSpeed`      | number  | `1`           | Animation speed multiplier.                          |
+| `flowStroke`     | hex     | `null`        | Flow colour. `null` → derived from the edge stroke (lightened). |
+| `flowOpacity`    | number  | `1`           | Multiplies into the overlay colour's alpha (0–1).    |
+| `flowDensity`    | number  | `1`           | Scales the pattern period (higher = sparser dashes/dots). |
 
 Edge labels use the same `label*` fields as nodes (§4), with edge-specific
 defaults: `labelPlacement` defaults to `"center"` (`start`/`center`/`end`),

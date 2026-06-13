@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+* **Density heatmap overlay** — an atmospheric node-density layer beneath the
+  graph, off by default and toggled from the workspace toolbar, with opacity,
+  intensity, gamma/contrast, threshold, bandwidth/radius and colour-ramp controls
+  (default / viridis / magma / accent / grayscale) plus an optional dim-graph mode.
+* **Animated edge flow** — a source→target flow overlay per edge, with `dash`,
+  `pulse`, `comet` and `chevron` styles and speed, colour, opacity and density controls.
+* **Pie-chart nodes** — nodes can render proportional pie slices from data.
+* **Dagre layered layout** added to the layout options.
+* **SVG export** — graphs can now be exported as SVG in addition to JSON and PNG.
+* Bubble-group label **placement, close-to-path and auto-rotate** knobs are now
+  honoured by the Sigma renderer (previously no-ops).
+
+### Fixes
+
+* The reset-style button no longer claims to reset node positions.
+
 ## 1.15.0
 
 ### Features
@@ -22,7 +42,7 @@ The entire rendering stack moved from AntV G6 5.x (canvas) to Sigma.js v3 (WebGL
 * Layouts run headlessly: force (graphology forceAtlas2), circular/grid (geometric), radial/concentric/mds (`@antv/layout` v2)
 * Fixed slow deselection when clicking empty canvas on large graphs (antvis/G6#7195) — removed from Known Issues
 * Distribution is ≈0.9 MB smaller (the 1.1 MB vendored `g6.min.js` is gone; sigma + graphology + headless layouts add ≈0.2 MB)
-* Documented degradations: dashed edges render solid and polyline edges render curved (no off-the-shelf WebGL programs for either); the bubble-group label placement / close-to-path / auto-rotate style knobs are currently no-ops (labels render at the outline top)
+* Documented degradations: dashed edges render solid and polyline edges render curved (no off-the-shelf WebGL programs for either)
 
 ## 1.14.2
 

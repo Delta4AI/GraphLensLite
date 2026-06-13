@@ -34,9 +34,9 @@ Then:
 |:-----------------------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------:|
 |          Open Excel or JSON files, explore demo networks, or take a tour; zero install with portable versions          |                 Write expressive queries with boolean logic, nested conditions, and range operators to filter your graph                  | Lasso select elements, undo and redo, focus and expand neighborhoods, and group nodes visually |
 |                  <img src="./static/screenshots/main_view_with_popup.png" alt="Graph canvas with filters" width="100%">                   |              <img src="./static/screenshots/network_metrics_and_data_editor.png" alt="Network metrics and data editor" width="100%">               |                           <img src="./static/screenshots/rich_styling.png" alt="Styling panel" width="100%">                           |
-| Filter by any property using range sliders and dropdown checklists, inspect node and edge metadata via tooltips, and navigate large graphs with a minimap | Compute centrality metrics like degree, betweenness, closeness, eigenvector, and PageRank, and edit your graph data live in a built-in spreadsheet |                 Customize shapes, sizes, colors, labels, halos, badges, arrows, and bubble set appearance per element                  |
+| Filter by any property using range sliders and dropdown checklists, inspect node and edge metadata via tooltips, and navigate large graphs with a minimap | Compute centrality metrics like degree, betweenness, closeness, eigenvector, and PageRank, and edit your graph data live in a built-in spreadsheet |       Customize shapes, sizes, colors, labels, halos, badges, arrows, pie-chart nodes, animated edge flow, and bubble set appearance per element, with an optional density-heatmap overlay        |
 |                     <img src="./static/screenshots/workspace_management.png" alt="Workspace management" width="100%">                     |                       <img src="./static/screenshots/graph_assistant.png" alt="Graph Assistant" width="100%">                       |         <img src="./static/screenshots/property_based_numerical_color_mapping.png" alt="Numerical color mapping" width="100%">         |
-|                    Create independent workspaces, each preserving their own node positions, styles, filters, and bubble set groups                     |                        Ask questions in plain English — the assistant translates them into filters, queries, and styling actions                        |         Map numeric properties to continuous color gradients with configurable stops, and export graphs as JSON, PNG, or Excel         |
+|                    Create independent workspaces, each preserving their own node positions, styles, filters, and bubble set groups                     |                        Ask questions in plain English — the assistant translates them into filters, queries, and styling actions                        |         Map numeric properties to continuous color gradients with configurable stops, and export graphs as JSON, PNG, SVG, or Excel         |
 
 ## Development
 
@@ -74,7 +74,7 @@ Open `http://127.0.0.1:7637/` and the pushed graph appears; further pushes updat
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before filing issues or submitting pull requests.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before filing issues or submitting pull requests. See [ARCHITECTURE.md](ARCHITECTURE.md) for a map of the codebase.
 
 ## License
 
