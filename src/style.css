@@ -2147,13 +2147,6 @@ hr {
     border-color: var(--accent-text);
 }
 
-.toolbar-sep {
-    width: 1px;
-    height: 18px;
-    background: var(--border-soft);
-    margin: 0 2px;
-}
-
 .button-separator {
     display: inline-block;
     width: 1px;
