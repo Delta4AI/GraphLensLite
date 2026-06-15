@@ -53,8 +53,8 @@ class GraphSelectionManager {
     }
     await this.cache.graph.setElementState(stateMap);
 
-    // Update manual bubble group button state when selection changes
-    this.cache.bs.updateManualGroupButtonState();
+    // Button resync happens in updateSelectedNodesAndEdges (after-draw), once
+    // cache.selectedNodes reflects this change — doing it here reads stale data.
 
     await this.cache.ui.hideLoading();
     await new Promise(resolve => requestAnimationFrame(resolve));
@@ -377,6 +377,11 @@ class GraphSelectionManager {
 
     this.updateSelectionCache();
     this.updateEnabledStateUndoRedoSelectionButtons();
+
+    // Single authoritative point where cache.selectedNodes is recomputed, so
+    // resync the "Add to group" quadrant button here. (updateSelectedState
+    // fires before this refresh and would read a stale selection.)
+    this.cache.bs.updateManualGroupButtonState();
 
     if (typeof this.cache.dataTable !== 'undefined' && this.cache.dataTable.fileData) {
       if (this.cache.dataTable.currentTab === 'selectedNodes'

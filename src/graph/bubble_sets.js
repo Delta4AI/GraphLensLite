@@ -1,6 +1,7 @@
 import {StaticUtilities} from "../utilities/static.js";
 import {detectCommunities as computeCommunityAssignments} from "./communities.js";
 import {clampPopoverLeft} from "../utilities/popover_position.js";
+import {Popup} from "../utilities/popup.js";
 
 class GraphBubbleSetManager {
   constructor(cache) {
@@ -34,6 +35,42 @@ class GraphBubbleSetManager {
     for (let group of Object.keys(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE)) {
       yield group;
     }
+  }
+
+  /**
+   * Single source of truth for a group's visible members in the current
+   * layout: filter/property-based (${group}Props) UNION manual selection
+   * (${group}ManualMembers), using the same visibility filter the outline
+   * renderer applies. Every count shown to the user (status badge, styling
+   * card enable state) and the rendered outline derive from THIS method, so
+   * the displayed number can never drift from what is highlighted.
+   * @param {string} group
+   * @returns {Set<string>} visible node IDs
+   */
+  getEffectiveGroupMembers(group) {
+    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
+    const members = new Set();
+
+    // Filter/property-based members: resolved live from the active props.
+    const propsInGroup = currentLayout[`${group}Props`] || new Set();
+    for (const prop of propsInGroup) {
+      const nodeIDs = this.cache.propIDsToNodeIDsToBeShown.get(prop) || [];
+      for (const nodeID of nodeIDs) {
+        if (!this.cache.hiddenDanglingNodeIDs.has(nodeID)) members.add(nodeID);
+      }
+    }
+
+    // Manual selection members: only nodes still present and visible.
+    const manualMembers = currentLayout[`${group}ManualMembers`];
+    if (manualMembers) {
+      for (const nodeID of manualMembers) {
+        if (this.cache.nodeRef.has(nodeID) && !this.cache.hiddenDanglingNodeIDs.has(nodeID)) {
+          members.add(nodeID);
+        }
+      }
+    }
+
+    return members;
   }
 
   async updateBubbleSetStyle(property, value) {
@@ -105,27 +142,8 @@ class GraphBubbleSetManager {
       const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
       const bubbleStyle = currentLayout.bubbleSetStyle[group];
 
-      // Calculate actual members for this group in the current layout
-      let actualMembers = new Set();
-
-      // Add members from filter-based properties
-      const propsInGroup = currentLayout[`${group}Props`] || new Set();
-      for (let prop of propsInGroup) {
-        let nodeIDsToBeGrouped = this.cache.propIDsToNodeIDsToBeShown.get(prop) || [];
-        for (let nodeID of nodeIDsToBeGrouped) {
-          actualMembers.add(nodeID);
-        }
-      }
-
-      // Add members from manual group selection
-      const manualMembers = currentLayout[`${group}ManualMembers`] || new Set();
-      for (let nodeID of manualMembers) {
-        if (this.cache.nodeRef.has(nodeID)) {
-          actualMembers.add(nodeID);
-        }
-      }
-
-      const hasActiveMembers = actualMembers.size > 0;
+      // Same union the outline renders (see getEffectiveGroupMembers).
+      const hasActiveMembers = this.getEffectiveGroupMembers(group).size > 0;
       if (hasActiveMembers) anyGroupActive = true;
       const labelConfigShouldBeEnabled = bubbleStyle.label;
 
@@ -199,33 +217,8 @@ class GraphBubbleSetManager {
 
   async updateBubbleSetIfChanged() {
     for (let group of this.traverseBubbleSets()) {
-      let propsInGroup = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}Props`];
-
       let lastSetMembers = this.cache.lastBubbleSetMembers.get(group);
-      let newSetMembers = new Set();
-
-      // Add members from filter-based properties
-      for (let prop of propsInGroup) {
-        let nodeIDsToBeGrouped = this.cache.propIDsToNodeIDsToBeShown.get(prop) || [];
-        for (let nodeID of nodeIDsToBeGrouped) {
-          // Exclude hidden dangling nodes
-          if (!this.cache.hiddenDanglingNodeIDs.has(nodeID)) {
-            newSetMembers.add(nodeID);
-          }
-        }
-      }
-
-      // Add members from manual group selection
-      const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`];
-      if (manualMembers && manualMembers.size > 0) {
-        for (let nodeID of manualMembers) {
-          // Only add if node is still visible (not filtered out or hidden dangling)
-          if (this.cache.nodeRef.has(nodeID) &&
-              !this.cache.hiddenDanglingNodeIDs.has(nodeID)) {
-            newSetMembers.add(nodeID);
-          }
-        }
-      }
+      let newSetMembers = this.getEffectiveGroupMembers(group);
 
       if (!StaticUtilities.setsAreEqual(lastSetMembers, newSetMembers)) {
         await this.updateBubbleSet(group, newSetMembers);
@@ -371,9 +364,23 @@ class GraphBubbleSetManager {
       return;
     }
 
+    // Auto-grouping overwrites every group's manual members. If the user has
+    // built manual groupings, confirm before discarding them (detection is
+    // already computed, so the graph is untouched if they cancel).
+    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
+    const hasManualGroups = groups.some(
+      (g) => (currentLayout[`${g}ManualMembers`]?.size ?? 0) > 0
+    );
+    if (hasManualGroups) {
+      const confirmed = await Popup.confirm(
+        "Auto-grouping replaces your existing manual bubble groups with the " +
+        "detected communities. Clear them and continue?"
+      );
+      if (!confirmed) return;
+    }
+
     // Replace the manual members of all groups for the current layout with
     // the detected communities (largest community → first group).
-    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
     for (const group of groups) {
       currentLayout[`${group}ManualMembers`] = result.assignments.get(group) ?? new Set();
     }
@@ -559,19 +566,13 @@ class GraphBubbleSetManager {
 
     const activeGroups = [];
 
-    for (let [group, quadrantPosition] of Object.entries(this.cache.DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS)) {
-      const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`] || new Set();
+    for (let [group] of Object.entries(this.cache.DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS)) {
+      // Count exactly what the outline renders (prop ∪ manual, one filter).
+      const visibleCount = this.getEffectiveGroupMembers(group).size;
 
-      // Filter out nodes that are no longer visible (filtered out)
-      const visibleMembers = [...manualMembers].filter(nodeId =>
-        this.cache.nodeRef.has(nodeId) &&
-        (this.cache.propIDsToNodeIDsToBeShown.size === 0 ||
-          [...this.cache.propIDsToNodeIDsToBeShown.values()].some(set => set.has(nodeId)))
-      );
-
-      if (visibleMembers.length > 0) {
+      if (visibleCount > 0) {
         const color = this.cache.data.layouts[this.cache.data.selectedLayout].bubbleSetStyle[group].fill;
-        activeGroups.push(this.buildManualGroupBadge(group, visibleMembers.length, color));
+        activeGroups.push(this.buildManualGroupBadge(group, visibleCount, color));
       }
     }
 
@@ -610,12 +611,36 @@ class GraphBubbleSetManager {
     return badge;
   }
 
+  /**
+   * Remove all filter/property-based assignments for a group from the current
+   * layout, mirroring the change into each prop's per-filter member set so the
+   * filter-panel quadrant buttons render inactive on the next build.
+   * @param {string} group
+   * @returns {boolean} true if any prop assignment was actually cleared
+   */
+  clearGroupPropAssignments(group) {
+    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
+    const propsInGroup = currentLayout[`${group}Props`];
+    if (!propsInGroup || propsInGroup.size === 0) return false;
+
+    for (const propID of propsInGroup) {
+      const filter = currentLayout.filters?.get(propID);
+      const groupMembers = filter?.[`${group}Members`];
+      if (groupMembers) groupMembers.delete(propID);
+    }
+    propsInGroup.clear();
+    return true;
+  }
+
   async clearManualGroup(group) {
     const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`];
     if (manualMembers) manualMembers.clear();
+    // The badge spans both sources, so clearing the group clears both.
+    const propsCleared = this.clearGroupPropAssignments(group);
 
     this.updateManualGroupButtonState();
     this.updateManualGroupStatus();
+    if (propsCleared) this.cache.ui?.buildFilterUI?.();
 
     this.cache.bubbleSetChanged = true;
     await this.updateBubbleSetIfChanged();
@@ -643,17 +668,20 @@ class GraphBubbleSetManager {
   }
 
   async clearAllManualGroups() {
-    // Clear all manual bubble groups
+    // Clear every group's contribution from both sources (manual + props).
+    let propsCleared = false;
     for (let group of Object.keys(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE)) {
       const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`];
       if (manualMembers) {
         manualMembers.clear();
       }
+      if (this.clearGroupPropAssignments(group)) propsCleared = true;
     }
 
     // Update UI
     this.updateManualGroupButtonState();
     this.updateManualGroupStatus();
+    if (propsCleared) this.cache.ui?.buildFilterUI?.();
 
     // Mark bubble sets as changed and redraw (don't re-layout)
     this.cache.bubbleSetChanged = true;
@@ -663,7 +691,7 @@ class GraphBubbleSetManager {
     // Force bubble set redraw to fix positioning
     await this.redrawBubbleSets();
 
-    this.cache.ui.info('Cleared all manual bubble groups');
+    this.cache.ui.info('Cleared all bubble groups');
   }
 }
 
