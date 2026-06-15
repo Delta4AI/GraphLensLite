@@ -16,6 +16,11 @@ class GraphLayoutManager {
   async changeLayout() {
     this.cache.data.selectedLayout = document.getElementById('selectView').value;
     await this.cache.ui.showLoading("Switching Workspace", this.cache.data.selectedLayout);
+    // Pin the overlay up across the whole switch so the inner render's
+    // #postRefresh hideLoading() can't drop it before bubble-sync and
+    // hide-disconnected finish. Released right before the position tween (which
+    // is meant to animate with the overlay clear) and again in finally.
+    this.cache.ui.holdLoading();
     await new Promise(resolve => requestAnimationFrame(resolve));
 
     const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
@@ -69,6 +74,11 @@ class GraphLayoutManager {
       this.cache.bs.updateManualGroupButtonState();
       this.cache.bs.refreshBubbleStyleElements();
 
+      // Everything that mutates the graph is done — drop the overlay now so the
+      // position tween below animates with it clear (its design intent).
+      this.cache.ui.releaseLoading();
+      await this.cache.ui.hideLoading();
+
       // Last: tween node positions from the outgoing view to this one (no-op
       // when there was nothing to animate; consumes pendingLayoutTransition).
       if (animatePositions) {
@@ -77,6 +87,10 @@ class GraphLayoutManager {
 
       this.cache.ui.info(`Switched to workspace: ${this.cache.data.selectedLayout}`);
     } finally {
+      // Defensive: if a step above threw before the release, drop the hold and
+      // the overlay here so a failed switch never strands a blocked UI.
+      this.cache.ui.releaseLoading();
+      await this.cache.ui.hideLoading();
       if (this.cache.graph) this.cache.graph.pendingLayoutTransition = false;
     }
   }
@@ -241,6 +255,26 @@ class GraphLayoutManager {
       // - Refreshing all UI elements
       await this.cache.lm.changeLayout();
     } else {
+      // Warn before kicking off a super-linear layout (dagre/mds) on a large
+      // graph: even off the main thread it can run for minutes, and the overlay
+      // blocks the UI for the whole time. Bail out cleanly if the user declines,
+      // before any workspace state is created.
+      const nodeCount = this.cache.graphData?.order ?? this.cache.nodeRef.size;
+      if (
+        this.cache.DEFAULTS.EXPENSIVE_LAYOUTS.includes(result.templateType) &&
+        nodeCount > this.cache.DEFAULTS.LAYOUT_NODE_WARNING_THRESHOLD
+      ) {
+        const proceed = await Popup.confirm(
+          `The "${result.templateType}" layout is computationally intensive and may ` +
+            `take several minutes on ${nodeCount.toLocaleString()} nodes. The UI stays ` +
+            `blocked until it finishes. Continue?`,
+        );
+        if (!proceed) {
+          this.cache.ui.info("Creating workspace canceled");
+          return;
+        }
+      }
+
       // Create the layout structure first
       this.cache.data.layouts[result.name] = {
         internals: null,
@@ -267,6 +301,11 @@ class GraphLayoutManager {
       this.cache.data.selectedLayout = result.name;
 
       await this.cache.ui.showLoading("Creating Workspace", `Applying ${result.templateType} layout`);
+      // Pin the overlay up across the whole creation so the inner render's
+      // #postRefresh hideLoading() can't drop it while the layout (possibly an
+      // expensive off-thread worker), bubble-sync and hide-disconnected are
+      // still running. Released right before the position tween, and in finally.
+      this.cache.ui.holdLoading();
 
       // Clear the filter lock since this is a fresh template with no query
       this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;
@@ -302,28 +341,31 @@ class GraphLayoutManager {
         }
       });
 
-      // Apply the layout algorithm once
-      await this.cache.graph.setLayout({type: result.templateType, ...this.cache.DEFAULTS.LAYOUT_INTERNALS[result.templateType]});
-      await this.cache.graph.layout();
-
-      // Persist the positions so they're stored permanently
-      await this.cache.lm.persistNodePositions();
-
-      // Restore the outgoing positions and hand the move to the animated
-      // transition: render paints them in place (pendingLayoutTransition skips
-      // the snap), then runLayoutTransition tweens to the persisted target.
-      const animateNewWorkspace = fromPositions.size > 0;
-      if (animateNewWorkspace) {
-        for (const [id, p] of fromPositions) {
-          if (this.cache.graphData.hasNode(id)) {
-            this.cache.graphData.mergeNodeAttributes(id, { x: p.x, y: p.y });
-          }
-        }
-        this.cache.graph.pendingLayoutTransition = true;
-      }
-
-      // finally: never leave pendingLayoutTransition stuck on (see changeLayout).
+      // setLayout/layout (possibly the off-thread worker), the full render
+      // pipeline and the position tween all run under one try so any failure —
+      // including the layout worker rejecting — releases the loading hold,
+      // drops the overlay and clears pendingLayoutTransition.
       try {
+        // Apply the layout algorithm once
+        await this.cache.graph.setLayout({type: result.templateType, ...this.cache.DEFAULTS.LAYOUT_INTERNALS[result.templateType]});
+        await this.cache.graph.layout();
+
+        // Persist the positions so they're stored permanently
+        await this.cache.lm.persistNodePositions();
+
+        // Restore the outgoing positions and hand the move to the animated
+        // transition: render paints them in place (pendingLayoutTransition skips
+        // the snap), then runLayoutTransition tweens to the persisted target.
+        const animateNewWorkspace = fromPositions.size > 0;
+        if (animateNewWorkspace) {
+          for (const [id, p] of fromPositions) {
+            if (this.cache.graphData.hasNode(id)) {
+              this.cache.graphData.mergeNodeAttributes(id, { x: p.x, y: p.y });
+            }
+          }
+          this.cache.graph.pendingLayoutTransition = true;
+        }
+
         // Render with the full pipeline
         this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED = false;
         await this.cache.gcm.decideToRenderOrDraw(true);
@@ -341,6 +383,8 @@ class GraphLayoutManager {
         this.cache.bs.updateManualGroupButtonState();
         this.cache.bs.refreshBubbleStyleElements();
 
+        // Graph mutations done — drop the overlay so the tween animates clear.
+        this.cache.ui.releaseLoading();
         await this.cache.ui.hideLoading();
 
         // Tween the new layout in from the outgoing positions, once the overlay
@@ -351,6 +395,10 @@ class GraphLayoutManager {
 
         this.cache.ui.info(`Created Workspace: ${result.name} (${result.templateType})`);
       } finally {
+        // Defensive: release the hold + drop the overlay on any failure so a
+        // half-created workspace never strands a blocked UI; clear the tween flag.
+        this.cache.ui.releaseLoading();
+        await this.cache.ui.hideLoading();
         if (this.cache.graph) this.cache.graph.pendingLayoutTransition = false;
       }
     }

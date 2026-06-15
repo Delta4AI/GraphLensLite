@@ -314,6 +314,135 @@ describe("executeLayout — force worker supervisor (browser path)", () => {
   });
 });
 
+describe("executeLayout — @antv worker path (browser)", () => {
+  /**
+   * Fake worker that drives the real plumbing: receives the posted graph data,
+   * runs `handler` to produce the worker reply, and dispatches it on the next
+   * microtask (mimicking a real worker's async onmessage). Records lifecycle.
+   */
+  function makeWorkerFactory(handler, calls = []) {
+    return () => {
+      const worker = {
+        terminated: false,
+        postMessage(msg) {
+          calls.push(["postMessage", msg]);
+          Promise.resolve().then(() => {
+            const reply = handler(msg);
+            if (reply && reply.errorEvent) {
+              worker.onerror(reply.errorEvent);
+            } else {
+              worker.onmessage({ data: reply });
+            }
+          });
+        },
+        terminate() {
+          worker.terminated = true;
+          calls.push(["terminate"]);
+        },
+      };
+      calls.push(["create", worker]);
+      return worker;
+    };
+  }
+
+  it("posts flat node/edge data and merges returned positions", async () => {
+    // Arrange
+    const graph = starGraph(3); // hub + n0..n2
+    const calls = [];
+    const factory = makeWorkerFactory(
+      (msg) => ({
+        positions: msg.nodes.map((n, i) => ({ id: n.id, x: i * 10, y: i * 5 })),
+      }),
+      calls,
+    );
+
+    // Act: radial does not negate y.
+    await executeLayout(graph, specFor("radial"), { LayoutWorkerFactory: factory });
+
+    // Assert: flat {id} nodes + {id,source,target} edges were posted, positions merged.
+    const [, posted] = calls.find(([name]) => name === "postMessage");
+    expect(posted.type).toBe("radial");
+    expect(posted.nodes.every((n) => "id" in n && Object.keys(n).length === 1)).toBe(true);
+    expect(posted.edges.every((e) => "source" in e && "target" in e)).toBe(true);
+    expect(graph.getNodeAttribute("hub", "x")).toBe(0);
+    expect(graph.getNodeAttribute("hub", "y")).toBe(0);
+  });
+
+  it("negates y for dagre (TB reads root-at-top in graphology y-up)", async () => {
+    // Arrange
+    const graph = starGraph(2);
+    const factory = makeWorkerFactory((msg) => ({
+      positions: msg.nodes.map((n) => ({ id: n.id, x: 1, y: 100 })),
+    }));
+
+    // Act
+    await executeLayout(graph, specFor("dagre"), { LayoutWorkerFactory: factory });
+
+    // Assert: worker y=100 lands as -100 after the dagre negateY flip.
+    graph.forEachNode((_id, attrs) => expect(attrs.y).toBe(-100));
+  });
+
+  it("skips non-finite coords and ids no longer in the graph", async () => {
+    // Arrange
+    const graph = starGraph(2);
+    const before = { x: graph.getNodeAttribute("hub", "x"), y: graph.getNodeAttribute("hub", "y") };
+    const factory = makeWorkerFactory(() => ({
+      positions: [
+        { id: "hub", x: NaN, y: 5 }, // non-finite → skipped
+        { id: "ghost", x: 9, y: 9 }, // absent → skipped
+      ],
+    }));
+
+    // Act
+    await executeLayout(graph, specFor("mds"), { LayoutWorkerFactory: factory });
+
+    // Assert: hub untouched, no ghost node created.
+    expect(graph.getNodeAttribute("hub", "x")).toBe(before.x);
+    expect(graph.getNodeAttribute("hub", "y")).toBe(before.y);
+    expect(graph.hasNode("ghost")).toBe(false);
+  });
+
+  it("terminates the worker after a successful run", async () => {
+    // Arrange
+    const graph = starGraph(2);
+    const calls = [];
+    const factory = makeWorkerFactory(
+      (msg) => ({ positions: msg.nodes.map((n) => ({ id: n.id, x: 1, y: 1 })) }),
+      calls,
+    );
+
+    // Act
+    await executeLayout(graph, specFor("concentric"), { LayoutWorkerFactory: factory });
+
+    // Assert
+    expect(calls.some(([name]) => name === "terminate")).toBe(true);
+  });
+
+  it("rejects and terminates when the worker reports an error", async () => {
+    // Arrange
+    const graph = starGraph(2);
+    const calls = [];
+    const factory = makeWorkerFactory(() => ({ error: "layout blew up" }), calls);
+
+    // Act + Assert
+    await expect(
+      executeLayout(graph, specFor("dagre"), { LayoutWorkerFactory: factory }),
+    ).rejects.toThrow("layout blew up");
+    expect(calls.some(([name]) => name === "terminate")).toBe(true);
+  });
+
+  it("rejects on worker onerror", async () => {
+    // Arrange
+    const graph = starGraph(2);
+    const factory = makeWorkerFactory(() => ({ errorEvent: { message: "worker crashed" } }));
+
+    // Act + Assert
+    await expect(
+      executeLayout(graph, specFor("radial"), { LayoutWorkerFactory: factory }),
+    ).rejects.toThrow("worker crashed");
+  });
+});
+
 describe("noverlap post-pass (spec.noverlap)", () => {
   const NOVERLAP_MARGIN = 5; // mirrors layout_algorithms.js
 

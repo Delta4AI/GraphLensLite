@@ -793,6 +793,11 @@ class GraphCoreManager {
     if (hotkeysRegistered) return;
 
     document.addEventListener("keydown", async (event) => {
+      // Suppress hotkeys while a workspace/layout/render is loading. The overlay
+      // blocks pointer input but not keydown, so without this the user could
+      // fire export/toggle/fit actions against a graph that is still settling.
+      if (this.cache.ui.isBusy()) return;
+
       const activeElement = document.activeElement;
 
       // Skip hotkeys if currently focused on an input, textarea, or select element

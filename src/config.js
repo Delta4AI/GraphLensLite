@@ -182,6 +182,13 @@ const DEFAULTS = {
     // nodesep/ranksep are graph-space px between same-rank / adjacent ranks.
     "dagre": {rankdir: "TB", nodesep: 40, ranksep: 90},
   },
+  // Layout templates whose headless compute scales super-linearly (dagre's
+  // Sugiyama ordering, classical MDS's O(n²) distance matrix). Above
+  // LAYOUT_NODE_WARNING_THRESHOLD nodes they can run for minutes even off the
+  // main thread, so workspace creation warns before kicking one off. force is
+  // excluded (worker-animated with a hard time budget); circular/grid are O(n).
+  EXPENSIVE_LAYOUTS: ["dagre", "mds"],
+  LAYOUT_NODE_WARNING_THRESHOLD: 2000,
   CUSTOM_LAYOUT_NAME: "custom",
   BUBBLE_GROUP_STYLE: {
     "groupOne": {

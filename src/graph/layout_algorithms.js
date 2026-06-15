@@ -16,6 +16,7 @@ import {
   MDSLayout,
   DagreLayout,
 } from "../lib/graphology.bundle.mjs";
+import { LAYOUT_WORKER_SOURCE } from "../lib/layout_worker_source.js";
 
 const FORCE_ITERATIONS = 200;
 const GRID_SPACING = 100;
@@ -110,6 +111,66 @@ async function executeAntvLayout(graph, LayoutClass, options, negateY = false) {
 }
 
 /**
+ * Lazily-created object URL for the layout worker. Built once from the embedded
+ * IIFE source (vendor_libs bundles @antv/layout into LAYOUT_WORKER_SOURCE) and
+ * reused for every worker so each layout run is just a cheap `new Worker(url)`.
+ * Touched only when a worker is actually spawned — never at module load.
+ */
+let layoutWorkerUrl = null;
+
+/** Default browser worker factory: a Blob worker over the embedded source. */
+function defaultLayoutWorkerFactory() {
+  if (layoutWorkerUrl === null) {
+    const blob = new Blob([LAYOUT_WORKER_SOURCE], {
+      type: "application/javascript",
+    });
+    layoutWorkerUrl = URL.createObjectURL(blob);
+  }
+  return new Worker(layoutWorkerUrl);
+}
+
+/**
+ * Run an @antv/layout v2 class in a worker thread and merge the positions back
+ * into the graphology graph. Same contract as executeAntvLayout (the synchronous
+ * twin) — flat {id,x,y} read-back, y-up negation, non-finite coords skipped — but
+ * the CPU-bound execute() runs off the main thread so a large graph never
+ * freezes the UI while the loading overlay is up. The worker is single-use:
+ * spawned, awaited, terminated.
+ * @param {string} type  antv layout key (radial/concentric/mds/dagre)
+ * @param {() => Worker} workerFactory  test seam (vitest has no Worker global)
+ * @returns {Promise<void>}
+ */
+async function executeAntvLayoutWorker(graph, type, options, negateY, workerFactory) {
+  const nodes = graph.mapNodes((id) => ({ id }));
+  const edges = graph.mapEdges((id, _attrs, source, target) => ({ id, source, target }));
+  const worker = workerFactory();
+  try {
+    const positions = await new Promise((resolve, reject) => {
+      worker.onmessage = (event) => {
+        if (event.data && event.data.error) {
+          reject(new Error(event.data.error));
+        } else {
+          resolve(event.data.positions);
+        }
+      };
+      worker.onerror = (event) => {
+        reject(new Error(event.message || "Layout worker failed"));
+      };
+      worker.postMessage({ type, options, nodes, edges });
+    });
+    for (const { id, x, y } of positions) {
+      // Skip non-finite output (partial layout beats NaN-corrupted coords) and
+      // nodes that vanished while the worker ran.
+      if (Number.isFinite(x) && Number.isFinite(y) && graph.hasNode(id)) {
+        graph.mergeNodeAttributes(id, { x, y: negateY ? -y : y });
+      }
+    }
+  } finally {
+    worker.terminate();
+  }
+}
+
+/**
  * Anti-collision post-pass: minimally spreads overlapping nodes apart.
  * Node sizes are read from the graphology `size` attribute (sigma radius,
  * always set by graph_model's node mapper) via noverlap's default reducer;
@@ -132,9 +193,10 @@ export function applyNoverlap(graph) {
  *   LAYOUT_INTERNALS options for it; missing/unknown type falls back to
  *   forceAtlas2. `noverlap: true` runs the anti-collision post-pass after the
  *   base layout completes (any type).
- * @param {{ForceSupervisor?: typeof FA2Layout}} [testOverrides]  test seam:
- *   substitute the FA2 worker supervisor class (vitest has no Worker global,
- *   so the animated branch is otherwise unreachable under node)
+ * @param {{ForceSupervisor?: typeof FA2Layout, LayoutWorkerFactory?: () => Worker}} [testOverrides]
+ *   test seams (vitest has no Worker global, so the worker branches are
+ *   otherwise unreachable under node): substitute the FA2 worker supervisor
+ *   class, and/or inject a factory for the @antv/layout worker.
  * @returns {Promise<void>}
  */
 export async function executeLayout(graph, spec, testOverrides = {}) {
@@ -168,7 +230,18 @@ async function executeBaseLayout(graph, spec, testOverrides) {
   if (graph.order < 2) return; // FA2/inferSettings and @antv layouts need ≥2 nodes
   const antv = ANTV_LAYOUTS[type];
   if (antv) {
-    await executeAntvLayout(graph, antv.Layout, options, antv.negateY);
+    // Browser/Electron: run the heavy headless layout in a worker so a large
+    // graph never freezes the main thread. Under node (vitest, no Worker) and
+    // when no factory is injected, fall back to the synchronous twin — same
+    // positions, just on-thread.
+    const workerFactory =
+      testOverrides.LayoutWorkerFactory ??
+      (typeof Worker === "undefined" ? null : defaultLayoutWorkerFactory);
+    if (workerFactory) {
+      await executeAntvLayoutWorker(graph, type, options, antv.negateY, workerFactory);
+    } else {
+      await executeAntvLayout(graph, antv.Layout, options, antv.negateY);
+    }
     return;
   }
   // 'force' and everything else → forceAtlas2. Where Worker exists (browser,

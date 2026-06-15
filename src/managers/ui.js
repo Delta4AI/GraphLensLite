@@ -16,6 +16,10 @@ class UIManager {
     this.cache = cache;
     this.debugEnabled = debugEnabled;
     this.bottomBarHeight = null;
+    // While > 0, hideLoading() is a no-op so a long multi-step orchestration
+    // (workspace create/switch) keeps the overlay up across its nested
+    // render→#postRefresh→hideLoading calls. See holdLoading/releaseLoading.
+    this._loadingHolds = 0;
   }
 
   setDataSourceLabel(text) {
@@ -24,6 +28,35 @@ class UIManager {
       label.textContent = text;
       label.title = text;
     }
+  }
+
+  /**
+   * True while the loading overlay is up. The overlay (#loadingOverlay,
+   * position:fixed inset:0) already swallows pointer events, but keydown
+   * hotkeys bypass it — callers gate keyboard-driven actions on this so the
+   * user can't mutate the graph mid-load. Derived from the DOM so it can never
+   * desync from a missed showLoading/hideLoading pairing.
+   * @returns {boolean}
+   */
+  isBusy() {
+    const overlay = document.getElementById('loadingOverlay');
+    return !!overlay && overlay.style.display === 'flex';
+  }
+
+  /**
+   * Pin the loading overlay open across a multi-step orchestration so a nested
+   * render's #postRefresh hideLoading() cannot drop it mid-flight — the hole
+   * that let the UI become interactable while a workspace create/switch was
+   * still computing layout, syncing bubbles and tweening positions. Balanced
+   * with releaseLoading(); the caller's own hideLoading() at the true end
+   * actually drops the overlay. Counted so nested holds compose safely.
+   */
+  holdLoading() {
+    this._loadingHolds += 1;
+  }
+
+  releaseLoading() {
+    if (this._loadingHolds > 0) this._loadingHolds -= 1;
   }
 
   async showLoading(header, text = "") {
@@ -48,7 +81,14 @@ class UIManager {
   }
 
   async hideLoading() {
+    // Pinned open by an in-progress orchestration — keep blocking until it
+    // releases its hold and calls hideLoading() itself at the true end.
+    if (this._loadingHolds > 0) return;
+
     const overlay = document.getElementById('loadingOverlay');
+    // Idempotent: already hidden (e.g. a defensive second call in a finally) —
+    // skip the opacity-transition wait.
+    if (overlay.style.display === 'none') return;
     overlay.style.opacity = '0';
 
     // Wait for the opacity transition to complete
