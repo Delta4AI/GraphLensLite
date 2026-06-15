@@ -1886,6 +1886,13 @@ class IOManager {
         await this.cache.graph.render();
         await this.cache.gcm.fitViewToVisibleNodes();
         this.cache.io.restoreHeatmapFromImport(fileData);
+
+        // Restored ManualMembers populate the layout, but the selection-panel
+        // badges (per-group deselect toggles) only refresh via these calls —
+        // mirror the post-layout sync so loaded groups stay deselectable.
+        this.cache.bs.updateManualGroupStatus();
+        this.cache.bs.updateManualGroupButtonState();
+
         this.cache.ui.debug("Initial graph rendered.");
 
         // Update UI lock state if query was applied
