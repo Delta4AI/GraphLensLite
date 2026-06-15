@@ -69,37 +69,37 @@ const STYLE = { fill: "#e74c3c", stroke: "#e74c3c", fillOpacity: 0.25, strokeOpa
 describe("BubbleSetLayer — malformed-fit guard", () => {
   it("keeps the previous good outline when a refit self-intersects", () => {
     const camera = { x: 0, y: 0, ratio: 1, angle: 0 };
-    const { sigma, emit } = makeSigma(camera);
+    const { sigma } = makeSigma(camera);
     const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
 
-    // First fit at ratio 1 → clean square, cached.
+    // First fit → clean square, cached.
     vi.mocked(computeOutlinePoints).mockReturnValue(CLEAN);
     layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
     flush();
     expect(layer.outlines.get("groupOne").graphPoints).toEqual(CLEAN);
 
-    // Cross a zoom bucket so the layer refits; this fit is malformed.
+    // A style change forces an identity-key re-fit; this fit is malformed.
     vi.mocked(computeOutlinePoints).mockReturnValue(BOWTIE);
-    camera.ratio = 8;
-    emit("afterRender");
+    layer.getGroupHandle("groupOne").update({ ...STYLE, fillOpacity: 0.5 });
     flush();
 
     // The self-intersecting fit is rejected — previous good outline retained.
     expect(layer.outlines.get("groupOne").graphPoints).toEqual(CLEAN);
   });
 
-  it("exportOutlines falls back to the cached outline when the fresh fit self-intersects", () => {
+  it("exportOutlines reprojects the cached (good) graph outline", () => {
     const camera = { x: 0, y: 0, ratio: 1, angle: 0 };
     const { sigma } = makeSigma(camera);
     const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
 
-    // First fit at ratio 1 → clean square, cached by the on-screen paint.
+    // First fit → clean square, cached.
     vi.mocked(computeOutlinePoints).mockReturnValue(CLEAN);
     layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
     flush();
 
-    // The export's exact re-fit comes back malformed → reprojected cache wins
-    // (projection is identity in this harness, so the points compare equal).
+    // Export reprojects the cached graph-space outline (zoom-invariant); a
+    // later malformed fit can't leak in because export uses the cache, not a
+    // fresh fit. Projection is identity in this harness, so points compare equal.
     vi.mocked(computeOutlinePoints).mockReturnValue(BOWTIE);
     const groups = layer.exportOutlines();
 
@@ -109,7 +109,7 @@ describe("BubbleSetLayer — malformed-fit guard", () => {
 
   it("accepts a clean refit (replaces the cached outline)", () => {
     const camera = { x: 0, y: 0, ratio: 1, angle: 0 };
-    const { sigma, emit } = makeSigma(camera);
+    const { sigma } = makeSigma(camera);
     const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
 
     vi.mocked(computeOutlinePoints).mockReturnValue(CLEAN);
@@ -118,10 +118,65 @@ describe("BubbleSetLayer — malformed-fit guard", () => {
 
     const NEXT = [{ x: 1, y: 1 }, { x: 9, y: 1 }, { x: 9, y: 9 }, { x: 1, y: 9 }];
     vi.mocked(computeOutlinePoints).mockReturnValue(NEXT);
-    camera.ratio = 8;
-    emit("afterRender");
+    layer.getGroupHandle("groupOne").update({ ...STYLE, fillOpacity: 0.5 }); // identity-key re-fit
     flush();
 
     expect(layer.outlines.get("groupOne").graphPoints).toEqual(NEXT);
+  });
+
+  it("keeps the previous good outline when a refit collapses to empty", () => {
+    // A re-fit that vanishes (e.g. avoid field cancels the members) must not
+    // overwrite the good cache with empty — it keeps the last good outline.
+    const camera = { x: 0, y: 0, ratio: 1, angle: 0 };
+    const { sigma } = makeSigma(camera);
+    const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
+
+    vi.mocked(computeOutlinePoints).mockReturnValue(CLEAN);
+    layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
+    flush();
+
+    vi.mocked(computeOutlinePoints).mockReturnValue([]); // fit collapses
+    layer.getGroupHandle("groupOne").update({ ...STYLE, fillOpacity: 0.5 }); // identity-key re-fit
+    flush();
+
+    expect(layer.outlines.get("groupOne").graphPoints).toEqual(CLEAN);
+  });
+
+  it("stays absent when the FIRST fit self-intersects and has no cache", () => {
+    const camera = { x: 0, y: 0, ratio: 1, angle: 0 };
+    const { sigma } = makeSigma(camera);
+    const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
+
+    // computeOutlinePoints repairs self-intersections in the real path; here it
+    // is mocked to a bow-tie (repair bypassed) with no prior good outline, so
+    // the layer must NOT paint the self-crossing ring — it stays absent until a
+    // clean fit appears (never a phantom shape or blocky hull).
+    vi.mocked(computeOutlinePoints).mockReturnValue(BOWTIE);
+    layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
+    flush();
+
+    expect(layer.outlines.has("groupOne")).toBe(false);
+  });
+
+  it("never re-fits on zoom — the graph-space outline is reused across ratios", () => {
+    const camera = { x: 0, y: 0, ratio: 1, angle: 0 };
+    const { sigma, emit } = makeSigma(camera);
+    const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
+
+    vi.mocked(computeOutlinePoints).mockReturnValue(CLEAN);
+    layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
+    flush();
+
+    // Any subsequent fit would change the cached points; assert none happens on
+    // zoom. The cached graph outline stays CLEAN and is only reprojected.
+    vi.mocked(computeOutlinePoints).mockClear();
+    vi.mocked(computeOutlinePoints).mockReturnValue(BOWTIE);
+    for (const ratio of [8, 0.5, 0.1, 4]) {
+      camera.ratio = ratio;
+      emit("afterRender");
+      flush();
+    }
+    expect(computeOutlinePoints).not.toHaveBeenCalled();
+    expect(layer.outlines.get("groupOne").graphPoints).toEqual(CLEAN);
   });
 });

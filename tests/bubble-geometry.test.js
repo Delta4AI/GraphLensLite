@@ -135,6 +135,25 @@ describe("computeOutlinePoints", () => {
       },
     );
 
+    // Regression (phantom chords / convex-hull artifact): a chain whose
+    // virtualEdges corridors route around avoid-members produces a genuinely
+    // SELF-INTERSECTING bubblesets ring at this zoomed-out scale (verified: the
+    // raw and smoothed contours both self-cross). Drawn directly it paints
+    // phantom straight chords; the old convex-hull fallback painted a blocky
+    // triangle. computeOutlinePoints must now repair it (polygon self-union)
+    // into a simple polygon that still encloses every member.
+    it("repairs a self-intersecting avoid-member outline into a simple hull", () => {
+      const s = 0.3;
+      const members = [rectAt(0, 0, 12 * s), rectAt(300 * s, 0, 12 * s), rectAt(600 * s, 0, 12 * s)];
+      const avoid = [rectAt(150 * s, 40 * s, 12 * s), rectAt(450 * s, -40 * s, 12 * s)];
+      const outline = computeOutlinePoints(members, avoid, { scale: s });
+      expect(outline.length).toBeGreaterThan(3);
+      expect(polygonSelfIntersects(outline)).toBe(false);
+      for (const m of members) {
+        expect(pointInPolygon({ x: m.x + m.width / 2, y: m.y + m.height / 2 }, outline)).toBe(true);
+      }
+    });
+
     it("keeps a dense zoomed-out group intact where unscaled constants lose it", () => {
       // Zoomed-out screen geometry: two 1 px members 6 px apart inside two
       // rings of 32 avoid nodes (the dense-graph repro for the vanishing

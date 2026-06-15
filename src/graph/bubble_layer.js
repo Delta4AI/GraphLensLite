@@ -1,26 +1,25 @@
 /**
  * Browser-only bubble-set rendering layer (MIGRATION.md Phase 4).
  *
- * Two 2d canvases registered with sigma: the fill/outline canvas sits BELOW
- * its edge/node layers (createCanvasContext + beforeLayer: "edges") so nodes
- * paint over the translucent body; the group-LABEL canvas sits ABOVE sigma's
- * node-label layer (afterLayer: "labels") so a member node's own label can
- * never obscure the group name (a primary read). All four bubble groups paint
- * in a single pass. GraphBubbleSetManager keeps talking to per-group
+ * Two 2d canvases registered with sigma: the fill/outline canvas sits ABOVE
+ * the node layer (createCanvasContext + afterLayer: "nodes") so the group
+ * body/outline stays visible at deep zoom-in, where enlarged nodes would
+ * otherwise cover a body painted underneath them; the group-LABEL canvas sits
+ * ABOVE sigma's node-label layer (afterLayer: "labels") so a member node's own
+ * label can never obscure the group name (a primary read). All four bubble
+ * groups paint in a single pass. GraphBubbleSetManager keeps talking to per-group
  * "plugin instances" — those are thin handles into this layer's group state
  * (see getGroupHandle), so the manager's member/filter/style logic survives
  * the G6 → sigma port unchanged.
  *
- * Outlines are computed by bubblesets-js from viewport-space node rects
- * (bubble_geometry.js), then cached in GRAPH space:
+ * Outlines are fitted by bubblesets-js at the ratio-1 reference scale
+ * (bubble_geometry.js) and cached in GRAPH space, so they are zoom-invariant —
+ * a member is always enclosed at every zoom:
  *   - membership / style / member-position changes → full recompute (the
  *     identity key in #syncGroupOutline catches them on the next frame, so
  *     a filter event can never leave a stale outline painted)
- *   - camera pan/zoom → cheap reprojection of the cached points (exact for
- *     pans; under zoom the cache key quantizes log2(camera.ratio) into
- *     RATIO_RECOMPUTE_LOG2-wide buckets, so node-radius drift forces a
- *     re-fit at each bucket crossing — this also keeps an empty outline
- *     from sticking once the zoom moves on)
+ *   - camera pan/zoom → cheap per-frame reprojection of the cached graph
+ *     points; the camera is NOT in the identity key, so zoom never re-fits
  * This replaces the G6 plugin's recompute-per-draw churn (the patched
  * updateBubbleSetsPath path coalescing, issue #7195) with an owned cache.
  */
@@ -38,11 +37,6 @@ import {
 const LAYER_NAME = "bubbleSets";
 const LABEL_LAYER_NAME = "bubbleSetsLabels";
 const OUTLINE_STROKE_WIDTH = 2;
-// Zoom drift before an outline re-fit: log2(camera.ratio) is quantized into
-// buckets of this width inside the outline cache key (node screen radii
-// scale non-linearly with the camera ratio, so a reprojected outline slowly
-// stops hugging the nodes).
-const RATIO_RECOMPUTE_LOG2 = 0.3;
 // Extra screen-px gap (beyond half the font box) between the outline and a
 // label drawn with labelCloseToPath: false.
 const LABEL_STANDOFF_PX = 8;
@@ -71,7 +65,7 @@ class BubbleSetLayer {
     // createCanvasContext returns the Sigma instance (fluent API); the canvas
     // and 2d context land in sigma.elements / sigma.canvasContexts.
     sigma.createCanvasContext(LAYER_NAME, {
-      beforeLayer: "edges",
+      afterLayer: "nodes",
       style: { pointerEvents: "none" },
     });
     this.canvas = sigma.getCanvases()[LAYER_NAME];
@@ -168,6 +162,11 @@ class BubbleSetLayer {
     const dpr = sigma.pixelRatio ?? window.devicePixelRatio ?? 1;
     const camera = sigma.getCamera().getState();
 
+    // Outlines are fitted in GRAPH space (zoom-invariant), so the camera never
+    // forces a re-fit — #syncGroupOutline only re-fits when a group's identity
+    // (members, positions, style) changes. Any camera move just reprojects the
+    // cached graph points each frame (cheap), keeping the hull hugging at every
+    // zoom with members always enclosed.
     let outlinesChanged = false;
     const active = [];
     for (const [group, state] of this.groups) {
@@ -175,8 +174,7 @@ class BubbleSetLayer {
         if (this.outlines.delete(group)) outlinesChanged = true;
         continue;
       }
-      outlinesChanged =
-        this.#syncGroupOutline(group, state, camera, width, height) || outlinesChanged;
+      outlinesChanged = this.#syncGroupOutline(group, state) || outlinesChanged;
       if (this.outlines.get(group)?.graphPoints.length) active.push([group, state]);
     }
 
@@ -190,7 +188,11 @@ class BubbleSetLayer {
 
     this.#prepareCanvas(this.canvas, this.ctx, width, height, dpr);
     this.#prepareCanvas(this.labelCanvas, this.labelCtx, width, height, dpr);
+    this.#drawOutlines(active, sigma);
+  }
 
+  /** Reproject each cached graph-space outline to viewport px and paint it. */
+  #drawOutlines(active, sigma) {
     for (const [group, state] of active) {
       // Reprojection assumes camera.angle === 0 (the app never rotates the camera).
       const points = this.outlines
@@ -209,11 +211,10 @@ class BubbleSetLayer {
   // ---------------------------------------------------------------- export
 
   /**
-   * Exact-fit outlines for export, in viewport CSS px at the CURRENT camera.
-   * The on-screen cache quantizes zoom into buckets and merely reprojects
-   * between crossings — close enough live, but visibly adrift next to a
-   * freshly re-rendered export frame. Falls back to the cached (reprojected)
-   * outline when the fresh fit self-intersects, mirroring #syncGroupOutline.
+   * Outlines for export, in viewport CSS px at the CURRENT camera. The cached
+   * outline is graph-space and zoom-invariant, so reprojecting it at the
+   * current camera is exact — it matches the on-screen hull. Fits on the fly
+   * for any group not yet painted.
    *
    * @returns {Array<{group: string, points: Array<{x: number, y: number}>,
    *   opts: object, defaults: object}>}
@@ -224,23 +225,21 @@ class BubbleSetLayer {
     const out = [];
     for (const [group, state] of this.groups) {
       if (state.members.size === 0) continue;
-      const visibleMembers = [];
-      for (const id of state.members.keys()) {
-        if (!graph.hasNode(id)) continue;
-        const attrs = graph.getNodeAttributes(id);
-        if (!attrs.hidden) visibleMembers.push({ id, attrs });
+      let graphPoints = this.outlines.get(group)?.graphPoints;
+      if (!graphPoints?.length) {
+        const visibleMembers = [];
+        for (const id of state.members.keys()) {
+          if (!graph.hasNode(id)) continue;
+          const attrs = graph.getNodeAttributes(id);
+          if (!attrs.hidden) visibleMembers.push({ id, attrs });
+        }
+        if (visibleMembers.length === 0) continue;
+        graphPoints = this.#fitGraphOutline(state, visibleMembers);
       }
-      if (visibleMembers.length === 0) continue;
-
-      let points = this.#fitViewportPoints(state, visibleMembers);
-      const cached = this.outlines.get(group);
-      if (cached?.graphPoints.length && polygonSelfIntersects(points)) {
-        points = cached.graphPoints.map((p) => sigma.graphToViewport(p));
-      }
-      if (points.length < 2) continue;
+      if (!graphPoints || graphPoints.length < 2) continue;
       out.push({
         group,
-        points,
+        points: graphPoints.map((p) => sigma.graphToViewport(p)),
         opts: state.opts,
         defaults: this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {},
       });
@@ -303,13 +302,12 @@ class BubbleSetLayer {
 
   /**
    * Recompute the group's outline when its identity (members, positions,
-   * style) changed, or when the camera ratio left the log2 bucket the
-   * outline was fitted in (between crossings the cached points are merely
-   * reprojected).
+   * style) changes. The fit is in graph space and zoom-invariant, so the
+   * camera is NOT part of the key — zoom never re-fits, it only reprojects.
    *
    * @returns {boolean} true when the cached outline was replaced
    */
-  #syncGroupOutline(group, state, camera, width, height) {
+  #syncGroupOutline(group, state) {
     const graph = this.adapter.graph;
     const memberPositions = [];
     const visibleMembers = [];
@@ -321,18 +319,14 @@ class BubbleSetLayer {
       memberPositions.push({ x: attrs.x, y: attrs.y });
     }
 
-    // Identity keys are precomputed in #updateGroup, so the per-frame cost
-    // here is the O(n) position checksum. Hidden flips stay correct: an
+    // membersKey/avoidKey are precomputed in #updateGroup, so the per-frame
+    // cost here is the O(n) position checksum. Hidden flips stay correct: an
     // unhide changes visibleMembers.length, and a same-count hidden swap
-    // changes the checksum (different nodes contribute their positions).
-    // The ratio bucket keys the zoom level the outline was fitted at: a
-    // bucket crossing recomputes (radius drift re-fit), and an empty
-    // outline can never outlive the zoom level that produced it.
-    const ratioBucket = Math.round(Math.log2(camera.ratio) / RATIO_RECOMPUTE_LOG2);
+    // changes the checksum. No camera/viewport term — the graph-space outline
+    // is the same at every zoom.
     const key =
       `${state.membersKey}|${state.avoidKey}|${visibleMembers.length}` +
-      `|${styleKey(state.opts)}|${positionsChecksum(memberPositions)}` +
-      `|${width}x${height}|r${ratioBucket}`;
+      `|${styleKey(state.opts)}|${positionsChecksum(memberPositions)}`;
     const cached = this.outlines.get(group);
     if (cached && cached.key === key) return false;
 
@@ -341,68 +335,75 @@ class BubbleSetLayer {
       return cached !== undefined;
     }
 
-    const viewportPoints = this.#fitViewportPoints(state, visibleMembers);
-    // When members spread apart faster than the influence field grows (deep
-    // zoom-in), bubblesets' bSpline smoothing loops the contour over itself —
-    // it paints as rough edges / a phantom lobe in empty space. A reprojection
-    // is affine, so the previous *good* outline can never become malformed:
-    // keep it (under the new key, so we don't refit every frame) until a zoom
-    // bucket yields a clean fit again. The group stays a smooth single blob.
-    if (cached?.graphPoints.length && polygonSelfIntersects(viewportPoints)) {
-      this.outlines.set(group, { key, graphPoints: cached.graphPoints });
-      return true;
+    const graphPoints = this.#fitGraphOutline(state, visibleMembers);
+    // computeOutlinePoints repairs self-intersections, so a bad fit here is a
+    // collapse to nothing or the rare unrepairable self-cross. Never let it
+    // replace a good outline.
+    const selfIntersects = graphPoints.length >= 4 && polygonSelfIntersects(graphPoints);
+    const collapsed = graphPoints.length < 3;
+    if (selfIntersects || collapsed) {
+      if (cached?.graphPoints.length) {
+        this.outlines.set(group, { key, graphPoints: cached.graphPoints });
+        return true;
+      }
+      // No prior good outline yet: stay absent until a clean fit appears.
+      return this.outlines.delete(group);
     }
-    this.outlines.set(group, {
-      key,
-      // Round-trip assumes camera.angle === 0 (the app never rotates the camera).
-      graphPoints: viewportPoints.map((p) => this.adapter.sigma.viewportToGraph(p)),
-    });
+    this.outlines.set(group, { key, graphPoints });
     return true;
   }
 
   /**
-   * Fit a group's outline against the CURRENT camera, in viewport CSS px.
-   * Shared by the cached on-screen path (#syncGroupOutline) and the export
-   * path (exportOutlines), which must re-fit exactly — exports composited
-   * from the zoom-bucketed cache visibly drift from the re-rendered nodes.
+   * Fit a group's outline at the ratio-1 REFERENCE viewport scale, then map it
+   * to graph space for the cache. bubblesets-js' field constants are tuned for
+   * on-screen pixels, so the fit must run where node sizes are pixel-scale —
+   * the ratio-1 viewport, which is independent of the current camera. That
+   * makes the outline zoom-invariant: a member is always enclosed and the same
+   * cached hull reprojects to hug the nodes at any zoom. Shared by
+   * #syncGroupOutline and the export path.
    *
    * @param {object} state  group state (avoidMembers, opts)
    * @param {Array<{id: string, attrs: object}>} visibleMembers
-   * @returns {Array<{x: number, y: number}>} outline points (may be empty)
+   * @returns {Array<{x: number, y: number}>} graph-space outline (may be empty)
    */
-  #fitViewportPoints(state, visibleMembers) {
+  #fitGraphOutline(state, visibleMembers) {
     const graph = this.adapter.graph;
     const sigma = this.adapter.sigma;
-    const toRect = ({ attrs }) => {
-      const p = sigma.graphToViewport({ x: attrs.x, y: attrs.y });
-      const radius = sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2);
-      return nodeViewportRect(p.x, p.y, radius);
+    const { width, height } = sigma.getDimensions();
+    const camera = sigma.getCamera().getState();
+    const cx = width / 2;
+    const cy = height / 2;
+    const r = camera.ratio;
+    // graphToViewport divides the offset-from-centre by the ratio; multiply it
+    // back to land at the ratio-1 viewport (ratio cancels, so this is the same
+    // at any zoom). Node radius is taken at ratio 1 too.
+    const toRefRect = (attrs) => {
+      const v = sigma.graphToViewport({ x: attrs.x, y: attrs.y });
+      const rx = cx + (v.x - cx) * r;
+      const ry = cy + (v.y - cy) * r;
+      return nodeViewportRect(rx, ry, sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1));
     };
-    const memberRects = visibleMembers.map(toRect);
+    const memberRects = visibleMembers.map(({ attrs }) => toRefRect(attrs));
     const avoidRects = [];
     for (const id of state.avoidMembers) {
       if (!graph.hasNode(id)) continue;
       const attrs = graph.getNodeAttributes(id);
       if (attrs.hidden) continue;
-      avoidRects.push(toRect({ attrs }));
+      avoidRects.push(toRefRect(attrs));
     }
 
-    // Zoom-invariant influence field: bubblesets-js' radii are absolute
-    // pixels, so they must shrink/grow with the node rects. With sigma's
-    // default settings scaleSize(s, ratio) = s / sqrt(ratio), making
-    // fieldScale = scaleSize(1) / scaleSize(1, 1) exactly the node-radius
-    // zoom factor, normalized to 1 at camera ratio 1 (the reference zoom
-    // the pixel constants were tuned for) for any zoomToSizeRatioFunction.
-    const fieldScale = sigma.scaleSize(1) / sigma.scaleSize(1, 1);
-    const outlineOpts = { virtualEdges: state.opts.virtualEdges, scale: fieldScale };
-    let viewportPoints = computeOutlinePoints(memberRects, avoidRects, outlineOpts);
-    // Safety net: at extreme zoom-out the avoid nodes' negative field can
-    // still cancel the members' field entirely and collapse the outline.
-    // A hull that ignores avoid nodes beats a vanished group.
-    if (viewportPoints.length === 0 && avoidRects.length > 0) {
-      viewportPoints = computeOutlinePoints(memberRects, [], outlineOpts);
+    const outlineOpts = { virtualEdges: state.opts.virtualEdges, scale: 1 };
+    let refPoints = computeOutlinePoints(memberRects, avoidRects, outlineOpts);
+    // Safety net: if the avoid nodes' negative field collapses the outline, a
+    // hull that ignores avoid nodes beats a vanished group.
+    if (refPoints.length === 0 && avoidRects.length > 0) {
+      refPoints = computeOutlinePoints(memberRects, [], outlineOpts);
     }
-    return viewportPoints;
+    // Reference-viewport → graph space (undo the ratio-1 mapping, then the
+    // camera): the cache holds zoom-independent graph coords.
+    return refPoints.map((p) =>
+      sigma.viewportToGraph({ x: cx + (p.x - cx) / r, y: cy + (p.y - cy) / r }),
+    );
   }
 
   /**

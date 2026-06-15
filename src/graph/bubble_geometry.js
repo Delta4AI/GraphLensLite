@@ -7,7 +7,7 @@
  * is actually needed. Must never import the sigma bundle — vitest imports
  * this module under node.
  */
-import { bubblesets } from "../lib/graphology.bundle.mjs";
+import { bubblesets, polygonClipping } from "../lib/graphology.bundle.mjs";
 
 // PointPath post-processing per the bubblesets-js README: sample the raw
 // marching-squares outline, B-spline it and drop collinear points. 8 is the
@@ -91,12 +91,19 @@ function computeOutlinePoints(memberRects, avoidRects = [], opts = {}) {
     // than throwing into the render loop and freezing the bubble canvas.
     return [];
   }
-  // The bSpline smoothing can loop the curve over itself when members spread
-  // apart faster than the influence field grows (deep zoom-in): a
-  // self-intersecting fill paints as rough edges / a phantom lobe. The layer
-  // detects that (polygonSelfIntersects) and reprojects the last good outline
-  // instead, so callers always receive the smoothed contour here.
-  return pointPathToArray(sampled);
+  const smoothed = pointPathToArray(sampled);
+  // bubblesets can return a self-intersecting ring — virtualEdges corridor
+  // routing crosses itself at some scales, and the bSpline smoothing overshoots
+  // into self-loops when members spread faster than the influence field grows.
+  // Drawn directly these paint as phantom chords / lobes (and a downstream
+  // convex-hull fallback was worse). Repair via polygon self-union, which
+  // resolves the crossings into valid simple rings; keep the largest. The
+  // result still hugs every member — never a blocky hull.
+  if (polygonSelfIntersects(smoothed)) {
+    const repaired = repairSelfIntersections(smoothed);
+    if (repaired.length >= 3) return repaired;
+  }
+  return smoothed;
 }
 
 /** Materialize a bubblesets-js PointPath into a plain {x,y} array. */
@@ -107,6 +114,54 @@ function pointPathToArray(pointPath) {
     points.push({ x: p.x, y: p.y });
   }
   return points;
+}
+
+/**
+ * Resolve a self-intersecting closed polygon into a simple one via polygon
+ * self-union (polygon-clipping), returning the largest resulting outer ring.
+ * The union normalizes the crossings into valid, non-self-intersecting rings;
+ * the largest is the outline's outer boundary, which still encloses every
+ * member. Returns the input unchanged if the union throws or yields nothing.
+ *
+ * @param {Array<{x: number, y: number}>} points  closed polygon ring
+ * @returns {Array<{x: number, y: number}>}
+ */
+function repairSelfIntersections(points) {
+  if (points.length < 4) return points;
+  const ring = points.map((p) => [p.x, p.y]);
+  ring.push([points[0].x, points[0].y]); // polygon-clipping expects closed rings
+  let result;
+  try {
+    result = polygonClipping.union([ring]);
+  } catch {
+    // A clipping edge case must never throw into the render loop and freeze
+    // the bubble canvas; the caller keeps the (self-intersecting) input.
+    return points;
+  }
+  let best = null;
+  let bestArea = -1;
+  for (const poly of result) {
+    const outer = poly[0];
+    const area = Math.abs(ringSignedArea(outer));
+    if (area > bestArea) {
+      bestArea = area;
+      best = outer;
+    }
+  }
+  if (!best || best.length < 4) return points;
+  // Drop polygon-clipping's repeated closing vertex; back to {x, y}.
+  return best.slice(0, -1).map(([x, y]) => ({ x, y }));
+}
+
+/** Signed area (shoelace) of a closed ring of [x, y] pairs. */
+function ringSignedArea(ring) {
+  let area = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [x1, y1] = ring[i];
+    const [x2, y2] = ring[i + 1];
+    area += x1 * y2 - x2 * y1;
+  }
+  return area / 2;
 }
 
 /** Do two segments (p1→p2, p3→p4) cross at an interior point of both? */

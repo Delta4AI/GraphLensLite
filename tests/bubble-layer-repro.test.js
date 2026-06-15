@@ -151,27 +151,49 @@ describe("BubbleSetLayer — zoom reprojection (symptoms 1-3)", () => {
     const centroid = (pts) => pts.reduce((a, p) => ({ x: a.x + p.x / pts.length, y: a.y + p.y / pts.length }), { x: 0, y: 0 });
     const c1 = centroid(pointsAt1);
 
-    // Zoom in: ratio 1 -> 0.4. afterRender drives the repaint, as in the app.
-    // Before the fix this threw inside computeOutlinePoints (fractional sample
-    // step), the exception escaped the rAF paint and the canvas froze.
+    // Zoom in: ratio 1 -> 0.4. The graph-space outline is zoom-invariant, so
+    // afterRender just reprojects the SAME cached graph points at the new camera
+    // (no re-fit). (Before an earlier fix, the zoom threw inside
+    // computeOutlinePoints on a fractional sample step and froze the canvas.)
     camera.ratio = 0.4;
     sigma.emit("afterRender");
     flushRaf();
-
     const pointsAt04 = filledPaths.at(-1);
 
-    // The hull must grow away from the viewport center as we zoom in (a frozen
-    // canvas would leave the points unchanged) ...
+    // The hull must grow away from the viewport center as we zoom in (the
+    // reprojection scales the cached graph points by 1/ratio) ...
     const c04 = centroid(pointsAt04);
     const spread = (pts, c) => Math.max(...pts.map((p) => Math.hypot(p.x - c.x, p.y - c.y)));
     expect(spread(pointsAt04, c04)).toBeGreaterThan(spread(pointsAt1, c1) * 1.5);
 
-    // ... and the drawn points must equal the CURRENT cached graph points
-    // reprojected at the new camera (the outline is re-fitted on a ratio-bucket
-    // crossing, so re-read the cache rather than the pre-zoom snapshot).
+    // ... and the drawn points must equal the cached graph points reprojected
+    // at the new camera (same cache, just reprojected — never re-fitted).
     const expected = layer.outlines.get("groupOne").graphPoints.map((g) => sigma.graphToViewport(g));
     expect(pointsAt04.length).toBe(expected.length);
     pointsAt04.forEach((p, i) => {
+      expect(p.x).toBeCloseTo(expected[i].x, 5);
+      expect(p.y).toBeCloseTo(expected[i].y, 5);
+    });
+  });
+
+  it("keeps the hull visible (reprojected) during a pan (ratio unchanged)", () => {
+    const camera = { x: 1, y: 1, ratio: 1, angle: 0 };
+    const { sigma, filledPaths } = makeSigma(camera, { width: 800, height: 600 });
+    const layer = new BubbleSetLayer({ sigma, graph: makeGraph(TRI) }, makeCache());
+
+    layer.getGroupHandle("groupOne").update({ members: ["a", "b", "c"], ...STYLE });
+    flushRaf();
+    const before = filledPaths.length;
+
+    // Pan only: move the camera, keep the ratio. The hull's margin is still
+    // valid at this zoom, so it stays drawn (reprojected), not hidden.
+    camera.x = 3;
+    sigma.emit("afterRender");
+    flushRaf();
+    expect(filledPaths.length, "hull stays drawn during a pan").toBeGreaterThan(before);
+    const drawn = filledPaths.at(-1);
+    const expected = layer.outlines.get("groupOne").graphPoints.map((g) => sigma.graphToViewport(g));
+    drawn.forEach((p, i) => {
       expect(p.x).toBeCloseTo(expected[i].x, 5);
       expect(p.y).toBeCloseTo(expected[i].y, 5);
     });

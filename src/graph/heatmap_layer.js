@@ -1,14 +1,13 @@
 /**
  * Browser-only atmospheric canvas layer: node-density heatmap.
  *
- * One 2d canvas registered BOTTOM-MOST — below the bubbleSets canvas.
+ * One 2d canvas registered BOTTOM-MOST, below the edges canvas.
  * LAYER ORDERING (verified against the bundled sigma createLayer): a layer
  * created with beforeLayer: "edges" is inserted into the DOM immediately
- * before the "edges" canvas via Element.before(), so among several layers
- * targeting the same beforeLayer the EARLIEST-created one ends up deepest
- * (each later sibling lands between the previous insert and "edges"). This
- * layer is therefore instantiated BEFORE BubbleSetLayer in the adapter
- * constructor: heatmap < bubbleSets < edges.
+ * before the "edges" canvas via Element.before(). The full stack is
+ * heatmap < edges < nodes < bubbleSets body < labels < bubbleSets labels —
+ * the bubbleSets body paints ABOVE nodes (afterLayer: "nodes") so it stays
+ * visible at deep zoom; this heatmap stays deepest of all.
  *
  * HEATMAP pass (off by default): gaussian-ish alpha splats per visible node,
  * accumulated into an OFFSCREEN canvas in graph-space px and colored through

@@ -95,6 +95,7 @@
     "graphology-layout-noverlap": "^0.4.2",
     "graphology-metrics": "^2.4.0",
     "marked": "^18.0.2",
+    "polygon-clipping": "^0.15.7",
     "sigma": "^3.0.3"
   }
 }

@@ -14,6 +14,9 @@ export {default as FA2Layout} from 'graphology-layout-forceatlas2/worker';
 export {default as noverlap} from 'graphology-layout-noverlap';
 export {RadialLayout, ConcentricLayout, MDSLayout, DagreLayout} from '@antv/layout';
 export * as bubblesets from 'bubblesets-js';
+// Polygon boolean ops (pure JS, node-safe). Repairs self-intersecting
+// bubble-set outlines into simple polygons (bubble_geometry.js).
+export {default as polygonClipping} from 'polygon-clipping';
 // Network metrics (graphology-metrics; pure JS, node-safe). Subpath imports
 // keep hits/modularity/layout-quality out of the bundle.
 export {degreeCentrality} from 'graphology-metrics/centrality/degree.js';
