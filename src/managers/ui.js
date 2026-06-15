@@ -515,7 +515,7 @@ class UIManager {
   }
 
   /**
-   * Resolution picker anchored to the 📷 button: choose 1×/2×/4×/8× and export
+   * Resolution picker anchored to the 📷 button: choose 1×/2×/4× and export
    * immediately at that scale. The chosen factor is remembered (and reused by
    * the "P" shortcut). Built lazily on first open.
    */

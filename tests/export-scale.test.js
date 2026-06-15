@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   EXPORT_SCALES,
+  WEBGL_SAFE_SIDE_FRACTION,
   clampExportScale,
   wasScaleClamped,
 } from "../src/utilities/export_scale.js";
@@ -14,8 +15,19 @@ import {
 const SMALL = { width: 800, height: 600 };
 
 describe("EXPORT_SCALES", () => {
-  it("offers the 1/2/4/8 ladder", () => {
-    expect(EXPORT_SCALES).toEqual([1, 2, 4, 8]);
+  it("offers the 1/2/4 ladder", () => {
+    expect(EXPORT_SCALES).toEqual([1, 2, 4]);
+  });
+
+  it("no longer offers 8x (silently blank/partial render on real GPUs)", () => {
+    expect(EXPORT_SCALES).not.toContain(8);
+  });
+});
+
+describe("WEBGL_SAFE_SIDE_FRACTION", () => {
+  it("keeps exports a margin back from the probed GPU ceiling", () => {
+    expect(WEBGL_SAFE_SIDE_FRACTION).toBeGreaterThan(0);
+    expect(WEBGL_SAFE_SIDE_FRACTION).toBeLessThan(1);
   });
 });
 

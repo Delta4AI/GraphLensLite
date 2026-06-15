@@ -26,7 +26,11 @@ import {
   createCurveHaloProgram,
   createEdgeMarkerHeadProgram,
 } from "./edge_programs.js";
-import { clampExportScale, MAX_CANVAS_SIDE } from "../utilities/export_scale.js";
+import {
+  clampExportScale,
+  MAX_CANVAS_SIDE,
+  WEBGL_SAFE_SIDE_FRACTION,
+} from "../utilities/export_scale.js";
 import { webglMaxCanvasSide } from "./webgl_support.js";
 import { buildGraphSvg } from "./export_svg.js";
 import { EdgeFlowProgram, createCurveFlowProgram } from "./edge_flow_programs.js";
@@ -904,8 +908,14 @@ class SigmaAdapter {
     const dpr = window.devicePixelRatio || 1;
     // The composite canvas is 2D (16384/side, ~268 MP ceilings baked into
     // clampExportScale), but sigma renders through WebGL first — its
-    // framebuffer limit governs when it is lower.
-    const maxSide = Math.min(webglMaxCanvasSide() ?? Infinity, MAX_CANVAS_SIDE);
+    // framebuffer limit governs when it is lower. Stay a margin back from the
+    // probed GPU ceiling: allocating right at MAX_TEXTURE_SIZE while the
+    // scene's buffers are resident fails silently (blank/partial render).
+    const probedSide = webglMaxCanvasSide();
+    const maxSide = Math.min(
+      probedSide != null ? probedSide * WEBGL_SAFE_SIDE_FRACTION : Infinity,
+      MAX_CANVAS_SIDE,
+    );
     let appliedScale = clampExportScale(scale, dims, dpr, { maxSide });
     const background = this.#stageBackgroundColor();
     const hasVisibleNodes = this.graph.someNode((_, attrs) => !attrs.hidden);

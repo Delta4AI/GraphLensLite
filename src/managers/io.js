@@ -1905,7 +1905,7 @@ class IOManager {
   }
 
   /**
-   * Export the current viewport as PNG. An explicit `scale` (1/2/4/8) updates
+   * Export the current viewport as PNG. An explicit `scale` (1/2/4) updates
    * and persists the remembered resolution; calling without one (keyboard "P")
    * reuses it. The renderer clamps the factor to canvas limits — if the final
    * resolution fell short of the request, the user is told.
