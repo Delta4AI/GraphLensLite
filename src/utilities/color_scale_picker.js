@@ -280,7 +280,7 @@ class ColorScalePicker {
     this.dom.applyButton.classList.remove('disabled');
 
     if (filterObj.isCategory) {
-      this.categories = ([...filterObj.categories] || []).map((name) => ({
+      this.categories = [...(filterObj.categories || [])].map((name) => ({
         name,
         color: this.generateRandomColor(),
       }));

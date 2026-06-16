@@ -1,3 +1,4 @@
+/* global ExcelJS */ // loaded as a global via vendored src/lib/exceljs.min.js script tag
 import { DEFAULTS, CFG, VERSION } from '../config.js';
 import { StaticUtilities } from '../utilities/static.js';
 import { buildDataTable } from '../utilities/data_editor.js';
@@ -1530,7 +1531,7 @@ class IOManager {
 
       sheetJson.forEach((row) => {
         Object.entries(columnMapping).forEach(([originalKey, sanitizedKey]) => {
-          if (row.hasOwnProperty(originalKey)) {
+          if (Object.prototype.hasOwnProperty.call(row, originalKey)) {
             row[sanitizedKey] = row[originalKey];
             delete row[originalKey];
           }
@@ -1797,7 +1798,7 @@ class IOManager {
 
         if (!userData) continue;
 
-        if (!nodeOrEdge.D4Data[header].hasOwnProperty(userData.subGroup)) {
+        if (!Object.prototype.hasOwnProperty.call(nodeOrEdge.D4Data[header], userData.subGroup)) {
           nodeOrEdge.D4Data[header][userData.subGroup] = {};
         }
 

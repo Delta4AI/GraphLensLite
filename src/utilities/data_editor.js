@@ -1,3 +1,4 @@
+/* global ExcelJS */ // loaded as a global via vendored src/lib/exceljs.min.js script tag
 import { Popup } from './popup.js';
 import { StaticUtilities } from './static.js';
 import { EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from '../managers/io.js';
@@ -1098,7 +1099,7 @@ class DataTable {
 
       const cleanElem = {};
       for (const key of allowedKeys) {
-        if (elem.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(elem, key)) {
           cleanElem[key] = elem[key];
         }
       }

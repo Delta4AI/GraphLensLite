@@ -292,7 +292,7 @@ class GraphSelectionManager {
   }
 
   updateSelectionCache() {
-    const { selectedNodes, selectedEdges, selectionMemory, selectedMemoryIndex } = cache;
+    const { selectedNodes, selectedEdges, selectionMemory, selectedMemoryIndex } = this.cache;
 
     // this should never be triggered; in case no snapshot is available, create an empty one
     if (selectionMemory.length === 0) {
