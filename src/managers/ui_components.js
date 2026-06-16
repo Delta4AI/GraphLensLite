@@ -1,12 +1,13 @@
-import {DEFAULTS} from "../config.js";
-import {StaticUtilities} from "../utilities/static.js";
+import { DEFAULTS } from '../config.js';
+import { StaticUtilities } from '../utilities/static.js';
 
 class DropdownChecklist {
   constructor(propID, cache) {
     this.propID = propID;
     this.cache = cache;
     this.categories = this.cache.data.filterDefaults.get(propID).categories;
-    this.selectedCategories = this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID).categories;
+    this.selectedCategories =
+      this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID).categories;
     this.isVisible = false;
     this.sortCategories();
     this.cache.propIDToDropdownChecklists.set(propID, this);
@@ -20,9 +21,9 @@ class DropdownChecklist {
     catArray.sort((a, b) => {
       const getPriority = (val) => {
         const lower = val.toLowerCase();
-        if (lower === "low") return 1;
-        if (lower === "medium") return 2;
-        if (lower === "high") return 3;
+        if (lower === 'low') return 1;
+        if (lower === 'medium') return 2;
+        if (lower === 'high') return 3;
         return 0; // “other” values
       };
       const priorityA = getPriority(a);
@@ -40,31 +41,31 @@ class DropdownChecklist {
   }
 
   appendTo(parent) {
-    this.container = document.createElement("div");
-    this.container.id = this.propID + "-dropdown";
-    this.container.className = "dropdown-check-list";
+    this.container = document.createElement('div');
+    this.container.id = this.propID + '-dropdown';
+    this.container.className = 'dropdown-check-list';
     this.container.tabIndex = 100;
 
     // Create the anchor (visible clickable part)
-    this.anchor = document.createElement("h5");
-    this.anchor.className = "anchor purple round-border";
+    this.anchor = document.createElement('h5');
+    this.anchor.className = 'anchor purple round-border';
     this.anchor.textContent = `${this.selectedCategories.size}/${this.categories.size} selected`;
-    this.anchor.id = this.propID + "-dropdown-anchor";
+    this.anchor.id = this.propID + '-dropdown-anchor';
     this.container.appendChild(this.anchor);
 
     // Create the unordered list (dropdown items)
-    this.itemsList = document.createElement("ul");
-    this.itemsList.className = "items";
+    this.itemsList = document.createElement('ul');
+    this.itemsList.className = 'items';
 
     // add buttons on top
-    this.buttonContainer = document.createElement("div");
-    this.buttonContainer.className = "dropdown-buttons";
+    this.buttonContainer = document.createElement('div');
+    this.buttonContainer.className = 'dropdown-buttons';
 
-    this.selectAllButton = document.createElement("button");
-    this.selectAllButton.textContent = "Select All";
+    this.selectAllButton = document.createElement('button');
+    this.selectAllButton.textContent = 'Select All';
 
-    this.deselectAllButton = document.createElement("button");
-    this.deselectAllButton.textContent = "Deselect All";
+    this.deselectAllButton = document.createElement('button');
+    this.deselectAllButton.textContent = 'Deselect All';
 
     this.buttonContainer.appendChild(this.selectAllButton);
     this.buttonContainer.appendChild(this.deselectAllButton);
@@ -72,26 +73,28 @@ class DropdownChecklist {
     this.itemsList.appendChild(this.buttonContainer);
 
     // Add the options as checkboxes
-    this.categories.forEach(option => {
-      const listItem = document.createElement("li");
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
+    this.categories.forEach((option) => {
+      const listItem = document.createElement('li');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
       checkbox.value = option;
       checkbox.checked = this.selectedCategories.has(option);
-      checkbox.className = "hidden-checkbox";
-      checkbox.addEventListener("change", async (ev) => await this.handleSelection(ev));
+      checkbox.className = 'hidden-checkbox';
+      checkbox.addEventListener('change', async (ev) => await this.handleSelection(ev));
 
-      const customCheckbox = document.createElement("span");
-      customCheckbox.className = "custom-checkbox";
+      const customCheckbox = document.createElement('span');
+      customCheckbox.className = 'custom-checkbox';
 
-      checkbox.addEventListener("change", () => {
-        checkbox.checked ? customCheckbox.classList.add("checked") : customCheckbox.classList.remove("checked");
+      checkbox.addEventListener('change', () => {
+        checkbox.checked
+          ? customCheckbox.classList.add('checked')
+          : customCheckbox.classList.remove('checked');
       });
 
       // Set initial state
-      if (checkbox.checked) customCheckbox.classList.add("checked");
+      if (checkbox.checked) customCheckbox.classList.add('checked');
 
-      const label = document.createElement("label");
+      const label = document.createElement('label');
       label.textContent = option;
       label.prepend(customCheckbox);
       label.prepend(checkbox);
@@ -115,8 +118,11 @@ class DropdownChecklist {
         ? this.selectedCategories.add(ev.target.value)
         : this.selectedCategories.delete(ev.target.value);
       this.anchor.textContent = `${this.selectedCategories.size}/${this.categories.size} selected`;
-      await this.cache.fm.handleFilterEvent(ev.target.checked ? "Showing" : "Hiding" + " Elements",
-        `Nodes and related edges for ${this.propID} ${ev.target.value}`, this.propID);
+      await this.cache.fm.handleFilterEvent(
+        ev.target.checked ? 'Showing' : 'Hiding' + ' Elements',
+        `Nodes and related edges for ${this.propID} ${ev.target.value}`,
+        this.propID
+      );
       // this.cache.ui.debug(`${this.propID} ${ev.target.value} ${ev.target.checked}`);
     } catch (err) {
       this.cache.ui.error(`Failed to handle category selection: ${err.message}`);
@@ -126,12 +132,12 @@ class DropdownChecklist {
   appendListeners() {
     const updateDropdownPosition = () => {
       // Temporarily make the dropdown visible to calculate its height
-      this.itemsList.style.visibility = "hidden";
-      this.itemsList.style.display = "block";
+      this.itemsList.style.visibility = 'hidden';
+      this.itemsList.style.display = 'block';
 
       const dropdownHeight = this.itemsList.offsetHeight;
-      this.itemsList.style.display = "";
-      this.itemsList.style.visibility = "";
+      this.itemsList.style.display = '';
+      this.itemsList.style.visibility = '';
 
       const anchorRect = this.anchor.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
@@ -144,34 +150,37 @@ class DropdownChecklist {
       // Make the dropdown scrollable if there's not enough space
       if (dropdownHeight > availableHeight) {
         this.itemsList.style.maxHeight = `${availableHeight}px`;
-        this.itemsList.style.overflowY = "auto";
+        this.itemsList.style.overflowY = 'auto';
       } else {
-        this.itemsList.style.maxHeight = "";
-        this.itemsList.style.overflowY = "";
+        this.itemsList.style.maxHeight = '';
+        this.itemsList.style.overflowY = '';
       }
     };
 
-    this.anchor.addEventListener("click", () => {
+    this.anchor.addEventListener('click', () => {
       this.isVisible = !this.isVisible;
       if (this.isVisible) {
         updateDropdownPosition();
-        document.addEventListener("scroll", updateDropdownPosition, true);
-        this.container.classList.add("visible");
+        document.addEventListener('scroll', updateDropdownPosition, true);
+        this.container.classList.add('visible');
       } else {
-        this.container.classList.remove("visible");
-        document.removeEventListener("scroll", updateDropdownPosition, true);
+        this.container.classList.remove('visible');
+        document.removeEventListener('scroll', updateDropdownPosition, true);
       }
     });
 
     // button callbacks
-    this.selectAllButton.addEventListener("click", async () => await this.selectAllCategories());
-    this.deselectAllButton.addEventListener("click", async () => await this.deselectAllCategories());
+    this.selectAllButton.addEventListener('click', async () => await this.selectAllCategories());
+    this.deselectAllButton.addEventListener(
+      'click',
+      async () => await this.deselectAllCategories()
+    );
 
     // Handle clicks outside the dropdown to close it
-    document.addEventListener("click", (event) => {
+    document.addEventListener('click', (event) => {
       if (!this.container.contains(event.target)) {
         this.isVisible = false;
-        this.container.classList.remove("visible");
+        this.container.classList.remove('visible');
       }
     });
   }
@@ -188,16 +197,20 @@ class DropdownChecklist {
       `input[type="checkbox"][value="${CSS.escape(category)}"]`
     );
     checkbox.checked = true;
-    checkbox.nextElementSibling.classList.add("checked");
+    checkbox.nextElementSibling.classList.add('checked');
     this.anchor.textContent = `${this.selectedCategories.size}/${this.categories.size} selected`;
   }
 
   async selectAllCategories(skipFilterEvent = false) {
     try {
-      this.categories.forEach(category => this.selectedCategories.add(category)); // Add all categories
+      this.categories.forEach((category) => this.selectedCategories.add(category)); // Add all categories
       this.updateCheckboxStates(true);
       if (!skipFilterEvent) {
-        await this.cache.fm.handleFilterEvent("Showing Elements", `Nodes and related edges for ${this.propID}`, this.propID);
+        await this.cache.fm.handleFilterEvent(
+          'Showing Elements',
+          `Nodes and related edges for ${this.propID}`,
+          this.propID
+        );
       }
     } catch (err) {
       this.cache.ui.error(`Failed to select all categories: ${err.message}`);
@@ -206,10 +219,14 @@ class DropdownChecklist {
 
   async deselectAllCategories(skipFilterEvent = false) {
     try {
-      this.categories.forEach(category => this.selectedCategories.delete(category)); // Clear all categories
+      this.categories.forEach((category) => this.selectedCategories.delete(category)); // Clear all categories
       this.updateCheckboxStates(false);
       if (!skipFilterEvent) {
-        await this.cache.fm.handleFilterEvent("Hiding Elements", `Nodes and related edges for ${this.propID}`, this.propID);
+        await this.cache.fm.handleFilterEvent(
+          'Hiding Elements',
+          `Nodes and related edges for ${this.propID}`,
+          this.propID
+        );
       }
     } catch (err) {
       this.cache.ui.error(`Failed to deselect all categories: ${err.message}`);
@@ -217,15 +234,14 @@ class DropdownChecklist {
   }
 
   updateCheckboxStates(selectAll) {
-    Array.from(this.itemsList.querySelectorAll("input[type='checkbox']")).forEach(checkbox => {
+    Array.from(this.itemsList.querySelectorAll("input[type='checkbox']")).forEach((checkbox) => {
       checkbox.checked = selectAll; // Update checkbox state
       selectAll
-        ? checkbox.nextElementSibling.classList.add("checked")
-        : checkbox.nextElementSibling.classList.remove("checked");
+        ? checkbox.nextElementSibling.classList.add('checked')
+        : checkbox.nextElementSibling.classList.remove('checked');
     });
     this.anchor.textContent = `${this.selectedCategories.size}/${this.categories.size} selected`; // Update anchor text
   }
-
 }
 
 class InvertibleRangeSlider {
@@ -236,13 +252,16 @@ class InvertibleRangeSlider {
     this.readCurrentFilterSettings();
     this.sliderMin = defaultFilterData.lowerThreshold;
     this.sliderMax = defaultFilterData.upperThreshold;
-    const allInteger = StaticUtilities.isInteger(this.sliderMin) && StaticUtilities.isInteger(this.sliderMax) && !defaultFilterData.hasFloatValues;
+    const allInteger =
+      StaticUtilities.isInteger(this.sliderMin) &&
+      StaticUtilities.isInteger(this.sliderMax) &&
+      !defaultFilterData.hasFloatValues;
     // Integer columns step by whole units (discrete counts). Float columns use
     // "any" — a continuous control with no value grid, so the column max (and
     // any high-decimal value) stays exactly selectable via both the slider and
     // the number box, at any column magnitude. A fixed absolute step floored
     // the reachable max below the true max and broke selection of the top node.
-    this.stepSize = allInteger ? this.cache.CFG.FILTER_STEP_SIZE_INTEGER : "any";
+    this.stepSize = allInteger ? this.cache.CFG.FILTER_STEP_SIZE_INTEGER : 'any';
     this.initializeIds();
     this.inputStart = null;
     this.inputEnd = null;
@@ -270,7 +289,9 @@ class InvertibleRangeSlider {
       this.currentMax = 1;
       this.isInverted = false;
     } else {
-      let filterData = this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(this.propID);
+      let filterData = this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(
+        this.propID
+      );
       this.currentMin = filterData.lowerThreshold;
       this.currentMax = filterData.upperThreshold;
       this.isInverted = filterData.isInverted;
@@ -279,7 +300,9 @@ class InvertibleRangeSlider {
 
   writeCurrentFilterSettings() {
     if (this.cache.data.layouts[this.cache.data.selectedLayout].filters.has(this.propID)) {
-      let filterData = this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(this.propID);
+      let filterData = this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(
+        this.propID
+      );
       filterData.lowerThreshold = this.currentMin;
       filterData.upperThreshold = this.currentMax;
       filterData.isInverted = this.isInverted;
@@ -319,8 +342,10 @@ class InvertibleRangeSlider {
     const r = this.track.getBoundingClientRect();
     if (r.width === 0) return; // not laid out yet
     const midY = r.top + r.height / 2;
-    const lw = this.signLeft.offsetWidth, lh = this.signLeft.offsetHeight;
-    const rw = this.signRight.offsetWidth, rh = this.signRight.offsetHeight;
+    const lw = this.signLeft.offsetWidth,
+      lh = this.signLeft.offsetHeight;
+    const rw = this.signRight.offsetWidth,
+      rh = this.signRight.offsetHeight;
     this.signLeft.style.top = `${midY - lh / 2}px`;
     this.signLeft.style.left = `${Math.max(2, r.left - lw - 8)}px`;
     this.signRight.style.top = `${midY - rh / 2}px`;
@@ -328,7 +353,7 @@ class InvertibleRangeSlider {
   }
 
   createSliderInput(id, initialValue, relatedSliderId) {
-    const input = document.createElement("input");
+    const input = document.createElement('input');
     input.id = id;
     input.value = initialValue;
     input.addEventListener('keydown', (ev) => {
@@ -343,8 +368,8 @@ class InvertibleRangeSlider {
           input.value = sliderElem.value;
         } else {
           sliderElem.value = newValue;
-          sliderElem.dispatchEvent(new Event("input"));
-          sliderElem.dispatchEvent(new Event("change"));
+          sliderElem.dispatchEvent(new Event('input'));
+          sliderElem.dispatchEvent(new Event('change'));
         }
       }
     });
@@ -363,12 +388,16 @@ class InvertibleRangeSlider {
 
   appendTo(parent) {
     if (this.cache.CFG.HIDE_SLIDERS_WITH_SAME_MIN_MAX_VALUES && this.sliderMin === this.sliderMax) {
-      parent.appendChild(document.createElement("span"));
+      // A numeric property whose only value is min === max has no range to
+      // filter, so a slider (and its exact-value inputs) would be inert. Show a
+      // compact read-only badge with the value instead; nothing is rendered for
+      // Details mode to reveal, so it stays a plain checkmark + value.
+      parent.appendChild(this.createSingleValueIndicator());
       return false;
     }
     this.isValidSlider = true;
 
-    const div = document.createElement("div");
+    const div = document.createElement('div');
     div.innerHTML = this.createDivInnerHTML();
     const slider = div.firstElementChild;
     slider.style.width = '100%';
@@ -379,15 +408,41 @@ class InvertibleRangeSlider {
     // sync with the handles via handleThresholdOnInputEvent (writes their values).
     const inputRow = document.createElement('div');
     inputRow.className = 'filter-input-row';
-    this.inputStart = this.createSliderInput(this.sliderIdStartInput, this.currentMin, this.sliderIdStart);
-    this.inputStart.title = "Lower threshold — type an exact value and press Enter";
-    this.inputEnd = this.createSliderInput(this.sliderIdEndInput, this.currentMax, this.sliderIdEnd);
-    this.inputEnd.title = "Upper threshold — type an exact value and press Enter";
+    this.inputStart = this.createSliderInput(
+      this.sliderIdStartInput,
+      this.currentMin,
+      this.sliderIdStart
+    );
+    this.inputStart.title = 'Lower threshold — type an exact value and press Enter';
+    this.inputEnd = this.createSliderInput(
+      this.sliderIdEndInput,
+      this.currentMax,
+      this.sliderIdEnd
+    );
+    this.inputEnd.title = 'Upper threshold — type an exact value and press Enter';
     inputRow.appendChild(this.inputStart);
     inputRow.appendChild(this.inputEnd);
 
     parent.appendChild(slider);
     parent.appendChild(inputRow);
+  }
+
+  createSingleValueIndicator() {
+    const badge = document.createElement('span');
+    badge.className = 'filter-single-value';
+    const value = StaticUtilities.formatNumber(
+      this.sliderMin,
+      this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
+    );
+    const check = document.createElement('span');
+    check.className = 'filter-single-value-check';
+    check.textContent = '✓';
+    check.setAttribute('aria-hidden', 'true');
+    const valueSpan = document.createElement('span');
+    valueSpan.textContent = value;
+    badge.append(check, valueSpan);
+    badge.title = `Single value (${value}) for ${StaticUtilities.formatPropsAsTree(this.propID)} — toggle this property to include or exclude nodes that have it; there is just no range to narrow.`;
+    return badge;
   }
 
   createDivInnerHTML() {
@@ -437,30 +492,36 @@ class InvertibleRangeSlider {
       this.sliderEnd.dispatchEvent(new Event('change'));
     });
 
-    this.sliderStart.addEventListener("input", () => {
+    this.sliderStart.addEventListener('input', () => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
       this.handleThresholdOnInputEvent(true);
     });
-    this.sliderStart.addEventListener("change", async () => {
+    this.sliderStart.addEventListener('change', async () => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
       try {
         this.writeCurrentFilterSettings();
-        await this.cache.fm.handleFilterEvent("Filtering",
-          `Applying lower threshold ${this.sliderStart.value} for ${this.propID}`, this.propID);
+        await this.cache.fm.handleFilterEvent(
+          'Filtering',
+          `Applying lower threshold ${this.sliderStart.value} for ${this.propID}`,
+          this.propID
+        );
       } catch (err) {
         this.cache.ui.error(`Failed to apply lower threshold: ${err.message}`);
       }
     });
-    this.sliderEnd.addEventListener("input", () => {
+    this.sliderEnd.addEventListener('input', () => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
       this.handleThresholdOnInputEvent(false);
     });
-    this.sliderEnd.addEventListener("change", async () => {
+    this.sliderEnd.addEventListener('change', async () => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
       try {
         this.writeCurrentFilterSettings();
-        await this.cache.fm.handleFilterEvent("Filtering",
-          `Applying upper threshold ${this.sliderEnd.value} for ${this.propID}`, this.propID);
+        await this.cache.fm.handleFilterEvent(
+          'Filtering',
+          `Applying upper threshold ${this.sliderEnd.value} for ${this.propID}`,
+          this.propID
+        );
       } catch (err) {
         this.cache.ui.error(`Failed to apply upper threshold: ${err.message}`);
       }
@@ -484,45 +545,69 @@ class InvertibleRangeSlider {
       const leftWidth = this.calcPercentage(isLower ? secondaryValue : primaryValue);
       const rightWidth = this.calcPercentage(isLower ? primaryValue : secondaryValue);
       this.inverseLeft.style.width = leftWidth + '%';
-      this.inverseRight.style.width = (100 - rightWidth) + '%';
+      this.inverseRight.style.width = 100 - rightWidth + '%';
       this.range.style.left = '50%';
       this.inverseLeft.style.backgroundColor = '#C33D35';
       this.inverseRight.style.backgroundColor = '#C33D35';
       if (isLower) {
-        this.labelEnd.innerHTML = StaticUtilities.formatNumber(primaryValue, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION);
-        this.labelStart.innerHTML = StaticUtilities.formatNumber(secondaryValue, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION);
+        this.labelEnd.innerHTML = StaticUtilities.formatNumber(
+          primaryValue,
+          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
+        );
+        this.labelStart.innerHTML = StaticUtilities.formatNumber(
+          secondaryValue,
+          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
+        );
       } else {
-        this.labelStart.innerHTML = StaticUtilities.formatNumber(primaryValue, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION);
-        this.labelEnd.innerHTML = StaticUtilities.formatNumber(secondaryValue, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION);
+        this.labelStart.innerHTML = StaticUtilities.formatNumber(
+          primaryValue,
+          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
+        );
+        this.labelEnd.innerHTML = StaticUtilities.formatNumber(
+          secondaryValue,
+          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
+        );
       }
 
-      this.labelStart.parentElement.classList.add("flipped");
-      this.labelEnd.parentElement.classList.add("flipped");
+      this.labelStart.parentElement.classList.add('flipped');
+      this.labelEnd.parentElement.classList.add('flipped');
 
-      this.inputStart.classList.add("red");
-      this.inputEnd.classList.add("red");
+      this.inputStart.classList.add('red');
+      this.inputEnd.classList.add('red');
     } else {
       const leftPos = this.calcPercentage(isLower ? primaryValue : secondaryValue);
       const rightPos = 100 - this.calcPercentage(isLower ? secondaryValue : primaryValue);
       this.range.style.left = leftPos + '%';
-      this.range.style.width = (100 - leftPos - rightPos) + '%';
+      this.range.style.width = 100 - leftPos - rightPos + '%';
       this.inverseLeft.style.width = leftPos + '%';
       this.inverseRight.style.width = rightPos + '%';
       this.inverseLeft.style.backgroundColor = 'grey';
       this.inverseRight.style.backgroundColor = 'grey';
       if (isLower) {
-        this.labelStart.innerHTML = StaticUtilities.formatNumber(primaryValue, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION);
-        this.labelEnd.innerHTML = StaticUtilities.formatNumber(secondaryValue, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION);
+        this.labelStart.innerHTML = StaticUtilities.formatNumber(
+          primaryValue,
+          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
+        );
+        this.labelEnd.innerHTML = StaticUtilities.formatNumber(
+          secondaryValue,
+          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
+        );
       } else {
-        this.labelStart.innerHTML = StaticUtilities.formatNumber(secondaryValue, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION);
-        this.labelEnd.innerHTML = StaticUtilities.formatNumber(primaryValue, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION);
+        this.labelStart.innerHTML = StaticUtilities.formatNumber(
+          secondaryValue,
+          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
+        );
+        this.labelEnd.innerHTML = StaticUtilities.formatNumber(
+          primaryValue,
+          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
+        );
       }
 
-      this.labelStart.parentElement.classList.remove("flipped");
-      this.labelEnd.parentElement.classList.remove("flipped");
+      this.labelStart.parentElement.classList.remove('flipped');
+      this.labelEnd.parentElement.classList.remove('flipped');
 
-      this.inputStart.classList.remove("red");
-      this.inputEnd.classList.remove("red");
+      this.inputStart.classList.remove('red');
+      this.inputEnd.classList.remove('red');
     }
 
     if (isLower) {
@@ -541,19 +626,27 @@ class InvertibleRangeSlider {
     const clampedMax = Math.min(Math.max(max, this.sliderMin), this.sliderMax);
 
     if (!inverted && min > max) {
-      this.cache.ui.error(`Cannot set min threshold to ${min} and max threshold to ${max} for ${this.propID}`);
+      this.cache.ui.error(
+        `Cannot set min threshold to ${min} and max threshold to ${max} for ${this.propID}`
+      );
       return;
     }
     if (inverted && max < min) {
-      this.cache.ui.error(`Cannot set threshold to LOWER THAN ${min} OR GREATER THAN ${max} for inverted ${this.propID}`);
+      this.cache.ui.error(
+        `Cannot set threshold to LOWER THAN ${min} OR GREATER THAN ${max} for inverted ${this.propID}`
+      );
       return;
     }
 
     if (min < this.sliderMin) {
-      this.cache.ui.warning(`Minimum threshold for ${this.propID} corrected to ${clampedMin} (from ${min})`);
+      this.cache.ui.warning(
+        `Minimum threshold for ${this.propID} corrected to ${clampedMin} (from ${min})`
+      );
     }
     if (max > this.sliderMax) {
-      this.cache.ui.warning(`Maximum threshold for ${this.propID} corrected to ${clampedMax} (from ${max})`);
+      this.cache.ui.warning(
+        `Maximum threshold for ${this.propID} corrected to ${clampedMax} (from ${max})`
+      );
     }
 
     this.sliderStart.value = inverted ? clampedMax : clampedMin;
@@ -573,35 +666,41 @@ class UIComponentManager {
 
   buildDropdownOptions() {
     let selectViewDropdown = document.getElementById('selectView');
-    let selectViewOptions = Object.keys(this.cache.data.layouts).map(key => {
-      let selected = this.cache.data.selectedLayout === key ? "selected" : "";
+    let selectViewOptions = Object.keys(this.cache.data.layouts).map((key) => {
+      let selected = this.cache.data.selectedLayout === key ? 'selected' : '';
       return `<option value="${key}" ${selected}>${key}</option>`;
     });
-    selectViewDropdown.innerHTML = selectViewOptions.join("");
+    selectViewDropdown.innerHTML = selectViewOptions.join('');
   }
 
   createSectionToggleButton(enable, section, subSection = null) {
-    const btn = document.createElement("button");
-    btn.className = "small-btn toggle-section-btn ml-1";
-    if (subSection) btn.classList.add("extra-small");
-    btn.textContent = enable ? "✔" : "✗";
-    btn.title = `${enable ? 'Enable' : 'Disable'} all filters for the ${subSection
-      ? 'group: ' + "\n └─ " + section + "\n        └─ " + subSection
-      : 'section: ' + "\n └─ " + section}`;
+    const btn = document.createElement('button');
+    btn.className = 'small-btn toggle-section-btn ml-1';
+    if (subSection) btn.classList.add('extra-small');
+    btn.textContent = enable ? '✔' : '✗';
+    btn.title = `${enable ? 'Enable' : 'Disable'} all filters for the ${
+      subSection
+        ? 'group: ' + '\n └─ ' + section + '\n        └─ ' + subSection
+        : 'section: ' + '\n └─ ' + section
+    }`;
     btn.onclick = async () => {
-      subSection ? await this.cache.ui.toggleSubSection(enable, section, subSection) : await this.cache.ui.toggleSection(enable, section);
+      subSection
+        ? await this.cache.ui.toggleSubSection(enable, section, subSection)
+        : await this.cache.ui.toggleSection(enable, section);
     };
     return btn;
   }
 
   createSectionResetButton(section, subSection = undefined) {
-    const btn = document.createElement("button");
-    btn.className = "small-btn toggle-section-btn ml-1";
-    if (subSection) btn.classList.add("extra-small");
-    btn.textContent = "⟳";
-    btn.title = `Reset all filters for the ${subSection
-      ? 'group to their default values: ' + "\n └─ " + section + "\n        └─ " + subSection
-      : 'section to their default values: ' + "\n └─ " + section}`;
+    const btn = document.createElement('button');
+    btn.className = 'small-btn toggle-section-btn ml-1';
+    if (subSection) btn.classList.add('extra-small');
+    btn.textContent = '⟳';
+    btn.title = `Reset all filters for the ${
+      subSection
+        ? 'group to their default values: ' + '\n └─ ' + section + '\n        └─ ' + subSection
+        : 'section to their default values: ' + '\n └─ ' + section
+    }`;
     btn.onclick = async () => {
       await this.cache.fm.resetFilters(section, subSection);
     };
@@ -612,28 +711,36 @@ class UIComponentManager {
     const circleButton = document.createElement('div');
     circleButton.className = `circle-button`;
 
-    for (let [group, quadrantPosition] of Object.entries(DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS)) {
+    for (let [group, quadrantPosition] of Object.entries(
+      DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS
+    )) {
       const quadrant = document.createElement('button');
-      quadrant.classList.add("quadrant");
+      quadrant.classList.add('quadrant');
       quadrant.classList.add(quadrantPosition);
-      this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID)[`${group}Members`].size === 0 ? quadrant.classList.remove("active") : quadrant.classList.add("active");
+      this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID)[`${group}Members`]
+        .size === 0
+        ? quadrant.classList.remove('active')
+        : quadrant.classList.add('active');
 
       quadrant.addEventListener('click', async () => {
         try {
-          let shouldShowRemove = quadrant.classList.contains("active");
-          let members = this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID)[`${group}Members`];
+          let shouldShowRemove = quadrant.classList.contains('active');
+          let members =
+            this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID)[
+              `${group}Members`
+            ];
 
           if (shouldShowRemove) {
             this.cache.data.layouts[this.cache.data.selectedLayout][`${group}Props`].delete(propID);
             quadrant.title = `Remove ${propID} from ${group}.`;
             members.delete(propID);
-            quadrant.classList.remove("active");
+            quadrant.classList.remove('active');
             await this.cache.gcm.decideToRenderOrDraw();
           } else {
             this.cache.data.layouts[this.cache.data.selectedLayout][`${group}Props`].add(propID);
             quadrant.title = `Highlight ${propID} and add to bubble-group (${group})`;
             members.add(propID);
-            quadrant.classList.add("active");
+            quadrant.classList.add('active');
             await this.cache.gcm.decideToRenderOrDraw();
           }
         } catch (err) {
@@ -653,12 +760,14 @@ class UIComponentManager {
     circleButton.className = `circle-button-compact`;
     circleButton.id = 'manualBubbleGroupButton';
 
-    for (let [group, quadrantPosition] of Object.entries(DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS)) {
+    for (let [group, quadrantPosition] of Object.entries(
+      DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS
+    )) {
       const quadrant = document.createElement('button');
-      quadrant.classList.add("quadrant");
+      quadrant.classList.add('quadrant');
       quadrant.classList.add(quadrantPosition);
-      quadrant.classList.add("manual");
-      quadrant.classList.add("compact");
+      quadrant.classList.add('manual');
+      quadrant.classList.add('compact');
 
       quadrant.addEventListener('click', async () => {
         try {
@@ -683,7 +792,7 @@ class UIComponentManager {
 
       return `<div class="tooltip-header">
       <div class="tooltip-header-text">
-        <span class="purple">${isEdge ? "Edge" : "Node"}</span>
+        <span class="purple">${isEdge ? 'Edge' : 'Node'}</span>
         <div class="tooltip-header-label">
           <div class="tooltip-header-title">${title}</div>
           ${subtitle}
@@ -713,11 +822,13 @@ class UIComponentManager {
           📊 <span class="tooltip-metric-header"></span>
         </h5>
         <p class="tooltip-metric-content"></p>
-      </div>`
+      </div>`;
       }
     }
 
-    const item = isEdge ? this.cache.edgeRef.get(nodeOrEdgeID) : this.cache.nodeRef.get(nodeOrEdgeID);
+    const item = isEdge
+      ? this.cache.edgeRef.get(nodeOrEdgeID)
+      : this.cache.nodeRef.get(nodeOrEdgeID);
     let tooltip = initAndAddHeader();
     addDescription();
     addMetric();
@@ -737,17 +848,17 @@ class UIComponentManager {
      * Ensures a section object and subSection array exist, then pushes a property item.
      */
     function pushSubSectionProperty(secName, subName, prop, val) {
-      let sectionObj = structuredData.find(s => s.section === secName);
+      let sectionObj = structuredData.find((s) => s.section === secName);
       if (!sectionObj) {
-        sectionObj = {section: secName, subSections: []};
+        sectionObj = { section: secName, subSections: [] };
         structuredData.push(sectionObj);
       }
-      let subObj = sectionObj.subSections.find(sub => sub.name === subName);
+      let subObj = sectionObj.subSections.find((sub) => sub.name === subName);
       if (!subObj) {
-        subObj = {name: subName, props: []};
+        subObj = { name: subName, props: [] };
         sectionObj.subSections.push(subObj);
       }
-      subObj.props.push({key: prop, value: val});
+      subObj.props.push({ key: prop, value: val });
     }
 
     // Gather valid properties, grouped
@@ -783,14 +894,13 @@ class UIComponentManager {
     function flattenBlocks() {
       const blocks = [];
       for (const s of structuredData) {
-        blocks.push({type: "section", text: s.section});
+        blocks.push({ type: 'section', text: s.section });
         for (const sb of s.subSections) {
-          blocks.push({type: "subSection", section: s.section, text: sb.name, props: sb.props});
+          blocks.push({ type: 'subSection', section: s.section, text: sb.name, props: sb.props });
         }
       }
       return blocks;
     }
-
 
     const orderedBlocks = flattenBlocks();
 
@@ -813,7 +923,6 @@ class UIComponentManager {
     // 5) Build the tooltip HTML
     // ------------------
     function buildColumns() {
-
       tooltip += `<hr><div class="tooltip-columns">`;
 
       for (const col of columns) {
@@ -821,13 +930,13 @@ class UIComponentManager {
 
         let startedList = false;
         for (const block of col) {
-          if (block.type === "section") {
+          if (block.type === 'section') {
             // Close a list if it's open before starting a new section
             if (startedList) {
               tooltip += `</ul>`;
               startedList = false;
             }
-          } else if (block.type === "subSection") {
+          } else if (block.type === 'subSection') {
             if (startedList) {
               tooltip += `</ul>`;
               startedList = false;
@@ -861,10 +970,13 @@ class UIComponentManager {
     wrapper.className = 'checkboxWrapper';
     wrapper.id = `filter-${propID}-checkbox-wrapper`;
 
-    const input = this.cache.uiComponents.createCheckboxInput(propID, this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID).active);
+    const input = this.cache.uiComponents.createCheckboxInput(
+      propID,
+      this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID).active
+    );
     const customCheckbox = this.cache.uiComponents.createCustomCheckbox(propID);
     const actionButton = this.cache.uiComponents.createAddToQueryButton(propID);
-    const displayField = document.createElement("span");
+    const displayField = document.createElement('span');
     displayField.className = 'checkboxLabel';
     displayField.textContent = prop;
 
@@ -878,10 +990,14 @@ class UIComponentManager {
     wrapper.addEventListener('change', async () => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
       try {
-        this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID).active = input.checked;
+        this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID).active =
+          input.checked;
         input.checked ? this.cache.activeProps.add(propID) : this.cache.activeProps.delete(propID);
-        let status = input.checked ? "Showing" : "Hiding";
-        await this.cache.fm.handleFilterEvent(`${status} Elements`, `Nodes and related edges for ${propID}`);
+        let status = input.checked ? 'Showing' : 'Hiding';
+        await this.cache.fm.handleFilterEvent(
+          `${status} Elements`,
+          `Nodes and related edges for ${propID}`
+        );
       } catch (err) {
         this.cache.ui.error(`Failed to toggle filter: ${err.message}`);
       }
@@ -914,7 +1030,7 @@ class UIComponentManager {
   createCustomCheckbox(propID) {
     const customCheckbox = document.createElement('span');
     customCheckbox.id = `filter-${propID}-checkbox-inner`;
-    customCheckbox.className = "checkbox checkbox-green";
+    customCheckbox.className = 'checkbox checkbox-green';
     return customCheckbox;
   }
 
@@ -941,20 +1057,21 @@ class UIComponentManager {
         }
       } else if (dropdown) {
         if (this.cache.CFG.QUERY_BTN_USE_CURRENT_FILTER) {
-          queryFragment = `${propID} IN [${[...dropdown.selectedCategories].join(",")}]`
+          queryFragment = `${propID} IN [${[...dropdown.selectedCategories].join(',')}]`;
         } else {
-          queryFragment = `${propID} IN [${[...dropdown.categories].join(",")}]`
+          queryFragment = `${propID} IN [${[...dropdown.categories].join(',')}]`;
         }
       }
 
-      if (this.cache.data.layouts[this.cache.data.selectedLayout]["query"] === undefined) {
+      if (this.cache.data.layouts[this.cache.data.selectedLayout]['query'] === undefined) {
         this.cache.qm.handleQueryValidationEvent(true);
       }
 
       if (!this.cache.query.text.textContent.trim()) {
-        this.cache.data.layouts[this.cache.data.selectedLayout]["query"] = `(${queryFragment})`;
+        this.cache.data.layouts[this.cache.data.selectedLayout]['query'] = `(${queryFragment})`;
       } else {
-        this.cache.data.layouts[this.cache.data.selectedLayout]["query"] += ` OR (${queryFragment})`;
+        this.cache.data.layouts[this.cache.data.selectedLayout]['query'] +=
+          ` OR (${queryFragment})`;
       }
       this.cache.qm.updateQueryTextArea();
     });
@@ -967,8 +1084,8 @@ class UIComponentManager {
   }
 
   createAddOrRemoveToSelectionGroup(propID) {
-    const group = document.createElement("div");
-    group.classList.add("pm-group");
+    const group = document.createElement('div');
+    group.classList.add('pm-group');
 
     const addBtn = this.createAddOrRemoveToSelectionButton(propID, true);
     const removeBtn = this.createAddOrRemoveToSelectionButton(propID, false);
@@ -979,14 +1096,14 @@ class UIComponentManager {
   }
 
   createAddOrRemoveToSelectionButton(propID, shouldAdd) {
-    const btn = document.createElement("button");
-    btn.classList.add("plus-minus-button");
-    btn.textContent = shouldAdd ? "+" : "-";
-    btn.title = shouldAdd ? "Add to selection" : "Remove from selection";
-    btn.addEventListener("click", async () => {
+    const btn = document.createElement('button');
+    btn.classList.add('plus-minus-button');
+    btn.textContent = shouldAdd ? '+' : '-';
+    btn.title = shouldAdd ? 'Add to selection' : 'Remove from selection';
+    btn.addEventListener('click', async () => {
       try {
         if (!this.cache.graph) {
-          this.cache.ui.warning("Please wait for graph to initialize");
+          this.cache.ui.warning('Please wait for graph to initialize');
           return;
         }
 
@@ -1009,4 +1126,4 @@ class UIComponentManager {
   }
 }
 
-export {DropdownChecklist, InvertibleRangeSlider, UIComponentManager};
+export { DropdownChecklist, InvertibleRangeSlider, UIComponentManager };
