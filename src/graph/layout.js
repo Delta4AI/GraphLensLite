@@ -424,13 +424,6 @@ class GraphLayoutManager {
     await this.changeLayout();
   }
 
-  async getPos() {
-    const zoom = await this.cache.graph.getZoom();
-    const pos = await this.cache.graph.getPosition();
-    console.log(`Zoom: ${zoom}`);
-    console.log(`Position: ${pos}`);
-  }
-
   async layoutSelectedNodes(action) {
     const cache = this.cache;
     if (cache.selectedNodes.length === 0) return;

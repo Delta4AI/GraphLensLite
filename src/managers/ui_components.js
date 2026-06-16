@@ -895,17 +895,6 @@ class UIComponentManager {
     return container;
   }
 
-  createQueryButton(propID, prop) {
-    const btn = document.createElement("button");
-    btn.className = "showOnQuery tiny-btn";
-    btn.textContent = "Q";
-    btn.title = `Query for nodes with the property:\n * ${propID}`;
-    btn.onclick = async () => {
-      console.log("foo");
-    };
-    return btn;
-  }
-
   createCheckboxContainer(propID) {
     const container = document.createElement('div');
     container.className = 'checkboxContainer';
