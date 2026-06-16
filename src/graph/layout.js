@@ -222,6 +222,7 @@ class GraphLayoutManager {
 
       this.cache.data.layouts[result.name] = {
         internals: null,
+        layoutType: currentLayout.layoutType,  // inherit origin type for re-layout default
         positions: structuredClone(currentLayout.positions),
         filters: structuredClone(currentLayout.filters),
         isCustom: true,
@@ -278,6 +279,7 @@ class GraphLayoutManager {
       // Create the layout structure first
       this.cache.data.layouts[result.name] = {
         internals: null,
+        layoutType: result.templateType,  // remember origin type for re-layout default
         positions: new Map(),  // Will be filled after layout
         filters: structuredClone(this.cache.data.filterDefaults),  // Reset to defaults
         isCustom: true,  // All layouts are custom (position-based)
@@ -699,6 +701,103 @@ class GraphLayoutManager {
     await this.persistNodePositions();
     await this.handleLayoutChangeLoadingEvent("Remove overlaps",
       "Spread overlapping nodes apart minimally");
+  }
+
+  /**
+   * Re-run a layout algorithm across the ENTIRE current workspace, recomputing
+   * every node's position. Unlike layoutSelectedNodes (selection-scoped) and
+   * removeNodeOverlaps (noverlap-only), this discards the current arrangement
+   * and lays the whole graph out afresh with a chosen algorithm.
+   *
+   * Styles, filters, query and bubble-group membership are untouched — only
+   * positions change. Mirrors the template branch of addLayout (setLayout →
+   * layout → persist → animated transition) but stays on the current workspace
+   * instead of creating a new one. Defaults the picker to the workspace's
+   * original layout type so it doubles as "redo the layout I started with".
+   */
+  async relayoutWorkspace() {
+    const currentName = this.cache.data.selectedLayout;
+    const currentLayout = this.cache.data.layouts[currentName];
+    if (!currentLayout) return;
+
+    const nodeCount = this.cache.graphData?.order ?? this.cache.nodeRef.size;
+    const result = await Popup.layoutSelectDialog(this.cache.DEFAULTS.LAYOUT_INTERNALS, {
+      defaultType: currentLayout.layoutType || this.cache.DEFAULTS.LAYOUT,
+      hasPositions: currentLayout.positions?.size > 0,
+      nodeCount,
+      expensiveLayouts: this.cache.DEFAULTS.EXPENSIVE_LAYOUTS,
+      warningThreshold: this.cache.DEFAULTS.LAYOUT_NODE_WARNING_THRESHOLD,
+    });
+    if (!result) {
+      this.cache.ui.info("Re-layout canceled");
+      return;
+    }
+
+    const layoutType = result.templateType;
+
+    await this.cache.ui.showLoading("Re-layouting Workspace", `Applying ${layoutType} layout`);
+    // Pin the overlay up across the whole re-layout so the inner render's
+    // hideLoading() can't drop it while the layout (possibly an expensive
+    // off-thread worker) and bubble-sync are still running. Released right
+    // before the position tween, and again in finally.
+    this.cache.ui.holdLoading();
+
+    // Snapshot the on-screen positions so the new layout animates IN from them
+    // instead of snapping (same approach as the addLayout template branch).
+    const fromPositions = new Map();
+    this.cache.graphData?.forEachNode((id, attrs) => {
+      if (Number.isFinite(attrs.x) && Number.isFinite(attrs.y)) {
+        fromPositions.set(id, {x: attrs.x, y: attrs.y});
+      }
+    });
+
+    try {
+      await this.cache.graph.setLayout({type: layoutType, ...this.cache.DEFAULTS.LAYOUT_INTERNALS[layoutType]});
+      await this.cache.graph.layout();
+
+      // Remember the chosen type so the next re-layout (and reload) defaults to it.
+      currentLayout.layoutType = layoutType;
+
+      // Persist the freshly computed positions as this workspace's positions.
+      await this.persistNodePositions();
+
+      // Restore the outgoing positions and hand the move to the animated
+      // transition: render paints them in place (pendingLayoutTransition skips
+      // the snap), then runLayoutTransition tweens to the persisted target.
+      const animate = fromPositions.size > 0;
+      if (animate) {
+        for (const [id, p] of fromPositions) {
+          if (this.cache.graphData.hasNode(id)) {
+            this.cache.graphData.mergeNodeAttributes(id, {x: p.x, y: p.y});
+          }
+        }
+        this.cache.graph.pendingLayoutTransition = true;
+      }
+
+      this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED = false;
+      await this.cache.gcm.decideToRenderOrDraw(true);
+
+      // Bubble outlines hug node positions — re-sync them to the new layout.
+      this.cache.bubbleSetChanged = true;
+      await this.cache.bs.updateBubbleSetIfChanged();
+      this.cache.bs.refreshBubbleStyleElements();
+
+      // Graph mutations done — drop the overlay so the tween animates clear.
+      this.cache.ui.releaseLoading();
+      await this.cache.ui.hideLoading();
+
+      if (animate) {
+        await this.cache.graph.runLayoutTransition(currentLayout.positions);
+      }
+
+      this.cache.ui.info(`Re-layouted workspace: ${currentName} (${layoutType})`);
+    } finally {
+      // Defensive: release the hold + drop the overlay on any failure so a
+      // half-applied re-layout never strands a blocked UI; clear the tween flag.
+      this.cache.ui.releaseLoading();
+      await this.cache.ui.hideLoading();
+      if (this.cache.graph) this.cache.graph.pendingLayoutTransition = false;
+    }
   }
 
   async getPositions() {
