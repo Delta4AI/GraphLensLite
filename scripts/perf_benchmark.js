@@ -36,11 +36,15 @@ const FPS_WINDOW_MS = 3000;
 const WHEEL_INTERVAL_MS = 30;
 const DRAG_WARMUP_MS = 1000;
 // An idle rAF ceiling below this means the environment has no usable GPU and is
-// rAF-throttled (CI runners measure ~1.6 fps vs ~59 fps on real hardware). In
-// that regime the FPS gates are capped to the ceiling and the GPU-bound load
-// gate is reported but not enforced — the strict load gate only holds on a real
-// GPU. See measureIdleFpsCeiling and the launch-args comment in main().
+// rAF-throttled (some CI runners measure ~1.6 fps vs ~59 fps on real hardware).
+// Used as a secondary non-representative-environment signal alongside the WebGL
+// renderer string (idle cadence alone is insufficient — a runner can clock rAF
+// at 60 Hz while painting through a software rasterizer at ~4 fps).
 const REALTIME_FPS_FLOOR = 30;
+
+// A WebGL UNMASKED_RENDERER_WEBGL matching any of these is a software
+// rasterizer (no usable GPU), so the GPU-bound gates can't be assessed.
+const SOFTWARE_RENDERER_RE = /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/i;
 
 // Acceptance gates from MIGRATION.md ("Acceptance criteria").
 const GATES = [
@@ -56,6 +60,14 @@ const GATES = [
   { key: 'dragPanFps', label: 'Warm drag-pan FPS', unit: 'fps', limit: 60, op: '>=' },
   { key: 'select500Ms', label: '500-node select', unit: 'ms', limit: 200, op: '<=' },
 ];
+
+// Gates bound by GPU render throughput or frame cadence; unassessable without a
+// real GPU. select500Ms is pure app-level JS, so it stays enforced everywhere.
+const GPU_BOUND_GATE_KEYS = ['loadMs', 'firstInteractionStallMs', 'wheelZoomFps', 'dragPanFps'];
+
+function isSoftwareRenderer(renderer) {
+  return renderer === 'no-webgl' || SOFTWARE_RENDERER_RE.test(renderer);
+}
 
 const MIME = {
   '.html': 'text/html',
@@ -194,6 +206,29 @@ async function measureIdleFpsCeiling(page) {
   await page.waitForTimeout(1000);
   const { fps } = await stopFrameCounter(page);
   return fps;
+}
+
+/**
+ * The active WebGL renderer string (UNMASKED_RENDERER_WEBGL). Distinguishes a
+ * real GPU from a software rasterizer (SwiftShader/llvmpipe), which idle rAF
+ * cadence cannot — a runner can clock rAF at 60 Hz while painting in software.
+ * Returns 'no-webgl' when no context is available.
+ */
+async function detectRenderer(page) {
+  return page.evaluate(() => {
+    try {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+      if (!gl) return 'no-webgl';
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      const renderer = ext
+        ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)
+        : gl.getParameter(gl.RENDERER);
+      return String(renderer || 'unknown');
+    } catch {
+      return 'unknown';
+    }
+  });
 }
 
 /**
@@ -395,6 +430,9 @@ async function main() {
     const idleFps = await measureIdleFpsCeiling(page);
     console.log(`[perf]   ceiling: ${idleFps.toFixed(1)} fps`);
 
+    const renderer = await detectRenderer(page);
+    console.log(`[perf] GPU renderer: ${renderer}`);
+
     console.log('[perf] wheel-zoom FPS (~3 s) ..');
     const wheel = await measureWheelZoomFps(page);
     if (!wheel.zoomChanged) {
@@ -419,19 +457,21 @@ async function main() {
       select500Ms: median(selectRuns),
     };
     // rAF-pinned FPS gates can never exceed the environment's idle ceiling, so
-    // evaluate them against min(raw gate, 0.95 × ceiling). On a no-GPU runner
-    // also stop enforcing the GPU-bound load gate (report-only).
+    // evaluate them against min(raw gate, 0.95 × ceiling).
     const fpsCap = (key) => Math.min(GATES.find((g) => g.key === key).limit, idleFps * 0.95);
-    const gpuLess = idleFps < REALTIME_FPS_FLOOR;
-    if (gpuLess) {
+    // Without a real GPU the render-throughput/frame-cadence gates are
+    // unassessable: report them but don't enforce. Detect via the software
+    // renderer string, with a low idle ceiling as a fallback signal.
+    const nonRepresentative = isSoftwareRenderer(renderer) || idleFps < REALTIME_FPS_FLOOR;
+    if (nonRepresentative) {
       console.warn(
-        `[perf] idle rAF ceiling ${idleFps.toFixed(1)} fps (< ${REALTIME_FPS_FLOOR}) — no-GPU/throttled environment: FPS gates capped to ceiling, load gate report-only. Run on real-GPU hardware for the strict load gate.`
+        `[perf] non-representative environment (renderer "${renderer}", idle ${idleFps.toFixed(1)} fps): GPU-bound gates report-only; only the 500-node select gate is enforced. Run on real-GPU hardware for the full gate set.`
       );
     }
     const gateRows = evaluateGates(
       results,
       { wheelZoomFps: fpsCap('wheelZoomFps'), dragPanFps: fpsCap('dragPanFps') },
-      gpuLess ? new Set(['loadMs']) : new Set()
+      nonRepresentative ? new Set(GPU_BOUND_GATE_KEYS) : new Set()
     );
     printTable(gateRows);
 
@@ -439,6 +479,8 @@ async function main() {
       timestamp: new Date().toISOString(),
       fixture: path.basename(FIXTURE_FILE),
       idleFpsCeiling: idleFps,
+      renderer,
+      nonRepresentative,
       gates: gateRows.map(
         ({ key, label, unit, limit, effectiveLimit, op, measured, skipped, pass }) => ({
           key,
