@@ -2,12 +2,15 @@
  * Node-safe layout execution (MIGRATION.md Phase 5).
  *
  * Maps the app's layout vocabulary (config LAYOUT_INTERNALS: force, circular,
- * radial, concentric, grid, mds, dagre) onto graphology layouts and headless
- * @antv/layout v2 instances. Writes x/y straight into the graphology graph —
- * no DOM/WebGL, so the whole module is unit-testable under vitest.
+ * circlepack, radial, concentric, grid, random, mds, dagre) onto graphology
+ * layouts and headless @antv/layout v2 instances. Writes x/y straight into the
+ * graphology graph — no DOM/WebGL, so the whole module is unit-testable under
+ * vitest.
  */
 import {
   circular,
+  circlepack,
+  random,
   forceAtlas2,
   FA2Layout,
   noverlap,
@@ -224,6 +227,23 @@ async function executeBaseLayout(graph, spec, testOverrides) {
         y: Math.floor(i / cols) * GRID_SPACING,
       });
       i++;
+    });
+    return;
+  }
+  if (type === "circlepack") {
+    // d3-hierarchy circle packing; each node's circle radius is its `size`
+    // attribute (sigma radius, set by graph_model's node mapper). center:0
+    // packs the cluster around the origin. Assigns x/y in place.
+    circlepack.assign(graph, { center: 0 });
+    return;
+  }
+  if (type === "random") {
+    // Uniform scatter around the origin. center:0 shifts random's [0,scale)
+    // range to [-scale/2, scale/2); scale tracks node count so the cloud grows
+    // with the graph instead of collapsing toward a point.
+    random.assign(graph, {
+      center: 0,
+      scale: Math.max(200, 24 * Math.sqrt(graph.order)),
     });
     return;
   }

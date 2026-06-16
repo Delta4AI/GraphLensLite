@@ -6,8 +6,8 @@ import { DEFAULTS } from "../src/config.js";
 // ==========================================================================
 // Layout algorithms (sigma migration Phase 5) — node-safe layout execution
 // for the app's full layout vocabulary (LAYOUT_INTERNALS): graphology
-// circular/forceAtlas2, geometric grid, and headless @antv/layout v2 for
-// radial/concentric/mds. Specs under test are the real config entries.
+// circular/circlepack/random/forceAtlas2, geometric grid, and headless
+// @antv/layout v2 for radial/concentric/mds. Specs are the real config entries.
 // ==========================================================================
 
 const LAYOUT_TYPES = Object.keys(DEFAULTS.LAYOUT_INTERNALS); // force, circular, radial, concentric, grid, mds
@@ -109,6 +109,63 @@ describe("executeLayout — grid", () => {
     }
     const cells = new Set(pts.map((p) => `${p.x},${p.y}`));
     expect(cells.size).toBe(graph.order);
+  });
+});
+
+describe("executeLayout — circlepack", () => {
+  it("packs node circles without overlap, sized by the `size` attribute", async () => {
+    // Arrange: uniform-radius nodes — packed circles must stay ≥ 2r apart
+    const graph = new Graph();
+    const R = 10;
+    for (let i = 0; i < 8; i++) graph.addNode(`n${i}`, { x: 0, y: 0, size: R });
+
+    // Act
+    await executeLayout(graph, specFor("circlepack"));
+
+    // Assert: every pair sits at least the sum of radii apart (minus the
+    // packer's 1e-6 separation fuzz).
+    const pts = positions(graph);
+    for (let i = 0; i < pts.length; i++) {
+      for (let j = i + 1; j < pts.length; j++) {
+        expect(distance(pts[i], pts[j])).toBeGreaterThanOrEqual(2 * R - 1e-3);
+      }
+    }
+  });
+
+  it("grows the packed cluster as node size increases", async () => {
+    // Arrange / Act: same topology, larger circles → wider cluster
+    const extentFor = async (size) => {
+      const graph = new Graph();
+      for (let i = 0; i < 12; i++) graph.addNode(`n${i}`, { x: 0, y: 0, size });
+      await executeLayout(graph, specFor("circlepack"));
+      const pts = positions(graph);
+      const c = centroid(pts);
+      return Math.max(...pts.map((p) => distance(p, c)));
+    };
+
+    // Assert
+    expect(await extentFor(20)).toBeGreaterThan(await extentFor(5));
+  });
+});
+
+describe("executeLayout — random", () => {
+  it("scatters nodes inside the origin-centered box and spreads them out", async () => {
+    // Arrange
+    const graph = starGraph();
+    const half = Math.max(200, 24 * Math.sqrt(graph.order)) / 2;
+
+    // Act
+    await executeLayout(graph, specFor("random"));
+
+    // Assert: every coord lands in [-half, half) (holds for any RNG draw) and
+    // the nodes are not all stacked on a single point.
+    const pts = positions(graph);
+    for (const p of pts) {
+      expect(Math.abs(p.x)).toBeLessThanOrEqual(half);
+      expect(Math.abs(p.y)).toBeLessThanOrEqual(half);
+    }
+    const unique = new Set(pts.map((p) => `${p.x},${p.y}`));
+    expect(unique.size).toBeGreaterThan(1);
   });
 });
 

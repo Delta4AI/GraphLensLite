@@ -168,14 +168,19 @@ const DEFAULTS = {
   LAYOUT: "force",
   // Keys define the layout template vocabulary (workspace-creation dropdown).
   // Option objects ride into the headless @antv/layout classes for
-  // radial/concentric/mds/dagre; force (forceAtlas2.inferSettings), circular
-  // and grid are self-tuning/geometric and take no options.
+  // radial/concentric/mds/dagre; force (forceAtlas2.inferSettings), circular,
+  // circlepack, grid and random are self-tuning/geometric and take no options.
   LAYOUT_INTERNALS: {
     "force": {},
     "circular": {},
+    // Circle packing (d3-hierarchy via graphology). Each node's circle radius
+    // is its `size` attribute (sigma radius); O(n), no expense guard.
+    "circlepack": {},
     "radial": {direction: "LR", nodeSize: 32, unitRadius: 100, linkDistance: 200},
     "concentric": {nodeSize: 32, maxLevelDiff: 0.5, sortBy: 'degree', preventOverlap: true},
     "grid": {},
+    // Uniform random scatter centered on the origin; O(n), no expense guard.
+    "random": {},
     "mds": {nodeSize: 32, linkDistance: 100},
     // Layered/hierarchical (Sugiyama). rankdir TB → ranks flow top-to-bottom
     // (y negated into graphology's y-up frame in layout_algorithms.js);
