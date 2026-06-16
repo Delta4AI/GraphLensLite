@@ -237,9 +237,12 @@ class InvertibleRangeSlider {
     this.sliderMin = defaultFilterData.lowerThreshold;
     this.sliderMax = defaultFilterData.upperThreshold;
     const allInteger = StaticUtilities.isInteger(this.sliderMin) && StaticUtilities.isInteger(this.sliderMax) && !defaultFilterData.hasFloatValues;
-    this.stepSize = allInteger
-      ? this.cache.CFG.FILTER_STEP_SIZE_INTEGER
-      : this.cache.CFG.FILTER_STEP_SIZE_FLOAT;
+    // Integer columns step by whole units (discrete counts). Float columns use
+    // "any" — a continuous control with no value grid, so the column max (and
+    // any high-decimal value) stays exactly selectable via both the slider and
+    // the number box, at any column magnitude. A fixed absolute step floored
+    // the reachable max below the true max and broke selection of the top node.
+    this.stepSize = allInteger ? this.cache.CFG.FILTER_STEP_SIZE_INTEGER : "any";
     this.initializeIds();
     this.inputStart = null;
     this.inputEnd = null;
@@ -300,14 +303,33 @@ class InvertibleRangeSlider {
     this.thumbEnd = document.getElementById(this.thumbEndId);
     this.labelStart = document.getElementById(this.labelStartId);
     this.labelEnd = document.getElementById(this.labelEndId);
+    // The value bubbles ([sign]) and their track parent — positioned with
+    // position:fixed (see positionSigns) so they can extend past the sidebar's
+    // clipped edges into the canvas; z-index alone cannot escape overflow.
+    this.signLeft = this.labelStart ? this.labelStart.parentElement : null;
+    this.signRight = this.labelEnd ? this.labelEnd.parentElement : null;
+    this.track = this.range ? this.range.parentElement : null;
+  }
+
+  // Pins the hover value bubbles to the track ends in viewport coordinates so
+  // they render above everything and are not clipped by the sidebar's
+  // overflow. Recomputed on hover and on scroll/resize while hovered.
+  positionSigns() {
+    if (!this.track || !this.signLeft || !this.signRight) return;
+    const r = this.track.getBoundingClientRect();
+    if (r.width === 0) return; // not laid out yet
+    const midY = r.top + r.height / 2;
+    const lw = this.signLeft.offsetWidth, lh = this.signLeft.offsetHeight;
+    const rw = this.signRight.offsetWidth, rh = this.signRight.offsetHeight;
+    this.signLeft.style.top = `${midY - lh / 2}px`;
+    this.signLeft.style.left = `${Math.max(2, r.left - lw - 8)}px`;
+    this.signRight.style.top = `${midY - rh / 2}px`;
+    this.signRight.style.left = `${Math.min(window.innerWidth - rw - 2, r.right + 8)}px`;
   }
 
   createSliderInput(id, initialValue, relatedSliderId) {
     const input = document.createElement("input");
     input.id = id;
-    input.style.width = '80px';
-    input.style.height = '16px';
-    input.style.boxSizing = 'border-box';
     input.value = initialValue;
     input.addEventListener('keydown', (ev) => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
@@ -346,29 +368,26 @@ class InvertibleRangeSlider {
     }
     this.isValidSlider = true;
 
-    const colLeft = document.createElement('div');
-    colLeft.classList.add('show-on-edit');
-    colLeft.style.transition = 'width 0.2s ease';
-    this.inputStart = this.createSliderInput(this.sliderIdStartInput, this.currentMin, this.sliderIdStart);
-    colLeft.appendChild(this.inputStart);
-
-    const colRight = document.createElement('div');
-    colRight.classList.add('show-on-edit');
-    colRight.style.transition = 'width 0.2s ease';
-    this.inputEnd = this.createSliderInput(this.sliderIdEndInput, this.currentMax, this.sliderIdEnd);
-    colRight.appendChild(this.inputEnd);
-
     const div = document.createElement("div");
     div.innerHTML = this.createDivInnerHTML();
     const slider = div.firstElementChild;
-    slider.classList.add('hide-on-edit');
     slider.style.width = '100%';
     slider.title = `Set the thresholds for the numeric property: ${StaticUtilities.formatPropsAsTree(this.propID)}\n---\n  - Move handles to set min/max (≥ min ∧ ≤ max).\n  - Swap handles to invert (≤ min ∨ ≥ max).\n  - Double-click to reset.`;
 
-    parent.appendChild(div);
-    parent.appendChild(colLeft);
+    // Min/max number boxes are always visible directly under the slider, so
+    // exact thresholds can be typed without a hidden "edit mode". They stay in
+    // sync with the handles via handleThresholdOnInputEvent (writes their values).
+    const inputRow = document.createElement('div');
+    inputRow.className = 'filter-input-row';
+    this.inputStart = this.createSliderInput(this.sliderIdStartInput, this.currentMin, this.sliderIdStart);
+    this.inputStart.title = "Lower threshold — type an exact value and press Enter";
+    this.inputEnd = this.createSliderInput(this.sliderIdEndInput, this.currentMax, this.sliderIdEnd);
+    this.inputEnd.title = "Upper threshold — type an exact value and press Enter";
+    inputRow.appendChild(this.inputStart);
+    inputRow.appendChild(this.inputEnd);
+
     parent.appendChild(slider);
-    parent.appendChild(colRight);
+    parent.appendChild(inputRow);
   }
 
   createDivInnerHTML() {
@@ -381,10 +400,10 @@ class InvertibleRangeSlider {
                  right:${100 - this.calcPercentage(this.currentMax)}%;"></div>
           <span id="${this.thumbStartId}" thumb style="left:${this.calcPercentage(this.currentMin)}%;"></span>
           <span id="${this.thumbEndId}" thumb style="left:${this.calcPercentage(this.currentMax)}%;"></span>
-          <div sign class="left" style="left:0%;">
+          <div sign class="left">
             <span id="${this.labelStartId}">${StaticUtilities.formatNumber(this.currentMin, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION)}</span>
           </div>
-          <div sign class="right" style="left:100%; margin-left: 24px;">
+          <div sign class="right">
             <span id="${this.labelEndId}">${StaticUtilities.formatNumber(this.currentMax, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION)}</span>
           </div>
         </div>
@@ -399,6 +418,19 @@ class InvertibleRangeSlider {
   appendListeners() {
     if (!this.isValidSlider) return;
     this.getDOMReferences();
+
+    // Position the fixed value bubbles on hover; keep them pinned while the
+    // sidebar scrolls or the window resizes during the hover.
+    const reposition = () => this.positionSigns();
+    this.slider.addEventListener('mouseenter', () => {
+      this.positionSigns();
+      window.addEventListener('scroll', reposition, true);
+      window.addEventListener('resize', reposition);
+    });
+    this.slider.addEventListener('mouseleave', () => {
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    });
 
     this.slider.addEventListener('dblclick', () => {
       this.reset();
@@ -658,8 +690,10 @@ class UIComponentManager {
         </div>
       </div>
       <div class="tooltip-header-actions">
-        <button class="tooltip-expand-btn" onclick="window.toggleTooltipExpand(this)">⛶</button>
-        <button class="tooltip-close-btn" onclick="window.closeTooltip(this)">×</button>
+        <!-- no inline onclick: tooltip HTML is sanitized at display time;
+             InteractionManager handles these via a delegated listener -->
+        <button class="tooltip-expand-btn">⛶</button>
+        <button class="tooltip-close-btn">×</button>
       </div>
     </div>
     <div class="tooltip-content">`;
@@ -859,17 +893,6 @@ class UIComponentManager {
     input.checked ? this.cache.activeProps.add(propID) : this.cache.activeProps.delete(propID);
 
     return container;
-  }
-
-  createQueryButton(propID, prop) {
-    const btn = document.createElement("button");
-    btn.className = "showOnQuery tiny-btn";
-    btn.textContent = "Q";
-    btn.title = `Query for nodes with the property:\n * ${propID}`;
-    btn.onclick = async () => {
-      console.log("foo");
-    };
-    return btn;
   }
 
   createCheckboxContainer(propID) {

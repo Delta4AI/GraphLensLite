@@ -1,17 +1,3 @@
-const {
-  Graph,
-  NodeEvent,
-  EdgeEvent,
-  GraphEvent,
-  CanvasEvent,
-  CommonEvent,
-  WindowEvent,
-  Layout,
-  BaseLayout,
-  ExtensionCategory,
-  register
-} = G6;
-
 import {VERSION, DEFAULTS, CFG} from './config.js';
 
 import {GraphCoreManager} from './graph/core.js';
@@ -31,12 +17,15 @@ import {AssistantManager} from './managers/assistant/index.js';
 
 import {ColorScalePicker} from './utilities/color_scale_picker.js';
 import {NumericScalePicker} from './utilities/numeric_scale_picker.js';
+import {PieChartPicker} from './utilities/pie_chart_picker.js';
 import {DataTable, buildDataTable} from "./utilities/data_editor.js";
 import {StringDemoDataLoader} from "./utilities/demo_loader.js";
 import {Popup} from "./utilities/popup.js";
 import {StaticUtilities} from "./utilities/static.js";
 import {generateTourData, GuidedTour} from "./utilities/tour.js";
 import {initApiClient} from "./managers/api_client.js";
+import {initTheme} from "./utilities/theme.js";
+import {initSelectionHud} from "./utilities/selection_hud.js";
 
 
 // Stores all reference objects
@@ -46,7 +35,7 @@ class Cache {
 
   reset() {
     this.initialized = false;
-    this.graph = null;  // The G6 graph object
+    this.graph = null;  // The renderer adapter (SigmaAdapter)
 
     // Stores json serializable data that is essential to reconstruct the graph
     this.data = {
@@ -76,20 +65,11 @@ class Cache {
     };
 
     this.EVENT_LOCKS = {
-      BEFORE_DRAW_RUNNING: false,
       AFTER_DRAW_RUNNING: false,
-      DRAG_END_RUNNING: false,
-      BEFORE_RENDER_RUNNING: false,
-      AFTER_RENDER_RUNNING: false,
-      BEFORE_LAYOUT_RUNNING: false,
-      AFTER_LAYOUT_RUNNING: false,
       ONCE_AFTER_RENDER_RUNNING: false,
       ONCE_AFTER_RENDER_COMPLETED: false,
-      IS_DESELECTING: false,
       BUBBLE_GROUP_REDRAW_RUNNING: false,
       TRIGGER_SET_LAYOUT_ONCE: false,
-      HOTKEY_EVENTS_REGISTERED: false,
-      GLOBAL_EVENTS_REGISTERED: false,
       SKIP_QUERY_VALIDATION: false,
       QUERY_SELECTION_EVENT: false,
       QUERY_UPDATE_EVENT: false,
@@ -111,6 +91,7 @@ class Cache {
     this.style = new GraphStyleManager(this);
     this.picker = new ColorScalePicker(this);
     this.numericPicker = new NumericScalePicker(this);
+    this.piePicker = new PieChartPicker(this);
     this.dataTable = new DataTable(this);
     this.metrics = new NetworkMetrics(this);
     this.assistant = new AssistantManager(this);
@@ -198,6 +179,11 @@ class Cache {
 
     this.iterNodes();
     this.iterEdges();
+
+    // NOTE: cache.graphData (the graphology model) is built exclusively by
+    // gcm.createGraphInstance — a single owner keeps the renderer and the
+    // model from ever diverging across reload cycles.
+    this.graphData = null;
 
     this.dataTable.init();
   }
@@ -406,6 +392,11 @@ async function loadDemoData() {
         cache.ui.buildUI();
 
         await cache.gcm.createGraphInstance();
+        if (!cache.graph) {
+          await cache.ui.hideLoading();
+          resolve(false);
+          return;
+        }
         await cache.graph.render();
         resolve(true);
       } else {
@@ -446,6 +437,10 @@ async function startTour() {
   cache.ui.buildUI();
 
   await cache.gcm.createGraphInstance();
+  if (!cache.graph) {
+    await cache.ui.hideLoading();
+    return;
+  }
   await cache.graph.render();
   await cache.ui.hideLoading();
 
@@ -463,17 +458,19 @@ window.cache = cache;
 
 window.addEventListener('resize', () => {
   if (window.graph !== undefined && window.graph !== null && window.cache.initialized) {
-    const editModeActive = document.getElementById("editBtn").classList.contains("active");
     const sidebar = document.getElementById("sidebar");
-    const sidebarContentContainer = document.getElementById("sidebarContentContainer");
     const status = document.getElementById("sidebarStatusContainer");
 
-    status.style.maxWidth = editModeActive ? `${sidebarContentContainer.offsetWidth}px` : `${sidebar.offsetWidth}px`;
+    status.style.maxWidth = `${sidebar.offsetWidth}px`;
   }
 })
 
 window.addEventListener("DOMContentLoaded", () => {
+  // Stored preference wins; prefers-color-scheme is only the first-run default.
+  initTheme(document, window);
   cache.reset();
+  cache.ui.updateDarkModeButton();
+  initSelectionHud();
   // cache.initialize();
 
   // Display version info
@@ -532,13 +529,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
     sidebar.style.width = `${newWidth}px`;
 
-    // Update status container max-width if needed
-    const editModeActive = document.getElementById("editBtn")?.classList.contains("active");
-    const sidebarContentContainer = document.getElementById("sidebarContentContainer");
+    // Update status container max-width to match the new sidebar width
     const status = document.getElementById("sidebarStatusContainer");
-
-    if (status && sidebarContentContainer) {
-      status.style.maxWidth = editModeActive ? `${sidebarContentContainer.offsetWidth}px` : `${newWidth}px`;
+    if (status) {
+      status.style.maxWidth = `${newWidth}px`;
     }
 
     isResizing = false;

@@ -1,6 +1,17 @@
 import {Popup} from "../utilities/popup.js";
+import {buildVisibleGraph} from "../graph/visible_graph.js";
+import {
+  betweennessCentrality,
+  closenessCentrality,
+  degreeCentrality,
+  density,
+  diameter,
+  eigenvectorCentrality,
+  pagerank,
+} from "../lib/graphology.bundle.mjs";
 
 const NODE_CONNECTIVITY_METRICS_PRECISION = 5;
+const POWER_ITERATION_OPTIONS = {maxIterations: 100, tolerance: 1e-6};
 const METRIC_VALUE_LABELS = {
   centrality: "Centrality",
   betweenness: "Score",
@@ -40,9 +51,16 @@ class NetworkMetrics {
     this.multiselect = null;
     this.table = null;
     this.m = metrics;
-    this.collapsed = false;
+    // Panel starts visually closed (CSS .nw-root is max-height:0). Metrics are
+    // computed lazily — only while the panel is open — so this gate must start
+    // true to match the DOM and avoid an eager compute on first load.
+    this.collapsed = true;
     this.cache = cache;
     this.metricValueCache = new Map();
+    // Tracks whether any node tooltip currently carries metric text, so
+    // invalidation can blank stale values without parsing every tooltip when
+    // metrics were never shown.
+    this.metricTooltipsActive = false;
 
     this.selectBtns = {
       'Add to Selection': async () => this.updateSelectedNodes(true),
@@ -74,51 +92,77 @@ class NetworkMetrics {
     }
 
     this.collapsed = !willOpen;
+
+    // Compute on open: the panel and tooltips are only refreshed while visible,
+    // so opening is the trigger that fills (or refreshes) the selected metric.
+    if (willOpen) {
+      this.updateMetricUI().catch(err =>
+        this.cache.ui.error(`Failed to update metrics: ${err.message}`)
+      );
+    }
   }
 
   async updateMetricUI() {
-    if (!this.cache.visibleElementsChanged) return;
+    // Lazy compute: skip the expensive graph algorithms while the panel is
+    // closed. Stale tooltip values can't linger because invalidateMetricValues
+    // blanks them on every visibility change; reopening the panel recomputes
+    // via toggleUI. This stops betweenness/eigenvector from running on every
+    // filter drag when nobody is looking at metrics.
+    if (this.collapsed) return;
+
+    // Recompute when visibility changed OR the selected metric was never
+    // computed. Under sigma a fresh load produces no visibility diff (elements
+    // start visible), so gating on the flag alone would block metrics forever.
+    const cached = this.metricValueCache.get(this.selected);
+    if (!this.cache.visibleElementsChanged && cached?.values?.size) return;
 
     const metricName = this.m[this.selected].label;
     await this.cache.ui.showLoading("Calculating", `Network Metric: ${metricName}`);
     await new Promise(resolve => requestAnimationFrame(resolve));
 
-    this.resetNodeToolTipMetricTexts();
+    // try/finally so a failing calculation (e.g. non-converging eigenvector)
+    // never leaves the loading overlay stuck on screen.
+    try {
+      this.resetNodeToolTipMetricTexts();
+      this.metricTooltipsActive = false;
 
-    const metricResult = await this.m[this.selected]?.calculate(this.cache);
-    this.storeMetricValues(this.selected, metricResult);
+      const metricResult = await this.m[this.selected]?.calculate(this.cache);
+      this.storeMetricValues(this.selected, metricResult);
 
-    /* multiselect */
-    const selectedValues = Array.from(this.multiselect.selectedOptions, opt => opt.value);
+      /* multiselect */
+      const selectedValues = Array.from(this.multiselect.selectedOptions, opt => opt.value);
 
-    this.multiselect.innerHTML = '';
-    for (const ns of metricResult.scores) {
-      const opt = document.createElement('option');
-      opt.value = ns.id;
-      opt.textContent = `${ns.id} | ${ns.text}`;
-      opt.selected = selectedValues.includes(ns.id);
-      this.updateNodeToolTipMetricText(ns.id, metricName, ns.text);
-      this.multiselect.appendChild(opt);
+      this.multiselect.innerHTML = '';
+      for (const ns of metricResult.scores) {
+        const opt = document.createElement('option');
+        opt.value = ns.id;
+        opt.textContent = `${ns.id} | ${ns.text}`;
+        opt.selected = selectedValues.includes(ns.id);
+        this.updateNodeToolTipMetricText(ns.id, metricName, ns.text);
+        this.multiselect.appendChild(opt);
+      }
+      this.metricTooltipsActive = metricResult.scores.length > 0;
+
+      /* graph-level table */
+      this.table.innerHTML = '';
+      Object.entries(metricResult.graphLevelMetrics).forEach(([label, value]) => {
+        const row = document.createElement('tr');
+        const labelCell = document.createElement('td');
+        labelCell.textContent = label;
+        const valueCell = document.createElement('td');
+        valueCell.textContent = `${value}`;
+        row.append(labelCell, valueCell);
+        this.table.appendChild(row);
+      });
+
+      /* tooltip */
+      document.getElementById("metricInfoBtn").onclick = () => {
+        this.cache.popup = new Popup(metricResult.popupContent, {title: metricResult.popupTitle, width: '400px'});
+      };
+    } finally {
+      await this.cache.ui.hideLoading();
+      await new Promise(resolve => requestAnimationFrame(resolve));
     }
-
-    /* graph-level table */
-    this.table.innerHTML = '';
-    Object.entries(metricResult.graphLevelMetrics).forEach(([label, value]) => {
-      const row = document.createElement('tr');
-      const labelCell = document.createElement('td');
-      labelCell.textContent = label;
-      const valueCell = document.createElement('td');
-      valueCell.textContent = `${value}`;
-      row.append(labelCell, valueCell);
-      this.table.appendChild(row);
-    });
-
-    /* tooltip */
-    document.getElementById("metricInfoBtn").onclick = () => {
-      this.cache.popup = new Popup(metricResult.popupContent, {title: metricResult.popupTitle, width: '400px'});
-    };
-    await this.cache.ui.hideLoading();
-    await new Promise(resolve => requestAnimationFrame(resolve));
   }
 
   storeMetricValues(metricId, metricResult) {
@@ -132,6 +176,14 @@ class NetworkMetrics {
 
   invalidateMetricValues() {
     this.metricValueCache.clear();
+    // Blank per-node tooltip metric text so a value computed for the previous
+    // subgraph is never shown after filtering. Cheap string work, and skipped
+    // entirely when no tooltip carries metric text (the common closed-panel
+    // case). Reopening the panel recomputes and repopulates.
+    if (this.metricTooltipsActive) {
+      this.resetNodeToolTipMetricTexts();
+      this.metricTooltipsActive = false;
+    }
   }
 
   async ensureMetricValues(metricId) {
@@ -145,11 +197,13 @@ class NetworkMetrics {
     await this.cache.ui.showLoading("Calculating", `Network Metric: ${metricName}`);
     await new Promise(resolve => requestAnimationFrame(resolve));
 
-    const metricResult = await metric.calculate(this.cache);
-    this.storeMetricValues(metricId, metricResult);
-
-    await this.cache.ui.hideLoading();
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    try {
+      const metricResult = await metric.calculate(this.cache);
+      this.storeMetricValues(metricId, metricResult);
+    } finally {
+      await this.cache.ui.hideLoading();
+      await new Promise(resolve => requestAnimationFrame(resolve));
+    }
     return this.metricValueCache.get(metricId) || null;
   }
 
@@ -302,51 +356,43 @@ class NetworkMetrics {
   }
 }
 
-async function calculateDegreeCentrality(cache) {
-  const {nodeIDsToBeShown: nodes, edgeIDsToBeShown: edges, edgeRef} = cache;
+/** Maps a graphology-metrics result object to [{id, value}] sorted desc. */
+function descendingScores(centralities) {
+  return Object.entries(centralities)
+    .map(([id, value]) => ({id, value}))
+    .sort((a, b) => b.value - a.value);
+}
 
-  const n = nodes.size;
-  if (n === 0) {
+async function calculateDegreeCentrality(cache) {
+  const graph = buildVisibleGraph(cache);
+  const n = graph.order;
+  // Uniform n <= 1 guard across all five calculators: degreeCentrality
+  // divides by (n - 1) and returns NaN for a single node, and centrality of
+  // a lone node is meaningless anyway, so every metric returns the same
+  // empty shape instead of per-library edge-case values.
+  if (n <= 1) {
     return {scores: [], graphLevelMetrics: {}};
   }
 
-  // 1. Degree accumulation
-  const degree = new Map();
-  for (const id of nodes) degree.set(id, 0);
-
-  for (const edgeId of edges) {
-    const {source, target} = edgeRef.get(edgeId);
-    if (degree.has(source)) degree.set(source, degree.get(source) + 1);
-    if (degree.has(target)) degree.set(target, degree.get(target) + 1);
-  }
-
-  // 2. Centrality + statistics
-  const scores = [];
-  let sum = 0, min = Infinity, max = -Infinity;
-
-  for (const [id, d] of degree) {
-    const c = d / (n - 1);                // Freeman degree centrality
-    scores.push({id, degree: d, centrality: c});
-    sum += c;
-    if (c < min) min = c;
-    if (c > max) max = c;
-  }
-
-  scores.sort((a, b) => b.centrality - a.centrality);
-  const median = scores[Math.floor(n / 2)].centrality;
+  const scores = descendingScores(degreeCentrality(graph));
+  const max = scores[0].value;
+  const min = scores[scores.length - 1].value;
+  const sum = scores.reduce((acc, s) => acc + s.value, 0);
   const mean = sum / n;
+  const median = scores[Math.floor(n / 2)].value;
+  // Avoid division by zero in percentage calculations (all-zero scores)
+  const maxForPercentage = max || 1;
 
   // Freeman network centralization (undirected)
   const centralization = (n > 2)
-    ? scores.reduce((acc, s) => acc + (max - s.centrality), 0) /
-    ((n - 1) * (n - 2))
+    ? scores.reduce((acc, s) => acc + (max - s.value), 0) / ((n - 1) * (n - 2))
     : 0;
 
-  const nodeValues = new Map(scores.map(s => [s.id, s.centrality]));
+  const nodeValues = new Map(scores.map(s => [s.id, s.value]));
   return {
     scores: scores.map(s => ({
       id: s.id,
-      text: `Degree ${s.degree} | Centrality ${s.centrality.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)} (${Math.round((s.centrality / max) * 100)} %)`
+      text: `Degree ${graph.degree(s.id)} | Centrality ${s.value.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)} (${Math.round((s.value / maxForPercentage) * 100)} %)`
     })),
     nodeValues,
     graphLevelMetrics: {
@@ -354,7 +400,7 @@ async function calculateDegreeCentrality(cache) {
       "Minimum Degree Centrality": min * (n - 1),
       "Average Degree Centrality": +(mean * (n - 1)).toFixed(NODE_CONNECTIVITY_METRICS_PRECISION),
       "Median Degree": +(median * (n - 1)).toFixed(NODE_CONNECTIVITY_METRICS_PRECISION),
-      "Graph Density": +(sum / n).toFixed(NODE_CONNECTIVITY_METRICS_PRECISION),
+      "Graph Density": +density(graph).toFixed(NODE_CONNECTIVITY_METRICS_PRECISION),
       "Centralization": +centralization.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)
     },
     popupTitle: 'Degree Centrality',
@@ -401,103 +447,33 @@ Nodes with more connections are considered more central and receive a higher sco
 }
 
 async function calculateBetweennessCentrality(cache) {
-  const {nodeIDsToBeShown: nodes, edgeIDsToBeShown: edges, edgeRef} = cache;
-
-  const n = nodes.size;
-  if (n === 0) {
+  const graph = buildVisibleGraph(cache);
+  const n = graph.order;
+  // Uniform n <= 1 guard — see calculateDegreeCentrality.
+  if (n <= 1) {
     return {scores: [], graphLevelMetrics: {}};
   }
 
-  // Build adjacency map
-  const adjacencyMap = new Map();
-  for (const id of nodes) adjacencyMap.set(id, new Set());
-  for (const edgeId of edges) {
-    const {source, target} = edgeRef.get(edgeId);
-    if (adjacencyMap.has(source)) adjacencyMap.get(source).add(target);
-    if (adjacencyMap.has(target)) adjacencyMap.get(target).add(source);
-  }
-
-  // Initialize betweenness scores
-  const betweenness = new Map();
-  for (const id of nodes) betweenness.set(id, 0);
-
-  // Process each node as source
-  for (const source of nodes) {
-    // Initialize data structures for BFS
-    const distance = new Map();
-    const paths = new Map();
-    const queue = [];
-    const stack = []; // for dependency accumulation
-
-    // Initialize source node
-    distance.set(source, 0);
-    paths.set(source, 1);
-    queue.push(source);
-
-    // BFS phase
-    while (queue.length > 0) {
-      const node = queue.shift();
-      stack.push(node);
-
-      for (const neighbor of adjacencyMap.get(node)) {
-        // Node discovered for first time?
-        if (!distance.has(neighbor)) {
-          queue.push(neighbor);
-          distance.set(neighbor, distance.get(node) + 1);
-          paths.set(neighbor, paths.get(node));
-        }
-        // Another shortest path found?
-        else if (distance.get(neighbor) === distance.get(node) + 1) {
-          paths.set(neighbor, paths.get(neighbor) + paths.get(node));
-        }
-      }
-    }
-
-    // Dependency accumulation phase
-    const dependency = new Map();
-    for (const node of nodes) dependency.set(node, 0);
-
-    // Process nodes in reverse order of discovery
-    while (stack.length > 0) {
-      const node = stack.pop();
-      if (node === source) continue;
-
-      for (const neighbor of adjacencyMap.get(node)) {
-        if (distance.get(neighbor) === distance.get(node) - 1) {
-          const coeff = (paths.get(neighbor) / paths.get(node)) * (1 + dependency.get(node));
-          dependency.set(neighbor, dependency.get(neighbor) + coeff);
-        }
-      }
-
-      betweenness.set(node, betweenness.get(node) + dependency.get(node) / 2);
-    }
-  }
-
-  // Normalize scores and prepare results
-  const scores = [];
-  let max = -Infinity;
-  const normalizationFactor = ((n - 1) * (n - 2)) / 2;
-
-  for (const [id, score] of betweenness) {
-    const normalizedScore = score / normalizationFactor;
-    scores.push({id, score: normalizedScore});
-    if (normalizedScore > max) max = normalizedScore;
-  }
-
-  scores.sort((a, b) => b.score - a.score);
-
-  // Calculate graph level metrics
-  const centralityValues = scores.map(s => s.score);
-  const sum = centralityValues.reduce((a, b) => a + b, 0);
+  // Brandes' algorithm; normalized pair-count scaling 2/((n-1)(n-2)) matches
+  // the previous implementation. getEdgeWeight: null selects the unweighted
+  // BFS variant.
+  const centralities = betweennessCentrality(graph, {getEdgeWeight: null, normalized: true});
+  const scores = descendingScores(centralities);
+  const max = scores[0].value;
+  const min = scores[scores.length - 1].value;
+  const sum = scores.reduce((acc, s) => acc + s.value, 0);
   const mean = sum / n;
-  const min = Math.min(...centralityValues);
-  const centralization = scores.reduce((acc, s) => acc + (max - s.score), 0) / ((n - 1) * (n - 2) / 2);
+  // Avoid division by zero in percentage calculations (all-zero scores)
+  const maxForPercentage = max || 1;
+  const centralization = (n > 2)
+    ? scores.reduce((acc, s) => acc + (max - s.value), 0) / ((n - 1) * (n - 2) / 2)
+    : 0;
 
-  const nodeValues = new Map(scores.map(s => [s.id, s.score]));
+  const nodeValues = new Map(scores.map(s => [s.id, s.value]));
   return {
     scores: scores.map(s => ({
       id: s.id,
-      text: `Score: ${s.score.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)} (${Math.round((s.score / max) * 100)}%)`
+      text: `Score: ${s.value.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)} (${Math.round((s.value / maxForPercentage) * 100)}%)`
     })),
     nodeValues,
     graphLevelMetrics: {
@@ -544,81 +520,40 @@ Nodes with high betweenness centrality are important controllers of information 
 }
 
 async function calculateClosenessCentrality(cache) {
-  const {nodeIDsToBeShown: nodes, edgeIDsToBeShown: edges, edgeRef} = cache;
+  const graph = buildVisibleGraph(cache);
+  const n = graph.order;
+  // Uniform n <= 1 guard — see calculateDegreeCentrality.
+  if (n <= 1) return {scores: [], graphLevelMetrics: {}};
 
-  const n = nodes.size;
-  if (n === 0) return {scores: [], graphLevelMetrics: {}};
-
-  // Build adjacency list
-  const graphMap = new Map();
-  for (const id of nodes) graphMap.set(id, new Set());
-
-  for (const edgeId of edges) {
-    const {source, target} = edgeRef.get(edgeId);
-    if (graphMap.has(source) && graphMap.has(target)) {
-      graphMap.get(source).add(target);
-      graphMap.get(target).add(source);
-    }
-  }
-
-  // Calculate shortest paths using BFS
-  function bfs(start) {
-    const distances = new Map();
-    const queue = [[start, 0]];
-    distances.set(start, 0);
-
-    while (queue.length > 0) {
-      const [node, dist] = queue.shift();
-      for (const neighbor of graphMap.get(node)) {
-        if (!distances.has(neighbor)) {
-          distances.set(neighbor, dist + 1);
-          queue.push([neighbor, dist + 1]);
-        }
-      }
-    }
-    return distances;
-  }
-
-  const scores = [];
-  let sum = 0, min = Infinity, max = -Infinity;
-
-  for (const nodeId of nodes) {
-    const distances = bfs(nodeId);
-    const reachableNodes = distances.size;
-
-    // Skip unreachable nodes in total distance calculation
-    const totalDistance = Array.from(distances.values())
-      .filter(d => d > 0)  // Exclude self-distance
-      .reduce((a, b) => a + b, 0);
-
-    // Wasserman and Faust (1994) formula for disconnected graphs
-    const closeness = totalDistance > 0 ?
-      ((reachableNodes - 1) * (reachableNodes - 1)) / ((n - 1) * totalDistance) : 0;
-
-    scores.push({id: nodeId, closeness});
-    sum += closeness;
-    if (closeness < min) min = closeness;
-    if (closeness > max) max = closeness;
-  }
-
-  scores.sort((a, b) => b.closeness - a.closeness);
+  // wassermanFaust keeps the disconnected-graph correction the previous
+  // implementation used: closeness scaled by reachable-fraction (count/(n-1)).
+  const centralities = closenessCentrality(graph, {wassermanFaust: true});
+  const scores = descendingScores(centralities);
+  const max = scores[0].value;
+  const min = scores[scores.length - 1].value;
+  const sum = scores.reduce((acc, s) => acc + s.value, 0);
   const mean = sum / n;
 
   // Avoid division by zero in percentage calculations
   const maxForPercentage = max || 1;
+  const centralization = (n > 2)
+    ? (n * max - sum) / ((n - 1) * (n - 2) / (2 * n - 3))
+    : 0;
+  const graphDiameter = diameter(graph);
 
-  const nodeValues = new Map(scores.map(s => [s.id, s.closeness]));
+  const nodeValues = new Map(scores.map(s => [s.id, s.value]));
   return {
     scores: scores.map(s => ({
       id: s.id,
-      text: `Score: ${s.closeness.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)} (${Math.round((s.closeness / maxForPercentage) * 100)}%)`
+      text: `Score: ${s.value.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)} (${Math.round((s.value / maxForPercentage) * 100)}%)`
     })),
     nodeValues,
     graphLevelMetrics: {
       "Maximum Closeness Centrality": +max.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION),
       "Minimum Closeness Centrality": +min.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION),
       "Average Closeness Centrality": +mean.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION),
-      "Centralization": +((n * max - sum) / ((n - 1) * (n - 2) / (2 * n - 3))).toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)
+      "Graph Diameter": Number.isFinite(graphDiameter) ? graphDiameter : "∞ (disconnected)",
+      "Centralization": +centralization.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)
     },
     popupTitle: 'Closeness Centrality',
     popupContent: `<div>
@@ -652,6 +587,9 @@ async function calculateClosenessCentrality(cache) {
 </svg>
 <hr>
 <p>
+<strong>Graph Diameter:</strong> Length of the longest shortest path between any two nodes; ∞ when the visible graph is disconnected.
+</p>
+<p>
 <strong>Centralization:</strong> Freeman closeness-centralization — degree to which one node is, on average, closer to all others than the rest of the network.
 </p>
 </div>`
@@ -659,67 +597,37 @@ async function calculateClosenessCentrality(cache) {
 }
 
 async function calculateEigenvectorCentrality(cache) {
-  const {nodeIDsToBeShown: nodes, edgeIDsToBeShown: edges, edgeRef} = cache;
+  const graph = buildVisibleGraph(cache);
+  const n = graph.order;
+  // Uniform n <= 1 guard — see calculateDegreeCentrality.
+  if (n <= 1) return {scores: [], graphLevelMetrics: {}};
 
-  const n = nodes.size;
-  if (n === 0) return {scores: [], graphLevelMetrics: {}};
-
-  // Initialize adjacency matrix and eigenvector
-  const matrix = Array(n).fill().map(() => Array(n).fill(0));
-  const nodeArray = Array.from(nodes);
-  const nodeIndex = new Map(nodeArray.map((id, i) => [id, i]));
-
-  // Build adjacency matrix
-  for (const edgeId of edges) {
-    const {source, target} = edgeRef.get(edgeId);
-    if (nodeIndex.has(source) && nodeIndex.has(target)) {
-      const i = nodeIndex.get(source), j = nodeIndex.get(target);
-      matrix[i][j] = matrix[j][i] = 1;
-    }
+  // graphology-metrics throws when the power iteration fails to converge
+  // (instead of silently returning a non-converged iterate like the previous
+  // implementation). Surface a clear message through the UI failure path.
+  let centralities;
+  try {
+    centralities = eigenvectorCentrality(graph, POWER_ITERATION_OPTIONS);
+  } catch {
+    throw new Error(
+      'Eigenvector centrality did not converge for the visible graph — try a different metric or filter to a denser subgraph.'
+    );
   }
 
-  // Power iteration method
-  let eigenVector = Array(n).fill(1 / n);
-  let prevEigenVector;
-  const maxIterations = 100;
-  const tolerance = 1e-6;
+  const scores = descendingScores(centralities);
+  const max = scores[0].value;
+  const min = scores[scores.length - 1].value;
+  const sum = scores.reduce((acc, s) => acc + s.value, 0);
+  const mean = sum / n;
+  const variance = scores.reduce((acc, s) => acc + Math.pow(s.value - mean, 2), 0) / n;
+  // Avoid division by zero in percentage calculations (all-zero scores)
+  const maxForPercentage = max || 1;
 
-  for (let iter = 0; iter < maxIterations; iter++) {
-    prevEigenVector = [...eigenVector];
-    eigenVector = Array(n).fill(0);
-
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        eigenVector[i] += matrix[i][j] * prevEigenVector[j];
-      }
-    }
-
-    // Normalize
-    const norm = Math.sqrt(eigenVector.reduce((sum, x) => sum + x * x, 0));
-    eigenVector = eigenVector.map(x => x / norm);
-
-    // Check convergence
-    if (eigenVector.every((x, i) => Math.abs(x - prevEigenVector[i]) < tolerance)) break;
-  }
-
-  // Prepare scores
-  const scores = eigenVector.map((score, i) => ({
-    id: nodeArray[i],
-    centrality: score
-  }));
-
-  scores.sort((a, b) => b.centrality - a.centrality);
-  const max = scores[0].centrality;
-  const min = scores[scores.length - 1].centrality;
-
-  const mean = eigenVector.reduce((a, b) => a + b) / n;
-  const variance = eigenVector.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / n;
-
-  const nodeValues = new Map(scores.map(s => [s.id, s.centrality]));
+  const nodeValues = new Map(scores.map(s => [s.id, s.value]));
   return {
     scores: scores.map(s => ({
       id: s.id,
-      text: `Score: ${s.centrality.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)} (${Math.round((s.centrality / max) * 100)}%)`
+      text: `Score: ${s.value.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)} (${Math.round((s.value / maxForPercentage) * 100)}%)`
     })),
     nodeValues,
     graphLevelMetrics: {
@@ -727,7 +635,7 @@ async function calculateEigenvectorCentrality(cache) {
       "Minimum Eigenvector Centrality": +min.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION),
       "Average Eigenvector Centrality": +mean.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION),
       "Variance Eigenvector Centrality": +variance.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION),
-      "Centralization": +(scores.reduce((acc, s) => acc + (max - s.centrality), 0) / (n - 1)).toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)
+      "Centralization": +(scores.reduce((acc, s) => acc + (max - s.value), 0) / (n - 1)).toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)
     },
     popupTitle: 'Eigenvector Centrality',
     popupContent: `<div>
@@ -735,8 +643,10 @@ async function calculateEigenvectorCentrality(cache) {
 links to influential neighbours matter more than links to peripheral ones.
 <a href="https://doi.org/10.1093/oso/9780198805090.003.0006">Newman, 2010</a>
 </p>
-<p><strong>Note:</strong> 
+<p><strong>Note:</strong>
   This implementation treats all graphs as undirected when calculating influence scores.
+  If the power iteration does not converge for the visible graph, an error is reported
+  instead of partial scores.
 </p>
 <p>
 <strong>Parameters:</strong>
@@ -774,79 +684,36 @@ links to influential neighbours matter more than links to peripheral ones.
 }
 
 async function calculatePageRank(cache) {
-  const {nodeIDsToBeShown: nodes, edgeIDsToBeShown: edges, edgeRef} = cache;
+  const graph = buildVisibleGraph(cache);
+  const n = graph.order;
+  // Uniform n <= 1 guard — see calculateDegreeCentrality.
+  if (n <= 1) return {scores: [], graphLevelMetrics: {}};
 
-  const n = nodes.size;
-  if (n === 0) return {scores: [], graphLevelMetrics: {}};
+  // Same convention as the previous implementation: undirected edges walked
+  // in both directions, dangling/isolated mass redistributed uniformly.
+  const ranks = pagerank(graph, {alpha: 0.85, ...POWER_ITERATION_OPTIONS});
+  const sortedScores = descendingScores(ranks);
 
-  const nodeArray = Array.from(nodes);
-  const nodeIndex = new Map(nodeArray.map((id, i) => [id, i]));
-  const matrix = Array(n).fill().map(() => Array(n).fill(0));
-  const degrees = Array(n).fill(0);
+  const maxScore = sortedScores[0].value;
+  const minScore = sortedScores[sortedScores.length - 1].value;
+  const meanScore = sortedScores.reduce((acc, s) => acc + s.value, 0) / n;
 
-  // Build symmetric adjacency matrix for undirected graph
-  for (const edgeId of edges) {
-    const {source, target} = edgeRef.get(edgeId);
-    if (nodeIndex.has(source) && nodeIndex.has(target)) {
-      const i = nodeIndex.get(source), j = nodeIndex.get(target);
-      // Add edges in both directions
-      matrix[j][i] = matrix[i][j] = 1;
-      degrees[i]++;
-      degrees[j]++;
-    }
-  }
+  let minDegree = Infinity, maxDegree = -Infinity, degreeSum = 0;
+  graph.forEachNode((node) => {
+    const d = graph.degree(node);
+    if (d < minDegree) minDegree = d;
+    if (d > maxDegree) maxDegree = d;
+    degreeSum += d;
+  });
+  const avgDegree = degreeSum / n;
+  // Avoid division by zero in percentage calculations (all-zero scores)
+  const maxForPercentage = maxScore || 1;
 
-  // Normalize the matrix
-  for (let i = 0; i < n; i++) {
-    if (degrees[i] > 0) {
-      for (let j = 0; j < n; j++) {
-        matrix[j][i] = matrix[j][i] / degrees[i];
-      }
-    } else {
-      // For isolated nodes, distribute probability evenly
-      for (let j = 0; j < n; j++) {
-        matrix[j][i] = 1 / n;
-      }
-    }
-  }
-
-  const d = 0.85;
-  let scores = Array(n).fill(1 / n);
-  let prevScores;
-  const maxIter = 100;
-  const tolerance = 1e-6;
-
-  // Power iteration method remains the same
-  for (let iter = 0; iter < maxIter; iter++) {
-    prevScores = [...scores];
-    scores = Array(n).fill((1 - d) / n);
-
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        scores[i] += d * matrix[i][j] * prevScores[j];
-      }
-    }
-
-    if (scores.every((x, i) => Math.abs(x - prevScores[i]) < tolerance)) break;
-  }
-
-  const sortedScores = scores.map((score, i) => ({
-    id: nodeArray[i],
-    score
-  })).sort((a, b) => b.score - a.score);
-
-  const maxScore = sortedScores[0].score;
-  const minScore = sortedScores[sortedScores.length - 1].score;
-  const meanScore = scores.reduce((a, b) => a + b) / n;
-  const minDegree = Math.min(...degrees);
-  const maxDegree = Math.max(...degrees);
-  const avgDegree = degrees.reduce((a, b) => a + b) / n;
-
-  const nodeValues = new Map(sortedScores.map(s => [s.id, s.score]));
+  const nodeValues = new Map(sortedScores.map(s => [s.id, s.value]));
   return {
     scores: sortedScores.map(s => ({
       id: s.id,
-      text: `Score: ${s.score.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)} (${Math.round((s.score / maxScore) * 100)}%)`
+      text: `Score: ${s.value.toFixed(NODE_CONNECTIVITY_METRICS_PRECISION)} (${Math.round((s.value / maxForPercentage) * 100)}%)`
     })),
     nodeValues,
     graphLevelMetrics: {

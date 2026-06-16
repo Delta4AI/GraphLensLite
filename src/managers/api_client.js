@@ -150,9 +150,10 @@ async function applyGraph(cache, data) {
 }
 
 /**
- * Build a serializing scheduler for graph application. G6 graph teardown
- * corrupts if a new render starts while the previous one is still settling, so
- * applications must never overlap. Under replace semantics only the latest
+ * Build a serializing scheduler for graph application. Renderer teardown and
+ * re-render must never overlap (the destroy/create choreography spans several
+ * awaits), so applications run strictly one at a time. Under replace semantics
+ * only the latest
  * payload matters, so intermediate payloads that arrive mid-render are
  * coalesced away.
  *

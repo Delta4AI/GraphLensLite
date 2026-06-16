@@ -1,11 +1,11 @@
-import {Popup} from './popup.js';
+import { Popup } from './popup.js';
 
 class ColorScalePicker {
   constructor(cache) {
     this.defaultColors = {
       min: '#403C53',
       zero: '#FFFFFF',
-      max: '#C33D35'
+      max: '#C33D35',
     };
     this.handles = [];
     this.resolvePromise = null;
@@ -13,10 +13,10 @@ class ColorScalePicker {
     this.maxValue = 0;
     this.categories = [];
     this.defaultColorForMissing = '#CCCCCC';
-    this.elementType = "nodes";
+    this.elementType = 'nodes';
     this.currentProperty = null;
     this.dom = {};
-    this.metricValuePrefix = "__metric__:";
+    this.metricValuePrefix = '__metric__:';
     this.activeMetricSource = null;
     this.popup = null;
     this.cache = cache;
@@ -117,7 +117,7 @@ class ColorScalePicker {
 
   async pickColors(elementType = 'nodes') {
     this.elementType = elementType;
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this.resolvePromise = resolve;
       const content = this.buildContent();
       this.popup = new Popup(content, {
@@ -131,7 +131,7 @@ class ColorScalePicker {
             this.resolvePromise = null;
           }
           this.popup = null;
-        }
+        },
       });
       this.initializeFilters();
       this.setupHandleDragging();
@@ -143,28 +143,29 @@ class ColorScalePicker {
     const filters = new Map(this.cache.data.layouts[this.cache.data.selectedLayout].filters);
     const available = new Set();
 
-    const selectedElements = this.elementType === 'nodes' ? this.cache.selectedNodes : this.cache.selectedEdges;
+    const selectedElements =
+      this.elementType === 'nodes' ? this.cache.selectedNodes : this.cache.selectedEdges;
 
-    selectedElements.forEach(elementId => {
-      const element = this.elementType === 'nodes'
-        ? this.cache.nodeRef.get(elementId)
-        : this.cache.edgeRef.get(elementId);
+    selectedElements.forEach((elementId) => {
+      const element =
+        this.elementType === 'nodes'
+          ? this.cache.nodeRef.get(elementId)
+          : this.cache.edgeRef.get(elementId);
 
-      element?.features.forEach(f => {
+      element?.features.forEach((f) => {
         if (filters.has(f)) available.add(f);
       });
     });
 
-    const metricOptions = this.elementType === 'nodes'
-      ? this.cache.metrics.getMetricScaleOptions()
-      : [];
+    const metricOptions =
+      this.elementType === 'nodes' ? this.cache.metrics.getMetricScaleOptions() : [];
 
     dropdown.innerHTML = '<option value="">Select property...</option>';
     const propertyOptions = Array.from(available).sort();
     if (propertyOptions.length > 0) {
       const dataGroup = document.createElement('optgroup');
       dataGroup.label = 'Data Properties';
-      propertyOptions.forEach(prop => {
+      propertyOptions.forEach((prop) => {
         const opt = document.createElement('option');
         opt.value = prop;
         opt.textContent = prop;
@@ -176,7 +177,7 @@ class ColorScalePicker {
     if (metricOptions.length > 0) {
       const metricGroup = document.createElement('optgroup');
       metricGroup.label = 'Network Metrics';
-      metricOptions.forEach(metric => {
+      metricOptions.forEach((metric) => {
         const opt = document.createElement('option');
         opt.value = `${this.metricValuePrefix}${metric.id}`;
         opt.textContent = `${metric.label} (${metric.valueLabel})${metric.cached ? '' : ' (calculate)'}`;
@@ -189,7 +190,7 @@ class ColorScalePicker {
       const value = dropdown.value;
       const metricSource = this.getMetricSource(value);
       if (metricSource) {
-        await this.selectProperty(value, {isCategory: false}, metricSource);
+        await this.selectProperty(value, { isCategory: false }, metricSource);
       } else {
         await this.selectProperty(value, filters.get(value));
       }
@@ -199,12 +200,13 @@ class ColorScalePicker {
   async selectProperty(property, filterObj, metricSource = null) {
     if (!property) return;
 
-    const selectedElements = this.elementType === 'nodes' ? this.cache.selectedNodes : this.cache.selectedEdges;
+    const selectedElements =
+      this.elementType === 'nodes' ? this.cache.selectedNodes : this.cache.selectedEdges;
     const elementRef = this.elementType === 'nodes' ? this.cache.nodeRef : this.cache.edgeRef;
     if (property.startsWith(this.metricValuePrefix) && !metricSource) {
       const metricId = property.slice(this.metricValuePrefix.length);
       metricSource = await this.cache.metrics.ensureMetricValues(metricId);
-      filterObj = {isCategory: false};
+      filterObj = { isCategory: false };
     }
     if (property.startsWith(this.metricValuePrefix) && !metricSource) {
       this.cache.ui.warning('Metric values not available yet. Calculate the metric first.');
@@ -217,24 +219,23 @@ class ColorScalePicker {
     this.activeMetricSource = metricSource;
 
     const values = [];
-    const elementsWithProperty = Array.from(selectedElements)
-      .filter(id => {
-        if (metricSource) {
-          const value = metricSource.values.get(id);
-          if (value !== undefined) {
-            values.push(value);
-            return true;
-          }
-          return false;
-        }
-        const element = elementRef.get(id);
-        const value = element?.featureValues.get(property);
+    const elementsWithProperty = Array.from(selectedElements).filter((id) => {
+      if (metricSource) {
+        const value = metricSource.values.get(id);
         if (value !== undefined) {
           values.push(value);
           return true;
         }
         return false;
-      });
+      }
+      const element = elementRef.get(id);
+      const value = element?.featureValues.get(property);
+      if (value !== undefined) {
+        values.push(value);
+        return true;
+      }
+      return false;
+    });
 
     const totalElements = selectedElements.length;
     const elementsWithPropertyCount = elementsWithProperty.length;
@@ -247,7 +248,9 @@ class ColorScalePicker {
     const elementTypeLabel = this.elementType === 'nodes' ? 'nodes' : 'edges';
     const propertyDisplayName = metricSource
       ? `${metricSource.label} (${metricSource.valueLabel})`
-      : (property.includes('::') ? property.split('::').pop() : property);
+      : property.includes('::')
+        ? property.split('::').pop()
+        : property;
     const targetProperty = this.currentProperty || 'color';
 
     let infoHTML = `<div class="picker-info-summary">
@@ -277,8 +280,10 @@ class ColorScalePicker {
     this.dom.applyButton.classList.remove('disabled');
 
     if (filterObj.isCategory) {
-      this.categories = ([...filterObj.categories] || [])
-        .map(name => ({name, color: this.generateRandomColor()}));
+      this.categories = [...(filterObj.categories || [])].map((name) => ({
+        name,
+        color: this.generateRandomColor(),
+      }));
       this.renderCategories();
     } else {
       this.initializeGradient(property);
@@ -292,7 +297,7 @@ class ColorScalePicker {
     this.dom.categoryContainer.innerHTML = '';
     this.dom.categoryContainer.style.display = '';
 
-    this.categories.forEach(cat => {
+    this.categories.forEach((cat) => {
       const row = document.createElement('div');
       row.className = 'picker-category-row';
 
@@ -302,7 +307,7 @@ class ColorScalePicker {
       const colorInput = document.createElement('input');
       colorInput.type = 'color';
       colorInput.value = cat.color;
-      colorInput.oninput = e => {
+      colorInput.oninput = (e) => {
         cat.color = e.target.value;
       };
 
@@ -312,26 +317,29 @@ class ColorScalePicker {
   }
 
   generateRandomColor() {
-    return `#${Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0')}`;
+    return `#${Math.floor(Math.random() * 0xffffff)
+      .toString(16)
+      .padStart(6, '0')}`;
   }
 
   initializeGradient(property) {
-    const selectedElements = this.elementType === 'nodes' ? this.cache.selectedNodes : this.cache.selectedEdges;
+    const selectedElements =
+      this.elementType === 'nodes' ? this.cache.selectedNodes : this.cache.selectedEdges;
     const elementRef = this.elementType === 'nodes' ? this.cache.nodeRef : this.cache.edgeRef;
     const values = this.activeMetricSource
       ? Array.from(selectedElements)
-        .map(id => this.activeMetricSource.values.get(id))
-        .filter(v => v !== undefined)
+          .map((id) => this.activeMetricSource.values.get(id))
+          .filter((v) => v !== undefined)
       : Array.from(selectedElements)
-        .map(id => elementRef.get(id)?.featureValues.get(property))
-        .filter(v => v !== undefined);
+          .map((id) => elementRef.get(id)?.featureValues.get(property))
+          .filter((v) => v !== undefined);
 
     this.minValue = Math.min(...values);
     this.maxValue = Math.max(...values);
 
     this.handles = [
-      {pos: 0, color: this.defaultColors.min, value: this.minValue, fixed: true},
-      {pos: 100, color: this.defaultColors.max, value: this.maxValue, fixed: true}
+      { pos: 0, color: this.defaultColors.min, value: this.minValue, fixed: true },
+      { pos: 100, color: this.defaultColors.max, value: this.maxValue, fixed: true },
     ];
 
     this.dom.gradient.style.display = '';
@@ -346,7 +354,7 @@ class ColorScalePicker {
   setupHandleDragging() {
     const container = this.dom.handleContainer;
 
-    container.addEventListener('mousedown', e => {
+    container.addEventListener('mousedown', (e) => {
       const handleEl = e.target.closest('.picker-handle');
       if (!handleEl) return;
 
@@ -354,7 +362,7 @@ class ColorScalePicker {
       const handleObj = this.handles[idx];
       if (handleObj.fixed) return;
 
-      const onMove = moveEvent => {
+      const onMove = (moveEvent) => {
         const rect = container.getBoundingClientRect();
         let pos = ((moveEvent.clientX - rect.left) / rect.width) * 100;
         pos = Math.max(0, Math.min(100, pos));
@@ -362,9 +370,13 @@ class ColorScalePicker {
       };
 
       document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', () => {
-        document.removeEventListener('mousemove', onMove);
-      }, {once: true});
+      document.addEventListener(
+        'mouseup',
+        () => {
+          document.removeEventListener('mousemove', onMove);
+        },
+        { once: true }
+      );
     });
   }
 
@@ -418,7 +430,7 @@ class ColorScalePicker {
   updateGradient() {
     const stops = [...this.handles]
       .sort((a, b) => a.pos - b.pos)
-      .map(h => `${h.color} ${h.pos}%`)
+      .map((h) => `${h.color} ${h.pos}%`)
       .join(', ');
     this.dom.gradient.style.background = `linear-gradient(to right, ${stops})`;
   }
@@ -442,7 +454,7 @@ class ColorScalePicker {
     const pos = (sortedHandles[insertIndex - 1].pos + sortedHandles[insertIndex].pos) / 2;
     const value = this.minValue + (pos / 100) * (this.maxValue - this.minValue);
 
-    this.handles.push({pos, color: newColor, value, fixed: false});
+    this.handles.push({ pos, color: newColor, value, fixed: false });
     this.handles.sort((a, b) => a.pos - b.pos);
 
     this.renderHandles();
@@ -460,21 +472,20 @@ class ColorScalePicker {
     const dropdown = this.dom.dropdown;
     const colorMap = new Map();
 
-    const selectedElements = this.elementType === 'nodes' ? this.cache.selectedNodes : this.cache.selectedEdges;
+    const selectedElements =
+      this.elementType === 'nodes' ? this.cache.selectedNodes : this.cache.selectedEdges;
     const elementRef = this.elementType === 'nodes' ? this.cache.nodeRef : this.cache.edgeRef;
 
     const metricSource = this.getMetricSource(dropdown.value);
     const filterObj = metricSource
-      ? {isCategory: false}
+      ? { isCategory: false }
       : this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(dropdown.value);
     const isCategory = filterObj?.isCategory;
 
     if (isCategory) {
-      const categoryColorMap = new Map(
-        this.categories.map(cat => [cat.name, cat.color])
-      );
+      const categoryColorMap = new Map(this.categories.map((cat) => [cat.name, cat.color]));
 
-      Array.from(selectedElements).forEach(elementId => {
+      Array.from(selectedElements).forEach((elementId) => {
         const element = elementRef.get(elementId);
         const valueSet = element?.featureValues.get(dropdown.value);
         const value = valueSet instanceof Set ? Array.from(valueSet)[0] : valueSet;
@@ -484,7 +495,7 @@ class ColorScalePicker {
         }
       });
     } else {
-      Array.from(selectedElements).forEach(elementId => {
+      Array.from(selectedElements).forEach((elementId) => {
         const element = elementRef.get(elementId);
         const value = metricSource
           ? metricSource.values.get(elementId)
@@ -556,7 +567,7 @@ class ColorScalePicker {
     const g = Math.round(g1 + (g2 - g1) * t);
     const b = Math.round(b1 + (b2 - b1) * t);
 
-    return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
   }
 
   close() {
@@ -581,7 +592,7 @@ function replaceColorScale(obj, elemID, colorMap) {
   for (let key in obj) {
     const value = obj[key];
 
-    if (value === "set_continuous_color_scale") {
+    if (value === 'set_continuous_color_scale') {
       if (colorMap.has(elemID)) {
         obj[key] = colorMap.get(elemID);
       } else {
@@ -595,4 +606,4 @@ function replaceColorScale(obj, elemID, colorMap) {
   return obj;
 }
 
-export {ColorScalePicker, replaceColorScale};
+export { ColorScalePicker, replaceColorScale };

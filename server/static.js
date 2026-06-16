@@ -28,7 +28,7 @@ const DEFAULT_DOCUMENT = "graph_lens_lite.html";
  * path-traversal attempt. Returns null when the request escapes the root.
  *
  * @param {string} rootDir  Absolute static root.
- * @param {string} urlPath  Decoded pathname (e.g. "/lib/g6.min.js").
+ * @param {string} urlPath  Decoded pathname (e.g. "/lib/sigma.bundle.mjs").
  * @returns {string|null}
  */
 function resolveStaticPath(rootDir, urlPath) {
@@ -76,13 +76,59 @@ function serveStatic(req, res, rootDir) {
       res.end("Not Found");
       return;
     }
+
+    // Asset names are stable while their content changes between releases, so a
+    // long max-age would serve stale JS/CSS. `no-cache` makes the browser
+    // revalidate on every load; the validators below let that revalidation
+    // return a cheap 304 instead of refetching unchanged bytes.
+    const lastModified = stats.mtime.toUTCString();
+    const etag = `W/"${stats.size.toString(16)}-${Math.floor(stats.mtimeMs).toString(16)}"`;
+
+    if (isNotModified(req, etag, stats.mtimeMs)) {
+      res.writeHead(304, {
+        "Cache-Control": "no-cache",
+        ETag: etag,
+        "Last-Modified": lastModified,
+      });
+      res.end();
+      return;
+    }
+
     res.writeHead(200, {
       "Content-Type": contentTypeFor(filePath),
       "Content-Length": stats.size,
       "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "no-cache",
+      ETag: etag,
+      "Last-Modified": lastModified,
     });
     fs.createReadStream(filePath).pipe(res);
   });
+}
+
+/**
+ * Decide whether a conditional GET can be answered with 304 Not Modified.
+ * Prefers the strong ETag match; falls back to If-Modified-Since (second
+ * resolution, matching HTTP date precision).
+ *
+ * @param {import('http').IncomingMessage} req
+ * @param {string} etag      Current entity tag for the file.
+ * @param {number} mtimeMs   File modification time in milliseconds.
+ * @returns {boolean}
+ */
+function isNotModified(req, etag, mtimeMs) {
+  const ifNoneMatch = req.headers["if-none-match"];
+  if (ifNoneMatch) {
+    return ifNoneMatch.split(",").some((tag) => tag.trim() === etag);
+  }
+  const ifModifiedSince = req.headers["if-modified-since"];
+  if (ifModifiedSince) {
+    const since = Date.parse(ifModifiedSince);
+    if (!Number.isNaN(since)) {
+      return Math.floor(mtimeMs / 1000) * 1000 <= since;
+    }
+  }
+  return false;
 }
 
 module.exports = { serveStatic, resolveStaticPath, contentTypeFor, DEFAULT_DOCUMENT };

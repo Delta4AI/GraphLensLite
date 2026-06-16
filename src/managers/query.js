@@ -23,6 +23,9 @@ class QueryAST {
   #evalExpr(expr, element, requestedMainGroup) {
     if (!Array.isArray(expr)) return false;
 
+    /* ---------- 0. empty query = no constraints = match everything ------ */
+    if (expr.length === 0) return true;
+
     /* ---------- 1. unwrap single-element containers --------------------- */
     if (expr.length === 1) {
       return this.#evalExpr(expr[0], element, requestedMainGroup);
@@ -189,9 +192,9 @@ class QueryManager {
         const sgok = mgok && (subGroup in this.cache.uniquePropHierarchy[mainGroup]);
         const pok = sgok && this.cache.uniquePropHierarchy[mainGroup][subGroup].has(prop);
 
-        const mainGroupEncoded = `<span class="${mgok ? 'q-maingroup' : 'q-error-unrecognized'}" data-encoded>${mainGroup}</span>`;
-        const subGroupEncoded = `<span class="${sgok ? 'q-subgroup' : 'q-error-unrecognized'}" data-encoded>${subGroup}</span>`;
-        const propEncoded = `<span class="${pok ? 'q-property' : 'q-error-unrecognized'}" data-encoded>${prop}</span>`;
+        const mainGroupEncoded = `<span class="${mgok ? 'q-maingroup' : 'q-error-unrecognized'}" data-encoded>${StaticUtilities.escapeHtml(mainGroup)}</span>`;
+        const subGroupEncoded = `<span class="${sgok ? 'q-subgroup' : 'q-error-unrecognized'}" data-encoded>${StaticUtilities.escapeHtml(subGroup)}</span>`;
+        const propEncoded = `<span class="${pok ? 'q-property' : 'q-error-unrecognized'}" data-encoded>${StaticUtilities.escapeHtml(prop)}</span>`;
         const sep = `<span class="q-prop-group-separator" data-encoded>::</span>`;
 
         return `<span class="q-property-wrapper" data-encoded>`
@@ -236,7 +239,7 @@ class QueryManager {
     asciiStr = asciiStr.replace(/IN\s*\[([^\]]*?)]/g, (_match, list) => {
         const encodedCategories = list
           .split(",")
-          .map(cat => `<span class='q-string' data-encoded>${cat}</span>`)
+          .map(cat => `<span class='q-string' data-encoded>${StaticUtilities.escapeHtml(cat)}</span>`)
           .join(`<span class='q-comma' data-encoded>,</span>`);
 
         return [

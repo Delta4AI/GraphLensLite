@@ -139,6 +139,12 @@ function createStyleDiv(cache) {
       case "Node Label Placement":
         await cache.gcm.updateNodes({style: {labelPlacement: value}}, commands);
         break;
+      case "Node Badge Font Size":
+        await cache.gcm.updateNodes({style: {badgeFontSize: value}}, commands);
+        break;
+      case "Node Badge Scale With Node":
+        await cache.gcm.updateNodes({style: {badgeScaleWithNode: value}}, commands);
+        break;
       case "Edge Color":
         await cache.gcm.updateEdges({style: {stroke: value}}, commands);
         break;
@@ -187,6 +193,24 @@ function createStyleDiv(cache) {
       case "Edge End Arrow Type":
         await cache.gcm.updateEdges({style: {endArrowType: value}}, commands);
         break;
+      case "Edge Start Arrow Color":
+        await cache.gcm.updateEdges({style: {startArrowColor: value}}, commands);
+        break;
+      case "Edge Start Arrow Border Color":
+        await cache.gcm.updateEdges({style: {startArrowBorderColor: value}}, commands);
+        break;
+      case "Edge Start Arrow Border Size":
+        await cache.gcm.updateEdges({style: {startArrowBorderSize: value}}, commands);
+        break;
+      case "Edge End Arrow Color":
+        await cache.gcm.updateEdges({style: {endArrowColor: value}}, commands);
+        break;
+      case "Edge End Arrow Border Color":
+        await cache.gcm.updateEdges({style: {endArrowBorderColor: value}}, commands);
+        break;
+      case "Edge End Arrow Border Size":
+        await cache.gcm.updateEdges({style: {endArrowBorderSize: value}}, commands);
+        break;
       case "Edge Halo":
         await cache.gcm.updateEdges({style: {halo: value}}, commands);
         break;
@@ -195,6 +219,24 @@ function createStyleDiv(cache) {
         break;
       case "Edge Halo Color":
         await cache.gcm.updateEdges({style: {haloStroke: value}}, commands);
+        break;
+      case "Edge Flow":
+        await cache.gcm.updateEdges({style: {flow: value}}, commands);
+        break;
+      case "Edge Flow Type":
+        await cache.gcm.updateEdges({style: {flowType: value}}, commands);
+        break;
+      case "Edge Flow Speed":
+        await cache.gcm.updateEdges({style: {flowSpeed: value}}, commands);
+        break;
+      case "Edge Flow Color":
+        await cache.gcm.updateEdges({style: {flowStroke: value}}, commands);
+        break;
+      case "Edge Flow Opacity":
+        await cache.gcm.updateEdges({style: {flowOpacity: value}}, commands);
+        break;
+      case "Edge Flow Density":
+        await cache.gcm.updateEdges({style: {flowDensity: value}}, commands);
         break;
       default:
         break;
@@ -296,7 +338,7 @@ function createStyleDiv(cache) {
       const scaleButton = document.createElement("button");
       scaleButton.className = "style-inner-button style-numeric-scale-button";
       scaleButton.textContent = "∿";
-      scaleButton.title = `Scale ${property} based on a property's values`;
+      scaleButton.title = `Map by data: scale ${property} from a numeric property's values (e.g. larger nodes for higher degree)`;
       scaleButton.style.marginLeft = "2px";
       scaleButton.dataset.property = property;
       scaleButton.onclick = async () => {
@@ -385,7 +427,7 @@ function createStyleDiv(cache) {
     if (continuousScaleBtn) {
       const contScaleBtn = document.createElement("button");
       contScaleBtn.className = "style-inner-button style-color-button style-color-gradient-button";
-      contScaleBtn.title = `Set ${property} of the selected elements to a continuous scale.`;
+      contScaleBtn.title = `Map by data: colour ${property} on a continuous gradient from a property's values`;
       contScaleBtn.onclick = async () => {
         colorInput.value = "";
         await handleStyleChangeEvent(property, "set_continuous_color_scale");
@@ -805,6 +847,12 @@ function createStyleDiv(cache) {
     const rowOne = createNewRow(nodeDiv);
     appendLabel(rowOne, "Shape");
     createNodeShapeControls(rowOne);
+    appendVerticalRule(rowOne);
+    appendButton(rowOne, "Pie…",
+      "Render the selected nodes as pie charts: map categorical values (equal slices) or numeric properties (sized slices) to wedges.",
+      async () => await cache.gcm.updateNodes({}, ["set_pie_chart"]));
+    appendButton(rowOne, "Clear pie", "Remove pie-chart rendering and restore the nodes' shape.",
+      async () => await cache.gcm.updateNodes({}, ["clear_pie_chart"]));
 
     const rowTwo = createNewRow(nodeDiv);
     appendLabel(rowTwo, "Size");
@@ -857,6 +905,17 @@ function createStyleDiv(cache) {
     const rowEleven = createNewRow(nodeDiv);
     appendLabel(rowEleven, "Badges", "Add Badges to the selected nodes.");
     createNodeBadgeControls(rowEleven);
+
+    const rowTwelve = createNewRow(nodeDiv);
+    appendLabel(rowTwelve, "Badge Size", "Defines the font size (and pill size) of the selected nodes badges.");
+    createNumericalSlider(rowTwelve, "Node Badge Font Size", cache.DEFAULTS.NODE.BADGE.FONT_SIZE,
+      {min: 4, max: 32, step: 1}, "Defines the font size (and pill size) of the selected nodes badges.");
+
+    const rowThirteen = createNewRow(nodeDiv);
+    appendLabel(rowThirteen, "Badge Scale With Node",
+      "Scale badges proportionally with each node's size (relative to the default node size).");
+    createBooleanControls(rowThirteen, "Node Badge Scale With Node",
+      "Scale badges proportionally with each node's size (relative to the default node size).");
   }
 
   function createEdgeConfigCard() {
@@ -933,28 +992,74 @@ function createStyleDiv(cache) {
     createBooleanControls(rowThirteen, "Edge Start Arrow", "Enable/Disable the start arrow of the selected edges.");
 
     const rowFourteen = createNewRow(edgeDiv);
-    appendLabel(rowFourteen, "Start Arrow Size", "Define the size of the start arrow of the selected edges.");
+    appendLabel(rowFourteen, "Start Arrow Size", "Define the size of the start marker of the selected edges.");
     createNumericalSlider(rowFourteen, "Edge Start Arrow Size", cache.DEFAULTS.EDGE.ARROWS.START_SIZE,
-      {min: 10, max: 40, step: 1}, "Define the size of the start arrow of the selected edges.", true);
+      {min: 4, max: 40, step: 1}, "Define the size of the start marker of the selected edges.", true);
 
     const rowFifteen = createNewRow(edgeDiv);
-    appendLabel(rowFifteen, "Start Arrow Type", "Define the type of the start arrow of the selected edges.");
+    appendLabel(rowFifteen, "Start Arrow Type",
+      "Marker shape at the source end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
     createCategoricalControls(rowFifteen, "Edge Start Arrow Type", cache.DEFAULTS.EDGE.ARROWS.START_TYPE,
-      cache.DEFAULTS.STYLES.EDGE_ARROW_TYPES, "Define the type of the start arrow of the selected edges.");
+      cache.DEFAULTS.STYLES.EDGE_ARROW_TYPES,
+      "Marker shape at the source end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
+
+    const rowFifteenColor = createNewRow(edgeDiv);
+    appendLabel(rowFifteenColor, "Start Arrow Color",
+      "Fill color of the start marker. Leave unset to inherit the edge color.");
+    createColorControls(rowFifteenColor, "Edge Start Arrow Color", cache.DEFAULTS.EDGE.COLOR,
+      cache.DEFAULTS.STYLES.EDGE_ARROW_COLORS,
+      "Fill color of the start marker. Leave unset to inherit the edge color.");
+
+    const rowFifteenBorder = createNewRow(edgeDiv);
+    appendLabel(rowFifteenBorder, "Start Arrow Border Color",
+      "Outline color of the start marker. Set to none for no border.");
+    createColorControls(rowFifteenBorder, "Edge Start Arrow Border Color", cache.DEFAULTS.EDGE.HALO.COLOR,
+      cache.DEFAULTS.STYLES.EDGE_ARROW_BORDER_COLORS,
+      "Outline color of the start marker. Set to none for no border.");
+
+    const rowFifteenBorderSize = createNewRow(edgeDiv);
+    appendLabel(rowFifteenBorderSize, "Start Arrow Border Size",
+      "Thickness of the start marker border in px. 0 = auto (scales with the arrow).");
+    createNumericalSlider(rowFifteenBorderSize, "Edge Start Arrow Border Size",
+      cache.DEFAULTS.EDGE.ARROWS.START_BORDER_SIZE, {min: 0, max: 20, step: 1},
+      "Thickness of the start marker border in px. 0 = auto (scales with the arrow).", true);
 
     const rowSixteen = createNewRow(edgeDiv);
     appendLabel(rowSixteen, "End Arrow", "Enable/Disable the end arrow of the selected edges.");
     createBooleanControls(rowSixteen, "Edge End Arrow", "Enable/Disable the end arrow of the selected edges.");
 
     const rowEighteen = createNewRow(edgeDiv);
-    appendLabel(rowEighteen, "End Arrow Size", "Define the size of the end arrow of the selected edges.");
+    appendLabel(rowEighteen, "End Arrow Size", "Define the size of the end marker of the selected edges.");
     createNumericalSlider(rowEighteen, "Edge End Arrow Size", cache.DEFAULTS.EDGE.ARROWS.END_SIZE,
-      {min: 10, max: 40, step: 1}, "Define the size of the end arrow of the selected edges.", true);
+      {min: 4, max: 40, step: 1}, "Define the size of the end marker of the selected edges.", true);
 
     const rowNineteen = createNewRow(edgeDiv);
-    appendLabel(rowNineteen, "End Arrow Type", "Define the type of the end arrow of the selected edges.");
+    appendLabel(rowNineteen, "End Arrow Type",
+      "Marker shape at the target end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
     createCategoricalControls(rowNineteen, "Edge End Arrow Type", cache.DEFAULTS.EDGE.ARROWS.END_TYPE,
-      cache.DEFAULTS.STYLES.EDGE_ARROW_TYPES, "Define the type of the end arrow of the selected edges.");
+      cache.DEFAULTS.STYLES.EDGE_ARROW_TYPES,
+      "Marker shape at the target end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
+
+    const rowNineteenColor = createNewRow(edgeDiv);
+    appendLabel(rowNineteenColor, "End Arrow Color",
+      "Fill color of the end marker. Leave unset to inherit the edge color.");
+    createColorControls(rowNineteenColor, "Edge End Arrow Color", cache.DEFAULTS.EDGE.COLOR,
+      cache.DEFAULTS.STYLES.EDGE_ARROW_COLORS,
+      "Fill color of the end marker. Leave unset to inherit the edge color.");
+
+    const rowNineteenBorder = createNewRow(edgeDiv);
+    appendLabel(rowNineteenBorder, "End Arrow Border Color",
+      "Outline color of the end marker. Set to none for no border.");
+    createColorControls(rowNineteenBorder, "Edge End Arrow Border Color", cache.DEFAULTS.EDGE.HALO.COLOR,
+      cache.DEFAULTS.STYLES.EDGE_ARROW_BORDER_COLORS,
+      "Outline color of the end marker. Set to none for no border.");
+
+    const rowNineteenBorderSize = createNewRow(edgeDiv);
+    appendLabel(rowNineteenBorderSize, "End Arrow Border Size",
+      "Thickness of the end marker border in px. 0 = auto (scales with the arrow).");
+    createNumericalSlider(rowNineteenBorderSize, "Edge End Arrow Border Size",
+      cache.DEFAULTS.EDGE.ARROWS.END_BORDER_SIZE, {min: 0, max: 20, step: 1},
+      "Thickness of the end marker border in px. 0 = auto (scales with the arrow).", true);
 
     appendHorizontalRule(edgeDiv);
 
@@ -964,13 +1069,53 @@ function createStyleDiv(cache) {
 
     const rowTwentyOne = createNewRow(edgeDiv);
     appendLabel(rowTwentyOne, "Halo Color", "Define the color of the halo for the selected edges.");
-    createColorControls(rowTwentyOne, "Edge Halo Color", cache.DEFAULTS.EDGE.COLOR,
+    createColorControls(rowTwentyOne, "Edge Halo Color", cache.DEFAULTS.EDGE.HALO.COLOR,
       cache.DEFAULTS.STYLES.EDGE_COLORS);
 
     const rowTwentyTwo = createNewRow(edgeDiv);
     appendLabel(rowTwentyTwo, "Halo Width", "Define the halo width for the selected edges.");
     createNumericalSlider(rowTwentyTwo, "Edge Halo Width", cache.DEFAULTS.EDGE.HALO.WIDTH,
       {min: 1, max: 30, step: 1}, "Define the halo width for the selected edges.");
+
+    appendHorizontalRule(edgeDiv);
+
+    const rowTwentyThree = createNewRow(edgeDiv);
+    appendLabel(rowTwentyThree, "Flow",
+      "Animate a directional flow along the selected edges (source → target).");
+    createBooleanControls(rowTwentyThree, "Edge Flow",
+      "Animate a directional flow along the selected edges (source → target).");
+
+    const flowTypeTooltip =
+      "dash = marching dashes, pulse = travelling dots, comet = fading tails, chevron = travelling arrows.";
+    const rowTwentyFour = createNewRow(edgeDiv);
+    appendLabel(rowTwentyFour, "Flow Type", flowTypeTooltip);
+    createCategoricalControls(rowTwentyFour, "Edge Flow Type", cache.DEFAULTS.EDGE.FLOW.TYPE,
+      cache.DEFAULTS.STYLES.EDGE_FLOW_TYPES, flowTypeTooltip);
+
+    const rowTwentyFive = createNewRow(edgeDiv);
+    appendLabel(rowTwentyFive, "Flow Speed", "Speed multiplier for the flow animation.");
+    createNumericalSlider(rowTwentyFive, "Edge Flow Speed", cache.DEFAULTS.EDGE.FLOW.SPEED,
+      {min: 0.2, max: 5, step: 0.2}, "Speed multiplier for the flow animation.", true);
+
+    const rowTwentySix = createNewRow(edgeDiv);
+    appendLabel(rowTwentySix, "Flow Color",
+      "Color of the flow overlay. Leave unset to derive a lighter shade of the edge color.");
+    // Swatch stand-in only (FLOW.COLOR is null = "derive from the stroke") —
+    // same convention as the arrow-color rows defaulting to EDGE.COLOR.
+    createColorControls(rowTwentySix, "Edge Flow Color", cache.DEFAULTS.EDGE.COLOR,
+      cache.DEFAULTS.STYLES.EDGE_COLORS);
+
+    const rowTwentySeven = createNewRow(edgeDiv);
+    appendLabel(rowTwentySeven, "Flow Opacity",
+      "Opacity of the flow overlay — lower to make it less prominent.");
+    createNumericalSlider(rowTwentySeven, "Edge Flow Opacity", cache.DEFAULTS.EDGE.FLOW.OPACITY,
+      {min: 0.1, max: 1, step: 0.05}, "Opacity of the flow overlay — lower to make it less prominent.", true);
+
+    const rowTwentyEight = createNewRow(edgeDiv);
+    appendLabel(rowTwentyEight, "Flow Density",
+      "Pattern spacing multiplier — higher spreads the dashes/dots further apart.");
+    createNumericalSlider(rowTwentyEight, "Edge Flow Density", cache.DEFAULTS.EDGE.FLOW.DENSITY,
+      {min: 0.5, max: 3, step: 0.25}, "Pattern spacing multiplier — higher spreads the dashes/dots further apart.", true);
   }
 
   function createBubbleSetConfigCard() {
@@ -1126,12 +1271,184 @@ function createStyleDiv(cache) {
     }
   }
 
+  // Turn a config card into a collapsible section: replace the floating
+  // `::before` title with a real clickable header (so the panel reads as a
+  // set of foldable sections instead of one tall wall of controls).
+  function makeCollapsible(label, startCollapsed = false) {
+    const card = root.querySelector(`[data-label="${label}"]`);
+    if (!card) return;
+    card.classList.add("card-collapsible");
+
+    const header = document.createElement("button");
+    header.type = "button";
+    header.className = "card-collapse-header";
+    header.setAttribute("aria-expanded", startCollapsed ? "false" : "true");
+
+    const title = document.createElement("span");
+    title.className = "card-collapse-title";
+    title.textContent = label;
+
+    const chevron = document.createElement("span");
+    chevron.className = "card-collapse-chevron";
+    chevron.textContent = startCollapsed ? "▸" : "▾";
+
+    header.append(title, chevron);
+    header.addEventListener("click", () => {
+      const collapsed = card.classList.toggle("collapsed");
+      chevron.textContent = collapsed ? "▸" : "▾";
+      header.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    });
+
+    card.insertBefore(header, card.firstChild);
+    if (startCollapsed) card.classList.add("collapsed");
+  }
+
+  // Workspace-level density-heatmap overlay (heatmap_layer.js). NOT a
+  // per-selection style: the controls drive the live layer's runtime
+  // settings directly, are never persisted into layout styles, and reset
+  // with the adapter on a data reload. Sliders update on `input` (live
+  // preview while dragging is the point of these knobs), unlike the
+  // persisted style sliders which commit on `change`.
+  function createHeatmapConfigCard() {
+    const card = createCard("Density Heatmap");
+    const layer = () => cache.graph?.heatmapLayer;
+    const D = cache.DEFAULTS.HEATMAP;
+    // Build-time fallback for the (startup) window where no adapter exists
+    // yet — mirrors heatmap_layer.js defaultSettings().
+    const settings = () =>
+      layer()?.settings ?? {
+        opacity: D.OPACITY,
+        intensity: D.INTENSITY,
+        gamma: D.GAMMA,
+        threshold: D.THRESHOLD,
+        bandwidthScale: D.BANDWIDTH_SCALE,
+        ramp: D.RAMP,
+        dimGraph: D.DIM_GRAPH,
+      };
+    const syncFns = [];
+    const syncControls = () => syncFns.forEach((fn) => fn());
+
+    function appendHeatmapSlider(parent, key, { min, max, step }, tooltip) {
+      const container = document.createElement("div");
+      container.className = "style-slider-container";
+      if (tooltip) container.title = tooltip;
+
+      const slider = document.createElement("input");
+      slider.type = "range";
+      slider.min = min;
+      slider.max = max;
+      slider.step = step;
+      slider.classList.add("style-slider");
+
+      const valueInput = document.createElement("input");
+      valueInput.type = "number";
+      valueInput.min = min;
+      valueInput.max = max;
+      valueInput.step = step;
+      valueInput.classList.add("style-input-sm");
+
+      const apply = (raw) => {
+        const value = parseFloat(raw);
+        if (!Number.isFinite(value)) return;
+        layer()?.updateSettings({ [key]: value });
+      };
+      slider.oninput = () => {
+        valueInput.value = slider.value;
+        apply(slider.value);
+      };
+      valueInput.onchange = () => {
+        slider.value = valueInput.value;
+        apply(valueInput.value);
+      };
+
+      const sync = () => {
+        slider.value = String(settings()[key]);
+        valueInput.value = String(settings()[key]);
+      };
+      sync();
+      syncFns.push(sync);
+
+      container.appendChild(slider);
+      container.appendChild(valueInput);
+      parent.appendChild(container);
+    }
+
+    const rowSwitches = createNewRow(card);
+    appendLabel(rowSwitches, "Enable",
+      "Render a density field under the graph showing where nodes crowd together.");
+    const enableSwitch = createSwitch(() => {
+      layer()?.setHeatmapEnabled(enableSwitch.isChecked());
+    }, "heatmapEnabledSwitch", layer()?.heatmapEnabled ?? D.ENABLED);
+    rowSwitches.appendChild(enableSwitch);
+    appendVerticalRule(rowSwitches);
+    appendLabel(rowSwitches, "Dim graph",
+      "De-emphasize nodes and edges while the heatmap is on, so the density field reads through.");
+    const dimSwitch = createSwitch(() => {
+      layer()?.updateSettings({ dimGraph: dimSwitch.isChecked() });
+    }, "heatmapDimGraphSwitch", settings().dimGraph);
+    rowSwitches.appendChild(dimSwitch);
+    syncFns.push(() => dimSwitch.setChecked(settings().dimGraph));
+
+    // min/max are UI guardrails, not physical limits: intensity beyond 0.5
+    // saturates with 2 overlaps, contrast beyond 2 crushes everything but
+    // peaks, and a threshold above 0.5 hides all but the densest cores.
+    const sliders = [
+      ["Intensity", "intensity", { min: 0.05, max: 0.5, step: 0.01 },
+        "Per-node splat strength — how quickly overlapping nodes climb the color ramp."],
+      ["Opacity", "opacity", { min: 0.1, max: 1, step: 0.05 },
+        "Overall transparency of the heatmap layer."],
+      ["Radius", "bandwidthScale", { min: 0.25, max: 3, step: 0.05 },
+        "Splat radius, as a multiple of the auto-derived bandwidth."],
+      ["Contrast", "gamma", { min: 0.3, max: 2, step: 0.05 },
+        "Density exponent: lower boosts faint regions, higher emphasizes dense peaks."],
+      ["Threshold", "threshold", { min: 0, max: 0.5, step: 0.01 },
+        "Density floor: clears everything below it, so only overlapping nodes show. "
+        + "A single node peaks at the Intensity value — set this just above it to hide isolated nodes."],
+    ];
+    for (const [label, key, params, tooltip] of sliders) {
+      const row = createNewRow(card);
+      appendLabel(row, label, tooltip);
+      appendHeatmapSlider(row, key, params, tooltip);
+    }
+
+    const rowRamp = createNewRow(card);
+    appendLabel(rowRamp, "Colors", "Color ramp the density maps through.");
+    const rampSelect = document.createElement("select");
+    rampSelect.className = "style-inner-button";
+    rampSelect.title = "Color ramp the density maps through.";
+    for (const name of Object.keys(D.RAMPS)) {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+      rampSelect.appendChild(option);
+    }
+    rampSelect.value = settings().ramp;
+    rampSelect.onchange = () => layer()?.updateSettings({ ramp: rampSelect.value });
+    rowRamp.appendChild(rampSelect);
+    syncFns.push(() => { rampSelect.value = settings().ramp; });
+
+    const rowReset = createNewRow(card);
+    appendButton(rowReset, "Reset", "Restore the heatmap appearance defaults.", () => {
+      layer()?.resetSettings();
+      syncControls();
+    });
+  }
+
   createFocusCard();
   createSelectCard();
   createArrangeNodesCard();
   createNodeConfigCard();
   createEdgeConfigCard();
   createBubbleSetConfigCard();
+  createHeatmapConfigCard();
+
+  // Node stays open (most common); Edge is the largest section so it starts
+  // folded; bubble styling only matters once groups exist, so fold it too.
+  // The heatmap overlay is an occasional set-and-leave feature — folded.
+  makeCollapsible("Node Configuration");
+  makeCollapsible("Edge Configuration", true);
+  makeCollapsible("Bubble Sets", true);
+  makeCollapsible("Density Heatmap", true);
 
   return root;
 }

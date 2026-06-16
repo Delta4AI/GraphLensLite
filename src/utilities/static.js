@@ -3,6 +3,22 @@ class StaticUtilities {
     return typeof value === 'string' || value instanceof String;
   }
 
+  /**
+   * Escape a value for safe interpolation into an HTML string. Use at every
+   * boundary where untrusted text (node/edge/property names, layout names,
+   * query fragments loaded from files) is concatenated into innerHTML.
+   * @param {*} value
+   * @returns {string}
+   */
+  static escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   static isNumber(value) {
     const parsed = parseFloat(value);
     return !isNaN(parsed) && isFinite(parsed);
@@ -167,6 +183,29 @@ class StaticUtilities {
       return `${hh}:${mm}:${ss}.${ms}`;
     }
     return `${hh}:${mm}:${ss}`;
+  }
+
+  /**
+   * True iff dotted-numeric version `a` is strictly newer than `b`
+   * (e.g. "1.16.0" > "1.15.0"). Missing trailing segments count as 0
+   * ("1.15.1" > "1.15"). Returns false for equal versions or any
+   * non-string / non-numeric / malformed input (empty or non-numeric
+   * segments, pre-release suffixes), so callers never warn on bad data.
+   */
+  static isVersionNewer(a, b) {
+    if (typeof a !== "string" || typeof b !== "string") return false;
+    // Empty segments ("1..0") must reject, not coerce to 0 via Number("").
+    const toNums = (v) => v.split(".").map((s) => (s === "" ? NaN : Number(s)));
+    const pa = toNums(a);
+    const pb = toNums(b);
+    if (pa.some(Number.isNaN) || pb.some(Number.isNaN)) return false;
+    const len = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+      const x = pa[i] ?? 0;
+      const y = pb[i] ?? 0;
+      if (x !== y) return x > y;
+    }
+    return false;
   }
 }
 

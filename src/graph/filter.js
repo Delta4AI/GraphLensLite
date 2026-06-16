@@ -124,20 +124,22 @@ class GraphFilterManager {
   }
 
   async updateElementVisibility(idsToShow, idsToHide) {
-    this.cache.visibleElementsChanged = false;
-    const { nodes, edges } = await this.cache.graph.getData();
-    const { visible, hidden } = [...nodes, ...edges].reduce(
-      (acc, item) => {
-        acc[item.style.visibility === "visible" ? "visible" : "hidden"].push(
-          item.id,
-        );
-        return acc;
-      },
-      { visible: [], hidden: [] },
-    );
+    // cache.graph is null both before any data is loaded and when WebGL init
+    // failed (dead renderer); either way there is nothing to show/hide.
+    if (!this.cache.graph) return;
 
-    const showElementsDiff = idsToShow.filter((id) => hidden.includes(id));
-    const hideElementsDiff = idsToHide.filter((id) => visible.includes(id));
+    this.cache.visibleElementsChanged = false;
+    // Current visibility comes from the graphology `hidden` attrs, surfaced
+    // as style.visibility by the renderer facade (sigma migration, Phase 1).
+    const { nodes, edges } = await this.cache.graph.getData();
+    const visible = new Set();
+    const hidden = new Set();
+    for (const item of [...nodes, ...edges]) {
+      (item.style.visibility === "visible" ? visible : hidden).add(item.id);
+    }
+
+    const showElementsDiff = idsToShow.filter((id) => hidden.has(id));
+    const hideElementsDiff = idsToHide.filter((id) => visible.has(id));
 
     if (showElementsDiff.length > 0) {
       await this.cache.graph.showElement(showElementsDiff);

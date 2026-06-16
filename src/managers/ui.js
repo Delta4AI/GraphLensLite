@@ -2,12 +2,24 @@ import {StaticUtilities} from "../utilities/static.js";
 import {DropdownChecklist, InvertibleRangeSlider} from "./ui_components.js";
 import {createStyleDiv} from "./ui_style_div.js";
 import {Popup} from "../utilities/popup.js";
+import {applyTheme, currentTheme, nodeLabelColorForTheme} from "../utilities/theme.js";
+import {EXPORT_SCALES} from "../utilities/export_scale.js";
+import {clampPopoverLeft} from "../utilities/popover_position.js";
+
+// Persisted preference: whether the filter panel reveals exact numeric inputs
+// and the per-row group / selection actions. Off keeps rows scannable when a
+// dataset has 30-50 properties.
+const FILTER_DETAILS_KEY = "gll.filterDetails";
 
 class UIManager {
   constructor(cache, debugEnabled = false) {
     this.cache = cache;
     this.debugEnabled = debugEnabled;
     this.bottomBarHeight = null;
+    // While > 0, hideLoading() is a no-op so a long multi-step orchestration
+    // (workspace create/switch) keeps the overlay up across its nested
+    // render→#postRefresh→hideLoading calls. See holdLoading/releaseLoading.
+    this._loadingHolds = 0;
   }
 
   setDataSourceLabel(text) {
@@ -16,6 +28,35 @@ class UIManager {
       label.textContent = text;
       label.title = text;
     }
+  }
+
+  /**
+   * True while the loading overlay is up. The overlay (#loadingOverlay,
+   * position:fixed inset:0) already swallows pointer events, but keydown
+   * hotkeys bypass it — callers gate keyboard-driven actions on this so the
+   * user can't mutate the graph mid-load. Derived from the DOM so it can never
+   * desync from a missed showLoading/hideLoading pairing.
+   * @returns {boolean}
+   */
+  isBusy() {
+    const overlay = document.getElementById('loadingOverlay');
+    return !!overlay && overlay.style.display === 'flex';
+  }
+
+  /**
+   * Pin the loading overlay open across a multi-step orchestration so a nested
+   * render's #postRefresh hideLoading() cannot drop it mid-flight — the hole
+   * that let the UI become interactable while a workspace create/switch was
+   * still computing layout, syncing bubbles and tweening positions. Balanced
+   * with releaseLoading(); the caller's own hideLoading() at the true end
+   * actually drops the overlay. Counted so nested holds compose safely.
+   */
+  holdLoading() {
+    this._loadingHolds += 1;
+  }
+
+  releaseLoading() {
+    if (this._loadingHolds > 0) this._loadingHolds -= 1;
   }
 
   async showLoading(header, text = "") {
@@ -40,7 +81,14 @@ class UIManager {
   }
 
   async hideLoading() {
+    // Pinned open by an in-progress orchestration — keep blocking until it
+    // releases its hold and calls hideLoading() itself at the true end.
+    if (this._loadingHolds > 0) return;
+
     const overlay = document.getElementById('loadingOverlay');
+    // Idempotent: already hidden (e.g. a defensive second call in a finally) —
+    // skip the opacity-transition wait.
+    if (overlay.style.display === 'none') return;
     overlay.style.opacity = '0';
 
     // Wait for the opacity transition to complete
@@ -181,13 +229,6 @@ class UIManager {
       this.hideBottomBar();
       queryBtn.classList.remove("highlight");
     }
-
-    // Wait for CSS transition to complete (300ms) before resizing graph canvas
-    setTimeout(() => {
-      if (this.cache.graph) {
-        this.cache.graph.resize();
-      }
-    }, 300);
   }
 
   async closeBottomBar() {
@@ -207,11 +248,6 @@ class UIManager {
     const bottomBar = document.getElementById("bottomBar");
     if (bottomBar.classList.contains("active")) {
       this.hideBottomBar();
-      setTimeout(() => {
-        if (this.cache.graph) {
-          this.cache.graph.resize();
-        }
-      }, 300);
     }
   }
 
@@ -232,13 +268,6 @@ class UIManager {
     }
 
     await this.hideLoading();
-
-    // Wait for CSS transition to complete (300ms) before resizing graph canvas
-    setTimeout(() => {
-      if (this.cache.graph) {
-        this.cache.graph.resize();
-      }
-    }, 300);
   }
 
   async reloadApp() {
@@ -374,11 +403,6 @@ class UIManager {
         bottomBar.style.height = finalHeight + 'px';
         mainContent.style.height = newMainHeight + 'px';
         this.bottomBarHeight = finalHeight;
-
-        // Resize graph canvas after manual resize (no transition, resize immediately)
-        if (this.cache.graph) {
-          this.cache.graph.resize();
-        }
       }
 
       shadowBar.style.display = 'none';
@@ -391,15 +415,6 @@ class UIManager {
         shadowBar.parentNode.removeChild(shadowBar);
       }
     });
-  }
-
-  async toggleEditMode() {
-    const editBtn = document.getElementById("editBtn");
-    if (!editBtn) return;
-    let editModeActive = editBtn.classList.contains("active");
-    editModeActive ? editBtn.classList.remove("active") : editBtn.classList.add("active");
-
-    this.handleEditModeUIChanges();
   }
 
   toggleStylingPanel() {
@@ -417,13 +432,6 @@ class UIManager {
       styleBtn.classList.add("highlight");
       outerGraphContainer.classList.add("styling-panel-active");
     }
-
-    // Wait for CSS transition to complete (300ms) before resizing graph canvas
-    setTimeout(() => {
-      if (this.cache.graph) {
-        this.cache.graph.resize();
-      }
-    }, 300);
   }
 
   toggleSelectionEditor() {
@@ -433,84 +441,164 @@ class UIManager {
     if (!container || !panel || !toggleBtn) return;
 
     const isExpanded = container.classList.toggle("expanded");
-    toggleBtn.textContent = isExpanded ? "▴" : "▾";
-    toggleBtn.title = isExpanded ? "Collapse selection editor" : "Expand selection editor";
+    toggleBtn.textContent = isExpanded ? "Tools ▴" : "Tools ▾";
+    toggleBtn.title = isExpanded
+      ? "Hide selection tools"
+      : "Show selection tools: select by name, neighbours, or arrange the selection";
     toggleBtn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
   }
 
   async toggleLassoSelection() {
     const lassoWrapper = document.getElementById("lassoWrapper");
-    let lassoIsActive = lassoWrapper.classList.contains("active");
-    lassoIsActive ? lassoWrapper.classList.remove("active") : lassoWrapper.classList.add("active");
+    const enableLasso = !lassoWrapper.classList.contains("active");
+    lassoWrapper.classList.toggle("active", enableLasso);
 
-    const clickAndDragBehaviors = [
-      this.cache.gcm.BEHAVIOURS.DRAG_CANVAS,
-      this.cache.gcm.BEHAVIOURS.DRAG_ELEMENT
-    ];
+    // The lasso overlay owns the pointer while active (camera pan and node
+    // drag are swallowed by it); tooltip clicks are routed away too. Hover
+    // needs no toggling here: the overlay blocks sigma's mousemove anyway.
+    this.cache.graph.setInteractionEnabled("lasso", enableLasso);
+    this.cache.graph.setInteractionEnabled("drag", !enableLasso);
+    this.cache.graph.setInteractionEnabled("tooltip", !enableLasso);
 
-    if (!this.cache.CFG.DISABLE_HOVER_EFFECT) {
-      clickAndDragBehaviors.push(this.cache.gcm.BEHAVIOURS.HOVER_ACTIVATE);
-    }
-
-    const lassoBehaviors = [
-      this.cache.gcm.BEHAVIOURS.LASSO_SELECT,
-    ];
-
-    if (!this.cache.CFG.APPLY_BUBBLE_SET_HOTFIX || (this.cache.CFG.APPLY_BUBBLE_SET_HOTFIX && !this.cache.CFG.DISABLE_HOVER_EFFECT)) {
-      lassoBehaviors.push(this.cache.gcm.BEHAVIOURS.CLICK_SELECT);
-    }
-
-    let behaviors = await this.cache.graph.getBehaviors()
-      .filter(b => ![
-        ...clickAndDragBehaviors.map(b => b.type),
-        ...lassoBehaviors.map(b => b.type)
-      ].includes(b.type));
-
-    lassoIsActive ? this.info("Switched to click and drag mode") : this.info("Switched to lasso selection mode");
-
-    await this.cache.graph.setBehaviors([...behaviors, ...lassoIsActive ? clickAndDragBehaviors : lassoBehaviors]);
-    await this.cache.graph.updatePlugin({key: 'tooltip', enable: lassoIsActive});
+    this.info(enableLasso ? "Switched to lasso selection mode" : "Switched to click and drag mode");
   }
 
   async toggleHoverEffect(btn) {
-    const isCurrentlyEnabled = !this.cache.CFG.DISABLE_HOVER_EFFECT;
+    const enable = this.cache.CFG.DISABLE_HOVER_EFFECT;
+    this.cache.CFG.DISABLE_HOVER_EFFECT = !enable;
 
-    if (isCurrentlyEnabled) {
-      this.cache.CFG.DISABLE_HOVER_EFFECT = true;
-      btn.classList.remove("green", "highlight");
-      btn.classList.add("red");
-      btn.title = "Enable hover highlight effect (H)";
-      const behaviors = await this.cache.graph.getBehaviors();
-      const filtered = behaviors.filter(b => b.type !== this.cache.gcm.BEHAVIOURS.HOVER_ACTIVATE.type);
-      await this.cache.graph.setBehaviors(filtered);
-
-      // Clear any lingering highlight/dim states from the hover behavior
-      const stateMap = {};
-      for (const node of this.cache.graph.getNodeData()) {
-        const states = await this.cache.graph.getElementState(node.id);
-        const cleaned = states.filter(s => s !== "highlight" && s !== "dim");
-        if (cleaned.length !== states.length) stateMap[node.id] = cleaned;
-      }
-      for (const edge of this.cache.graph.getEdgeData()) {
-        const states = await this.cache.graph.getElementState(edge.id);
-        const cleaned = states.filter(s => s !== "highlight" && s !== "dim");
-        if (cleaned.length !== states.length) stateMap[edge.id] = cleaned;
-      }
-      if (Object.keys(stateMap).length > 0) {
-        await this.cache.graph.setElementState(stateMap);
-      }
-
-      this.info("Hover highlight effect disabled");
-    } else {
-      this.cache.CFG.DISABLE_HOVER_EFFECT = false;
+    if (enable) {
       btn.classList.remove("red");
       btn.classList.add("green", "highlight");
       btn.title = "Disable hover highlight effect (H)";
-      const behaviors = await this.cache.graph.getBehaviors();
-      behaviors.push(this.cache.gcm.BEHAVIOURS.HOVER_ACTIVATE);
-      await this.cache.graph.setBehaviors(behaviors);
-      this.info("Hover highlight effect enabled");
+    } else {
+      btn.classList.remove("green", "highlight");
+      btn.classList.add("red");
+      btn.title = "Enable hover highlight effect (H)";
     }
+
+    // Disabling also clears any lingering hover highlight/dim layer;
+    // selection states are untouched (they live in elementStates).
+    this.cache.graph.setInteractionEnabled("hover", enable);
+    this.info(enable ? "Hover highlight effect enabled" : "Hover highlight effect disabled");
+  }
+
+  /**
+   * Close every anchored popover (graph teardown hook — the popovers outlive
+   * the adapter, but their outside-click document listeners must not).
+   */
+  closeAnchoredPopovers() {
+    this.#closeExportResolutionPopover();
+  }
+
+  toggleDarkMode() {
+    const next = currentTheme(document) === "dark" ? "light" : "dark";
+    applyTheme(document, next);
+    this.updateDarkModeButton();
+    // Flip the renderer's default label color (per-element labelColor attrs
+    // set by the user/style pipeline are untouched). setSetting schedules a
+    // refresh; the minimap redraws via its afterRender hook.
+    const sigma = this.cache.graph?.sigma;
+    if (sigma) {
+      sigma.setSetting("labelColor", { color: nodeLabelColorForTheme(next) });
+      sigma.setSetting("edgeLabelColor", { color: nodeLabelColorForTheme(next) });
+    }
+    this.info(next === "dark" ? "Dark mode enabled" : "Light mode enabled");
+  }
+
+  updateDarkModeButton() {
+    const btn = document.getElementById("darkModeToggleBtn");
+    if (!btn) return;
+    const isDark = currentTheme(document) === "dark";
+    btn.textContent = isDark ? "☀️" : "🌙";
+    btn.title = isDark ? "Switch to light mode" : "Switch to dark mode";
+  }
+
+  /**
+   * Resolution picker anchored to the 📷 button: choose 1×/2×/4× and export
+   * immediately at that scale. The chosen factor is remembered (and reused by
+   * the "P" shortcut). Built lazily on first open.
+   */
+  toggleExportResolutionPopover() {
+    if (this._exportPopover?.classList.contains("open")) {
+      this.#closeExportResolutionPopover();
+      return;
+    }
+    this.#openExportResolutionPopover();
+  }
+
+  #closeExportResolutionPopover() {
+    this._exportPopover?.classList.remove("open");
+    if (this._exportOutsideHandler) {
+      document.removeEventListener("pointerdown", this._exportOutsideHandler, true);
+      this._exportOutsideHandler = null;
+    }
+  }
+
+  #openExportResolutionPopover() {
+    const anchor = document.getElementById("exportImage");
+    if (!anchor) return;
+
+    const popover = this.#ensureExportResolutionPopover();
+    const current = this.cache.io.exportScale || 1;
+    popover.querySelectorAll(".export-res-option").forEach((btn) => {
+      btn.classList.toggle("active", Number(btn.dataset.scale) === current);
+    });
+
+    const rect = anchor.getBoundingClientRect();
+    popover.classList.add("open");
+    // Anchor below the button, clamped to the viewport's right edge.
+    popover.style.top = `${rect.bottom + 6}px`;
+    popover.style.left = `${clampPopoverLeft(rect.left, popover.offsetWidth, window.innerWidth)}px`;
+
+    this._exportOutsideHandler = (e) => {
+      if (!popover.contains(e.target) && e.target !== anchor) this.#closeExportResolutionPopover();
+    };
+    document.addEventListener("pointerdown", this._exportOutsideHandler, true);
+  }
+
+  #ensureExportResolutionPopover() {
+    if (this._exportPopover) return this._exportPopover;
+    const popover = document.createElement("div");
+    popover.className = "export-resolution-popover";
+    popover.id = "exportResolutionPopover";
+
+    const title = document.createElement("div");
+    title.className = "export-res-title";
+    title.textContent = "Export image resolution";
+    popover.appendChild(title);
+
+    const row = document.createElement("div");
+    row.className = "export-res-row";
+    for (const scale of EXPORT_SCALES) {
+      const btn = document.createElement("button");
+      btn.className = "export-res-option";
+      btn.dataset.scale = String(scale);
+      btn.textContent = `${scale}×`;
+      btn.title = `Export at ${scale}× viewport resolution`;
+      btn.addEventListener("click", () => {
+        this.#closeExportResolutionPopover();
+        this.cache.io.exportPNG(scale);
+      });
+      row.appendChild(btn);
+    }
+    popover.appendChild(row);
+
+    // Vector output has no resolution to pick — one button, below the PNG
+    // scales. SVG never participates in the remembered scale (PNG-only).
+    const svgBtn = document.createElement("button");
+    svgBtn.className = "export-res-option export-res-svg";
+    svgBtn.textContent = "Vector (SVG)";
+    svgBtn.title = "Export as resolution-independent SVG vector graphic";
+    svgBtn.addEventListener("click", () => {
+      this.#closeExportResolutionPopover();
+      this.cache.io.exportSVG();
+    });
+    popover.appendChild(svgBtn);
+
+    document.body.appendChild(popover);
+    this._exportPopover = popover;
+    return popover;
   }
 
   updateHoverToggleButton() {
@@ -525,50 +613,6 @@ class UIManager {
       btn.classList.add("green", "highlight");
       btn.title = "Disable hover highlight effect (H)";
     }
-  }
-
-  handleEditModeUIChanges() {
-    const editBtn = document.getElementById("editBtn");
-    if (!editBtn) return;
-    const editModeActive = editBtn.classList.contains("active");
-
-    editModeActive ? editBtn.classList.add("highlight") : editBtn.classList.remove("highlight");
-
-    // handle all edit elements
-    const editElements = document.querySelectorAll('.show-on-edit, .show-on-edit-full-width');
-    editElements.forEach(el => {
-      editModeActive ? el.classList.add("show") : el.classList.remove("show");
-      el.style.height = editModeActive ? `${el.scrollHeight}px` : "0";
-    });
-
-    const hideOnEditElements = document.querySelectorAll('.hide-on-edit');
-    hideOnEditElements.forEach(el => {
-      el.style.display = editModeActive ? "none" : "";
-    });
-
-    // 'collapse' all open style rows
-    if (!editModeActive) {
-      const styleRows = document.querySelectorAll('.style-row');
-      styleRows.forEach(row => {
-        row.classList.remove("show");
-      });
-    }
-
-    // handle filter row layouts
-    const filterRows = document.querySelectorAll('.filter-row');
-    filterRows.forEach(row => {
-      const sliderCol = row.querySelector(".filter-row-col2");
-      const hasRangeSlider = sliderCol.querySelector(".hide-on-edit");
-      if (hasRangeSlider) {
-        sliderCol.style.display = editModeActive ? "flex" : "";
-        sliderCol.style.alignItems = editModeActive ? "center" : "";
-        sliderCol.style.gap = editModeActive ? "4px" : "";
-      } else {
-        sliderCol.style.display = "";
-        sliderCol.style.alignItems = "";
-        sliderCol.style.gap = "";
-      }
-    });
   }
 
   buildUI() {
@@ -600,10 +644,6 @@ class UIManager {
 
     this.buildStylingPanelUI();
 
-    document.getElementById("resetSelectedElementsStyleBtn").title = this.cache.CFG.RESET_SELECTION_BUTTON_RESETS_POSITIONS
-      ? "Reset the visual appearance and positions of the selected elements to their defaults"
-      : "Reset the visual appearance of the selected elements to their defaults";
-
     this.showUI(true);
 
     this.cache.query.lastGoodWidth = this.cache.query.editorDiv.offsetWidth;
@@ -612,13 +652,7 @@ class UIManager {
 
   buildFilterUI() {
     const div = document.getElementById("filterContainer");
-    const editBtn = document.getElementById("editBtn");
     div.innerHTML = "";
-
-    // Re-append editBtn if it exists
-    if (editBtn) {
-      div.appendChild(editBtn);
-    }
 
     // Always create lock status bar, show/hide based on lock state
     const statusBar = this.createFilterLockStatusBar();
@@ -633,8 +667,15 @@ class UIManager {
       div.classList.remove('locked');
     }
 
-    let sectionsCreated = new Set();
-    let subSectionsCreated = new Set();
+    // A single "Details" toggle reveals exact numeric inputs and per-row
+    // group / selection actions. Compact by default so dense property sets
+    // (30-50 properties) stay scannable. It rides on the first section header.
+    const detailsToggle = this.createFilterDetailsToggle(div);
+
+    // Each section (and sub-group) is a collapsible accordion so large
+    // property sets can be folded down to just the groups in use.
+    const sectionBodies = new Map();
+    const subBodies = new Map();
     const sortedPropIDs = this.cache.CFG.SORT_FILTERS ?
       [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()].sort() :
       [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()];
@@ -642,8 +683,10 @@ class UIManager {
     for (let propID of sortedPropIDs) {
       let [section, subSection, prop] = StaticUtilities.decodePropHashId(propID);
       let isCategoricalProperty = this.cache.data.filterDefaults.get(propID).isCategory;
-      if (!sectionsCreated.has(section)) {
-        if (sectionsCreated.size > 0) div.appendChild(document.createElement("hr"));
+
+      if (!sectionBodies.has(section)) {
+        const sectionWrap = document.createElement("div");
+        sectionWrap.className = "filter-section";
         const headerDiv = document.createElement("div");
         headerDiv.className = "header-card";
         const header = document.createElement("h4");
@@ -653,11 +696,27 @@ class UIManager {
         headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(false, section));
         headerDiv.appendChild(this.cache.uiComponents.createSectionResetButton(section));
         headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(true, section));
-        div.appendChild(headerDiv);
-        div.appendChild(document.createElement("br"));
-        sectionsCreated.add(section);
+        const sectionBody = document.createElement("div");
+        sectionBody.className = "filter-section-body";
+        this.makeFilterGroupCollapsible(sectionWrap, headerDiv);
+        if (sectionBodies.size === 0) {
+          // Pair the first section header with the panel-level Details toggle.
+          const headerRow = document.createElement("div");
+          headerRow.className = "filter-section-headerrow";
+          headerRow.append(headerDiv, detailsToggle);
+          sectionWrap.append(headerRow, sectionBody);
+        } else {
+          sectionWrap.append(headerDiv, sectionBody);
+        }
+        div.appendChild(sectionWrap);
+        sectionBodies.set(section, sectionBody);
       }
-      if (!subSectionsCreated.has(`${section}::${subSection}`)) {
+      const sectionBody = sectionBodies.get(section);
+
+      const subKey = `${section}::${subSection}`;
+      if (!subBodies.has(subKey)) {
+        const subWrap = document.createElement("div");
+        subWrap.className = "filter-subgroup";
         const subHeaderDiv = document.createElement("div");
         subHeaderDiv.className = "sub-header-card";
         const subHeader = document.createElement("h5");
@@ -667,9 +726,15 @@ class UIManager {
         subHeaderDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(false, section, subSection));
         subHeaderDiv.appendChild(this.cache.uiComponents.createSectionResetButton(section, subSection));
         subHeaderDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(true, section, subSection));
-        div.appendChild(subHeaderDiv);
-        subSectionsCreated.add(`${section}::${subSection}`);
+        const subBody = document.createElement("div");
+        subBody.className = "filter-subgroup-body";
+        this.makeFilterGroupCollapsible(subWrap, subHeaderDiv);
+        subWrap.append(subHeaderDiv, subBody);
+        sectionBody.appendChild(subWrap);
+        subBodies.set(subKey, subBody);
       }
+      const subBody = subBodies.get(subKey);
+
       const row = document.createElement('div');
       row.className = "filter-row";
       const col1 = document.createElement('div');
@@ -696,13 +761,66 @@ class UIManager {
       }
       col3.appendChild(this.cache.uiComponents.createAddOrRemoveToSelectionGroup(propID));
       row.appendChild(col3);
-      div.append(row);
+      subBody.append(row);
       sliderOrDropdown.appendListeners();
     }
 
     this.manageDynamicWidgets();
-    this.handleEditModeUIChanges();
     this.cache.qm.updateQueryTextArea();
+  }
+
+  // Builds the panel-level "Details" toggle button. Adding/removing
+  // `show-details` on the filter container drives input/action visibility
+  // purely via CSS. Returned button is mounted on the first section header.
+  createFilterDetailsToggle(container) {
+    const detailsBtn = document.createElement('button');
+    detailsBtn.type = 'button';
+    detailsBtn.className = 'filter-details-toggle';
+    detailsBtn.textContent = '⚙ Details';
+
+    const apply = (on) => {
+      container.classList.toggle('show-details', on);
+      detailsBtn.classList.toggle('active', on);
+      detailsBtn.setAttribute('aria-pressed', String(on));
+      detailsBtn.title = on
+        ? 'Hide exact value inputs and per-row group / selection actions'
+        : 'Show exact value inputs and per-row group / selection actions';
+    };
+
+    detailsBtn.addEventListener('click', () => {
+      const on = !container.classList.contains('show-details');
+      try {
+        window.localStorage.setItem(FILTER_DETAILS_KEY, on ? '1' : '0');
+      } catch (err) {
+        this.debug(`Could not persist filter-details preference: ${err.message}`);
+      }
+      apply(on);
+    });
+
+    let stored = '0';
+    try {
+      stored = window.localStorage.getItem(FILTER_DETAILS_KEY) ?? '0';
+    } catch (err) {
+      this.debug(`Could not read filter-details preference: ${err.message}`);
+    }
+    apply(stored === '1');
+
+    return detailsBtn;
+  }
+
+  // Prepends a chevron and wires a click on the group header to fold the group
+  // body. Clicks on the header's action badges are ignored so they still fire.
+  makeFilterGroupCollapsible(wrapper, headerDiv) {
+    const chevron = document.createElement('span');
+    chevron.className = 'filter-group-chevron';
+    chevron.textContent = '▾';
+    headerDiv.insertBefore(chevron, headerDiv.firstChild);
+    headerDiv.classList.add('collapsible-filter-header');
+    headerDiv.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      const collapsed = wrapper.classList.toggle('collapsed');
+      chevron.textContent = collapsed ? '▸' : '▾';
+    });
   }
 
   showUI(show) {
@@ -803,10 +921,10 @@ class UIManager {
     statusBar.innerHTML = `
       <div class="filter-lock-message">
         <span class="filter-lock-icon">🔒</span>
-        <span>Filters locked | Query manually edited</span>
+        <span>Filters are driven by your edited query. Unlock to control them here again.</span>
       </div>
       <button class="filter-unlock-btn" onclick="cache.ui.unlockFiltersAndResetQuery()">
-        Reset
+        Unlock filters
       </button>
     `;
     return statusBar;
@@ -871,6 +989,27 @@ class UIManager {
       const card = document.getElementById(cardId);
       if (card) selectionPanel.appendChild(card);
     });
+  }
+
+  // Additively open a collapsible styling card by its label (never closes one).
+  // Driven by the current selection so the relevant card is already open when
+  // the user reaches for it, without fighting cards they toggled themselves.
+  expandStylingCard(label) {
+    const content = document.getElementById("stylingPanelContent");
+    const card = content?.querySelector(`[data-label="${label}"]`);
+    if (!card || !card.classList.contains("collapsed")) return;
+    card.classList.remove("collapsed");
+    const header = card.querySelector(".card-collapse-header");
+    const chevron = card.querySelector(".card-collapse-chevron");
+    if (header) header.setAttribute("aria-expanded", "true");
+    if (chevron) chevron.textContent = "▾";
+  }
+
+  // Mirror the live selection onto the styling cards: open Node/Edge config for
+  // whatever is selected. Additive only — see expandStylingCard.
+  syncStylingCardsToSelection(hasNodes, hasEdges) {
+    if (hasNodes) this.expandStylingCard("Node Configuration");
+    if (hasEdges) this.expandStylingCard("Edge Configuration");
   }
 }
 

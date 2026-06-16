@@ -24,7 +24,7 @@ npm run serve:api
 On start the service prints the viewer URL and the ingest endpoint:
 
 ```
-Graph Lens Lite service v1.13.1
+Graph Lens Lite service vX.Y.Z
   Viewer:  http://127.0.0.1:7637/
   Ingest:  POST http://127.0.0.1:7637/api/graph
 ```
