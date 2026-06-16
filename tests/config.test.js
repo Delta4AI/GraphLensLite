@@ -193,7 +193,6 @@ describe('DEFAULTS.BUBBLE_GROUP_STYLE', () => {
 describe('CFG', () => {
   it('has expected threshold settings', () => {
     expect(CFG.MAX_NODES_BEFORE_HIDING_LABELS).toBeGreaterThan(0)
-    expect(CFG.MAX_NODES_BEFORE_DISABLING_HOVER_EFFECT).toBeGreaterThan(0)
     expect(CFG.MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS).toBeGreaterThan(0)
   })
 
@@ -201,10 +200,9 @@ describe('CFG', () => {
     expect(CFG.MAX_SELECTION_MEMORY).toBeGreaterThan(0)
   })
 
-  it('has valid filter step sizes', () => {
+  it('has a valid integer filter step size (floats use a continuous step="any")', () => {
     expect(CFG.FILTER_STEP_SIZE_INTEGER).toBe(1)
-    expect(CFG.FILTER_STEP_SIZE_FLOAT).toBeGreaterThan(0)
-    expect(CFG.FILTER_STEP_SIZE_FLOAT).toBeLessThan(1)
+    expect(CFG.FILTER_STEP_SIZE_FLOAT).toBeUndefined()
   })
 
   it('has required Excel header strings', () => {
@@ -212,11 +210,6 @@ describe('CFG', () => {
     expect(CFG.EXCEL_UNCATEGORIZED_SUBHEADER.length).toBeGreaterThan(0)
     expect(typeof CFG.EXCEL_NODE_HEADER).toBe('string')
     expect(typeof CFG.EXCEL_EDGE_HEADER).toBe('string')
-  })
-
-  it('INVISIBLE_DUMMY_NODE has hidden visibility', () => {
-    expect(CFG.INVISIBLE_DUMMY_NODE.style.visibility).toBe('hidden')
-    expect(CFG.INVISIBLE_DUMMY_NODE.id).toBeTruthy()
   })
 
   it('boolean flags default correctly', () => {

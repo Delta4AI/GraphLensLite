@@ -7,11 +7,9 @@
   <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='4' y='24' font-size='24'>🔍</text></svg>"
         type="image/svg+xml">
-<!-- @antv/g6 version 5.0.46, modified according to https://github.com/antvis/G6/issues/7195 -->
-  <script inline src="lib/g6.min.js"></script>
   <script inline src="lib/exceljs.min.js"></script>
   <script type="module" src="gll.js"></script>
-  <link inline rel="stylesheet" href="style.css?v=1" />
+  <link inline rel="stylesheet" href="style.css" />
 </head>
 <body>
 <div id="landingPage">
@@ -65,10 +63,12 @@
 </div>
 
 <div id="loadingOverlay" class="container">
-  <div id="loadingInnerContent">
+  <div id="loadingInnerContent" role="status" aria-live="polite">
     <div class="loader"></div>
-    <h3 id="loadingHeader">Loading ..</h3>
-    <span id="loadingText" class="h7">Please wait</span>
+    <div id="loadingTextGroup">
+      <h3 id="loadingHeader">Loading ..</h3>
+      <span id="loadingText" class="h7">Please wait</span>
+    </div>
   </div>
 </div>
 <div id="mainContent">
@@ -83,14 +83,17 @@
           </h3>
           <span id="dataSourceLabel" class="data-source-label"></span>
         </div>
-        <div class="showOnLoad button-group">
-          <button id="metricsToggleBtn" class="showOnLoad medium-btn" title="Toggle network metrics panel (M)" onclick="cache.metrics.toggleUI()">📊</button>
-          <button id="dataToggleBtn" class="showOnLoad medium-btn" title="Toggle data editor (D)" onclick="cache.ui.toggleDataEditor()">🔢</button>
-          <button id="queryToggleBtn" class="showOnLoad medium-btn" title="Toggle query editor (Q)" onclick="cache.ui.toggleQueryEditor()">📝</button>
-          <button id="exportImage" class="showOnLoad medium-btn" onclick="cache.io.exportPNG()" title="Save Image (P)">📷️</button>
-          <button id="exportModel" class="showOnLoad medium-btn" onclick="cache.io.exportGraphAsJSON()" title="Save Model (S)">💾</button>
-          <button id="assistantToggleBtn" class="medium-btn" title="Toggle Graph Assistant (A)" onclick="cache.assistant.togglePanel()">🤖</button>
+        <div class="header-actions">
+          <button id="exportImage" class="showOnLoad medium-btn" title="Save image (P)" onclick="cache.ui.toggleExportResolutionPopover()">📷</button>
+          <button id="exportModel" class="showOnLoad medium-btn" title="Save model (S)" onclick="cache.io.exportGraphAsJSON()">💾</button>
+          <button id="darkModeToggleBtn" class="medium-btn" title="Switch to dark mode" onclick="cache.ui.toggleDarkMode()">🌙</button>
         </div>
+      </div>
+      <div class="showOnLoad app-toolbar">
+        <button id="metricsToggleBtn" class="showOnLoad toolbar-pill" title="Toggle network metrics panel (M)" onclick="cache.metrics.toggleUI()">📊 Metrics</button>
+        <button id="dataToggleBtn" class="showOnLoad toolbar-pill" title="Toggle data editor (D)" onclick="cache.ui.toggleDataEditor()">🔢 Data</button>
+        <button id="queryToggleBtn" class="showOnLoad toolbar-pill" title="Toggle query editor (Q)" onclick="cache.ui.toggleQueryEditor()">📝 Query</button>
+        <button id="assistantToggleBtn" class="toolbar-pill" title="Toggle Graph Assistant (A)" onclick="cache.assistant.togglePanel()">🤖 Assistant</button>
       </div>
       <div class="hideOnLoad">
         <input type="file" id="fileInput" name="fileInput" onchange="cache.io.loadFileWrapper(event);"
@@ -113,6 +116,8 @@
           <button class="small-btn green" title="Create new workspace" onclick="cache.lm.addLayout()" >&nbsp;✚&nbsp;</button>
           <div class="button-separator"></div>
           <button class="small-btn" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">⛶</button>
+          <button id="removeOverlapsBtn" class="small-btn" title="Remove overlaps: minimally spread overlapping nodes apart (applies to all nodes in this workspace)" onclick="cache.lm.removeNodeOverlaps()">↔️</button>
+          <button id="relayoutBtn" class="small-btn" title="Re-layout: recompute positions for the entire workspace with a chosen layout algorithm (overwrites manual positions)" onclick="cache.lm.relayoutWorkspace()">🔄</button>
           <button id="hideDisconnectedBtn" class="small-btn red" title="Hide all nodes and edges that are not connected to any other node or edge" onclick="cache.gcm.toggleCleanUpDanglingElements(this)">🚫</button>
           <button id="hoverToggleBtn" class="small-btn green highlight" title="Disable hover highlight effect (H)" onclick="cache.ui.toggleHoverEffect(this)">✨</button>
           <div id="debugDiv" class="inline"></div>
@@ -124,47 +129,76 @@
         </div>
         <hr>
         <div id="metricsContainer"></div>
-        <div id="filterContainer">
-          <button id="editBtn" class="showOnLoad medium-btn" title="Toggle Edit mode (E)" onclick="cache.ui.toggleEditMode()">⚙️</button>
-        </div>
+        <div id="filterContainer"></div>
       </div>
     </div>
     <div id="sidebarStatusContainer"></div>
   </div>
   <div id="outerGraphContainer">
-    <div id="selectedElementsContainer" class="showOnLoad">
-      Selected nodes: <span id="selectedNodes" class="red"></span>
-      <button id="focusNodesBtn" class="tiny-btn disabled ml-1" title="Center and zoom the viewport to show all selected nodes"
-              onclick="cache.gcm.focusNodes()">🔍</button>
-      <button id="deselectNodesBtn" class="tiny-btn red disabled" title="Clear node selection"
-              onclick="cache.sm.toggleSelectionForAllNodes(false)">×</button>
-      <span id="manualBubbleGroupButtonContainer" class="manual-group-container"></span>
-      <br>
-      Selected edges: <span id="selectedEdges" class="red"></span>
-      <button id="focusEdgesBtn" class="tiny-btn disabled ml-1" title="Center and zoom the viewport to show all selected edges"
-              onclick="cache.gcm.focusEdges()">🔍</button>
-      <button id="deselectEdgesBtn" class="tiny-btn red disabled" title="Clear edge selection"
-              onclick="cache.sm.toggleSelectionForAllEdges(false)">×</button>
-      <hr>
-      <div id="lassoWrapper" class="showOnLoad small-btn"><button id="lassoToggleBtn" class="lasso-icon" title="Toggle lasso selection (L)" onclick="cache.ui.toggleLassoSelection()">➰</button></div>
-      <div class="button-separator"></div>
-      <button class="small-btn disabled" title="Reset style for selected elements" id="resetSelectedElementsStyleBtn"
-              onclick="cache.style.resetStyleForSelectedElements()">⟳</button>
-      <div class="button-separator"></div>
-      <button class="small-btn disabled" title="Undo Selection" id="undoSelectionBtn"
-              onclick="cache.sm.undoSelection()">↩</button>
-      <button class="small-btn disabled" title="Redo Selection" id="redoSelectionBtn"
-              onclick="cache.sm.redoSelection()">↪</button>
-      <div class="button-separator"></div>
-      <button id="styleToggleBtn" class="small-btn showOnLoad" title="Open styling panel (Y)" onclick="cache.ui.toggleStylingPanel()">🎨</button>
-      <button class="small-btn" title="Expand selection editor" id="selectionEditorToggleBtn"
-              onclick="cache.ui.toggleSelectionEditor()">▾</button>
-      <div id="manualGroupSeparator" class="button-separator" style="display: none;"></div>
-      <span id="manualBubbleGroupStatus" class="manual-group-status" style="display: none;"></span>
-      <button id="clearManualGroupsBtn" class="small-btn red" title="Clear all manual bubble groups"
-              onclick="cache.bs.clearAllManualGroups()" style="display: none;">×</button>
+    <div id="selectedElementsContainer" class="showOnLoad sel-hud-tr">
+      <div class="sel-hud-header" title="Drag to move — releases to the nearest corner">
+        <span class="sel-hud-title">Selection</span>
+        <span class="sel-hud-header-tools">
+          <button class="sel-hud-tools-toggle" id="selectionEditorToggleBtn"
+                  title="Show selection tools: select by name, neighbours, or arrange the selection"
+                  aria-expanded="false" onclick="cache.ui.toggleSelectionEditor()">Tools ▾</button>
+          <button class="sel-hud-hide-btn" id="selHudHideBtn" title="Hide the selection panel (e.g. for a screenshot)" aria-label="Hide selection panel">✕</button>
+        </span>
+      </div>
+
+      <div class="sel-hud-toolbar">
+        <div id="lassoWrapper" class="showOnLoad"><button id="lassoToggleBtn" class="sel-hud-btn" title="Toggle lasso selection: drag to select elements (L)" onclick="cache.ui.toggleLassoSelection()">➰ Lasso</button></div>
+        <button id="styleToggleBtn" class="sel-hud-btn showOnLoad" title="Open styling panel (Y)" onclick="cache.ui.toggleStylingPanel()">🎨 Style</button>
+        <span class="sel-hud-toolbar-spacer"></span>
+        <button class="sel-hud-icon-btn disabled" title="Undo selection" id="undoSelectionBtn"
+                onclick="cache.sm.undoSelection()">↩</button>
+        <button class="sel-hud-icon-btn disabled" title="Redo selection" id="redoSelectionBtn"
+                onclick="cache.sm.redoSelection()">↪</button>
+      </div>
+
+      <div class="sel-hud-empty">
+        <div class="sel-hud-empty-title">Nothing selected</div>
+        <div class="sel-hud-empty-hint">Click an element, drag a <button type="button" class="sel-hud-link" onclick="cache.ui.toggleLassoSelection()">lasso</button> (L), or use <button type="button" class="sel-hud-link" onclick="cache.ui.toggleSelectionEditor()">Tools</button> to select by name or neighbours. The <button type="button" class="sel-hud-link" onclick="cache.ui.toggleQueryEditor()">query editor</button> allows selection by properties.</div>
+      </div>
+
+      <div class="sel-hud-active">
+        <div class="sel-hud-counts">
+          <span class="sel-count"><strong id="selectedNodes" class="red">0</strong>&nbsp;nodes</span>
+          <button id="focusNodesBtn" class="sel-hud-icon-btn disabled" title="Center and zoom to selected nodes"
+                  onclick="cache.gcm.focusNodes()">🔍</button>
+          <button id="deselectNodesBtn" class="sel-hud-icon-btn red disabled" title="Clear node selection"
+                  onclick="cache.sm.toggleSelectionForAllNodes(false)">×</button>
+          <span class="sel-count-sep"></span>
+          <span class="sel-count"><strong id="selectedEdges" class="red">0</strong>&nbsp;edges</span>
+          <button id="focusEdgesBtn" class="sel-hud-icon-btn disabled" title="Center and zoom to selected edges"
+                  onclick="cache.gcm.focusEdges()">🔍</button>
+          <button id="deselectEdgesBtn" class="sel-hud-icon-btn red disabled" title="Clear edge selection"
+                  onclick="cache.sm.toggleSelectionForAllEdges(false)">×</button>
+        </div>
+
+        <div class="sel-hud-actions">
+          <span class="sel-group-control">
+            <span class="sel-group-label">Add to group:</span>
+            <span id="manualBubbleGroupButtonContainer" class="manual-group-container"></span>
+          </span>
+          <button class="sel-hud-btn disabled" title="Reset the style of selected elements to defaults" id="resetSelectedElementsStyleBtn"
+                  onclick="cache.style.resetStyleForSelectedElements()">⟳ Reset style</button>
+        </div>
+      </div>
+
+      <div class="sel-hud-groups">
+        <span class="sel-group-label">Groups:</span>
+        <button id="detectCommunitiesBtn" class="sel-hud-btn" title="Auto-group by community (Louvain): pick edge weighting & resolution, then assign the largest communities to bubble groups"
+                onclick="cache.bs.toggleCommunityDetectionPopover()">🧩 Auto</button>
+        <span id="manualGroupSeparator" class="button-separator" style="display: none;"></span>
+        <span id="manualBubbleGroupStatus" class="manual-group-status" style="display: none;"></span>
+        <button id="clearManualGroupsBtn" class="sel-hud-btn red" title="Clear all manual bubble groups"
+                onclick="cache.bs.clearAllManualGroups()" style="display: none;">Clear all</button>
+      </div>
+
       <div id="selectionEditorPanel" class="selection-editor-panel"></div>
     </div>
+    <button id="selHudRestoreBtn" class="sel-hud-restore sel-hud-tr showOnLoad" title="Show the selection panel" aria-label="Show selection panel">▸ Selection</button>
     <div id="innerGraphContainer"></div>
   </div>
   <div id="rightSidebar">
@@ -174,6 +208,7 @@
               onclick="cache.ui.toggleStylingPanel()">×</button>
     </div>
     <div id="rightSidebarContentContainer">
+      <div id="stylingSelectionStatus" class="styling-status empty">Nothing selected — select nodes or edges to style them. Bubble-group styling below works without a selection.</div>
       <div id="stylingPanelContent">
         <!-- Styling controls will be populated here -->
       </div>

@@ -1,6 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { DEFAULTS, CFG } from "../src/config.js";
 import { StaticUtilities } from "../src/utilities/static.js";
 import { GraphStyleManager } from "../src/graph/style.js";
@@ -168,120 +166,14 @@ function setupEdgeInCache(cache, edgeData) {
   cache.edgeRef.set(edgeData.id, edgeClone);
 }
 
-// ==========================================================================
-// REGRESSION: Graph constructor must not set spec-level type/style
-// ==========================================================================
-
-describe("Graph constructor must not set spec-level node/edge type or style", () => {
-  const coreSource = readFileSync(
-    join(import.meta.dirname, "..", "src", "graph", "core.js"),
-    "utf8",
-  );
-
-  // Extract the Graph constructor call block
-  const graphConstructorMatch = coreSource.match(
-    /this\.cache\.graph\s*=\s*new\s+Graph\(\{[\s\S]*?\n\s*\}\)\s*;/,
-  );
-
-  it("Graph constructor call is found in source", () => {
-    expect(graphConstructorMatch).not.toBeNull();
-  });
-
-  it("node config must not have a top-level type property", () => {
-    // Match the node: { ... } block inside the Graph constructor
-    const nodeBlock = graphConstructorMatch[0].match(
-      /node:\s*\{([\s\S]*?)\},\s*edge:/,
-    );
-    expect(nodeBlock).not.toBeNull();
-    // Should not have `type:` as a direct child (state.type patterns are fine)
-    const lines = nodeBlock[1].split("\n");
-    const topLevelTypeLines = lines.filter((line) => /^\s*type\s*:/.test(line));
-    expect(topLevelTypeLines).toHaveLength(0);
-  });
-
-  it("node config must not have a top-level style property", () => {
-    const nodeBlock = graphConstructorMatch[0].match(
-      /node:\s*\{([\s\S]*?)\},\s*edge:/,
-    );
-    expect(nodeBlock).not.toBeNull();
-    const lines = nodeBlock[1].split("\n");
-    // `style:` as direct child of node config (not inside state: { ... })
-    const topLevelStyleLines = lines.filter((line) =>
-      /^\s*style\s*:/.test(line),
-    );
-    expect(topLevelStyleLines).toHaveLength(0);
-  });
-
-  it("edge config must not have a top-level type property", () => {
-    const edgeBlock = graphConstructorMatch[0].match(
-      /edge:\s*\{([\s\S]*?)\},\s*behaviors:/,
-    );
-    expect(edgeBlock).not.toBeNull();
-    const lines = edgeBlock[1].split("\n");
-    const topLevelTypeLines = lines.filter((line) => /^\s*type\s*:/.test(line));
-    expect(topLevelTypeLines).toHaveLength(0);
-  });
-
-  it("edge config must not have a top-level style property", () => {
-    const edgeBlock = graphConstructorMatch[0].match(
-      /edge:\s*\{([\s\S]*?)\},\s*behaviors:/,
-    );
-    expect(edgeBlock).not.toBeNull();
-    const lines = edgeBlock[1].split("\n");
-    const topLevelStyleLines = lines.filter((line) =>
-      /^\s*style\s*:/.test(line),
-    );
-    expect(topLevelStyleLines).toHaveLength(0);
-  });
-});
-
-// ==========================================================================
-// REGRESSION: State styles must not override user-customizable properties
-// In G6 v5, state styles always override per-node data styles. Any
-// user-settable property (fill, size, stroke, lineWidth, type) in a
-// persistent state like "selected" would silently break the styling panel.
-// ==========================================================================
-
-describe("State styles must not override user-customizable properties", () => {
-  const coreSource = readFileSync(
-    join(import.meta.dirname, "..", "src", "graph", "core.js"),
-    "utf8",
-  );
-
-  const graphConstructorMatch = coreSource.match(
-    /this\.cache\.graph\s*=\s*new\s+Graph\(\{[\s\S]*?\n\s*\}\)\s*;/,
-  );
-
-  // Extract the node selected state block
-  const nodeSelectedMatch = graphConstructorMatch[0].match(
-    /node:[\s\S]*?selected:\s*\{([^}]*)\}/,
-  );
-
-  // Extract the edge selected state block
-  const edgeSelectedMatch = graphConstructorMatch[0].match(
-    /edge:[\s\S]*?selected:\s*\{([^}]*)\}/,
-  );
-
-  const userCustomizableNodeProps = ["fill", "size", "stroke", "lineWidth"];
-  const userCustomizableEdgeProps = ["stroke", "lineWidth"];
-
-  for (const prop of userCustomizableNodeProps) {
-    it(`node selected state must not set "${prop}"`, () => {
-      expect(nodeSelectedMatch).not.toBeNull();
-      // Property should not appear as a key in the state block
-      const regex = new RegExp(`\\b${prop}\\s*:`);
-      expect(nodeSelectedMatch[1]).not.toMatch(regex);
-    });
-  }
-
-  for (const prop of userCustomizableEdgeProps) {
-    it(`edge selected state must not set "${prop}"`, () => {
-      expect(edgeSelectedMatch).not.toBeNull();
-      const regex = new RegExp(`\\b${prop}\\s*:`);
-      expect(edgeSelectedMatch[1]).not.toMatch(regex);
-    });
-  }
-});
+// NOTE(sigma-migration): the former source-pinning regressions ("Graph
+// constructor must not set spec-level node/edge type or style" and "State
+// styles must not override user-customizable properties") guarded a G6 v5
+// hazard — spec-level options and state styles silently overriding per-node
+// data styles. The sigma renderer has no spec-level node/edge config and its
+// reducers (src/graph/graph_model.js) only adjust render-time display data,
+// so the hazard is structurally impossible; reducer behavior is covered by
+// tests/graph-model.test.js.
 
 // ==========================================================================
 // REGRESSION: Node style overrides survive the full update → render pipeline

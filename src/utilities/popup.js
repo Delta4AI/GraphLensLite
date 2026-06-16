@@ -45,7 +45,9 @@ static async prompt(message) {
       inputField.className = "p-prompt";
 
       const content = document.createElement('div');
-      content.innerHTML = `<div>${message}</div>`;
+      const messageEl = document.createElement('div');
+      messageEl.textContent = message;
+      content.appendChild(messageEl);
       content.appendChild(inputField);
 
       const buttonContainer = document.createElement('div');
@@ -93,7 +95,9 @@ static async prompt(message) {
   static async confirm(message) {
     return new Promise((resolve) => {
       const content = document.createElement('div');
-      content.innerHTML = `<div>${message}</div>`;
+      const messageEl = document.createElement('div');
+      messageEl.textContent = message;
+      content.appendChild(messageEl);
 
       const buttonContainer = document.createElement('div');
       buttonContainer.className = 'p-footer';
@@ -176,7 +180,7 @@ static async prompt(message) {
       const cloneDesc = document.createElement('p');
       cloneDesc.textContent = 'Copies all settings: positions, filters, query, and bubble groups';
       cloneDesc.style.fontSize = '12px';
-      cloneDesc.style.color = '#666';
+      cloneDesc.style.color = 'var(--text-muted)';
       cloneDesc.style.marginLeft = '20px';
       cloneDesc.style.marginTop = '5px';
       cloneDesc.style.marginBottom = '0';
@@ -220,7 +224,7 @@ static async prompt(message) {
       const templateDesc = document.createElement('p');
       templateDesc.textContent = 'Starts fresh with selected layout algorithm and default filters';
       templateDesc.style.fontSize = '12px';
-      templateDesc.style.color = '#666';
+      templateDesc.style.color = 'var(--text-muted)';
       templateDesc.style.marginLeft = '20px';
       templateDesc.style.marginTop = '5px';
       templateDesc.style.marginBottom = '10px';
@@ -306,6 +310,134 @@ static async prompt(message) {
       });
 
       setTimeout(() => nameInput.focus(), 0);
+    });
+  }
+
+  /**
+   * Layout-picker dialog for re-laying-out the current workspace. A trimmed
+   * sibling of layoutCreationDialog: no name/mode, just an algorithm choice
+   * plus inline warnings. Resolves to { templateType } on Apply, or null on
+   * Cancel / close.
+   *
+   * @param {Object} layoutInternals - layout template vocabulary (keys are types)
+   * @param {Object} [options]
+   * @param {string} [options.defaultType] - layout type to pre-select
+   * @param {boolean} [options.hasPositions] - show the overwrite-positions warning
+   * @param {number} [options.nodeCount] - current node count (perf warning)
+   * @param {string[]} [options.expensiveLayouts] - types that warrant a perf warning
+   * @param {number} [options.warningThreshold] - node count above which to warn
+   * @returns {Promise<{templateType: string}|null>}
+   */
+  static async layoutSelectDialog(layoutInternals, options = {}) {
+    const {
+      defaultType = null,
+      hasPositions = false,
+      nodeCount = 0,
+      expensiveLayouts = [],
+      warningThreshold = Infinity,
+    } = options;
+
+    return new Promise((resolve) => {
+      const container = document.createElement('div');
+
+      const label = document.createElement('label');
+      label.textContent = 'Layout algorithm';
+      label.htmlFor = 'relayout-type-select';
+      label.style.display = 'block';
+      label.style.fontWeight = 'bold';
+      label.style.marginBottom = '8px';
+      container.appendChild(label);
+
+      const dropdown = document.createElement('select');
+      dropdown.id = 'relayout-type-select';
+      dropdown.className = 'p-prompt';
+      dropdown.style.width = '100%';
+      dropdown.style.marginBottom = '12px';
+      for (const key of Object.keys(layoutInternals)) {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = key.charAt(0).toUpperCase() + key.slice(1);
+        if (key === defaultType) option.selected = true;
+        dropdown.appendChild(option);
+      }
+      container.appendChild(dropdown);
+
+      // Overwrite note (static): a full re-layout always discards the current
+      // arrangement, so only surface it when there are positions to lose.
+      if (hasPositions) {
+        const overwrite = document.createElement('p');
+        overwrite.textContent =
+          '⚠ Recomputes positions for the whole workspace, overwriting the current (manually arranged) layout.';
+        overwrite.style.fontSize = '12px';
+        overwrite.style.color = 'var(--text-muted)';
+        overwrite.style.margin = '0 0 12px';
+        container.appendChild(overwrite);
+      }
+
+      // Perf warning (dynamic): only for super-linear layouts on large graphs;
+      // re-evaluated whenever the chosen type changes.
+      const perf = document.createElement('p');
+      perf.id = 'relayout-perf-warning';
+      perf.style.fontSize = '12px';
+      perf.style.color = 'var(--danger-text)';
+      perf.style.margin = '0 0 12px';
+      container.appendChild(perf);
+
+      const updatePerfWarning = () => {
+        const type = dropdown.value;
+        if (expensiveLayouts.includes(type) && nodeCount > warningThreshold) {
+          perf.textContent =
+            `⚠ The "${type}" layout is computationally intensive and may take several ` +
+            `minutes on ${nodeCount.toLocaleString()} nodes. The UI stays blocked until it finishes.`;
+          perf.style.display = '';
+        } else {
+          perf.textContent = '';
+          perf.style.display = 'none';
+        }
+      };
+      dropdown.addEventListener('change', updatePerfWarning);
+      updatePerfWarning();
+
+      const buttonContainer = document.createElement('div');
+      buttonContainer.className = 'p-footer';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.className = 'p-button p-button-secondary';
+
+      const applyBtn = document.createElement('button');
+      applyBtn.textContent = 'Apply';
+      applyBtn.className = 'p-button p-button-primary';
+
+      buttonContainer.appendChild(cancelBtn);
+      buttonContainer.appendChild(applyBtn);
+      container.appendChild(buttonContainer);
+
+      let isResolved = false;
+
+      const popup = new Popup(container, {
+        title: 'Re-layout Workspace',
+        width: '400px',
+        showFullscreenButton: false,
+        closeOnClickOutside: false,
+        onClose: () => {
+          if (!isResolved) resolve(null);
+        },
+      });
+
+      applyBtn.addEventListener('click', () => {
+        isResolved = true;
+        popup.close();
+        resolve({ templateType: dropdown.value });
+      });
+
+      cancelBtn.addEventListener('click', () => {
+        isResolved = true;
+        popup.close();
+        resolve(null);
+      });
+
+      setTimeout(() => applyBtn.focus(), 0);
     });
   }
 

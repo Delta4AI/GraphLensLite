@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Copies ESM builds of npm deps into src/lib/ so they load under raw-module
-// dev serve (npm run serve) and keep parity with vendored libs (g6, exceljs).
+// dev serve (npm run serve) and keep parity with vendored libs (exceljs).
 // Also regenerates the assistant system prompt JS module from its .md source.
 const fs = require('fs');
 const path = require('path');
@@ -45,6 +45,79 @@ for (const {from, to, pkg} of copies) {
   const hash = sha256(to);
   const ver = pkgVersion(pkg);
   console.log(`[vendor-libs] ${path.relative(root, from)} -> ${path.relative(root, to)} (${pkg}@${ver} sha256:${hash.slice(0, 16)}…)`);
+}
+
+// Bundle multi-module deps (sigma + plugins, graphology + utils) into single
+// ESM files under src/lib/ so they load under raw-module dev serve, Electron
+// (file://), the esbuild app bundle and the inline-html dist — same parity
+// goal as the plain copies above, but these packages have bare-specifier
+// imports and need bundling instead of copying.
+const esbuild = require('esbuild');
+
+const bundles = [
+  {
+    entry: path.join(__dirname, 'vendor_entry_graphology.mjs'),
+    out: path.join(libDir, 'graphology.bundle.mjs'),
+    pkgs: ['graphology', 'graphology-layout', 'graphology-layout-forceatlas2', 'graphology-layout-noverlap', 'graphology-metrics', 'graphology-communities-louvain', '@antv/layout', 'bubblesets-js', 'polygon-clipping'],
+  },
+  {
+    entry: path.join(__dirname, 'vendor_entry_sigma.mjs'),
+    out: path.join(libDir, 'sigma.bundle.mjs'),
+    pkgs: ['sigma', '@sigma/node-square', '@sigma/node-image', '@sigma/node-border', '@sigma/node-piechart', '@sigma/edge-curve', '@sigma/export-image'],
+  },
+];
+
+for (const {entry, out, pkgs} of bundles) {
+  try {
+    esbuild.buildSync({
+      entryPoints: [entry],
+      bundle: true,
+      format: 'esm',
+      target: 'es2020',
+      minify: true,
+      legalComments: 'eof',
+      outfile: out,
+      logLevel: 'silent',
+    });
+  } catch (err) {
+    console.error(`[vendor-libs] esbuild failed for ${path.relative(root, entry)}: ${err.message}`);
+    process.exit(1);
+  }
+  const versions = pkgs.map((p) => `${p}@${pkgVersion(p)}`).join(' ');
+  const sizeKb = (fs.statSync(out).size / 1024).toFixed(0);
+  console.log(`[vendor-libs] ${path.relative(root, entry)} -> ${path.relative(root, out)} (${sizeKb} kB; ${versions} sha256:${sha256(out).slice(0, 16)}…)`);
+}
+
+// Layout worker: bundle the headless @antv/layout entry to a self-contained
+// IIFE and embed it as a string. layout_algorithms.js spins this up as a Blob
+// worker so dagre/mds/radial/concentric run off the main thread. Embedding as
+// a string (rather than emitting a separate worker file) keeps the single-file
+// inline-html dist working — there is no extra chunk to fetch.
+{
+  const entry = path.join(__dirname, 'vendor_entry_layout_worker.mjs');
+  const out = path.join(libDir, 'layout_worker_source.js');
+  let result;
+  try {
+    result = esbuild.buildSync({
+      entryPoints: [entry],
+      bundle: true,
+      format: 'iife',
+      target: 'es2020',
+      minify: true,
+      legalComments: 'none',
+      write: false,
+      logLevel: 'silent',
+    });
+  } catch (err) {
+    console.error(`[vendor-libs] esbuild failed for ${path.relative(root, entry)}: ${err.message}`);
+    process.exit(1);
+  }
+  const source = result.outputFiles[0].text;
+  const escaped = source.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+  const module = `// AUTO-GENERATED from ${path.basename(entry)} by src/package/vendor_libs.js.\n// Do not edit by hand — run \`npm run vendor-libs\`.\nexport const LAYOUT_WORKER_SOURCE = \`${escaped}\`\n`;
+  fs.writeFileSync(out, module);
+  const sizeKb = (fs.statSync(out).size / 1024).toFixed(0);
+  console.log(`[vendor-libs] ${path.relative(root, entry)} -> ${path.relative(root, out)} (${sizeKb} kB; @antv/layout@${pkgVersion('@antv/layout')})`);
 }
 
 // Regenerate assistant prompt modules from their markdown sources so the

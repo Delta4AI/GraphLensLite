@@ -1,6 +1,7 @@
-import {Popup} from "./popup.js";
-import {StaticUtilities} from "./static.js";
-import {EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES} from "../managers/io.js";
+/* global ExcelJS */ // loaded as a global via vendored src/lib/exceljs.min.js script tag
+import { Popup } from './popup.js';
+import { StaticUtilities } from './static.js';
+import { EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from '../managers/io.js';
 
 let dataTable;
 
@@ -19,7 +20,7 @@ class DataTable {
     this.tableDataBackup = [];
     this.pendingChanges = new Map();
     this.onPendingChangesCallback = null;
-    
+
     this.cache = cache;
 
     // this.init();
@@ -92,11 +93,11 @@ class DataTable {
   }
 
   async switchTab(tab) {
-    await this.cache.ui.showLoading("Data Editor", `Loading ${tab} this.cache.data...`);
+    await this.cache.ui.showLoading('Data Editor', `Loading ${tab} this.cache.data...`);
 
     this.currentTab = tab;
 
-    this.tabsContainer.querySelectorAll('.data-table-tab').forEach(btn => {
+    this.tabsContainer.querySelectorAll('.data-table-tab').forEach((btn) => {
       btn.classList.remove('active');
       if (btn.dataset.tab === tab) {
         btn.classList.add('active');
@@ -115,11 +116,15 @@ class DataTable {
       return;
     }
 
-    this.headers = ["Del", "Row #", "Type", "ID", "Label", "Description"];
+    this.headers = ['Del', 'Row #', 'Type', 'ID', 'Label', 'Description'];
 
     // Deduplicate headers to prevent duplicate columns
-    const nodeHeaders = this.fileData.nodeDataHeaders.map(o => `${this.cache.CFG.EXCEL_NODE_HEADER}::${o.subGroup}::${o.key}`);
-    const edgeHeaders = this.fileData.edgeDataHeaders.map(o => `${this.cache.CFG.EXCEL_EDGE_HEADER}::${o.subGroup}::${o.key}`);
+    const nodeHeaders = this.fileData.nodeDataHeaders.map(
+      (o) => `${this.cache.CFG.EXCEL_NODE_HEADER}::${o.subGroup}::${o.key}`
+    );
+    const edgeHeaders = this.fileData.edgeDataHeaders.map(
+      (o) => `${this.cache.CFG.EXCEL_EDGE_HEADER}::${o.subGroup}::${o.key}`
+    );
     const uniqueNodeHeaders = [...new Set(nodeHeaders)];
     const uniqueEdgeHeaders = [...new Set(edgeHeaders)];
 
@@ -147,7 +152,7 @@ class DataTable {
       pendingRowIds.add(id);
     });
 
-    const preservedRows = this.tableData.filter(row => pendingRowIds.has(row[3]));
+    const preservedRows = this.tableData.filter((row) => pendingRowIds.has(row[3]));
 
     this.tableData = [];
 
@@ -173,7 +178,7 @@ class DataTable {
     }
 
     // Ensure preserved rows have correct number of columns
-    preservedRows.forEach(row => {
+    preservedRows.forEach((row) => {
       while (row.length < this.headers.length) {
         row.push('');
       }
@@ -185,7 +190,7 @@ class DataTable {
       row[1] = index + 1;
     });
 
-    this.tableDataBackup = this.tableData.map(row => [...row]);
+    this.tableDataBackup = this.tableData.map((row) => [...row]);
     this.originalOrder = this.tableData.map((_, index) => index);
     this.render();
   }
@@ -194,7 +199,7 @@ class DataTable {
     if (!this.fileData.nodes || !this.cache.selectedNodes) return;
 
     const selectedNodeSet = new Set(this.cache.selectedNodes);
-    const selectedNodes = this.fileData.nodes.filter(node => selectedNodeSet.has(node.id));
+    const selectedNodes = this.fileData.nodes.filter((node) => selectedNodeSet.has(node.id));
     this.addNodesToTable(selectedNodes);
   }
 
@@ -202,7 +207,7 @@ class DataTable {
     if (!this.fileData.edges || !this.cache.selectedEdges) return;
 
     const selectedEdgeSet = new Set(this.cache.selectedEdges);
-    const selectedEdges = this.fileData.edges.filter(edge => selectedEdgeSet.has(edge.id));
+    const selectedEdges = this.fileData.edges.filter((edge) => selectedEdgeSet.has(edge.id));
     this.addEdgesToTable(selectedEdges);
   }
 
@@ -211,13 +216,13 @@ class DataTable {
 
     if (this.fileData.nodes && this.cache.selectedNodes) {
       const selectedNodeSet = new Set(this.cache.selectedNodes);
-      const selectedNodes = this.fileData.nodes.filter(node => selectedNodeSet.has(node.id));
+      const selectedNodes = this.fileData.nodes.filter((node) => selectedNodeSet.has(node.id));
       this.addNodesToTable(selectedNodes);
     }
 
     if (this.fileData.edges && this.cache.selectedEdges) {
       const selectedEdgeSet = new Set(this.cache.selectedEdges);
-      const selectedEdges = this.fileData.edges.filter(edge => selectedEdgeSet.has(edge.id));
+      const selectedEdges = this.fileData.edges.filter((edge) => selectedEdgeSet.has(edge.id));
       this.addEdgesToTable(selectedEdges);
     }
   }
@@ -242,7 +247,7 @@ class DataTable {
   }
 
   addNodesToTable(nodes) {
-    nodes.forEach(node => {
+    nodes.forEach((node) => {
       const row = new Array(this.headers.length).fill('');
       row[0] = '';
       row[1] = this.tableData.length + 1;
@@ -264,7 +269,7 @@ class DataTable {
   }
 
   addEdgesToTable(edges) {
-    edges.forEach(edge => {
+    edges.forEach((edge) => {
       const row = new Array(this.headers.length).fill('');
       row[0] = '';
       row[1] = this.tableData.length + 1;
@@ -293,7 +298,7 @@ class DataTable {
   }
 
   async handleHeaderTableClick(event) {
-    await this.cache.ui.showLoading("Data Editor", "Sorting ..");
+    await this.cache.ui.showLoading('Data Editor', 'Sorting ..');
     const headerDiv = event.target.closest('.data-table-sortable-header');
     if (headerDiv) {
       const columnIndex = parseInt(headerDiv.dataset.column);
@@ -349,7 +354,7 @@ class DataTable {
   }
 
   reset() {
-    this.tableData = this.tableDataBackup.map(row => [...row]);
+    this.tableData = this.tableDataBackup.map((row) => [...row]);
     this.sortState = {};
     this.originalOrder = this.tableData.map((_, index) => index);
     this.render();
@@ -373,13 +378,13 @@ class DataTable {
     const len = property.length;
     let sizeClass = 'data-table-header-property';
     if (len > 20) {
-      sizeClass += ' size-xs';  // 9px - smallest for longest text
+      sizeClass += ' size-xs'; // 9px - smallest for longest text
     } else if (len > 18) {
-      sizeClass += ' size-s';   // 10px
+      sizeClass += ' size-s'; // 10px
     } else if (len > 16) {
-      sizeClass += ' size-m';   // 11px
+      sizeClass += ' size-m'; // 11px
     } else if (len > 14) {
-      sizeClass += ' size-l';   // 12px
+      sizeClass += ' size-l'; // 12px
     }
     // ≤15 chars uses default 12px
 
@@ -410,7 +415,7 @@ class DataTable {
       const th = document.createElement('th');
 
       if (index === 0) {
-        th.classList.add("data-table-delete-row-column");
+        th.classList.add('data-table-delete-row-column');
       } else {
         const formattedHeader = this.formatHeaderForDisplay(header);
         th.innerHTML = `
@@ -439,11 +444,12 @@ class DataTable {
           td.classList.add('data-table-delete-row-column');
         } else {
           // Explicitly check for null/undefined to preserve 0 values
-          td.textContent = (cellData !== null && cellData !== undefined) ? cellData : '';
+          td.textContent = cellData !== null && cellData !== undefined ? cellData : '';
 
           const isBasicColumn = colIndex <= 3;
           const isReservedColumn = colIndex === 4 || colIndex === 5;
-          const isMismatchedColumn = (isNodeRow && this.headers[colIndex].startsWith(this.cache.CFG.EXCEL_EDGE_HEADER)) ||
+          const isMismatchedColumn =
+            (isNodeRow && this.headers[colIndex].startsWith(this.cache.CFG.EXCEL_EDGE_HEADER)) ||
             (!isNodeRow && this.headers[colIndex].startsWith(this.cache.CFG.EXCEL_NODE_HEADER));
           const shouldBeEditable = (!isBasicColumn || isReservedColumn) && !isMismatchedColumn;
 
@@ -490,7 +496,7 @@ class DataTable {
 
       this.tableData.splice(rowIndex, 1);
       this.originalOrder.splice(rowIndex, 1);
-      this.originalOrder = this.originalOrder.map(idx => idx > rowIndex ? idx - 1 : idx);
+      this.originalOrder = this.originalOrder.map((idx) => (idx > rowIndex ? idx - 1 : idx));
 
       this.render();
 
@@ -519,8 +525,8 @@ class DataTable {
 
   sortColumn(columnIndex, direction) {
     if (!direction) {
-      const originalData = this.originalOrder.map(idx => this.tableDataBackup[idx]);
-      this.tableData = originalData.map(row => [...row]);
+      const originalData = this.originalOrder.map((idx) => this.tableDataBackup[idx]);
+      this.tableData = originalData.map((row) => [...row]);
       this.render();
       return;
     }
@@ -543,7 +549,7 @@ class DataTable {
       }
     });
 
-    this.tableData = sortIndices.map(idx => this.tableData[idx]);
+    this.tableData = sortIndices.map((idx) => this.tableData[idx]);
     this.render();
   }
 
@@ -556,7 +562,7 @@ class DataTable {
 
   handleCellFocus(event, rowIndex, colIndex) {
     const cell = event.target;
-    this.currentEditingCell = {cell, rowIndex, colIndex};
+    this.currentEditingCell = { cell, rowIndex, colIndex };
     cell.classList.add('editing');
 
     const range = document.createRange();
@@ -565,7 +571,6 @@ class DataTable {
     selection.removeAllRanges();
     selection.addRange(range);
   }
-
 
   handleCellBlur(event, rowIndex, colIndex) {
     const cell = event.target;
@@ -590,7 +595,7 @@ class DataTable {
       const hasChangesFromOriginal = this.hasChangesFromOriginal();
       this.onPendingChangesCallback({
         hasPendingChanges,
-        hasChangesFromOriginal
+        hasChangesFromOriginal,
       });
     }
   }
@@ -659,7 +664,9 @@ class DataTable {
       return;
     }
 
-    const targetCell = this.tableBody.querySelector(`td[data-row="${rowIndex}"][data-col="${colIndex}"]`);
+    const targetCell = this.tableBody.querySelector(
+      `td[data-row="${rowIndex}"][data-col="${colIndex}"]`
+    );
     if (targetCell && targetCell.contentEditable === 'true') {
       targetCell.focus();
     }
@@ -672,71 +679,81 @@ class DataTable {
   getData() {
     return {
       headers: [...this.headers],
-      data: this.tableData.map(row => [...row])
+      data: this.tableData.map((row) => [...row]),
     };
   }
 
   async addNode() {
     if (!this.cache || !this.tableData) return;
 
-    let nodeID = await Popup.prompt("Enter Node ID: ");
+    let nodeID = await Popup.prompt('Enter Node ID: ');
     if (!nodeID) {
-      this.cache.ui.info("Adding node canceled");
+      this.cache.ui.info('Adding node canceled');
       return;
     }
 
     nodeID = nodeID.trim();
     if (!nodeID) {
-      this.cache.ui.error("Node ID cannot be empty");
+      this.cache.ui.error('Node ID cannot be empty');
       return;
     }
 
-    if (this.cache.nodeRef.has(nodeID) || this.tableData.some(row => row[2] === "Node" && row[3] === nodeID)) {
+    if (
+      this.cache.nodeRef.has(nodeID) ||
+      this.tableData.some((row) => row[2] === 'Node' && row[3] === nodeID)
+    ) {
       this.cache.ui.error(`Node "${nodeID}" already exists`);
       return;
     }
 
-    this.addRow("Node", nodeID);
+    this.addRow('Node', nodeID);
     this.cache.ui.success(`Node "${nodeID}" added. Click Apply to save changes.`);
   }
 
   async addEdge() {
     if (!this.cache || !this.tableData) return;
 
-    let edgeID = await Popup.prompt("Enter Edge ID (format: sourceID::targetID): ");
+    let edgeID = await Popup.prompt('Enter Edge ID (format: sourceID::targetID): ');
     if (!edgeID) {
-      this.cache.ui.info("Adding edge canceled");
+      this.cache.ui.info('Adding edge canceled');
       return;
     }
 
     edgeID = edgeID.trim();
     if (!edgeID) {
-      this.cache.ui.error("Edge ID cannot be empty");
+      this.cache.ui.error('Edge ID cannot be empty');
       return;
     }
 
-    if (this.cache.edgeRef.has(edgeID) || this.tableData.some(row => row[2] === "Edge" && row[3] === edgeID)) {
+    if (
+      this.cache.edgeRef.has(edgeID) ||
+      this.tableData.some((row) => row[2] === 'Edge' && row[3] === edgeID)
+    ) {
       this.cache.ui.error(`Edge "${edgeID}" already exists`);
       return;
     }
 
-    if (!edgeID.includes("::")) {
-      this.cache.ui.error(`Edge ID must contain a double colon (::) to separate source and target nodes (e.g., "NodeA::NodeB")`);
+    if (!edgeID.includes('::')) {
+      this.cache.ui.error(
+        `Edge ID must contain a double colon (::) to separate source and target nodes (e.g., "NodeA::NodeB")`
+      );
       return;
     }
 
-    const parts = edgeID.split("::");
+    const parts = edgeID.split('::');
     if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) {
       this.cache.ui.error(`Invalid Edge ID format. Use: "sourceID::targetID"`);
       return;
     }
 
-    const [source, target] = parts.map(p => p.trim());
+    const [source, target] = parts.map((p) => p.trim());
 
-    const sourceExists = this.cache.nodeRef.has(source) ||
-      this.tableData.some(row => row[2] === "Node" && row[3] === source);
-    const targetExists = this.cache.nodeRef.has(target) ||
-      this.tableData.some(row => row[2] === "Node" && row[3] === target);
+    const sourceExists =
+      this.cache.nodeRef.has(source) ||
+      this.tableData.some((row) => row[2] === 'Node' && row[3] === source);
+    const targetExists =
+      this.cache.nodeRef.has(target) ||
+      this.tableData.some((row) => row[2] === 'Node' && row[3] === target);
 
     if (!sourceExists) {
       this.cache.ui.error(`Source node "${source}" does not exist. Please create the node first.`);
@@ -748,7 +765,7 @@ class DataTable {
       return;
     }
 
-    this.addRow("Edge", edgeID);
+    this.addRow('Edge', edgeID);
     this.cache.ui.success(`Edge "${edgeID}" added. Click Apply to save changes.`);
   }
 
@@ -792,7 +809,10 @@ class DataTable {
     `;
 
     return new Promise((resolve) => {
-      this.cache.popup = new Popup(formHtml, {title: 'Add Property Column', showFullscreenButton: false});
+      this.cache.popup = new Popup(formHtml, {
+        title: 'Add Property Column',
+        showFullscreenButton: false,
+      });
 
       // Store resolve function globally for button handlers
       window.addColumnConfirm = () => {
@@ -809,7 +829,7 @@ class DataTable {
         const result = {
           isNodeProperty: propertyTypeInput.value === 'node',
           propertyName: propertyNameInput.value.trim(),
-          groupName: groupNameInput.value.trim()
+          groupName: groupNameInput.value.trim(),
         };
 
         this.cache.popup.close();
@@ -820,40 +840,45 @@ class DataTable {
         this.cache.popup.close();
         resolve(null);
       };
-    }).then(result => {
+    }).then((result) => {
       // Clean up global handlers
       delete window.addColumnConfirm;
       delete window.addColumnCancel;
 
       if (!result) {
-        this.cache.ui.info("Adding column canceled");
+        this.cache.ui.info('Adding column canceled');
         return;
       }
 
       const { isNodeProperty, propertyName, groupName } = result;
 
       if (!propertyName) {
-        this.cache.ui.error("Property name cannot be empty");
+        this.cache.ui.error('Property name cannot be empty');
         return;
       }
 
       if (!groupName) {
-        this.cache.ui.error("Group name cannot be empty");
+        this.cache.ui.error('Group name cannot be empty');
         return;
       }
 
       // Check if column already exists in the appropriate headers list
-      const exists = (isNodeProperty ? this.fileData.nodeDataHeaders : this.fileData.edgeDataHeaders)
-        .some(h => h.subGroup === groupName && h.key === propertyName);
+      const exists = (
+        isNodeProperty ? this.fileData.nodeDataHeaders : this.fileData.edgeDataHeaders
+      ).some((h) => h.subGroup === groupName && h.key === propertyName);
 
       if (exists) {
-        this.cache.ui.error(`Column "${propertyName}" in group "${groupName}" already exists for ${isNodeProperty ? 'nodes' : 'edges'}`);
+        this.cache.ui.error(
+          `Column "${propertyName}" in group "${groupName}" already exists for ${isNodeProperty ? 'nodes' : 'edges'}`
+        );
         return;
       }
 
       // Add to appropriate data headers list, inserting next to existing group members
-      const targetHeaders = isNodeProperty ? this.fileData.nodeDataHeaders : this.fileData.edgeDataHeaders;
-      const lastGroupIdx = targetHeaders.findLastIndex(h => h.subGroup === groupName);
+      const targetHeaders = isNodeProperty
+        ? this.fileData.nodeDataHeaders
+        : this.fileData.edgeDataHeaders;
+      const lastGroupIdx = targetHeaders.findLastIndex((h) => h.subGroup === groupName);
       const newHeader = { subGroup: groupName, key: propertyName };
       if (lastGroupIdx !== -1) {
         targetHeaders.splice(lastGroupIdx + 1, 0, newHeader);
@@ -864,14 +889,17 @@ class DataTable {
       // Reload tab data to rebuild headers with proper filtering
       this.loadTabData();
 
-      this.cache.ui.success(`Column "${propertyName}" (${groupName}) added for ${isNodeProperty ? 'nodes' : 'edges'}. Click Apply to save changes.`);
+      this.cache.ui.success(
+        `Column "${propertyName}" (${groupName}) added for ${isNodeProperty ? 'nodes' : 'edges'}. Click Apply to save changes.`
+      );
     });
   }
 
   addRow(type = 'Node', id = '') {
     const newRow = new Array(this.headers.length).fill('');
     newRow[0] = '';
-    newRow[1] = this.tableData.length > 0 ? Math.max(...this.tableData.map(row => row[1])) + 1 : 1;
+    newRow[1] =
+      this.tableData.length > 0 ? Math.max(...this.tableData.map((row) => row[1])) + 1 : 1;
     newRow[2] = type;
     newRow[3] = id;
     newRow[4] = '';
@@ -886,7 +914,7 @@ class DataTable {
   }
 
   trackChange(id, type) {
-    const rowData = this.tableData.find(row => row[3] === id && row[2] === type);
+    const rowData = this.tableData.find((row) => row[3] === id && row[2] === type);
     if (rowData) {
       this.pendingChanges.set(id, { type, rowData: [...rowData] });
     }
@@ -896,7 +924,7 @@ class DataTable {
     if (index >= 0 && index < this.tableData.length) {
       this.tableData.splice(index, 1);
       this.originalOrder.splice(index, 1);
-      this.originalOrder = this.originalOrder.map(idx => idx > index ? idx - 1 : idx);
+      this.originalOrder = this.originalOrder.map((idx) => (idx > index ? idx - 1 : idx));
       this.render();
     }
   }
@@ -911,21 +939,23 @@ class DataTable {
   }
 
   async update() {
-    await this.cache.ui.showLoading("Updating Data", "Updating Data from Data Table ..");
+    await this.cache.ui.showLoading('Updating Data', 'Updating Data from Data Table ..');
     try {
       const updatedFileData = this.getUpdatedFileData();
 
       if (!updatedFileData || (!updatedFileData.nodes && !updatedFileData.edges)) {
-        this.cache.ui.error("No data to update with.");
+        this.cache.ui.error('No data to update with.');
         return;
       }
 
       const validationErrors = this.validateNewElements();
       if (validationErrors.length > 0) {
         await this.cache.ui.hideLoading();
-        this.cache.ui.error("Cannot apply changes:\n" +
-          validationErrors.join("\n") +
-          "\nPlease add at least one property to each new element.");
+        this.cache.ui.error(
+          'Cannot apply changes:\n' +
+            validationErrors.join('\n') +
+            '\nPlease add at least one property to each new element.'
+        );
         return;
       }
 
@@ -934,17 +964,17 @@ class DataTable {
       await this.cache.graph?.destroy();
       this.cache.graph = null;
 
-      const status = document.getElementById("sidebarStatusContainer");
-      status.innerHTML = "";
-      status.style.height = "0";
+      const status = document.getElementById('sidebarStatusContainer');
+      status.innerHTML = '';
+      status.style.height = '0';
 
       await this.cache.gcm.destroyGraphAndRollBackUI();
       this.cache.gcm.resetEventLocks();
 
       // Reset lasso wrapper visual state to match default behavior (no lasso mode)
-      const lassoWrapper = document.getElementById("lassoWrapper");
+      const lassoWrapper = document.getElementById('lassoWrapper');
       if (lassoWrapper) {
-        lassoWrapper.classList.remove("active");
+        lassoWrapper.classList.remove('active');
       }
       this.cache.io.preProcessData(updatedFileData);
 
@@ -961,6 +991,10 @@ class DataTable {
       // this.fileData = structuredClone(updatedFileData);
 
       await this.cache.gcm.createGraphInstance();
+      if (!this.cache.graph) {
+        this.cache.ui.error('Graph not initialized, aborting.');
+        return;
+      }
       await this.cache.graph.render();
 
       // Refresh UI to update node/edge counts and filter availability
@@ -970,8 +1004,7 @@ class DataTable {
       this.fileData = updatedFileData;
       this.loadTabData();
 
-      console.log("DATA TABLE UPDATE DONE!")
-
+      console.log('DATA TABLE UPDATE DONE!');
     } catch (err) {
       this.cache.ui.error(`Error updating graph: ${err}`);
     } finally {
@@ -992,9 +1025,10 @@ class DataTable {
       const elementId = row[3];
 
       // Check if this is a newly added element (not in original fileData)
-      const isNew = type === 'Node'
-        ? !this.fileData.nodes?.some(n => n.id === elementId)
-        : !this.fileData.edges?.some(e => e.id === elementId);
+      const isNew =
+        type === 'Node'
+          ? !this.fileData.nodes?.some((n) => n.id === elementId)
+          : !this.fileData.edges?.some((e) => e.id === elementId);
 
       if (!isNew) return;
 
@@ -1025,11 +1059,20 @@ class DataTable {
       edgeDataHeaders: [...this.fileData.edgeDataHeaders],
       // Preserve existing layouts and selected layout to maintain per-view configurations
       layouts: this.cache.data.layouts,
-      selectedLayout: this.cache.data.selectedLayout
+      selectedLayout: this.cache.data.selectedLayout,
       // filterDefaults will be rebuilt by preProcessData() from the headers
     };
 
-    const allowedKeys = new Set(["D4Data", "id", "label", "source", "style", "target", "description", "type"]);
+    const allowedKeys = new Set([
+      'D4Data',
+      'id',
+      'label',
+      'source',
+      'style',
+      'target',
+      'description',
+      'type',
+    ]);
 
     const processedIds = new Set();
     const deletedIds = new Set();
@@ -1042,7 +1085,7 @@ class DataTable {
     });
 
     const processRow = (row) => {
-      const isNode = row[2] === "Node";
+      const isNode = row[2] === 'Node';
       const id = row[3];
 
       if (processedIds.has(id)) return;
@@ -1050,11 +1093,13 @@ class DataTable {
 
       const label = row[4] || undefined;
       const description = row[5] || undefined;
-      const elem = isNode ? this.cache.nodeRef.get(id) || this.createNode(id) : this.cache.edgeRef.get(id) || this.createEdge(id);
+      const elem = isNode
+        ? this.cache.nodeRef.get(id) || this.createNode(id)
+        : this.cache.edgeRef.get(id) || this.createEdge(id);
 
       const cleanElem = {};
       for (const key of allowedKeys) {
-        if (elem.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(elem, key)) {
           cleanElem[key] = elem[key];
         }
       }
@@ -1102,11 +1147,11 @@ class DataTable {
       }
     });
 
-    pendingNodes.forEach(rowData => processRow(rowData));
-    pendingEdges.forEach(rowData => processRow(rowData));
+    pendingNodes.forEach((rowData) => processRow(rowData));
+    pendingEdges.forEach((rowData) => processRow(rowData));
 
     if (this.fileData.nodes) {
-      this.fileData.nodes.forEach(node => {
+      this.fileData.nodes.forEach((node) => {
         if (!processedIds.has(node.id) && !deletedIds.has(node.id)) {
           result.nodes.push(structuredClone(node));
           processedIds.add(node.id);
@@ -1115,7 +1160,7 @@ class DataTable {
     }
 
     if (this.fileData.edges) {
-      this.fileData.edges.forEach(edge => {
+      this.fileData.edges.forEach((edge) => {
         if (!processedIds.has(edge.id) && !deletedIds.has(edge.id)) {
           result.edges.push(structuredClone(edge));
           processedIds.add(edge.id);
@@ -1123,8 +1168,8 @@ class DataTable {
       });
     }
 
-    const nodeIds = new Set(result.nodes.map(n => n.id));
-    result.edges = result.edges.filter(edge => {
+    const nodeIds = new Set(result.nodes.map((n) => n.id));
+    result.edges = result.edges.filter((edge) => {
       if (!nodeIds.has(edge.source)) {
         console.warn(`Edge ${edge.id} references non-existent source node: ${edge.source}`);
         return false;
@@ -1142,22 +1187,22 @@ class DataTable {
   createNode(id) {
     return {
       id: id,
-      ...this.cache.style.getNodeStyleOrDefaults(id)
-    }
+      ...this.cache.style.getNodeStyleOrDefaults(id),
+    };
   }
 
   createEdge(id) {
-    const [source, target] = id.split("::");
+    const [source, target] = id.split('::');
     return {
       id: id,
       source: source,
       target: target,
-      ...this.cache.style.getEdgeStyleOrDefaults(id)
-    }
+      ...this.cache.style.getEdgeStyleOrDefaults(id),
+    };
   }
 
   async exportToExcel() {
-    await this.cache.ui.showLoading("Data Editor", "Exporting Table to Excel ..");
+    await this.cache.ui.showLoading('Data Editor', 'Exporting Table to Excel ..');
 
     try {
       const workbook = new ExcelJS.Workbook();
@@ -1198,20 +1243,25 @@ class DataTable {
       };
 
       // Use filterDefaults key order (group-contiguous) instead of Set iteration order
-      const orderedNodeProps = [...this.cache.data.filterDefaults.keys()]
-        .filter(propId => this.cache.nodeExclusiveProps.has(propId));
-      const orderedEdgeProps = [...this.cache.data.filterDefaults.keys()]
-        .filter(propId => this.cache.edgeExclusiveProps.has(propId));
+      const orderedNodeProps = [...this.cache.data.filterDefaults.keys()].filter((propId) =>
+        this.cache.nodeExclusiveProps.has(propId)
+      );
+      const orderedEdgeProps = [...this.cache.data.filterDefaults.keys()].filter((propId) =>
+        this.cache.edgeExclusiveProps.has(propId)
+      );
 
       if (nodesToExport.length > 0) {
         const nodesSheet = workbook.addWorksheet('nodes');
-        const nodesHeader = [...EXCEL_NODE_PROPERTIES.map(p => p.column), ...orderedNodeProps.map(propIdToExcelHeader)];
+        const nodesHeader = [
+          ...EXCEL_NODE_PROPERTIES.map((p) => p.column),
+          ...orderedNodeProps.map(propIdToExcelHeader),
+        ];
         nodesSheet.addRow(nodesHeader);
 
         for (const node of nodesToExport) {
           const pos = positions?.get(node.id);
           const exportNode = pos
-            ? {...node, style: {...node.style, x: pos.style.x, y: pos.style.y}}
+            ? { ...node, style: { ...node.style, x: pos.style.x, y: pos.style.y } }
             : node;
           const row = [];
 
@@ -1223,9 +1273,10 @@ class DataTable {
           for (const customProp of orderedNodeProps) {
             const [group, subGroup, prop] = StaticUtilities.decodePropHashId(customProp);
 
-            const value = node.D4Data && node.D4Data[group] && node.D4Data[group][subGroup]
-              ? node.D4Data[group][subGroup][prop]
-              : '';
+            const value =
+              node.D4Data && node.D4Data[group] && node.D4Data[group][subGroup]
+                ? node.D4Data[group][subGroup][prop]
+                : '';
             row.push(value);
           }
 
@@ -1235,7 +1286,10 @@ class DataTable {
 
       if (edgesToExport.length > 0) {
         const edgesSheet = workbook.addWorksheet('edges');
-        const edgesHeader = [...EXCEL_EDGE_PROPERTIES.map(p => p.column), ...orderedEdgeProps.map(propIdToExcelHeader)];
+        const edgesHeader = [
+          ...EXCEL_EDGE_PROPERTIES.map((p) => p.column),
+          ...orderedEdgeProps.map(propIdToExcelHeader),
+        ];
         edgesSheet.addRow(edgesHeader);
 
         for (const edge of edgesToExport) {
@@ -1249,9 +1303,10 @@ class DataTable {
           for (const customProp of orderedEdgeProps) {
             const [group, subGroup, prop] = StaticUtilities.decodePropHashId(customProp);
 
-            const value = edge.D4Data && edge.D4Data[group] && edge.D4Data[group][subGroup]
-              ? edge.D4Data[group][subGroup][prop]
-              : '';
+            const value =
+              edge.D4Data && edge.D4Data[group] && edge.D4Data[group][subGroup]
+                ? edge.D4Data[group][subGroup][prop]
+                : '';
             row.push(value);
           }
 
@@ -1261,14 +1316,14 @@ class DataTable {
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
 
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       const suffix = this.currentTab === 'entireGraph' ? '' : this.currentTab;
-      link.download = this.cache.io.buildExportFilename("xlsx", suffix);
+      link.download = this.cache.io.buildExportFilename('xlsx', suffix);
 
       document.body.appendChild(link);
       link.click();
@@ -1276,7 +1331,6 @@ class DataTable {
       window.URL.revokeObjectURL(url);
 
       this.cache.ui.info('Excel file exported successfully!');
-
     } catch (error) {
       this.cache.ui.error('Failed to export Excel file: ' + error.message);
     } finally {
@@ -1313,7 +1367,8 @@ class DataTable {
   }
 
   help() {
-    this.cache.popup = new Popup(`<p>Explore and directly modify graph data through an interactive spreadsheet interface.</p>
+    this.cache.popup = new Popup(
+      `<p>Explore and directly modify graph data through an interactive spreadsheet interface.</p>
 
 <div class="alert-warning">
   <strong>⚠️ Important:</strong> Data modifications affect ALL views globally. Changing node/edge properties here will update them across all view presets. Only view-specific settings (positions, filters, styles, queries) are preserved per view.
@@ -1348,13 +1403,14 @@ class DataTable {
   </li>
   <li><strong>Tabs:</strong> Switch between different views (selected elements vs. all existing data)</li>
 </ul>
-`, {title: 'Data Editor', width: '50vw', height: '60vh', lineHeight: '1.5em'});
+`,
+      { title: 'Data Editor', width: '50vw', height: '60vh', lineHeight: '1.5em' }
+    );
   }
-
 }
 
 function buildDataTable(fileData) {
-  this.dataTable.onPendingChangesUpdated(({hasPendingChanges, hasChangesFromOriginal}) => {
+  this.dataTable.onPendingChangesUpdated(({ hasPendingChanges, hasChangesFromOriginal }) => {
     const applyBtn = document.getElementById('updateDataTableBtn');
     const resetBtn = document.getElementById('resetDataTableBtn');
 
@@ -1377,6 +1433,5 @@ function buildDataTable(fileData) {
   //   console.log(`Data changed at row ${rowIndex}, column ${colIndex}:`, newValue);
   //   // add logic, trigger graph refresh, ..
   // });
-
 }
 export { DataTable, buildDataTable };

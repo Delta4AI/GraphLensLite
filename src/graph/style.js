@@ -13,10 +13,6 @@ class GraphStyleManager {
       if (currentLayout.nodeStyles.has(nodeId)) {
         currentLayout.nodeStyles.delete(nodeId);
       }
-      // Reset positions if configured
-      if (this.cache.CFG.RESET_SELECTION_BUTTON_RESETS_POSITIONS && currentLayout.positions.has(nodeId)) {
-        currentLayout.positions.delete(nodeId);
-      }
     }
 
     // Remove selected edges from the current layout's custom styles
@@ -56,6 +52,7 @@ class GraphStyleManager {
       badges       : src.badges        ?? [],
       badgePalette : src.badgePalette  ?? [],
       badgeFontSize: src.badgeFontSize ?? d.BADGE.FONT_SIZE,
+      badgeScaleWithNode: src.badgeScaleWithNode ?? d.BADGE.SCALE_WITH_NODE,
     }
   };
 
@@ -98,12 +95,18 @@ class GraphStyleManager {
   const defaultEdge = {
     type : edge.type ?? d.TYPE,
     style: {
-      startArrow     : src.startArrow     ?? d.ARROWS.START,
-      startArrowSize : src.startArrowSize ?? d.ARROWS.START_SIZE,
-      startArrowType : src.startArrowType ?? d.ARROWS.START_TYPE,
-      endArrow       : src.endArrow       ?? d.ARROWS.END,
-      endArrowSize   : src.endArrowSize   ?? d.ARROWS.END_SIZE,
-      endArrowType   : src.endArrowType   ?? d.ARROWS.END_TYPE,
+      startArrow           : src.startArrow           ?? d.ARROWS.START,
+      startArrowSize       : src.startArrowSize       ?? d.ARROWS.START_SIZE,
+      startArrowType       : src.startArrowType       ?? d.ARROWS.START_TYPE,
+      startArrowColor      : src.startArrowColor      ?? d.ARROWS.START_COLOR,
+      startArrowBorderColor: src.startArrowBorderColor?? d.ARROWS.START_BORDER_COLOR,
+      startArrowBorderSize : src.startArrowBorderSize ?? d.ARROWS.START_BORDER_SIZE,
+      endArrow             : src.endArrow             ?? d.ARROWS.END,
+      endArrowSize         : src.endArrowSize         ?? d.ARROWS.END_SIZE,
+      endArrowType         : src.endArrowType         ?? d.ARROWS.END_TYPE,
+      endArrowColor        : src.endArrowColor        ?? d.ARROWS.END_COLOR,
+      endArrowBorderColor  : src.endArrowBorderColor  ?? d.ARROWS.END_BORDER_COLOR,
+      endArrowBorderSize   : src.endArrowBorderSize   ?? d.ARROWS.END_BORDER_SIZE,
 
       lineWidth      : src.lineWidth      ?? d.LINE_WIDTH,
       lineDash       : src.lineDash       ?? d.LINE_DASH,
@@ -112,6 +115,13 @@ class GraphStyleManager {
       halo           : src.halo           ?? d.HALO.ENABLED,
       haloStroke     : src.haloStroke     ?? d.HALO.COLOR,
       haloLineWidth  : src.haloLineWidth  ?? d.HALO.WIDTH,
+
+      flow           : src.flow           ?? d.FLOW.ENABLED,
+      flowType       : src.flowType       ?? d.FLOW.TYPE,
+      flowSpeed      : src.flowSpeed      ?? d.FLOW.SPEED,
+      flowStroke     : src.flowStroke     ?? d.FLOW.COLOR,
+      flowOpacity    : src.flowOpacity    ?? d.FLOW.OPACITY,
+      flowDensity    : src.flowDensity    ?? d.FLOW.DENSITY,
     }
   };
 

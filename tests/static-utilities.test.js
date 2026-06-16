@@ -367,3 +367,29 @@ describe('StaticUtilities.humanFileSize', () => {
     expect(StaticUtilities.humanFileSize(1073741824)).toBe('1 GB')
   })
 })
+
+describe('StaticUtilities.escapeHtml', () => {
+  it('escapes all five HTML-significant characters', () => {
+    expect(StaticUtilities.escapeHtml(`&<>"'`)).toBe('&amp;&lt;&gt;&quot;&#39;')
+  })
+
+  it('neutralizes a script-injection payload', () => {
+    expect(StaticUtilities.escapeHtml('<img src=x onerror=alert(1)>')).toBe(
+      '&lt;img src=x onerror=alert(1)&gt;'
+    )
+  })
+
+  it('escapes the ampersand first so existing entities are not double-decoded', () => {
+    expect(StaticUtilities.escapeHtml('&lt;')).toBe('&amp;lt;')
+  })
+
+  it('leaves safe text untouched', () => {
+    expect(StaticUtilities.escapeHtml('Node filters')).toBe('Node filters')
+  })
+
+  it('coerces non-string input and treats null/undefined as empty', () => {
+    expect(StaticUtilities.escapeHtml(42)).toBe('42')
+    expect(StaticUtilities.escapeHtml(null)).toBe('')
+    expect(StaticUtilities.escapeHtml(undefined)).toBe('')
+  })
+})

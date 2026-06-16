@@ -1,0 +1,22 @@
+# Dependencies & environments
+node_modules/
+.venv/
+
+# Build output & generated artifacts
+dist/
+coverage/
+src/lib/
+src/gll.bundle.js
+src/gll.bundle.js.map
+src/**/*_prompt.js
+scripts/fixtures/
+
+# Lockfiles
+package-lock.json
+uv.lock
+
+# Research manuscript (kept as-is)
+manuscript/
+
+# Minified vendor files
+*.min.js

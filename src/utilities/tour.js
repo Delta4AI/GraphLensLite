@@ -112,17 +112,27 @@ const TOUR_STEPS = [
     target: null,
   },
   {
-    title: "App Header — Quick Actions",
-    text: `The header bar contains quick-access buttons:
+    title: "App Header & Toolbar",
+    text: `The <strong>header</strong> shows the app name plus three actions:
            <br><br>
-           📊 <strong>Metrics</strong> — compute network metrics (degree, betweenness, PageRank, etc.)
-           <br>🔢 <strong>Data Editor</strong> — view and edit your graph data in a spreadsheet
-           <br>📝 <strong>Query Editor</strong> — write filter/selection queries using our query language
-           <br>📷 <strong>Save Image</strong> — export the current view as PNG
+           📷 <strong>Save Image</strong> — export the current view as <strong>PNG</strong> or <strong>SVG</strong>; click to pick the format and resolution
            <br>💾 <strong>Save Model</strong> — export the full graph (data + styles + layouts) as JSON
+           <br>🌙 <strong>Dark mode</strong> — toggle between the light and dark themes
            <br><br>
-           <em>Clicking the app name reloads the application.</em>`,
-    target: ".header-row",
+           <em>Clicking the app name reloads the application.</em>
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           The <strong>toolbar pills</strong> below open the main panels:
+           <br><br>
+           📊 <strong>Metrics</strong> — compute network metrics
+           <br>🔢 <strong>Data</strong> — view and edit your graph data in a spreadsheet
+           <br>📝 <strong>Query</strong> — write filter/selection queries using our query language
+           <br>🤖 <strong>Assistant</strong> — ask natural-language questions about your graph
+           <br><br>
+           Each pill stays highlighted while its panel is open.`,
+    targets: [
+      {selector: ".app-toolbar"},
+      {selector: ".header-row"},
+    ],
     position: "below",
   },
   {
@@ -138,7 +148,12 @@ const TOUR_STEPS = [
            <br><br>
            Use the <strong class="tour-green">✚</strong> button to create a new workspace (clone or template-based), and the <strong class="tour-red">✗</strong> button to delete the current one.
            <br><br>
-           The <strong>⛶</strong> button fits the graph to the screen, <strong>🚫</strong> hides disconnected nodes, and <strong>✨</strong> toggles the hover highlight effect.`,
+           A row of icon buttons acts on the current workspace:
+           <br>• <strong>⛶</strong> — fit the graph to the screen
+           <br>• <strong>↔️</strong> — nudge overlapping nodes apart
+           <br>• <strong>🔄</strong> — re-layout: recompute every node's position with a chosen layout algorithm (overwrites manual positions)
+           <br>• <strong>🚫</strong> — hide disconnected nodes
+           <br>• <strong>✨</strong> — toggle the hover highlight effect`,
     target: "#workspaceContainer",
     position: "below",
   },
@@ -146,16 +161,22 @@ const TOUR_STEPS = [
     title: "Filtering Panel",
     text: `Every property from your data becomes a <strong>filter</strong>.
            <div style="margin:8px 0;padding:8px 10px;background:#f8f7fb;border-radius:6px;border:1px solid #dddbe2;">
-             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-               <span style="display:inline-block;width:14px;height:14px;border:1px solid #015C0C;border-radius:3px;box-sizing:border-box;text-align:center;line-height:12px;font-size:12px;color:#015C0C;flex-shrink:0;">✔</span>
-               <span style="font-size:12px;color:#403C53;font-weight:600;">Expression Level</span>
-               <div style="flex:1;position:relative;height:8px;border-radius:10px;background:#CCC;">
-                 <div style="position:absolute;left:20%;right:30%;height:100%;border-radius:10px;background:#403C53;"></div>
-                 <div style="position:absolute;left:calc(20% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:#EEE;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
-                 <div style="position:absolute;left:calc(70% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:#EEE;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
+             <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">
+               <span style="display:inline-block;width:14px;height:14px;border:1px solid #015C0C;border-radius:3px;box-sizing:border-box;text-align:center;line-height:12px;font-size:12px;color:#015C0C;flex-shrink:0;margin-top:2px;">✔</span>
+               <span style="font-size:12px;color:#403C53;font-weight:600;padding-top:2px;">Expression Level</span>
+               <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+                 <div style="position:relative;height:8px;border-radius:10px;background:#CCC;margin-top:4px;">
+                   <div style="position:absolute;left:20%;right:30%;height:100%;border-radius:10px;background:#403C53;"></div>
+                   <div style="position:absolute;left:calc(20% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:#EEE;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
+                   <div style="position:absolute;left:calc(70% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:#EEE;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
+                 </div>
+                 <div style="display:flex;gap:6px;">
+                   <input disabled value="20" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid #aaa;border-radius:3px;background:white;color:#403C53;box-sizing:border-box;">
+                   <input disabled value="70" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid #aaa;border-radius:3px;background:white;color:#403C53;box-sizing:border-box;">
+                 </div>
                </div>
-               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;overflow:hidden;position:relative;flex-shrink:0;background:#E4E3EA;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;background:#E4E3EA;flex-shrink:0;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
+               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;overflow:hidden;position:relative;flex-shrink:0;background:#E4E3EA;margin-top:2px;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
+               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;background:#E4E3EA;flex-shrink:0;margin-top:2px;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
              </div>
              <div style="display:flex;align-items:center;gap:8px;">
                <span style="display:inline-block;width:14px;height:14px;border:1px solid #C33D35;border-radius:3px;box-sizing:border-box;flex-shrink:0;"></span>
@@ -179,7 +200,7 @@ const TOUR_STEPS = [
            <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;vertical-align:middle;background:#E4E3EA;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
            <strong>Selection button</strong> — <strong>+</strong> add or <strong>−</strong> remove all nodes matching that filter property to/from the current selection.
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           ⚙️ <strong>Edit Mode</strong> — reveals more fine-grained configuration for numeric properties.`,
+           <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;font-size:11px;font-weight:600;color:#403C53;background:#E4E3EA;border:1px solid #dddbe2;border-radius:12px;vertical-align:middle;">⚙ Details</span> — the panel stays compact by default. Toggle it to reveal each numeric property's <strong>exact min/max input boxes</strong> (shown under the slider above) together with the per-row <strong>bubble group</strong> and <strong>selection</strong> buttons. The mock-up above is in Details mode. Your preference is remembered between sessions.`,
     target: "#filterContainer",
     position: "right",
   },
@@ -193,15 +214,99 @@ const TOUR_STEPS = [
            <br>• <strong>Click + drag a node</strong> — moves that node
            <br>• <strong>Click + drag selected nodes</strong> — moves the entire selection
            <br><br>
-           The <strong>lasso tool</strong> <span class="lasso-icon" style="display:inline-block;vertical-align:middle;--size:16px;--color:#000"></span> (highlighted above) lets you draw a freeform selection area to select multiple nodes and edges at once. While in lasso mode, <strong>Shift+click</strong> adds individual nodes/edges to the selection.
-           <br><br>
            The <strong>minimap</strong> (bottom-right corner) shows an overview of the entire graph. Click or drag inside it to quickly navigate to different parts of the network.`,
     targets: [
       {selector: "#innerGraphContainer"},
-      {selector: "#lassoWrapper"},
-      {selector: ".g6-minimap"},
+      {selector: ".gll-minimap"},
     ],
     position: "left",
+    action: "collapseSelectionPanel",
+  },
+  {
+    title: "Selection Panel",
+    text: `A floating panel pinned to a corner of the canvas — drag its header to move it and it snaps to the nearest corner. It tracks whatever you've selected and gathers every action you can take on that selection, top to bottom:
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Header</strong>
+           <br>• <strong>Tools ▾</strong> — expand the advanced selection tools (next step)
+           <br>• <strong>✕</strong> — tuck the panel away; a <strong>▸ Selection</strong> tab brings it back
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Toolbar</strong>
+           <br>• <strong>➰ Lasso</strong> — toggle the lasso tool to draw a freeform selection area; while active, <strong>Shift+click</strong> adds individual nodes/edges
+           <br>• <strong>🎨 Style</strong> — open the styling panel to restyle the selection
+           <br>• <strong>↩</strong> / <strong>↪</strong> — undo / redo selection changes (up to 25 states)
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Counts</strong> — live <strong>node</strong> and <strong>edge</strong> totals, each with <strong>🔍</strong> (zoom to fit the selection) and <strong class="tour-red">×</strong> (clear that selection).
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Add to group</strong> — the quadrant button
+           <span style="display:inline-block;width:14px;height:14px;border-radius:50%;overflow:hidden;position:relative;vertical-align:middle;background:#E4E3EA;border:1px solid black;box-sizing:border-box;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
+           assigns or removes the selected nodes to/from one of four colored <strong>bubble set</strong> groups (visual overlays on the canvas). <strong>⟳ Reset style</strong> reverts the selection's styles to defaults.
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Groups</strong> — manage every manual group at once:
+           <br>• <strong>🧩 Auto</strong> — auto-detect communities with <strong>Louvain</strong> clustering and assign the largest to groups; choose the edge weighting and resolution (higher = more, smaller clusters)
+           <br>• a size readout (e.g. <span style="color:var(--groupOne-color);font-weight:bold;">●3</span> <span style="color:var(--groupTwo-color);font-weight:bold;">●2</span>) and <strong class="tour-red">Clear all</strong> to remove them`,
+    target: "#selectedElementsContainer",
+    position: "below",
+  },
+  {
+    title: "Selection Panel — Advanced Tools",
+    text: `Expand the selection panel with <strong>Tools ▾</strong> to reveal three tool sections:
+           <br><br>
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Focus Elements</strong> — search for a node or edge by ID/label and zoom to it.
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Select Elements</strong> — bulk selection controls:
+           <br>• Select/deselect all nodes or edges
+           <br>• <strong>Expand/Reduce Edges</strong> — add or remove edges connected to selected nodes
+           <br>• <strong>Expand/Reduce Neighbors</strong> — grow or shrink the selection by one hop
+           <br>• Select by <strong>Node/Edge IDs</strong> or <strong>Labels</strong> with include/exclude toggle
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Arrange Selection</strong> — reposition selected nodes:
+           <br>• <strong>Shrink/Expand</strong> — pull nodes closer or push them apart
+           <br>• <strong>Circle/Force/Grid/Random</strong> — apply a sub-layout to the selection only`,
+    targets: [
+      {selector: "#selectedElementsContainer"},
+      {selector: "#selectionEditorToggleBtn"},
+    ],
+    position: "below",
+    action: "expandSelectionEditor",
+  },
+  {
+    title: "Styling Panel 🎨",
+    text: `The styling panel lets you customize the visual appearance of your graph.
+           Styles are applied <strong>only to selected elements</strong> — select nodes/edges first, then adjust.
+           All styles are <strong>per-workspace</strong>.
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Node Configuration</strong>
+           <br>• Shape, size, fill color, border size &amp; color
+           <br>• Label text, font size, placement, color &amp; background
+           <br>• <strong>Badges</strong> — small text markers at any corner of a node
+           <br>• <strong>Pie-chart nodes</strong> — render a node as a multi-slice pie driven by category data
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Edge Configuration</strong>
+           <br>• Type (line/quadratic/cubic), width, dash pattern, color
+           <br>• Label text, font size, placement, rotation, offset &amp; color
+           <br>• <strong>Arrows</strong> — start/end arrows with configurable size and type
+           <br>• <strong>Halos</strong> — colored glow around edges with adjustable width
+           <br>• <strong>Edge flow</strong> — animated directional motion along edges (comet or chevron), with adjustable opacity and density
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Bubble Set Configuration</strong>
+           <br>Each of the four groups has fill/stroke color &amp; opacity, plus optional labels.
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Density Heatmap</strong>
+           <br>A workspace-level overlay that shades the densest regions of the graph — configure radius, intensity and color ramp.
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Scale tools</strong> — map any data property or computed network metric to a visual property:
+           <br>• <span style="display:inline-block;width:20px;height:16px;border:1px solid black;border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> <strong>Numeric scale</strong> — e.g. scale node size by PageRank
+           <br>• <span style="display:inline-block;width:24px;height:16px;border:1px solid black;border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> <strong>Color scale</strong> — continuous gradient or discrete colors per category
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           💡 Color inputs accept any hex code — type it in the text field and press <strong>Enter</strong> to apply.`,
+    targets: [
+      {selector: "#rightSidebar"},
+      {selector: "#styleToggleBtn"},
+    ],
+    position: "left",
+    positionOffset: {y: 120},
+    action: "openStylingPanel",
   },
   {
     title: "Network Metrics 📊",
@@ -310,97 +415,19 @@ const TOUR_STEPS = [
     action: "openAssistantPanel",
   },
   {
-    title: "Selection Panel",
-    text: `The selection panel sits above the graph canvas.
-           <br><br>
-           Selected <strong>node</strong> and <strong>edge</strong> counts are shown, each with:
-           <br>• <strong>🔍</strong> — zoom the viewport to fit the selected elements
-           <br>• <strong class="tour-red">×</strong> — clear that selection
-           <br>
-           Next to selected nodes, a <strong>bubble group button</strong>
-           <span style="display:inline-block;width:14px;height:14px;border-radius:50%;overflow:hidden;position:relative;vertical-align:middle;background:#E4E3EA;border:1px solid black;box-sizing:border-box;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
-           appears — click a quadrant to assign/remove selected nodes to/from one of four colored groups. These create visual <strong>bubble set</strong> overlays on the canvas.
-           When manual groups are active, a status indicator (e.g. <span style="color:var(--groupOne-color);font-weight:bold;">●3</span> <span style="color:var(--groupTwo-color);font-weight:bold;">●2</span>) and a <strong class="tour-red">×</strong> clear button appear.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           • <span class="lasso-icon" style="display:inline-block;vertical-align:middle;--size:16px;--color:#000"></span> — toggle the <strong>lasso tool</strong> for freeform multi-select
-           <br>• <strong>⟳</strong> — reset styles for selected elements to defaults
-           <br>• <strong>↩</strong>/<strong>↪</strong> — undo/redo selections (up to 25 states)
-           <br>• <strong>🎨</strong> — open the <strong>styling panel</strong> to style selected elements
-           <br>• <strong>▾</strong> — expand the panel for advanced tools (next step)`,
-    target: "#selectedElementsContainer",
-    position: "below",
-  },
-  {
-    title: "Selection Panel — Advanced Tools",
-    text: `Expand the selection panel with <strong>▾</strong> to reveal three tool sections:
-           <br><br>
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Focus Elements</strong> — search for a node or edge by ID/label and zoom to it.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Select Elements</strong> — bulk selection controls:
-           <br>• Select/deselect all nodes or edges
-           <br>• <strong>Expand/Reduce Edges</strong> — add or remove edges connected to selected nodes
-           <br>• <strong>Expand/Reduce Neighbors</strong> — grow or shrink the selection by one hop
-           <br>• Select by <strong>Node/Edge IDs</strong> or <strong>Labels</strong> with include/exclude toggle
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Arrange Selection</strong> — reposition selected nodes:
-           <br>• <strong>Shrink/Expand</strong> — pull nodes closer or push them apart
-           <br>• <strong>Circle/Force/Grid/Random</strong> — apply a sub-layout to the selection only`,
-    targets: [
-      {selector: "#selectedElementsContainer"},
-      {selector: "#selectionEditorToggleBtn"},
-    ],
-    position: "below",
-    action: "expandSelectionEditor",
-  },
-  {
-    title: "Styling Panel 🎨",
-    text: `The styling panel lets you customize the visual appearance of your graph.
-           Styles are applied <strong>only to selected elements</strong> — select nodes/edges first, then adjust.
-           All styles are <strong>per-workspace</strong>.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Node Configuration</strong>
-           <br>• Shape, size, fill color, border size &amp; color
-           <br>• Label text, font size, placement, color &amp; background
-           <br>• <strong>Badges</strong> — small text markers at any corner of a node
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Edge Configuration</strong>
-           <br>• Type (line/quadratic/cubic), width, dash pattern, color
-           <br>• Label text, font size, placement, rotation, offset &amp; color
-           <br>• <strong>Arrows</strong> — start/end arrows with configurable size and type
-           <br>• <strong>Halos</strong> — colored glow around edges with adjustable width
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Bubble Set Configuration</strong>
-           <br>Each of the four groups has fill/stroke color &amp; opacity, plus optional labels.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Scale tools</strong> — map any data property or computed network metric to a visual property:
-           <br>• <span style="display:inline-block;width:20px;height:16px;border:1px solid black;border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> <strong>Numeric scale</strong> — e.g. scale node size by PageRank
-           <br>• <span style="display:inline-block;width:24px;height:16px;border:1px solid black;border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> <strong>Color scale</strong> — continuous gradient or discrete colors per category
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           💡 Color inputs accept any hex code — type it in the text field and press <strong>Enter</strong> to apply.`,
-    targets: [
-      {selector: "#rightSidebar"},
-      {selector: "#styleToggleBtn"},
-    ],
-    position: "left",
-    positionOffset: {y: 120},
-    action: "openStylingPanel",
-  },
-  {
     title: "You're all set! 🎉",
     text: `That covers the main features. Here are some <strong>keyboard shortcuts</strong> to remember:
            <br><br>
-           <strong>F</strong> — Fit graph to screen
+           <strong>P</strong> — Export as PNG
+           <br><strong>S</strong> — Save as JSON
+           <br><strong>M</strong> — Toggle metrics panel
+           <br><strong>D</strong> — Toggle data editor
+           <br><strong>Q</strong> — Toggle query editor
+           <br><strong>A</strong> — Toggle Graph Assistant
+           <br><strong>F</strong> — Fit graph to screen
            <br><strong>H</strong> — Toggle hover highlight effect
            <br><strong>L</strong> — Toggle lasso selection
-           <br><strong>Q</strong> — Toggle query editor
-           <br><strong>D</strong> — Toggle data editor
-           <br><strong>M</strong> — Toggle metrics panel
            <br><strong>Y</strong> — Toggle styling panel
-           <br><strong>A</strong> — Toggle Graph Assistant
-           <br><strong>E</strong> — Toggle edit mode
-           <br><strong>P</strong> — Export as PNG
-           <br><strong>S</strong> — Save as JSON
            <br><br>
            Try loading your own data from an <strong>Excel file</strong> or <strong>JSON export</strong>, or fetch protein networks from the <strong>STRING database</strong>.
            <br><br>
@@ -433,6 +460,11 @@ class GuidedTour {
     }
 
     const step = TOUR_STEPS[this.currentStep]
+
+    // Re-expand the selection panel once we leave the step that collapsed it.
+    if (step.action !== "collapseSelectionPanel") {
+      this.restoreSelectionPanel()
+    }
 
     // execute pre-step action
     if (step.action) {
@@ -670,7 +702,13 @@ class GuidedTour {
   async executeAction(action) {
     switch (action) {
       case "openMetricsPanel": {
-        const metricsBtn = document.getElementById("metricsToggleBtn")
+        // Styling now precedes metrics in the tour; close its right sidebar so
+        // it doesn't linger over the panels demoed in the later steps.
+        const rightSidebar = document.getElementById("rightSidebar")
+        if (rightSidebar && rightSidebar.classList.contains("active")) {
+          this.cache.ui.toggleStylingPanel()
+          await this.sleep(350)
+        }
         const metricsPanel = document.getElementById("networkMetricsContainer")
         if (metricsPanel && !metricsPanel.classList.contains("open")) {
           this.cache.metrics.toggleUI()
@@ -776,7 +814,34 @@ class GuidedTour {
         await this.sleep(350)
         break
       }
+      case "collapseSelectionPanel": {
+        // Collapse the selection HUD so the canvas step reads cleanly. Toggle
+        // the class directly (not the HUD's hide()) so we don't persist the
+        // hidden preference, and remember the pre-tour state to restore it.
+        const container = document.getElementById("selectedElementsContainer")
+        const restore = document.getElementById("selHudRestoreBtn")
+        if (container) {
+          this._selPanelWasHidden = container.classList.contains("hidden")
+          this._selPanelCollapsedByTour = true
+          container.classList.add("hidden")
+          restore?.classList.add("visible")
+        }
+        await this.sleep(250)
+        break
+      }
     }
+  }
+
+  // Re-expand the selection panel if the tour collapsed it, honoring whatever
+  // state the user had it in before the tour started.
+  restoreSelectionPanel() {
+    if (!this._selPanelCollapsedByTour) return
+    this._selPanelCollapsedByTour = false
+    if (this._selPanelWasHidden) return
+    const container = document.getElementById("selectedElementsContainer")
+    const restore = document.getElementById("selHudRestoreBtn")
+    container?.classList.remove("hidden")
+    restore?.classList.remove("visible")
   }
 
   sleep(ms) {
@@ -809,6 +874,7 @@ class GuidedTour {
 
   finish() {
     this.cleanup()
+    this.restoreSelectionPanel()
 
     // close any open panels
     const metricsPanel = document.getElementById("networkMetricsContainer")

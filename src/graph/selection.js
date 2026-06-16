@@ -1,4 +1,4 @@
-import {StaticUtilities} from "../utilities/static.js";
+import { StaticUtilities } from '../utilities/static.js';
 
 class GraphSelectionManager {
   constructor(cache) {
@@ -16,7 +16,11 @@ class GraphSelectionManager {
   /**
    * Selects given element IDs while deselecting all others
    */
-  async selectElements(elementIDs, refMap, stateOverride = "selected") {
+  async selectElements(elementIDs, refMap, stateOverride = 'selected') {
+    // cache.graph is null both before any data is loaded and when WebGL init
+    // failed (dead renderer); selection is a silent no-op in either state.
+    if (!this.cache.graph) return;
+
     const visibility = {};
     const elementIDsAsSet = new Set(elementIDs);
 
@@ -26,7 +30,8 @@ class GraphSelectionManager {
       const shouldSelect = elementIDsAsSet.has(nodeOrEdgeID);
 
       if (shouldSelect && !state.includes(stateOverride)) state.push(stateOverride);
-      if (!shouldSelect && state.includes(stateOverride)) state.splice(state.indexOf(stateOverride), 1);
+      if (!shouldSelect && state.includes(stateOverride))
+        state.splice(state.indexOf(stateOverride), 1);
 
       visibility[nodeOrEdgeID] = state;
     }
@@ -35,47 +40,58 @@ class GraphSelectionManager {
   }
 
   async updateSelectedState(elemData, enable) {
-    await this.cache.ui.showLoading(enable ? "Selecting" : "Deselecting", `Modifying selection of ${elemData.length} elements`);
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    if (!this.cache.graph) return;
+
+    await this.cache.ui.showLoading(
+      enable ? 'Selecting' : 'Deselecting',
+      `Modifying selection of ${elemData.length} elements`
+    );
+    await new Promise((resolve) => requestAnimationFrame(resolve));
 
     const stateMap = {};
     for (const item of elemData) {
       const states = await this.cache.graph.getElementState(item.id);
-      if (enable && !states.includes("selected")) states.push("selected");
-      if (!enable && states.includes("selected")) states.splice(states.indexOf("selected"), 1);
+      if (enable && !states.includes('selected')) states.push('selected');
+      if (!enable && states.includes('selected')) states.splice(states.indexOf('selected'), 1);
       stateMap[item.id] = states;
     }
     await this.cache.graph.setElementState(stateMap);
 
-    // Update manual bubble group button state when selection changes
-    this.cache.bs.updateManualGroupButtonState();
+    // Button resync happens in updateSelectedNodesAndEdges (after-draw), once
+    // cache.selectedNodes reflects this change — doing it here reads stale data.
 
     await this.cache.ui.hideLoading();
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
   }
 
   async getSelectedNodes() {
-    return await this.cache.graph.getNodeData().filter(n => n.states?.includes("selected"));
+    if (!this.cache.graph) return [];
+
+    return await this.cache.graph.getNodeData().filter((n) => n.states?.includes('selected'));
   }
 
   updateElementSelectedState(element, shouldSelect) {
     if (!element.states) {
       element.states = [];
     }
-    if (shouldSelect && !element.states.includes("selected")) {
-      element.states.push("selected");
+    if (shouldSelect && !element.states.includes('selected')) {
+      element.states.push('selected');
     }
-    if (!shouldSelect && element.states.includes("selected")) {
-      element.states.splice(element.states.indexOf("selected"), 1);
+    if (!shouldSelect && element.states.includes('selected')) {
+      element.states.splice(element.states.indexOf('selected'), 1);
     }
   }
 
   async toggleSelectionForAllNodes(enable) {
+    if (!this.cache.graph) return;
+
     const nodes = await this.cache.graph.getNodeData();
     await this.updateSelectedState(nodes, enable);
   }
 
   async toggleSelectionForAllEdges(enable) {
+    if (!this.cache.graph) return;
+
     const edges = await this.cache.graph.getEdgeData();
     await this.updateSelectedState(edges, enable);
   }
@@ -90,15 +106,17 @@ class GraphSelectionManager {
     for (const node of this.cache.graph.getNodeData()) {
       const states = await this.cache.graph.getElementState(node.id);
       const shouldSelect = snapshot.nodes.includes(node.id);
-      if (shouldSelect && !states.includes("selected")) states.push("selected");
-      if (!shouldSelect && states.includes("selected")) states.splice(states.indexOf("selected"), 1);
+      if (shouldSelect && !states.includes('selected')) states.push('selected');
+      if (!shouldSelect && states.includes('selected'))
+        states.splice(states.indexOf('selected'), 1);
       stateMap[node.id] = states;
     }
     for (const edge of this.cache.graph.getEdgeData()) {
       const states = await this.cache.graph.getElementState(edge.id);
       const shouldSelect = snapshot.edges.includes(edge.id);
-      if (shouldSelect && !states.includes("selected")) states.push("selected");
-      if (!shouldSelect && states.includes("selected")) states.splice(states.indexOf("selected"), 1);
+      if (shouldSelect && !states.includes('selected')) states.push('selected');
+      if (!shouldSelect && states.includes('selected'))
+        states.splice(states.indexOf('selected'), 1);
       stateMap[edge.id] = states;
     }
     await this.cache.graph.setElementState(stateMap);
@@ -108,36 +126,43 @@ class GraphSelectionManager {
   }
 
   undoSelection() {
+    // Silent no-op without a renderer: syncSelectionCacheAndElementStates
+    // below reads cache.graph, and moving the memory index without syncing
+    // would desync the snapshot stack.
+    if (!this.cache.graph) return;
+
     if (this.cache.selectedMemoryIndex > 0) {
       this.cache.selectedMemoryIndex--;
       this.syncSelectionCacheAndElementStates();
     } else {
-      this.cache.ui.warning("Cannot undo!");
+      this.cache.ui.warning('Cannot undo!');
     }
   }
 
   redoSelection() {
+    if (!this.cache.graph) return;
+
     if (this.cache.selectionMemory.length > this.cache.selectedMemoryIndex + 1) {
       this.cache.selectedMemoryIndex++;
       this.syncSelectionCacheAndElementStates();
     } else {
-      this.cache.ui.warning("Cannot redo!");
+      this.cache.ui.warning('Cannot redo!');
     }
   }
 
   async addNodeOrEdgeIDsToSelectionWrapper(elementIDs, isNode) {
     const shouldAdd = isNode
-      ? !document.getElementById("selectByNodeIDsSwitch").checked
-      : !document.getElementById("selectByEdgeIDsSwitch").checked;
-    const elementIDsAsArray = elementIDs ? elementIDs.split(",") : [];
+      ? !document.getElementById('selectByNodeIDsSwitch').checked
+      : !document.getElementById('selectByEdgeIDsSwitch').checked;
+    const elementIDsAsArray = elementIDs ? elementIDs.split(',') : [];
 
     await this.addNodeOrEdgeIDsToSelection(elementIDsAsArray, isNode, shouldAdd);
   }
 
   async addNodeOrEdgeLabelsToSelectionWrapper(elementLabels, isNode) {
-    const elementLabelsAsArray = elementLabels ? elementLabels.split(",") : [];
+    const elementLabelsAsArray = elementLabels ? elementLabels.split(',') : [];
 
-    const elementIDs = elementLabelsAsArray.flatMap(label => {
+    const elementIDs = elementLabelsAsArray.flatMap((label) => {
       const set = isNode
         ? this.cache.nodeLabelToNodeIDs.get(label)
         : this.cache.edgeLabelToEdgeIDs.get(label);
@@ -145,18 +170,19 @@ class GraphSelectionManager {
     });
 
     const shouldAdd = isNode
-      ? !document.getElementById("selectByNodeLabelsSwitch").checked
-      : !document.getElementById("selectByEdgeLabelsSwitch").checked;
+      ? !document.getElementById('selectByNodeLabelsSwitch').checked
+      : !document.getElementById('selectByEdgeLabelsSwitch').checked;
 
     await this.addNodeOrEdgeIDsToSelection(elementIDs, isNode, shouldAdd);
   }
 
   async addNodeOrEdgeIDsToSelection(elementIDs, isNode, shouldAdd) {
-
-    const elemDescription = isNode ? "Node" : "Edge";
+    const elemDescription = isNode ? 'Node' : 'Edge';
 
     const visibleElements = isNode ? this.cache.nodeIDsToBeShown : this.cache.edgeIDsToBeShown;
-    const existingElements = isNode ? this.cache.nodeRef.keys().toArray() : this.cache.edgeRef.keys().toArray();
+    const existingElements = isNode
+      ? this.cache.nodeRef.keys().toArray()
+      : this.cache.edgeRef.keys().toArray();
     const selectedElements = isNode ? this.cache.selectedNodes : this.cache.selectedEdges;
     const ref = isNode ? this.cache.nodeRef : this.cache.edgeRef;
 
@@ -167,7 +193,9 @@ class GraphSelectionManager {
       }
 
       if (!visibleElements.has(elemID)) {
-        this.cache.ui.warning(`Cannot update selection of ${elemDescription} with ID: '${elemID}' as it is not visible.`);
+        this.cache.ui.warning(
+          `Cannot update selection of ${elemDescription} with ID: '${elemID}' as it is not visible.`
+        );
         continue;
       }
 
@@ -206,18 +234,17 @@ class GraphSelectionManager {
       }
 
       return neighborsInSelection <= 1;
-    }
+    };
 
     const update = async () => {
       if (edgesToShow.length > 0) await this.updateSelectedState(edgesToShow, true);
       if (edgesToHide.length > 0) await this.updateSelectedState(edgesToHide, false);
       if (nodesToShow.length > 0) await this.updateSelectedState(nodesToShow, true);
       if (nodesToHide.length > 0) await this.updateSelectedState(nodesToHide, false);
-    }
+    };
 
     switch (mode) {
-
-      case "expand-edges":
+      case 'expand-edges':
         for (let nodeID of this.cache.selectedNodes) {
           for (let edgeID of this.cache.nodeIDToEdgeIDs.get(nodeID) || []) {
             edgesToShow.push(this.cache.edgeRef.get(edgeID));
@@ -225,16 +252,17 @@ class GraphSelectionManager {
         }
         break;
 
-      case "reduce-edges":
+      case 'reduce-edges':
         for (let edgeID of this.cache.selectedEdges) {
           const edge = this.cache.edgeRef.get(edgeID);
-          const connectingNodesAreSelected = this.cache.selectedNodes.includes(edge.source)
-            && this.cache.selectedNodes.includes(edge.target);
+          const connectingNodesAreSelected =
+            this.cache.selectedNodes.includes(edge.source) &&
+            this.cache.selectedNodes.includes(edge.target);
           connectingNodesAreSelected ? edgesToShow.push(edge) : edgesToHide.push(edge);
         }
         break;
 
-      case "expand-neighbors":
+      case 'expand-neighbors':
         for (let nodeID of this.cache.selectedNodes) {
           for (let edgeID of this.cache.nodeIDToEdgeIDs.get(nodeID) || []) {
             const edge = this.cache.edgeRef.get(edgeID);
@@ -246,7 +274,7 @@ class GraphSelectionManager {
         }
         break;
 
-      case "reduce-neighbors":
+      case 'reduce-neighbors':
         for (const nodeID of this.cache.selectedNodes.filter(isOuterNodeInSelection)) {
           nodesToHide.push(this.cache.nodeRef.get(nodeID));
 
@@ -264,11 +292,11 @@ class GraphSelectionManager {
   }
 
   updateSelectionCache() {
-    const {selectedNodes, selectedEdges, selectionMemory, selectedMemoryIndex} = cache;
+    const { selectedNodes, selectedEdges, selectionMemory, selectedMemoryIndex } = this.cache;
 
     // this should never be triggered; in case no snapshot is available, create an empty one
     if (selectionMemory.length === 0) {
-      selectionMemory.push({nodes: [], edges: []});
+      selectionMemory.push({ nodes: [], edges: [] });
       this.cache.selectedMemoryIndex = 0;
     }
 
@@ -278,7 +306,6 @@ class GraphSelectionManager {
     const edgesChanged = !StaticUtilities.arraysAreEqual(currentSnapshot.edges, selectedEdges);
 
     if (nodesChanged || edgesChanged) {
-
       // In case the user goes back in memory & then changes the selection, clear all memories after the current selection
       if (selectedMemoryIndex < selectionMemory.length - 1) {
         selectionMemory.splice(selectedMemoryIndex + 1);
@@ -301,50 +328,87 @@ class GraphSelectionManager {
   }
 
   updateEnabledStateUndoRedoSelectionButtons() {
-    const {selectionMemory, selectedMemoryIndex} = this.cache;
-    const canUndo = (selectedMemoryIndex > 0);
-    const canRedo = (selectedMemoryIndex < selectionMemory.length - 1);
+    const { selectionMemory, selectedMemoryIndex } = this.cache;
+    const canUndo = selectedMemoryIndex > 0;
+    const canRedo = selectedMemoryIndex < selectionMemory.length - 1;
 
-    this.cache.ui.toggleDisabledElements(["undoSelectionBtn"], canUndo);
-    this.cache.ui.toggleDisabledElements(["redoSelectionBtn"], canRedo);
+    this.cache.ui.toggleDisabledElements(['undoSelectionBtn'], canUndo);
+    this.cache.ui.toggleDisabledElements(['redoSelectionBtn'], canRedo);
   }
 
   async updateSelectedNodesAndEdges() {
-    this.cache.selectedNodes = await this.cache.graph.getNodeData()
-      .filter((n) => n.states?.includes("selected") && this.cache.nodeIDsToBeShown.has(n.id))
+    this.cache.selectedNodes = await this.cache.graph
+      .getNodeData()
+      .filter((n) => n.states?.includes('selected') && this.cache.nodeIDsToBeShown.has(n.id))
       .map((n) => n.id);
-    this.cache.selectedEdges = await this.cache.graph.getEdgeData()
-      .filter((e) => e.states?.includes("selected") && this.cache.edgeIDsToBeShown.has(e.id))
+    this.cache.selectedEdges = await this.cache.graph
+      .getEdgeData()
+      .filter((e) => e.states?.includes('selected') && this.cache.edgeIDsToBeShown.has(e.id))
       .map((e) => e.id);
 
     const selectedNodesCount = this.cache.selectedNodes?.length || 0;
     const selectedEdgesCount = this.cache.selectedEdges?.length || 0;
 
-    document.getElementById("selectedNodes").textContent = `${selectedNodesCount}`;
-    document.getElementById("selectedEdges").textContent = `${selectedEdgesCount}`;
+    document.getElementById('selectedNodes').textContent = `${selectedNodesCount}`;
+    document.getElementById('selectedEdges').textContent = `${selectedEdgesCount}`;
 
     const atLeastOneNodeSelected = selectedNodesCount > 0;
     const atLeastOneEdgeSelected = selectedEdgesCount > 0;
     const atLeastOneNodeOrEdgeSelected = atLeastOneNodeSelected || atLeastOneEdgeSelected;
+
+    // Swap the HUD between its empty state (instructions) and its active
+    // state (counts + actions). CSS keys off the `has-selection` class.
+    document
+      .getElementById('selectedElementsContainer')
+      ?.classList.toggle('has-selection', atLeastOneNodeOrEdgeSelected);
+
+    // Tell the styling panel what it is acting on, so the node/edge cards
+    // are no longer silently greyed with no explanation.
+    const stylingStatus = document.getElementById('stylingSelectionStatus');
+    if (stylingStatus) {
+      if (atLeastOneNodeOrEdgeSelected) {
+        const parts = [];
+        if (selectedNodesCount)
+          parts.push(`${selectedNodesCount} node${selectedNodesCount === 1 ? '' : 's'}`);
+        if (selectedEdgesCount)
+          parts.push(`${selectedEdgesCount} edge${selectedEdgesCount === 1 ? '' : 's'}`);
+        stylingStatus.textContent = `Styling ${parts.join(' · ')}`;
+        stylingStatus.classList.remove('empty');
+        // Open the config card(s) matching the selection (additive).
+        this.cache.ui.syncStylingCardsToSelection(atLeastOneNodeSelected, atLeastOneEdgeSelected);
+      } else {
+        stylingStatus.textContent =
+          'Nothing selected — select nodes or edges to style them. Bubble-group styling below works without a selection.';
+        stylingStatus.classList.add('empty');
+      }
+    }
     const moreThanOneNodeSelected = selectedNodesCount > 1;
 
     this.cache.ui.toggleStyleElementsThatRequireAtLeastOneSelectedNode(atLeastOneNodeSelected);
     this.cache.ui.toggleStyleElementsThatRequireAtLeastOneSelectedEdge(atLeastOneEdgeSelected);
-    this.cache.ui.toggleStyleElementsThatRequireAtLeastOneSelectedNodeOrEdge(atLeastOneNodeOrEdgeSelected);
+    this.cache.ui.toggleStyleElementsThatRequireAtLeastOneSelectedNodeOrEdge(
+      atLeastOneNodeOrEdgeSelected
+    );
     this.cache.ui.toggleStyleElementsThatRequireMoreThanOneSelectedNode(moreThanOneNodeSelected);
 
     this.updateSelectionCache();
     this.updateEnabledStateUndoRedoSelectionButtons();
 
+    // Single authoritative point where cache.selectedNodes is recomputed, so
+    // resync the "Add to group" quadrant button here. (updateSelectedState
+    // fires before this refresh and would read a stale selection.)
+    this.cache.bs.updateManualGroupButtonState();
+
     if (typeof this.cache.dataTable !== 'undefined' && this.cache.dataTable.fileData) {
-      if (this.cache.dataTable.currentTab === 'selectedNodes'
-        || this.cache.dataTable.currentTab === 'selectedEdges'
-        || this.cache.dataTable.currentTab === 'selectedElements') {
+      if (
+        this.cache.dataTable.currentTab === 'selectedNodes' ||
+        this.cache.dataTable.currentTab === 'selectedEdges' ||
+        this.cache.dataTable.currentTab === 'selectedElements'
+      ) {
         this.cache.dataTable.refreshCurrentTab();
       }
     }
   }
-
 }
 
-export {GraphSelectionManager}
+export { GraphSelectionManager };
