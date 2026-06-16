@@ -3,6 +3,22 @@ class StaticUtilities {
     return typeof value === 'string' || value instanceof String;
   }
 
+  /**
+   * Escape a value for safe interpolation into an HTML string. Use at every
+   * boundary where untrusted text (node/edge/property names, layout names,
+   * query fragments loaded from files) is concatenated into innerHTML.
+   * @param {*} value
+   * @returns {string}
+   */
+  static escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   static isNumber(value) {
     const parsed = parseFloat(value);
     return !isNaN(parsed) && isFinite(parsed);

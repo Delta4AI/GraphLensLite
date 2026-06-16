@@ -29,7 +29,12 @@ function createWindow() {
   }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    // Only hand http(s)/mailto URLs to the OS shell; never forward arbitrary
+    // schemes (file:, javascript:, custom protocol handlers) from in-page
+    // window.open calls. Per Electron's openExternal hardening guidance.
+    if (/^(https?|mailto):/i.test(url)) {
+      shell.openExternal(url);
+    }
     return { action: 'deny' };
   });
 }

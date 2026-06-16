@@ -45,7 +45,9 @@ static async prompt(message) {
       inputField.className = "p-prompt";
 
       const content = document.createElement('div');
-      content.innerHTML = `<div>${message}</div>`;
+      const messageEl = document.createElement('div');
+      messageEl.textContent = message;
+      content.appendChild(messageEl);
       content.appendChild(inputField);
 
       const buttonContainer = document.createElement('div');
@@ -93,7 +95,9 @@ static async prompt(message) {
   static async confirm(message) {
     return new Promise((resolve) => {
       const content = document.createElement('div');
-      content.innerHTML = `<div>${message}</div>`;
+      const messageEl = document.createElement('div');
+      messageEl.textContent = message;
+      content.appendChild(messageEl);
 
       const buttonContainer = document.createElement('div');
       buttonContainer.className = 'p-footer';
