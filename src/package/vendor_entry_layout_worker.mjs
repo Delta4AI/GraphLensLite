@@ -1,3 +1,4 @@
+/* global self */ // bundled into a web worker where `self` is the global scope
 // Entry for the off-main-thread layout worker (src/lib/layout_worker_source.js).
 // Bundled to a self-contained IIFE by src/package/vendor_libs.js and embedded
 // as a string so layout_algorithms.js can spin up a Blob worker at runtime —

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global window, document, requestAnimationFrame, Image, Node */ // browser globals run inside page.evaluate() callbacks
 // Renderer performance benchmark (MIGRATION.md Phase 0 acceptance gates).
 // Boots the app in headless chromium against the benchmark fixture and
 // measures: load time, first-interaction stall, wheel-zoom FPS, drag-pan FPS
@@ -16,17 +17,17 @@
 // The fixture is fetched in-page from the harness's own static server so the
 // JSON transfer happens before the timer starts.
 
-const fs = require("fs");
-const http = require("http");
-const path = require("path");
-const {spawnSync} = require("child_process");
-const {chromium} = require("playwright");
+const fs = require('fs');
+const http = require('http');
+const path = require('path');
+const { spawnSync } = require('child_process');
+const { chromium } = require('playwright');
 
-const ROOT = path.resolve(__dirname, "..");
-const SRC_DIR = path.join(ROOT, "src");
-const FIXTURE_DIR = path.join(__dirname, "fixtures");
-const FIXTURE_FILE = path.join(FIXTURE_DIR, "benchmark_6000x9000.json");
-const FIXTURE_URL_PATH = "/__fixtures__/benchmark_6000x9000.json";
+const ROOT = path.resolve(__dirname, '..');
+const SRC_DIR = path.join(ROOT, 'src');
+const FIXTURE_DIR = path.join(__dirname, 'fixtures');
+const FIXTURE_FILE = path.join(FIXTURE_DIR, 'benchmark_6000x9000.json');
+const FIXTURE_URL_PATH = '/__fixtures__/benchmark_6000x9000.json';
 
 const LOAD_RUNS = 3;
 const SELECT_RUNS = 3;
@@ -37,23 +38,29 @@ const DRAG_WARMUP_MS = 1000;
 
 // Acceptance gates from MIGRATION.md ("Acceptance criteria").
 const GATES = [
-  {key: "loadMs", label: "Load (data → rendered)", unit: "ms", limit: 2000, op: "<="},
-  {key: "firstInteractionStallMs", label: "First-interaction stall", unit: "ms", limit: 500, op: "<="},
-  {key: "wheelZoomFps", label: "Wheel-zoom FPS", unit: "fps", limit: 30, op: ">="},
-  {key: "dragPanFps", label: "Warm drag-pan FPS", unit: "fps", limit: 60, op: ">="},
-  {key: "select500Ms", label: "500-node select", unit: "ms", limit: 200, op: "<="},
+  { key: 'loadMs', label: 'Load (data → rendered)', unit: 'ms', limit: 2000, op: '<=' },
+  {
+    key: 'firstInteractionStallMs',
+    label: 'First-interaction stall',
+    unit: 'ms',
+    limit: 500,
+    op: '<=',
+  },
+  { key: 'wheelZoomFps', label: 'Wheel-zoom FPS', unit: 'fps', limit: 30, op: '>=' },
+  { key: 'dragPanFps', label: 'Warm drag-pan FPS', unit: 'fps', limit: 60, op: '>=' },
+  { key: 'select500Ms', label: '500-node select', unit: 'ms', limit: 200, op: '<=' },
 ];
 
 const MIME = {
-  ".html": "text/html",
-  ".js": "text/javascript",
-  ".mjs": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".png": "image/png",
-  ".svg": "image/svg+xml",
-  ".map": "application/json",
-  ".woff2": "font/woff2",
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.map': 'application/json',
+  '.woff2': 'font/woff2',
 };
 
 function median(values) {
@@ -63,22 +70,22 @@ function median(values) {
 }
 
 function run(cmd, args) {
-  const res = spawnSync(cmd, args, {cwd: ROOT, stdio: "inherit"});
+  const res = spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit' });
   if (res.status !== 0) {
-    console.error(`[perf] '${cmd} ${args.join(" ")}' failed (exit ${res.status})`);
+    console.error(`[perf] '${cmd} ${args.join(' ')}' failed (exit ${res.status})`);
     process.exit(1);
   }
 }
 
 function ensurePreconditions() {
-  run("node", [path.join(SRC_DIR, "package", "vendor_libs.js")]);
+  run('node', [path.join(SRC_DIR, 'package', 'vendor_libs.js')]);
   if (!fs.existsSync(FIXTURE_FILE)) {
-    run("node", [path.join(__dirname, "generate_benchmark_fixture.js")]);
+    run('node', [path.join(__dirname, 'generate_benchmark_fixture.js')]);
   }
   // Only download chromium when the pinned revision is actually missing.
   if (!fs.existsSync(chromium.executablePath())) {
-    console.log("[perf] playwright chromium missing, installing ..");
-    run("npx", ["playwright", "install", "chromium"]);
+    console.log('[perf] playwright chromium missing, installing ..');
+    run('npx', ['playwright', 'install', 'chromium']);
   }
 }
 
@@ -87,28 +94,28 @@ function ensurePreconditions() {
 // EventSource doesn't busy-reconnect (404) during FPS measurements.
 function startServer() {
   const server = http.createServer((req, res) => {
-    const urlPath = decodeURIComponent(new URL(req.url, "http://localhost").pathname);
+    const urlPath = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
 
-    if (urlPath === "/api/events") {
-      res.writeHead(200, {"Content-Type": "text/event-stream", "Cache-Control": "no-cache"});
-      res.write(": benchmark stub\n\n");
+    if (urlPath === '/api/events') {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+      res.write(': benchmark stub\n\n');
       return; // hold the connection open, never push a graph
     }
 
-    const baseDir = urlPath.startsWith("/__fixtures__/") ? FIXTURE_DIR : SRC_DIR;
-    const rel = urlPath.replace(/^\/__fixtures__\//, "/");
+    const baseDir = urlPath.startsWith('/__fixtures__/') ? FIXTURE_DIR : SRC_DIR;
+    const rel = urlPath.replace(/^\/__fixtures__\//, '/');
     const file = path.join(baseDir, path.normalize(rel));
     if (!file.startsWith(baseDir) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
       res.writeHead(404);
-      res.end("not found");
+      res.end('not found');
       return;
     }
-    res.writeHead(200, {"Content-Type": MIME[path.extname(file)] || "application/octet-stream"});
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
     fs.createReadStream(file).pipe(res);
   });
 
   return new Promise((resolve) => {
-    server.listen(0, "127.0.0.1", () => resolve(server));
+    server.listen(0, '127.0.0.1', () => resolve(server));
   });
 }
 
@@ -122,7 +129,7 @@ async function measureLoadOnce(page) {
     const data = await (await fetch(fixtureUrl)).json();
     const t0 = performance.now();
     const ok = await window.renderGraphData(data);
-    if (!ok) throw new Error("renderGraphData reported failure");
+    if (!ok) throw new Error('renderGraphData reported failure');
     await new Promise((resolve) => requestAnimationFrame(resolve));
     return performance.now() - t0;
   }, FIXTURE_URL_PATH);
@@ -130,8 +137,8 @@ async function measureLoadOnce(page) {
 
 /** Center of the graph container (Node-side geometry for real mouse input). */
 async function containerCenter(page) {
-  const box = await page.locator("#innerGraphContainer").boundingBox();
-  return {box, cx: box.x + box.width / 2, cy: box.y + box.height / 2};
+  const box = await page.locator('#innerGraphContainer').boundingBox();
+  return { box, cx: box.x + box.width / 2, cy: box.y + box.height / 2 };
 }
 
 /**
@@ -143,7 +150,7 @@ async function containerCenter(page) {
  */
 async function installFrameCounter(page) {
   await page.evaluate(() => {
-    window.__fps = {frames: 0, start: 0, running: false};
+    window.__fps = { frames: 0, start: 0, running: false };
     const loop = () => {
       if (window.__fps.running) window.__fps.frames++;
       requestAnimationFrame(loop);
@@ -164,7 +171,7 @@ async function stopFrameCounter(page) {
   return page.evaluate(() => {
     window.__fps.running = false;
     const elapsed = performance.now() - window.__fps.start;
-    return {fps: window.__fps.frames / (elapsed / 1000), elapsedMs: elapsed};
+    return { fps: window.__fps.frames / (elapsed / 1000), elapsedMs: elapsed };
   });
 }
 
@@ -179,7 +186,7 @@ async function measureIdleFpsCeiling(page) {
   await page.waitForTimeout(1000); // let deferred work from prior steps settle
   await startFrameCounter(page);
   await page.waitForTimeout(1000);
-  const {fps} = await stopFrameCounter(page);
+  const { fps } = await stopFrameCounter(page);
   return fps;
 }
 
@@ -190,19 +197,22 @@ async function measureIdleFpsCeiling(page) {
  * ms — negligible against the 500 ms gate (and the ~11 s G6 baseline).
  */
 async function measureFirstInteractionStall(page) {
-  const {cx, cy} = await containerCenter(page);
+  const { cx, cy } = await containerCenter(page);
   await page.mouse.move(cx, cy);
 
   const t0 = await page.evaluate(() => performance.now());
   await page.mouse.wheel(0, -120);
-  const t1 = await page.evaluate(() => new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve(performance.now())));
-  }));
+  const t1 = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve(performance.now())));
+      })
+  );
   // No zoom-changed sanity check here: G6 swallows the very first wheel tick
   // (zoom stays constant, verified empirically) while still running its
   // lazy-init work — which is exactly the stall this measures. Zoom behavior
   // is asserted in measureWheelZoomFps instead.
-  return {stallMs: t1 - t0};
+  return { stallMs: t1 - t0 };
 }
 
 /**
@@ -211,7 +221,7 @@ async function measureFirstInteractionStall(page) {
  * counter tallies rAF frames.
  */
 async function measureWheelZoomFps(page) {
-  const {cx, cy} = await containerCenter(page);
+  const { cx, cy } = await containerCenter(page);
   await page.mouse.move(cx, cy);
   const zoomBefore = await page.evaluate(() => window.cache.graph.getZoom());
 
@@ -226,7 +236,7 @@ async function measureWheelZoomFps(page) {
   }
   const counter = await stopFrameCounter(page);
   const zoomAfter = await page.evaluate(() => window.cache.graph.getZoom());
-  return {...counter, events: tick, zoomChanged: zoomAfter !== zoomBefore};
+  return { ...counter, events: tick, zoomChanged: zoomAfter !== zoomBefore };
 }
 
 /**
@@ -240,7 +250,7 @@ async function measureDragPanFps(page) {
     await window.cache.graph.zoomTo(0.5);
   });
 
-  const {box} = await containerCenter(page);
+  const { box } = await containerCenter(page);
   const startX = box.x + box.width * 0.08;
   const startY = box.y + box.height * 0.12;
 
@@ -250,10 +260,10 @@ async function measureDragPanFps(page) {
     const t0 = Date.now();
     let step = 0;
     while (Date.now() - t0 < durationMs) {
-      const phase = (step % 40) / 40 * 2 * Math.PI;
+      const phase = ((step % 40) / 40) * 2 * Math.PI;
       await page.mouse.move(
         startX + Math.sin(phase) * box.width * 0.05,
-        startY + (1 - Math.cos(phase)) * box.height * 0.05,
+        startY + (1 - Math.cos(phase)) * box.height * 0.05
       );
       step++;
     }
@@ -266,7 +276,7 @@ async function measureDragPanFps(page) {
   await startFrameCounter(page);
   const moves = await drag(FPS_WINDOW_MS);
   const counter = await stopFrameCounter(page);
-  return {...counter, moves};
+  return { ...counter, moves };
 }
 
 /**
@@ -297,29 +307,30 @@ function evaluateGates(results, limitOverrides = {}) {
   return GATES.map((gate) => {
     const effectiveLimit = limitOverrides[gate.key] ?? gate.limit;
     const measured = results[gate.key];
-    const pass = gate.op === "<=" ? measured <= effectiveLimit : measured >= effectiveLimit;
-    return {...gate, effectiveLimit, measured, pass};
+    const pass = gate.op === '<=' ? measured <= effectiveLimit : measured >= effectiveLimit;
+    return { ...gate, effectiveLimit, measured, pass };
   });
 }
 
 function printTable(rows) {
-  const fmt = (v, unit) => `${unit === "fps" ? v.toFixed(1) : Math.round(v)} ${unit}`;
+  const fmt = (v, unit) => `${unit === 'fps' ? v.toFixed(1) : Math.round(v)} ${unit}`;
   const widths = [28, 14, 28, 6];
-  const line = (cols) => console.log(cols.map((c, i) => String(c).padEnd(widths[i])).join(" | "));
-  console.log("");
-  line(["Metric", "Measured", "Gate", "Pass"]);
-  line(widths.map((w) => "-".repeat(w)));
+  const line = (cols) => console.log(cols.map((c, i) => String(c).padEnd(widths[i])).join(' | '));
+  console.log('');
+  line(['Metric', 'Measured', 'Gate', 'Pass']);
+  line(widths.map((w) => '-'.repeat(w)));
   for (const row of rows) {
-    const gateText = row.effectiveLimit === row.limit
-      ? `${row.op} ${row.limit} ${row.unit}`
-      : `${row.op} ${fmt(row.effectiveLimit, row.unit)} (capped, raw ${row.limit})`;
-    line([row.label, fmt(row.measured, row.unit), gateText, row.pass ? "PASS" : "FAIL"]);
+    const gateText =
+      row.effectiveLimit === row.limit
+        ? `${row.op} ${row.limit} ${row.unit}`
+        : `${row.op} ${fmt(row.effectiveLimit, row.unit)} (capped, raw ${row.limit})`;
+    line([row.label, fmt(row.measured, row.unit), gateText, row.pass ? 'PASS' : 'FAIL']);
   }
-  console.log("");
+  console.log('');
 }
 
 async function main() {
-  const assertGates = process.argv.includes("--assert");
+  const assertGates = process.argv.includes('--assert');
   ensurePreconditions();
 
   const server = await startServer();
@@ -337,18 +348,18 @@ async function main() {
   const browser = await chromium.launch({
     headless: true,
     args: [
-      "--enable-gpu",
-      "--use-angle=vulkan",
-      "--enable-features=Vulkan",
-      "--ignore-gpu-blocklist",
+      '--enable-gpu',
+      '--use-angle=vulkan',
+      '--enable-features=Vulkan',
+      '--ignore-gpu-blocklist',
     ],
   });
-  const page = await browser.newPage({viewport: {width: 1600, height: 900}});
-  page.on("pageerror", (err) => console.error(`[perf] page error: ${err.message}`));
+  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  page.on('pageerror', (err) => console.error(`[perf] page error: ${err.message}`));
 
   const gotoApp = async () => {
-    await page.goto(`${baseUrl}/graph_lens_lite.html`, {waitUntil: "load"});
-    await page.waitForFunction(() => typeof window.renderGraphData === "function");
+    await page.goto(`${baseUrl}/graph_lens_lite.html`, { waitUntil: 'load' });
+    await page.waitForFunction(() => typeof window.renderGraphData === 'function');
   };
 
   try {
@@ -364,20 +375,20 @@ async function main() {
     await installFrameCounter(page);
 
     // Must run directly after a fresh load, before any other interaction.
-    console.log("[perf] first-interaction stall ..");
+    console.log('[perf] first-interaction stall ..');
     const stall = await measureFirstInteractionStall(page);
 
-    console.log("[perf] calibrating idle rAF ceiling ..");
+    console.log('[perf] calibrating idle rAF ceiling ..');
     const idleFps = await measureIdleFpsCeiling(page);
     console.log(`[perf]   ceiling: ${idleFps.toFixed(1)} fps`);
 
-    console.log("[perf] wheel-zoom FPS (~3 s) ..");
+    console.log('[perf] wheel-zoom FPS (~3 s) ..');
     const wheel = await measureWheelZoomFps(page);
     if (!wheel.zoomChanged) {
-      console.warn("[perf]   WARNING: wheel events did not change zoom — FPS value may be invalid");
+      console.warn('[perf]   WARNING: wheel events did not change zoom — FPS value may be invalid');
     }
 
-    console.log("[perf] drag-pan FPS (warmup + ~3 s) ..");
+    console.log('[perf] drag-pan FPS (warmup + ~3 s) ..');
     const drag = await measureDragPanFps(page);
 
     console.log(`[perf] ${SELECT_NODE_COUNT}-node select: ${SELECT_RUNS} runs ..`);
@@ -395,7 +406,7 @@ async function main() {
       select500Ms: median(selectRuns),
     };
     const gateRows = evaluateGates(results, {
-      dragPanFps: Math.min(GATES.find((g) => g.key === "dragPanFps").limit, idleFps * 0.95),
+      dragPanFps: Math.min(GATES.find((g) => g.key === 'dragPanFps').limit, idleFps * 0.95),
     });
     printTable(gateRows);
 
@@ -403,21 +414,31 @@ async function main() {
       timestamp: new Date().toISOString(),
       fixture: path.basename(FIXTURE_FILE),
       idleFpsCeiling: idleFps,
-      gates: gateRows.map(({key, label, unit, limit, effectiveLimit, op, measured, pass}) =>
-        ({key, label, unit, limit, effectiveLimit, op, measured, pass})),
-      raw: {loadRuns, stall, wheel, drag, selectRuns},
+      gates: gateRows.map(({ key, label, unit, limit, effectiveLimit, op, measured, pass }) => ({
+        key,
+        label,
+        unit,
+        limit,
+        effectiveLimit,
+        op,
+        measured,
+        pass,
+      })),
+      raw: { loadRuns, stall, wheel, drag, selectRuns },
     };
-    const stamp = report.timestamp.replace(/[:.]/g, "-");
+    const stamp = report.timestamp.replace(/[:.]/g, '-');
     const outFile = path.join(FIXTURE_DIR, `perf_results_${stamp}.json`);
     fs.writeFileSync(outFile, JSON.stringify(report, null, 2));
     console.log(`[perf] results written to ${path.relative(process.cwd(), outFile)}`);
 
     const failed = gateRows.filter((row) => !row.pass);
     if (failed.length > 0) {
-      console.log(`[perf] ${failed.length}/${gateRows.length} gates FAILED: ${failed.map((f) => f.key).join(", ")}`);
+      console.log(
+        `[perf] ${failed.length}/${gateRows.length} gates FAILED: ${failed.map((f) => f.key).join(', ')}`
+      );
       if (assertGates) process.exitCode = 1;
     } else {
-      console.log("[perf] all gates passed");
+      console.log('[perf] all gates passed');
     }
   } finally {
     await browser.close();

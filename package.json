@@ -4,6 +4,14 @@
   "main": "src/package/electron_app.js",
   "description": "Visualise and explore property graphs in a lightweight desktop app.",
   "homepage": "https://github.com/Delta4AI/GraphLensLite",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Delta4AI/GraphLensLite.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Delta4AI/GraphLensLite/issues"
+  },
   "author": {
     "name": "Matthias Ley",
     "email": "matthias.ley@delta4.ai"
@@ -32,8 +40,14 @@
     "version": "npm run inject-version && git add src/config.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src server scripts tests",
+    "lint:fix": "eslint src server scripts tests --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "perf:fixture": "node scripts/generate_benchmark_fixture.js",
-    "perf": "node scripts/perf_benchmark.js"
+    "perf": "node scripts/perf_benchmark.js",
+    "notices": "node scripts/gen_third_party_notices.mjs"
   },
   "build": {
     "appId": "com.delta4ai.graphlenslite",
@@ -67,14 +81,20 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@vitest/coverage-v8": "^4.1.9",
     "electron": "^36.3.1",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.25.11",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
     "exceljs": "^4.4.0",
+    "globals": "^17.6.0",
     "inline-source": "^8.0.3",
     "inline-source-cli": "^1.2.0",
     "jsdom": "^29.0.2",
     "playwright": "^1.60.0",
+    "prettier": "^3.8.4",
     "rimraf": "^6.0.1",
     "vitest": "^4.0.18"
   },
@@ -87,7 +107,7 @@
     "@sigma/node-piechart": "3.0.1",
     "@sigma/node-square": "^3.0.0",
     "bubblesets-js": "^3.0.1",
-    "dompurify": "^3.4.1",
+    "dompurify": "^3.4.10",
     "graphology": "^0.26.0",
     "graphology-communities-louvain": "^2.0.2",
     "graphology-layout": "^0.6.1",

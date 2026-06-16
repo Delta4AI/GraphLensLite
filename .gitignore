@@ -7,6 +7,9 @@
 node_modules/
 dist/
 
+# Coverage reports (npm run test:coverage)
+coverage/
+
 # Generated bundle (rebuilt during dist/build)
 src/gll.bundle.js
 src/gll.bundle.js.map
