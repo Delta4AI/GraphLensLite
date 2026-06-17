@@ -1,7 +1,7 @@
 /**
  * Defaults for the graph, layouts and UI
  */
-const VERSION = "1.15.0";
+const VERSION = "1.15.1";
 
 const DEFAULTS = {
   NODE: {

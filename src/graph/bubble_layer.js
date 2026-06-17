@@ -23,7 +23,7 @@
  * This replaces the G6 plugin's recompute-per-draw churn (the patched
  * updateBubbleSetsPath path coalescing, issue #7195) with an owned cache.
  */
-import { DEFAULTS } from "../config.js";
+import { DEFAULTS } from '../config.js';
 import {
   nodeViewportRect,
   computeOutlinePoints,
@@ -32,10 +32,10 @@ import {
   idsKey,
   positionsChecksum,
   styleKey,
-} from "./bubble_geometry.js";
+} from './bubble_geometry.js';
 
-const LAYER_NAME = "bubbleSets";
-const LABEL_LAYER_NAME = "bubbleSetsLabels";
+const LAYER_NAME = 'bubbleSets';
+const LABEL_LAYER_NAME = 'bubbleSetsLabels';
 const OUTLINE_STROKE_WIDTH = 2;
 // Extra screen-px gap (beyond half the font box) between the outline and a
 // label drawn with labelCloseToPath: false.
@@ -65,23 +65,23 @@ class BubbleSetLayer {
     // createCanvasContext returns the Sigma instance (fluent API); the canvas
     // and 2d context land in sigma.elements / sigma.canvasContexts.
     sigma.createCanvasContext(LAYER_NAME, {
-      afterLayer: "nodes",
-      style: { pointerEvents: "none" },
+      afterLayer: 'nodes',
+      style: { pointerEvents: 'none' },
     });
     this.canvas = sigma.getCanvases()[LAYER_NAME];
-    this.ctx = this.canvas.getContext("2d");
+    this.ctx = this.canvas.getContext('2d');
 
     // Group labels paint on their own canvas stacked above sigma's node-label
     // layer so they always win the z-order contest against member labels.
     sigma.createCanvasContext(LABEL_LAYER_NAME, {
-      afterLayer: "labels",
-      style: { pointerEvents: "none" },
+      afterLayer: 'labels',
+      style: { pointerEvents: 'none' },
     });
     this.labelCanvas = sigma.getCanvases()[LABEL_LAYER_NAME];
-    this.labelCtx = this.labelCanvas.getContext("2d");
+    this.labelCtx = this.labelCanvas.getContext('2d');
 
     this.renderHandler = () => this.scheduleRedraw();
-    sigma.on("afterRender", this.renderHandler);
+    sigma.on('afterRender', this.renderHandler);
   }
 
   /**
@@ -110,7 +110,7 @@ class BubbleSetLayer {
     if (this.killed) return;
     this.killed = true;
     if (this.rafHandle !== null) cancelAnimationFrame(this.rafHandle);
-    this.adapter.sigma.off("afterRender", this.renderHandler);
+    this.adapter.sigma.off('afterRender', this.renderHandler);
     // sigma.kill() may or may not remove custom layer canvases; remove() on
     // an already-detached node is a no-op, so drop ours defensively.
     this.canvas?.remove();
@@ -130,7 +130,7 @@ class BubbleSetLayer {
   #groupState(group) {
     let state = this.groups.get(group);
     if (!state) {
-      state = { members: new Map(), avoidMembers: [], opts: {}, membersKey: "", avoidKey: "" };
+      state = { members: new Map(), avoidMembers: [], opts: {}, membersKey: '', avoidKey: '' };
       this.groups.set(group, state);
     }
     return state;
@@ -182,7 +182,7 @@ class BubbleSetLayer {
     // re-renders on hover etc. without clearing custom layers).
     const signature =
       `${width}x${height}x${dpr}|${camera.x},${camera.y},${camera.ratio},${camera.angle}` +
-      `|${active.map(([g]) => g).join(",")}`;
+      `|${active.map(([g]) => g).join(',')}`;
     if (!outlinesChanged && signature === this.lastPaintSignature) return;
     this.lastPaintSignature = signature;
 
@@ -195,9 +195,7 @@ class BubbleSetLayer {
   #drawOutlines(active, sigma) {
     for (const [group, state] of active) {
       // Reprojection assumes camera.angle === 0 (the app never rotates the camera).
-      const points = this.outlines
-        .get(group)
-        .graphPoints.map((p) => sigma.graphToViewport(p));
+      const points = this.outlines.get(group).graphPoints.map((p) => sigma.graphToViewport(p));
       const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {};
       const drawn = this.#drawGroup(this.ctx, points, state, defaults);
       // Labels paint on the top canvas (afterLayer: "labels") so they read
@@ -296,6 +294,16 @@ class BubbleSetLayer {
       canvas.width = width * dpr;
       canvas.height = height * dpr;
     }
+    // Own the CSS display size too: sigma.createCanvasContext only sets
+    // position:absolute, and sigma.resize() (the sole writer of element.style
+    // width/height) runs once at construction — before this canvas exists — and
+    // early-returns on unchanged dimensions. Left unset, the canvas displays at
+    // its backing-store size (width*dpr CSS px), which is dpr* too large on a
+    // >1 DPR display, so the group lands in the wrong place until a panel toggle
+    // forces a real sigma resize. Setting it here keeps the overlay 1:1 with the
+    // WebGL layers regardless of sigma's resize timing or the display's DPR.
+    if (canvas.style.width !== `${width}px`) canvas.style.width = `${width}px`;
+    if (canvas.style.height !== `${height}px`) canvas.style.height = `${height}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
   }
@@ -402,7 +410,7 @@ class BubbleSetLayer {
     // Reference-viewport → graph space (undo the ratio-1 mapping, then the
     // camera): the cache holds zoom-independent graph coords.
     return refPoints.map((p) =>
-      sigma.viewportToGraph({ x: cx + (p.x - cx) / r, y: cy + (p.y - cy) / r }),
+      sigma.viewportToGraph({ x: cx + (p.x - cx) / r, y: cy + (p.y - cy) / r })
     );
   }
 
@@ -422,10 +430,10 @@ class BubbleSetLayer {
     ctx.save();
     try {
       ctx.globalAlpha = opts.fillOpacity ?? defaults.fillOpacity ?? 0.25;
-      ctx.fillStyle = opts.fill ?? defaults.fill ?? "#403C53";
+      ctx.fillStyle = opts.fill ?? defaults.fill ?? '#403C53';
       ctx.fill(path);
       ctx.globalAlpha = opts.strokeOpacity ?? defaults.strokeOpacity ?? 1;
-      ctx.strokeStyle = opts.stroke ?? defaults.stroke ?? "#403C53";
+      ctx.strokeStyle = opts.stroke ?? defaults.stroke ?? '#403C53';
       ctx.lineWidth = OUTLINE_STROKE_WIDTH;
       ctx.stroke(path);
       ctx.globalAlpha = 1;
@@ -442,9 +450,9 @@ class BubbleSetLayer {
    * outline tangent. labelOffsetX/Y stay additive in screen space.
    */
   #drawLabel(ctx, points, opts, defaults) {
-    const text = opts.labelText ?? defaults.labelText ?? "";
+    const text = opts.labelText ?? defaults.labelText ?? '';
     if (!text) return;
-    const placement = opts.labelPlacement ?? defaults.labelPlacement ?? "bottom";
+    const placement = opts.labelPlacement ?? defaults.labelPlacement ?? 'bottom';
     const closeToPath = opts.labelCloseToPath ?? defaults.labelCloseToPath ?? true;
     const autoRotate = opts.labelAutoRotate ?? defaults.labelAutoRotate ?? true;
     const anchor = outlineLabelAnchor(points, placement);
@@ -459,12 +467,12 @@ class BubbleSetLayer {
     const y = anchor.y + anchor.ny * standoff + (opts.labelOffsetY ?? 0);
 
     ctx.font = `${fontSize}px Arial, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     const textWidth = ctx.measureText(text).width;
 
     // Rotation only makes sense hugging the path; "center" has no tangent.
-    const rotated = autoRotate && closeToPath && placement !== "center";
+    const rotated = autoRotate && closeToPath && placement !== 'center';
     if (rotated) {
       ctx.save();
       ctx.translate(x, y);
@@ -475,18 +483,18 @@ class BubbleSetLayer {
 
     if (opts.labelBackground ?? defaults.labelBackground) {
       const radius = opts.labelBackgroundRadius ?? defaults.labelBackgroundRadius ?? 5;
-      ctx.fillStyle = opts.labelBackgroundFill ?? defaults.labelBackgroundFill ?? "#403C53";
+      ctx.fillStyle = opts.labelBackgroundFill ?? defaults.labelBackgroundFill ?? '#403C53';
       ctx.beginPath();
       ctx.roundRect(
         lx - textWidth / 2 - padding,
         ly - fontSize / 2 - padding,
         textWidth + 2 * padding,
         fontSize + 2 * padding,
-        radius,
+        radius
       );
       ctx.fill();
     }
-    ctx.fillStyle = opts.labelFill ?? defaults.labelFill ?? "#fff";
+    ctx.fillStyle = opts.labelFill ?? defaults.labelFill ?? '#fff';
     ctx.fillText(text, lx, ly);
     if (rotated) ctx.restore();
   }

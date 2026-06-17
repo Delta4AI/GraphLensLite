@@ -1,5 +1,5 @@
-import {Popup} from "../utilities/popup.js";
-import {applyNoverlap} from "./layout_algorithms.js";
+import { Popup } from '../utilities/popup.js';
+import { applyNoverlap, layoutSelectionSubgraph } from './layout_algorithms.js';
 
 class GraphLayoutManager {
   constructor(cache) {
@@ -15,13 +15,13 @@ class GraphLayoutManager {
 
   async changeLayout() {
     this.cache.data.selectedLayout = document.getElementById('selectView').value;
-    await this.cache.ui.showLoading("Switching Workspace", this.cache.data.selectedLayout);
+    await this.cache.ui.showLoading('Switching Workspace', this.cache.data.selectedLayout);
     // Pin the overlay up across the whole switch so the inner render's
     // #postRefresh hideLoading() can't drop it before bubble-sync and
     // hide-disconnected finish. Released right before the position tween (which
     // is meant to animate with the overlay clear) and again in finally.
     this.cache.ui.holdLoading();
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
 
     const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
 
@@ -48,7 +48,7 @@ class GraphLayoutManager {
 
       // Update filter lock state based on whether this layout has a custom query
       this.cache.qm.updateQueryTextArea();
-      if (currentLayout["query"]) {
+      if (currentLayout['query']) {
         this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
       } else {
         this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;
@@ -135,7 +135,7 @@ class GraphLayoutManager {
         }
       }
 
-      nodeUpdates.push({id: nodeID, type: newType, style: newStyle});
+      nodeUpdates.push({ id: nodeID, type: newType, style: newStyle });
 
       // Update the nodeRef cache to keep it in sync
       node.type = newType;
@@ -170,7 +170,7 @@ class GraphLayoutManager {
         newType = edge.originalType || edge.type;
       }
 
-      edgeUpdates.push({id: edgeID, type: newType, style: newStyle});
+      edgeUpdates.push({ id: edgeID, type: newType, style: newStyle });
 
       // Update the edgeRef cache to keep it in sync
       edge.type = newType;
@@ -188,7 +188,7 @@ class GraphLayoutManager {
     // Show dialog with clone vs template options
     const result = await Popup.layoutCreationDialog(this.cache.DEFAULTS.LAYOUT_INTERNALS);
     if (!result) {
-      this.cache.ui.info("Creating workspace canceled");
+      this.cache.ui.info('Creating workspace canceled');
       return;
     }
 
@@ -208,7 +208,7 @@ class GraphLayoutManager {
       for (const [nodeID, node] of this.cache.nodeRef.entries()) {
         nodeStyles.set(nodeID, {
           type: node.type,
-          style: structuredClone(node.style)
+          style: structuredClone(node.style),
         });
       }
 
@@ -216,13 +216,13 @@ class GraphLayoutManager {
       for (const [edgeID, edge] of this.cache.edgeRef.entries()) {
         edgeStyles.set(edgeID, {
           type: edge.type,
-          style: structuredClone(edge.style)
+          style: structuredClone(edge.style),
         });
       }
 
       this.cache.data.layouts[result.name] = {
         internals: null,
-        layoutType: currentLayout.layoutType,  // inherit origin type for re-layout default
+        layoutType: currentLayout.layoutType, // inherit origin type for re-layout default
         positions: structuredClone(currentLayout.positions),
         filters: structuredClone(currentLayout.filters),
         isCustom: true,
@@ -234,14 +234,18 @@ class GraphLayoutManager {
       };
 
       // Copy query if it exists
-      if (currentLayout["query"]) {
-        this.cache.data.layouts[result.name]["query"] = currentLayout["query"];
+      if (currentLayout['query']) {
+        this.cache.data.layouts[result.name]['query'] = currentLayout['query'];
       }
 
       // Copy bubble group props and manual members
       for (let group of this.cache.bs.traverseBubbleSets()) {
-        this.cache.data.layouts[result.name][`${group}Props`] = structuredClone(currentLayout[`${group}Props`]);
-        this.cache.data.layouts[result.name][`${group}ManualMembers`] = structuredClone(currentLayout[`${group}ManualMembers`] || new Set());
+        this.cache.data.layouts[result.name][`${group}Props`] = structuredClone(
+          currentLayout[`${group}Props`]
+        );
+        this.cache.data.layouts[result.name][`${group}ManualMembers`] = structuredClone(
+          currentLayout[`${group}ManualMembers`] || new Set()
+        );
       }
 
       this.cache.ui.info(`Cloned view: ${result.name}`);
@@ -268,10 +272,10 @@ class GraphLayoutManager {
         const proceed = await Popup.confirm(
           `The "${result.templateType}" layout is computationally intensive and may ` +
             `take several minutes on ${nodeCount.toLocaleString()} nodes. The UI stays ` +
-            `blocked until it finishes. Continue?`,
+            `blocked until it finishes. Continue?`
         );
         if (!proceed) {
-          this.cache.ui.info("Creating workspace canceled");
+          this.cache.ui.info('Creating workspace canceled');
           return;
         }
       }
@@ -279,11 +283,11 @@ class GraphLayoutManager {
       // Create the layout structure first
       this.cache.data.layouts[result.name] = {
         internals: null,
-        layoutType: result.templateType,  // remember origin type for re-layout default
-        positions: new Map(),  // Will be filled after layout
-        filters: structuredClone(this.cache.data.filterDefaults),  // Reset to defaults
-        isCustom: true,  // All layouts are custom (position-based)
-        query: undefined,  // No query
+        layoutType: result.templateType, // remember origin type for re-layout default
+        positions: new Map(), // Will be filled after layout
+        filters: structuredClone(this.cache.data.filterDefaults), // Reset to defaults
+        isCustom: true, // All layouts are custom (position-based)
+        query: undefined, // No query
         hideDisconnectedNodes: false,
         // Start with default styles
         nodeStyles: new Map(),
@@ -302,7 +306,10 @@ class GraphLayoutManager {
       document.getElementById('selectView').value = result.name;
       this.cache.data.selectedLayout = result.name;
 
-      await this.cache.ui.showLoading("Creating Workspace", `Applying ${result.templateType} layout`);
+      await this.cache.ui.showLoading(
+        'Creating Workspace',
+        `Applying ${result.templateType} layout`
+      );
       // Pin the overlay up across the whole creation so the inner render's
       // #postRefresh hideLoading() can't drop it while the layout (possibly an
       // expensive off-thread worker), bubble-sync and hide-disconnected are
@@ -349,7 +356,10 @@ class GraphLayoutManager {
       // drops the overlay and clears pendingLayoutTransition.
       try {
         // Apply the layout algorithm once
-        await this.cache.graph.setLayout({type: result.templateType, ...this.cache.DEFAULTS.LAYOUT_INTERNALS[result.templateType]});
+        await this.cache.graph.setLayout({
+          type: result.templateType,
+          ...this.cache.DEFAULTS.LAYOUT_INTERNALS[result.templateType],
+        });
         await this.cache.graph.layout();
 
         // Persist the positions so they're stored permanently
@@ -392,7 +402,9 @@ class GraphLayoutManager {
         // Tween the new layout in from the outgoing positions, once the overlay
         // has cleared (no-op when there was nothing on screen to animate from).
         if (animateNewWorkspace) {
-          await this.cache.graph.runLayoutTransition(this.cache.data.layouts[result.name].positions);
+          await this.cache.graph.runLayoutTransition(
+            this.cache.data.layouts[result.name].positions
+          );
         }
 
         this.cache.ui.info(`Created Workspace: ${result.name} (${result.templateType})`);
@@ -408,19 +420,21 @@ class GraphLayoutManager {
 
   async removeSelectedLayout() {
     // Protect the "Default" layout from deletion
-    if (this.cache.data.selectedLayout === "Default") {
-      this.cache.ui.error("Cannot delete the Default workspace.");
+    if (this.cache.data.selectedLayout === 'Default') {
+      this.cache.ui.error('Cannot delete the Default workspace.');
       return;
     }
 
-    const confirmed = await Popup.confirm(`Are you sure you want to delete view "${this.cache.data.selectedLayout}"?`);
+    const confirmed = await Popup.confirm(
+      `Are you sure you want to delete view "${this.cache.data.selectedLayout}"?`
+    );
     if (!confirmed) return false;
 
     delete this.cache.data.layouts[this.cache.data.selectedLayout];
     this.cache.uiComponents.buildDropdownOptions();
 
     // Switch back to Default layout after deletion
-    document.getElementById('selectView').value = "Default";
+    document.getElementById('selectView').value = 'Default';
     await this.changeLayout();
   }
 
@@ -438,110 +452,31 @@ class GraphLayoutManager {
       }
     }
 
-    async function arrangeNodesInCircle(radius) {
-      const numNodes = cache.selectedNodes.length;
-      let angleStep = (2 * Math.PI) / numNodes;
-
-      let i = 0;
-      for (const node of await cache.sm.getSelectedNodes()) {
-        const angle = i * angleStep;
-        node.style.x = origAvgX + radius * Math.cos(angle);
-        node.style.y = origAvgY + radius * Math.sin(angle);
-        i++;
-      }
-    }
-
-    async function applyForceLayout(iterations) {
-      // -----------------------------
-      // Updated parameters
-      // -----------------------------
-      const INITIAL_TEMPERATURE = 2.0;     // Starting "temperature" for the cooling factor
-      const COOLING_FACTOR = 0.98;    // Slower cooling to allow more spreading
-      const GRAVITY_STRENGTH = 0.00001; // Reduced gravity so nodes aren't pulled too close
-      const MAX_DISPLACEMENT = 50;      // Higher limit on movement per iteration or remove if needed
-
-      const REPULSION = 20000;        // Strong repulsion to push nodes apart
-      const SPRING_LENGTH = 300;         // Ideal distance between connected nodes
-      const SPRING_STRENGTH = 0.005;        // Reduced tension to allow more space
-
-      // -----------------------------
-      // Larger initial placement range
-      // -----------------------------
+    // circle/force/random delegate to graphology layouts run on a throwaway
+    // subgraph of the selection, then recentered on the selection's original
+    // centroid. Replaces the former hand-rolled circle/physics/scatter geometry.
+    async function applySubgraphLayout(type) {
       const nodes = await cache.sm.getSelectedNodes();
+      if (nodes.length === 0) return;
+
+      const selectedIds = new Set(nodes.map((n) => n.id));
+      const edges = (await cache.graph.getEdgeData())
+        .filter((e) => selectedIds.has(e.source) && selectedIds.has(e.target))
+        .map((e) => ({ source: e.source, target: e.target }));
+
+      const positions = layoutSelectionSubgraph(
+        nodes.map((n) => ({ id: n.id, x: n.style.x, y: n.style.y, size: n.style.size })),
+        edges,
+        type,
+        { x: origAvgX, y: origAvgY }
+      );
+
       for (const node of nodes) {
-        node.style.x = Math.random() * 1000 - 500;  // Range: [-500, 500]
-        node.style.y = Math.random() * 1000 - 500;  // Range: [-500, 500]
-      }
-
-      // -----------------------------
-      // Main iteration
-      // -----------------------------
-      let temperature = INITIAL_TEMPERATURE;
-      for (let i = 0; i < iterations; i++) {
-        // 1) Repulsion between every pair of nodes
-        for (let a = 0; a < nodes.length; a++) {
-          for (let b = a + 1; b < nodes.length; b++) {
-            const dx = nodes[b].style.x - nodes[a].style.x;
-            const dy = nodes[b].style.y - nodes[a].style.y;
-            const dist = Math.sqrt(dx * dx + dy * dy) + 0.01; // Avoid dividing by zero
-
-            const force = REPULSION / (dist * dist); // 1 / distance^2
-            const fx = force * (dx / dist);
-            const fy = force * (dy / dist);
-
-            // Apply forces (scaled by temperature)
-            nodes[a].style.x -= fx * temperature;
-            nodes[a].style.y -= fy * temperature;
-            nodes[b].style.x += fx * temperature;
-            nodes[b].style.y += fy * temperature;
-          }
+        const pos = positions.get(node.id);
+        if (pos) {
+          node.style.x = pos.x;
+          node.style.y = pos.y;
         }
-
-        // 2) Spring forces (edges)
-        for (const edge of await cache.graph.getEdgeData()) {
-          const {source, target} = edge;
-          if (cache.selectedNodes.includes(source) && cache.selectedNodes.includes(target)) {
-            const nodeA = nodes.find((n) => n.id === source);
-            const nodeB = nodes.find((n) => n.id === target);
-            if (nodeA && nodeB) {
-              const dx = nodeB.style.x - nodeA.style.x;
-              const dy = nodeB.style.y - nodeA.style.y;
-              const dist = Math.sqrt(dx * dx + dy * dy) + 0.01;
-
-              // (currentDistance - idealDistance)
-              const force = (dist - SPRING_LENGTH) * SPRING_STRENGTH;
-              const fx = force * (dx / dist);
-              const fy = force * (dy / dist);
-
-              // Apply (scaled by temperature)
-              nodeA.style.x += fx * temperature;
-              nodeA.style.y += fy * temperature;
-              nodeB.style.x -= fx * temperature;
-              nodeB.style.y -= fy * temperature;
-            }
-          }
-        }
-
-        // 3) Gravity / Centering
-        // With reduced gravity, nodes won't cluster too tightly
-        for (const node of nodes) {
-          node.style.x += -node.style.x * GRAVITY_STRENGTH * temperature;
-          node.style.y += -node.style.y * GRAVITY_STRENGTH * temperature;
-        }
-
-        // 4) Limit maximum displacement (optional)
-        // Increase or remove if you don't want clamping
-        for (const node of nodes) {
-          const dist = Math.sqrt(node.style.x * node.style.x + node.style.y * node.style.y);
-          if (dist > MAX_DISPLACEMENT) {
-            const ratio = MAX_DISPLACEMENT / dist;
-            node.style.x *= ratio;
-            node.style.y *= ratio;
-          }
-        }
-
-        // 5) Cool down temperature for next iteration
-        temperature *= COOLING_FACTOR;
       }
     }
 
@@ -569,110 +504,46 @@ class GraphLayoutManager {
       }
     }
 
-    async function applyRandomLayout() {
-      const nodes = await cache.sm.getSelectedNodes();
-      if (nodes.length < 2) return;
-
-      // ALWAYS use the fixed original bounding‐box:
-      const centerX = origCenterX;
-      const centerY = origCenterY;
-      const width = origWidth;
-      const height = origHeight;
-
-      // If you really want rotation (see note below), be aware a rotated
-      // rectangle has a larger AABB—but we’re not recomputing the AABB,
-      // so the outer box stays fixed at origWidth × origHeight.
-      const angle = Math.random() * 2 * Math.PI;
-
-      // Pick two anchors to go to two opposite corners of the ROTATED rectangle
-      // (but the *axis‐aligned* bounding-box of that rotated rectangle is still
-      // held “virtually” at origWidth×origHeight; we do not “re‐read” min/max from it).
-      const [anchor1, anchor2] = getRandomElements(nodes, 2);
-
-      // Rotate those two anchors to the “corners” of a width×height box at random angle:
-      // corner1 ( +width/2, +height/2 ) after rotation; corner2 ( -width/2, -height/2 ).
-      anchor1.style.x = centerX + (width / 2) * Math.cos(angle) - (height / 2) * Math.sin(angle);
-      anchor1.style.y = centerY + (width / 2) * Math.sin(angle) + (height / 2) * Math.cos(angle);
-
-      anchor2.style.x = centerX - (width / 2) * Math.cos(angle) + (height / 2) * Math.sin(angle);
-      anchor2.style.y = centerY - (width / 2) * Math.sin(angle) - (height / 2) * Math.cos(angle);
-
-      // Now scatter the rest uniformly inside that same rotated box:
-      for (const node of nodes) {
-        if (node === anchor1 || node === anchor2) continue;
-
-        // pick a random (u,v) in [–0.5..+0.5] × [–0.5..+0.5]
-        const u = Math.random() - 0.5;
-        const v = Math.random() - 0.5;
-
-        // scale to [–width/2..+width/2], [–height/2..+height/2]
-        const dx = u * width;
-        const dy = v * height;
-
-        // rotate (dx,dy) around origin by “angle”
-        node.style.x = centerX + dx * Math.cos(angle) - dy * Math.sin(angle);
-        node.style.y = centerY + dx * Math.sin(angle) + dy * Math.cos(angle);
-      }
-    }
-
-    function getRandomElements(array, n) {
-      const shuffled = [...array];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-      }
-      return shuffled.slice(0, n);
-    }
-
     const sel = await cache.sm.getSelectedNodes();
     if (sel.length == 0) return;
 
-    const coords = sel.map(n => ({x: n.style.x, y: n.style.y}));
+    const coords = sel.map((n) => ({ x: n.style.x, y: n.style.y }));
 
     const origAvgX = coords.reduce((sum, pos) => sum + pos.x, 0) / coords.length;
     const origAvgY = coords.reduce((sum, pos) => sum + pos.y, 0) / coords.length;
-    const origMinX = Math.min(...coords.map((pos) => pos.x));
-    const origMaxX = Math.max(...coords.map((pos) => pos.x));
-    const origMinY = Math.min(...coords.map((pos) => pos.y));
-    const origMaxY = Math.max(...coords.map((pos) => pos.y));
-
-    const origCenterX = (origMinX + origMaxX) / 2;
-    const origCenterY = (origMinY + origMaxY) / 2;
-    const origWidth = origMaxX - origMinX;
-    const origHeight = origMaxY - origMinY;
-
 
     const eventLabels = {
-      "shrink": "Shrink selected nodes toward their center",
-      "expand": "Expand selected nodes outward from their center",
-      "circle": "Arrange selected nodes evenly in a circular layout",
-      "force": "Apply a force-directed layout to selected nodes",
-      "grid": "Align selected nodes in a uniform grid layout",
-      "random": "Distribute selected nodes randomly while preserving the original layout bounds"
+      shrink: 'Shrink selected nodes toward their center',
+      expand: 'Expand selected nodes outward from their center',
+      circle: 'Arrange selected nodes evenly in a circular layout',
+      force: 'Apply a force-directed layout to selected nodes',
+      grid: 'Align selected nodes in a uniform grid layout',
+      random: 'Distribute selected nodes randomly around their center',
     };
 
     const layoutActions = {
-      "shrink": () => groupOrSpreadSelectedNodes(0.5),
-      "expand": () => groupOrSpreadSelectedNodes(2),
-      "circle": () => arrangeNodesInCircle(100),
-      "force": () => applyForceLayout(150),
-      "grid": () => applyGridLayout(),
-      "random": () => applyRandomLayout(),
-    }
+      shrink: () => groupOrSpreadSelectedNodes(0.5),
+      expand: () => groupOrSpreadSelectedNodes(2),
+      circle: () => applySubgraphLayout('circular'),
+      force: () => applySubgraphLayout('force'),
+      grid: () => applyGridLayout(),
+      random: () => applySubgraphLayout('random'),
+    };
 
     await layoutActions[action]();
-    await this.persistNodePositions();
 
-    // Push new positions to G6 — without this, mutated node.style.x/y on cached
-    // refs don't reach the graph's internal data store, so the layout only
-    // becomes visible once the selection state changes and forces a re-read.
-    const movedNodes = await cache.sm.getSelectedNodes();
-    if (movedNodes.length > 0) {
+    // Push the freshly mutated positions to the graph BEFORE anything reads it
+    // back. getNodeData() (used by persistNodePositions) re-syncs nodeRef.style
+    // from graphology, so persisting first would clobber these positions with
+    // the pre-layout ones — that bug made every Arrange button a silent no-op.
+    // `sel` holds the same node refs the layout fns just mutated.
+    if (sel.length > 0) {
       await this.cache.graph.updateNodeData(
-        movedNodes.map(n => ({id: n.id, style: {x: n.style.x, y: n.style.y}}))
+        sel.map((n) => ({ id: n.id, style: { x: n.style.x, y: n.style.y } }))
       );
     }
 
+    await this.persistNodePositions();
     await this.handleLayoutChangeLoadingEvent(action, eventLabels[action]);
   }
 
@@ -692,8 +563,10 @@ class GraphLayoutManager {
     if (!graph || graph.order < 2) return;
     applyNoverlap(graph);
     await this.persistNodePositions();
-    await this.handleLayoutChangeLoadingEvent("Remove overlaps",
-      "Spread overlapping nodes apart minimally");
+    await this.handleLayoutChangeLoadingEvent(
+      'Remove overlaps',
+      'Spread overlapping nodes apart minimally'
+    );
   }
 
   /**
@@ -722,13 +595,13 @@ class GraphLayoutManager {
       warningThreshold: this.cache.DEFAULTS.LAYOUT_NODE_WARNING_THRESHOLD,
     });
     if (!result) {
-      this.cache.ui.info("Re-layout canceled");
+      this.cache.ui.info('Re-layout canceled');
       return;
     }
 
     const layoutType = result.templateType;
 
-    await this.cache.ui.showLoading("Re-layouting Workspace", `Applying ${layoutType} layout`);
+    await this.cache.ui.showLoading('Re-layouting Workspace', `Applying ${layoutType} layout`);
     // Pin the overlay up across the whole re-layout so the inner render's
     // hideLoading() can't drop it while the layout (possibly an expensive
     // off-thread worker) and bubble-sync are still running. Released right
@@ -740,12 +613,15 @@ class GraphLayoutManager {
     const fromPositions = new Map();
     this.cache.graphData?.forEachNode((id, attrs) => {
       if (Number.isFinite(attrs.x) && Number.isFinite(attrs.y)) {
-        fromPositions.set(id, {x: attrs.x, y: attrs.y});
+        fromPositions.set(id, { x: attrs.x, y: attrs.y });
       }
     });
 
     try {
-      await this.cache.graph.setLayout({type: layoutType, ...this.cache.DEFAULTS.LAYOUT_INTERNALS[layoutType]});
+      await this.cache.graph.setLayout({
+        type: layoutType,
+        ...this.cache.DEFAULTS.LAYOUT_INTERNALS[layoutType],
+      });
       await this.cache.graph.layout();
 
       // Remember the chosen type so the next re-layout (and reload) defaults to it.
@@ -761,7 +637,7 @@ class GraphLayoutManager {
       if (animate) {
         for (const [id, p] of fromPositions) {
           if (this.cache.graphData.hasNode(id)) {
-            this.cache.graphData.mergeNodeAttributes(id, {x: p.x, y: p.y});
+            this.cache.graphData.mergeNodeAttributes(id, { x: p.x, y: p.y });
           }
         }
         this.cache.graph.pendingLayoutTransition = true;
@@ -800,8 +676,8 @@ class GraphLayoutManager {
         id: node.id,
         style: {
           x: node.style.x,
-          y: node.style.y
-        }
+          y: node.style.y,
+        },
       });
     }
     return posCopy;
@@ -814,19 +690,21 @@ class GraphLayoutManager {
   }
 
   async persistNodePositions() {
-    this.cache.ui.debug("PERSISTING NODE POSITIONS ..");
+    this.cache.ui.debug('PERSISTING NODE POSITIONS ..');
     for (const node of await this.cache.graph.getNodeData()) {
-      this.cache.data.layouts[this.cache.data.selectedLayout].positions.set(node.id, {style: {x: node.style.x, y: node.style.y}});
+      this.cache.data.layouts[this.cache.data.selectedLayout].positions.set(node.id, {
+        style: { x: node.style.x, y: node.style.y },
+      });
     }
   }
 
   createDefaultLayout(key, overridePositionsFromExcel = false) {
     const defLayout = {
-      layoutType: key,  // Store layout algorithm type for initial render only
+      layoutType: key, // Store layout algorithm type for initial render only
       internals: null,
       positions: new Map(),
       filters: structuredClone(this.cache.data.filterDefaults),
-      isCustom: true,  // All layouts are position-based
+      isCustom: true, // All layouts are position-based
       query: undefined,
       hideDisconnectedNodes: false,
       // Per-view styles
@@ -838,7 +716,7 @@ class GraphLayoutManager {
     if (overridePositionsFromExcel) {
       // applies given coordinates from Excel template; remaining positions will be force layouted
       for (const [nodeID, positions] of this.cache.nodePositionsFromExcelImport) {
-        defLayout.positions.set(nodeID, {style: {x: positions.x, y: positions.y}});
+        defLayout.positions.set(nodeID, { style: { x: positions.x, y: positions.y } });
       }
       defLayout.layoutType = this.cache.DEFAULTS.LAYOUT;
     }
@@ -852,7 +730,9 @@ class GraphLayoutManager {
 
   async nodePositionsAreInSync() {
     for (const node of await this.cache.graph.getNodeData()) {
-      const existing = this.cache.data.layouts[this.cache.data.selectedLayout].positions?.get(node.id);
+      const existing = this.cache.data.layouts[this.cache.data.selectedLayout].positions?.get(
+        node.id
+      );
       if (!existing) continue;
       if (node.style.x !== existing.style.x || node.style.y !== existing.style.y) {
         return false;
@@ -862,4 +742,4 @@ class GraphLayoutManager {
   }
 }
 
-export {GraphLayoutManager}
+export { GraphLayoutManager };
