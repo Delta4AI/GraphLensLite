@@ -34,18 +34,18 @@
  * ≤ MAX_RESOLUTION² offscreen; fine at the app's typical graph sizes, the
  * knob to lower on huge graphs is DEFAULTS.HEATMAP.MAX_RESOLUTION.
  */
-import { DEFAULTS } from "../config.js";
-import { currentTheme } from "../utilities/theme.js";
-import { positionsChecksum } from "./bubble_geometry.js";
+import { DEFAULTS } from '../config.js';
+import { currentTheme } from '../utilities/theme.js';
+import { positionsChecksum } from './bubble_geometry.js';
 import {
   graphBBox,
   splatTransform,
   heatBandwidth,
   buildRampLut,
   applyRampToAlpha,
-} from "./heatmap_geometry.js";
+} from './heatmap_geometry.js';
 
-const LAYER_NAME = "heatmap";
+const LAYER_NAME = 'heatmap';
 
 /** Initial runtime settings, copied from config (see header comment). */
 function defaultSettings() {
@@ -63,7 +63,7 @@ function defaultSettings() {
 /** Theme-resolved stops for a preset name; unknown names fall back to default. */
 function rampStopsFor(ramp, theme) {
   const preset = DEFAULTS.HEATMAP.RAMPS[ramp] ?? DEFAULTS.HEATMAP.RAMPS.default;
-  return theme === "dark" ? preset.dark : preset.light;
+  return theme === 'dark' ? preset.dark : preset.light;
 }
 
 class HeatmapLayer {
@@ -88,14 +88,14 @@ class HeatmapLayer {
 
     const sigma = adapter.sigma;
     sigma.createCanvasContext(LAYER_NAME, {
-      beforeLayer: "edges",
-      style: { pointerEvents: "none" },
+      beforeLayer: 'edges',
+      style: { pointerEvents: 'none' },
     });
     this.canvas = sigma.getCanvases()[LAYER_NAME];
-    this.ctx = this.canvas.getContext("2d");
+    this.ctx = this.canvas.getContext('2d');
 
     this.renderHandler = () => this.scheduleRedraw();
-    sigma.on("afterRender", this.renderHandler);
+    sigma.on('afterRender', this.renderHandler);
   }
 
   /** @param {boolean} enabled */
@@ -122,9 +122,9 @@ class HeatmapLayer {
     const next = { ...this.settings };
     for (const [key, value] of Object.entries(partial)) {
       if (!(key in next)) continue;
-      if (key === "dimGraph") next.dimGraph = !!value;
-      else if (key === "ramp") {
-        if (typeof value === "string" && value in DEFAULTS.HEATMAP.RAMPS) next.ramp = value;
+      if (key === 'dimGraph') next.dimGraph = !!value;
+      else if (key === 'ramp') {
+        if (typeof value === 'string' && value in DEFAULTS.HEATMAP.RAMPS) next.ramp = value;
       } else if (Number.isFinite(value)) next[key] = value;
     }
     this.settings = next;
@@ -144,7 +144,7 @@ class HeatmapLayer {
     if (this.killed) return;
     this.killed = true;
     if (this.rafHandle !== null) cancelAnimationFrame(this.rafHandle);
-    this.adapter.sigma.off("afterRender", this.renderHandler);
+    this.adapter.sigma.off('afterRender', this.renderHandler);
     // sigma.kill() may or may not remove custom layer canvases; remove() on
     // an already-detached node is a no-op, so drop ours defensively.
     this.canvas?.remove();
@@ -229,6 +229,13 @@ class HeatmapLayer {
       this.canvas.width = width * dpr;
       this.canvas.height = height * dpr;
     }
+    // Own the CSS display size too (see bubble_layer.js #prepareCanvas): sigma
+    // never sets element.style width/height on a custom canvas created after its
+    // construction-time resize, so without this the field displays at its
+    // backing-store size (dpr* too large on a >1 DPR monitor) until a panel
+    // toggle forces a real sigma resize.
+    if (this.canvas.style.width !== `${width}px`) this.canvas.style.width = `${width}px`;
+    if (this.canvas.style.height !== `${height}px`) this.canvas.style.height = `${height}px`;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.clearRect(0, 0, width, height);
   }
@@ -275,10 +282,10 @@ class HeatmapLayer {
       return;
     }
     const transform = splatTransform(bbox, bandwidth, DEFAULTS.HEATMAP.MAX_RESOLUTION);
-    const off = document.createElement("canvas");
+    const off = document.createElement('canvas');
     off.width = transform.width;
     off.height = transform.height;
-    const offCtx = off.getContext("2d", { willReadFrequently: true });
+    const offCtx = off.getContext('2d', { willReadFrequently: true });
 
     // One alpha-only sprite stamped per node beats N radial-gradient fills.
     const radiusPx = Math.max(1, bandwidth * transform.scale);
@@ -288,7 +295,7 @@ class HeatmapLayer {
       offCtx.drawImage(
         sprite,
         (p.x - transform.offsetX) * transform.scale - half,
-        (p.y - transform.offsetY) * transform.scale - half,
+        (p.y - transform.offsetY) * transform.scale - half
       );
     }
 
@@ -298,9 +305,14 @@ class HeatmapLayer {
     // the contract explicit at this call site.
     const image = offCtx.getImageData(0, 0, transform.width, transform.height);
     offCtx.putImageData(
-      applyRampToAlpha(image, this.#rampLut(rampStops), this.settings.gamma, this.settings.threshold),
+      applyRampToAlpha(
+        image,
+        this.#rampLut(rampStops),
+        this.settings.gamma,
+        this.settings.threshold
+      ),
       0,
-      0,
+      0
     );
     this.heatCache = { key, canvas: off, transform };
   }
@@ -308,14 +320,14 @@ class HeatmapLayer {
   /** Radial alpha falloff sprite: settings.intensity at center → 0 at radius. */
   #buildSplatSprite(radiusPx) {
     const size = Math.max(2, Math.ceil(radiusPx * 2));
-    const sprite = document.createElement("canvas");
+    const sprite = document.createElement('canvas');
     sprite.width = size;
     sprite.height = size;
-    const ctx = sprite.getContext("2d");
+    const ctx = sprite.getContext('2d');
     const c = size / 2;
     const gradient = ctx.createRadialGradient(c, c, 0, c, c, radiusPx);
     gradient.addColorStop(0, `rgba(0, 0, 0, ${this.settings.intensity})`);
-    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, size, size);
     return sprite;

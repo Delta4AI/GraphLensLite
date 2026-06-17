@@ -23,7 +23,7 @@ const BOWTIE = [{ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 10, y: 0 }, { x: 0, y: 10
 function makeSigma(camera) {
   const handlers = new Map();
   const ctx = new Proxy({}, { get: () => () => {} });
-  const canvas = { width: 0, height: 0, getContext: () => ctx, remove: () => {} };
+  const canvas = { width: 0, height: 0, style: {}, getContext: () => ctx, remove: () => {} };
   const sigma = {
     pixelRatio: 1,
     createCanvasContext: () => sigma,

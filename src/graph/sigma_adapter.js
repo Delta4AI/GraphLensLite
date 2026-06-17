@@ -19,34 +19,35 @@ import {
   edgeCurve,
   animateNodes,
   createNodePiechartProgram,
-} from "../lib/sigma.bundle.mjs";
-import { DEFAULTS } from "../config.js";
+} from '../lib/sigma.bundle.mjs';
+import { DEFAULTS } from '../config.js';
 import {
   EdgeHaloProgram,
   createCurveHaloProgram,
   createEdgeMarkerHeadProgram,
-} from "./edge_programs.js";
+} from './edge_programs.js';
 import {
   clampExportScale,
   MAX_CANVAS_SIDE,
   WEBGL_SAFE_SIDE_FRACTION,
-} from "../utilities/export_scale.js";
-import { webglMaxCanvasSide } from "./webgl_support.js";
-import { buildGraphSvg } from "./export_svg.js";
-import { EdgeFlowProgram, createCurveFlowProgram } from "./edge_flow_programs.js";
-import { FlowAnimator } from "./flow_animator.js";
+} from '../utilities/export_scale.js';
+import { webglMaxCanvasSide } from './webgl_support.js';
+import { buildGraphSvg } from './export_svg.js';
+import { EdgeFlowProgram, createCurveFlowProgram } from './edge_flow_programs.js';
+import { FlowAnimator } from './flow_animator.js';
 import {
   nodeAttributesFromStyle,
   edgeAttributesFromStyle,
   flipY,
   buildLayoutTransitionTargets,
-} from "./graph_model.js";
-import { executeLayout } from "./layout_algorithms.js";
-import { drawNodeLabel, drawEdgeLabel, BAKED_DEFAULT_LABEL_COLOR } from "./label_renderers.js";
-import { InteractionManager } from "./interactions.js";
-import { BubbleSetLayer } from "./bubble_layer.js";
-import { HeatmapLayer } from "./heatmap_layer.js";
-import { Minimap } from "./minimap.js";
+} from './graph_model.js';
+import { executeLayout } from './layout_algorithms.js';
+import { drawNodeLabel, drawEdgeLabel, BAKED_DEFAULT_LABEL_COLOR } from './label_renderers.js';
+import { InteractionManager } from './interactions.js';
+import { BubbleSetLayer } from './bubble_layer.js';
+import { HeatmapLayer } from './heatmap_layer.js';
+import { Minimap } from './minimap.js';
+import { watchDevicePixelRatio } from './dpr_watch.js';
 
 // Rasterization resolution for the SVG shape textures. 512 px keeps shapes
 // crisp at the ~4x zoom the UI allows (risk #1 in MIGRATION.md).
@@ -67,7 +68,7 @@ const LAYOUT_TRANSITION_MAX_NODES = 2000;
 
 /** @returns {boolean} whether the user asked the OS to minimize motion */
 function prefersReducedMotion() {
-  return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
 }
 
 /**
@@ -87,7 +88,7 @@ function guardHoverDrawer(drawer, getDraggedNode) {
   // Defensive: if a future sigma bundle moves the wrapped drawer off the
   // instance/export we read it from, fail to "no hover" instead of throwing
   // inside sigma's render loop (which would swallow the error silently).
-  if (typeof drawer !== "function") return () => {};
+  if (typeof drawer !== 'function') return () => {};
   return (context, data, settings) => {
     if (getDraggedNode()) return;
     // Sigma's drawDiscNodeHover hardcodes a white pill behind the label, so
@@ -97,7 +98,7 @@ function guardHoverDrawer(drawer, getDraggedNode) {
     // (sigma resolves data[attribute] || color).
     drawer(context, data, {
       ...settings,
-      labelColor: { attribute: "labelColor", color: "#000" },
+      labelColor: { attribute: 'labelColor', color: '#000' },
     });
   };
 }
@@ -126,9 +127,9 @@ function guardHoverDrawer(drawer, getDraggedNode) {
  */
 function buildProgramRegistry(getDraggedNode) {
   const shapeProgram = nodeImage.createNodeImageProgram({
-    size: { mode: "force", value: SHAPE_TEXTURE_RESOLUTION },
-    objectFit: "contain",
-    drawingMode: "background",
+    size: { mode: 'force', value: SHAPE_TEXTURE_RESOLUTION },
+    objectFit: 'contain',
+    drawingMode: 'background',
     keepWithinCircle: false,
     padding: 0,
     debounceTimeout: ATLAS_REGEN_DEBOUNCE_MS,
@@ -164,10 +165,10 @@ function buildProgramRegistry(getDraggedNode) {
   const borderCircleProgram = createNodeBorderProgram({
     borders: [
       {
-        size: { attribute: "borderRatio", defaultValue: 0, mode: "relative" },
-        color: { attribute: "borderColor" },
+        size: { attribute: 'borderRatio', defaultValue: 0, mode: 'relative' },
+        color: { attribute: 'borderColor' },
       },
-      { size: { fill: true }, color: { attribute: "color" } },
+      { size: { fill: true }, color: { attribute: 'color' } },
     ],
   });
   // Pie-chart nodes: one program with a fixed slice count, each slice reading
@@ -181,7 +182,7 @@ function buildProgramRegistry(getDraggedNode) {
     defaultColor: pie.DEFAULT_COLOR,
     offset: { value: 0 },
     slices: Array.from({ length: pie.MAX_SLICES }, (_, k) => ({
-      color: { attribute: `pieColor${k}`, defaultValue: "#00000000" },
+      color: { attribute: `pieColor${k}`, defaultValue: '#00000000' },
       value: { attribute: `pieValue${k}` },
     })),
     drawLabel: drawNodeLabel,
@@ -203,7 +204,7 @@ function buildProgramRegistry(getDraggedNode) {
   try {
     curveFlowProgram = createCurveFlowProgram(curveProgram);
   } catch (error) {
-    console.warn("buildProgramRegistry: curve flow overlay disabled:", error);
+    console.warn('buildProgramRegistry: curve flow overlay disabled:', error);
   }
   return {
     nodeProgramClasses: {
@@ -218,8 +219,8 @@ function buildProgramRegistry(getDraggedNode) {
         EdgeHaloProgram,
         EdgeRectangleProgram,
         EdgeFlowProgram,
-        createEdgeMarkerHeadProgram({ extremity: "source" }),
-        createEdgeMarkerHeadProgram({ extremity: "target" }),
+        createEdgeMarkerHeadProgram({ extremity: 'source' }),
+        createEdgeMarkerHeadProgram({ extremity: 'target' }),
       ]),
       curve: curveProgram,
       styledCurve: createEdgeCompoundProgram(
@@ -228,10 +229,10 @@ function buildProgramRegistry(getDraggedNode) {
           curveProgram,
           // Flow overlay rides on the body, marker heads stay crisp on top.
           ...(curveFlowProgram ? [curveFlowProgram] : []),
-          createEdgeMarkerHeadProgram({ extremity: "source", curved: true }),
-          createEdgeMarkerHeadProgram({ extremity: "target", curved: true }),
+          createEdgeMarkerHeadProgram({ extremity: 'source', curved: true }),
+          createEdgeMarkerHeadProgram({ extremity: 'target', curved: true }),
         ],
-        drawCurvedEdgeLabelWithSize,
+        drawCurvedEdgeLabelWithSize
       ),
     },
   };
@@ -240,7 +241,7 @@ function buildProgramRegistry(getDraggedNode) {
 // Curved-edge labels reuse @sigma/edge-curve's drawer, proxying the settings
 // so per-edge labelSize/labelColor (graph_model attrs) are honoured.
 const drawCurvedEdgeLabelBase = edgeCurve.createDrawCurvedEdgeLabel(
-  edgeCurve.DEFAULT_EDGE_CURVE_PROGRAM_OPTIONS,
+  edgeCurve.DEFAULT_EDGE_CURVE_PROGRAM_OPTIONS
 );
 function drawCurvedEdgeLabelWithSize(context, edgeData, sourceData, targetData, settings) {
   // The baked #000000 default counts as "no explicit color" so the
@@ -254,9 +255,7 @@ function drawCurvedEdgeLabelWithSize(context, edgeData, sourceData, targetData, 
       ? {
           ...settings,
           edgeLabelSize: edgeData.labelSize ?? settings.edgeLabelSize,
-          edgeLabelColor: explicitColor
-            ? { color: explicitColor }
-            : settings.edgeLabelColor,
+          edgeLabelColor: explicitColor ? { color: explicitColor } : settings.edgeLabelColor,
         }
       : settings;
   drawCurvedEdgeLabelBase(context, edgeData, sourceData, targetData, effective);
@@ -279,10 +278,10 @@ const MAX_FIT_ZOOM = 4;
  * @returns {() => void} restore
  */
 function overrideDevicePixelRatio(value) {
-  const original = Object.getOwnPropertyDescriptor(window, "devicePixelRatio");
-  Object.defineProperty(window, "devicePixelRatio", { configurable: true, value });
+  const original = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
+  Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value });
   return () => {
-    if (original) Object.defineProperty(window, "devicePixelRatio", original);
+    if (original) Object.defineProperty(window, 'devicePixelRatio', original);
     else delete window.devicePixelRatio;
   };
 }
@@ -302,10 +301,10 @@ const BLANK_PROBE_SIDE = 32;
  * @returns {boolean} true when every sampled pixel has alpha 0
  */
 function bitmapLooksBlank(bitmap) {
-  const probe = document.createElement("canvas");
+  const probe = document.createElement('canvas');
   probe.width = BLANK_PROBE_SIDE;
   probe.height = BLANK_PROBE_SIDE;
-  const ctx = probe.getContext("2d", { willReadFrequently: true });
+  const ctx = probe.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(bitmap, 0, 0, BLANK_PROBE_SIDE, BLANK_PROBE_SIDE);
   const { data } = ctx.getImageData(0, 0, BLANK_PROBE_SIDE, BLANK_PROBE_SIDE);
   for (let i = 3; i < data.length; i += 4) {
@@ -323,7 +322,7 @@ class SigmaAdapter {
   constructor(
     cache,
     container,
-    { nodeReducer, edgeReducer, elementStates, hoverIds = new Set(), settings = {} },
+    { nodeReducer, edgeReducer, elementStates, hoverIds = new Set(), settings = {} }
   ) {
     this.cache = cache;
     this.graph = cache.graphData;
@@ -338,7 +337,7 @@ class SigmaAdapter {
     this.killed = false;
 
     const containerEl =
-      typeof container === "string" ? document.getElementById(container) : container;
+      typeof container === 'string' ? document.getElementById(container) : container;
 
     // Lazy read: this.interactions is assigned AFTER new Sigma(...); the
     // closure only runs per hover render, by which time it exists.
@@ -375,6 +374,19 @@ class SigmaAdapter {
       this.resizeDebounce = setTimeout(() => this.resize(), RESIZE_DEBOUNCE_MS);
     });
     this.resizeObserver.observe(containerEl);
+    // Recover from a device-pixel-ratio change (window dragged to a monitor with
+    // a different DPR). Such a move changes window.devicePixelRatio WITHOUT
+    // changing the container's CSS box, so sigma.resize() refreshes its
+    // pixelRatio but early-returns before re-sizing any canvas — leaving the
+    // WebGL layers at the old backing resolution while the bubble/heatmap
+    // overlays repaint at the new ratio, so groups land misaligned until a
+    // sidebar toggle forces a real resize. Force that resize on every DPR change
+    // (the same recovery the user otherwise triggers manually), then re-render.
+    this.dprWatchCleanup = watchDevicePixelRatio(() => {
+      if (this.killed) return;
+      this.sigma.resize(true);
+      this.sigma.scheduleRender();
+    });
     this.interactions = new InteractionManager(this, cache, hoverIds, containerEl);
     // Created BEFORE BubbleSetLayer on purpose: both register with
     // beforeLayer: "edges", and the earliest-created canvas sits deepest
@@ -406,8 +418,8 @@ class SigmaAdapter {
       nodeLabels = this.graph.someNode((_, attrs) => attrs.label != null);
       edgeLabels = this.graph.someEdge((_, attrs) => attrs.label != null);
     }
-    this.sigma.setSetting("renderLabels", nodeLabels);
-    this.sigma.setSetting("renderEdgeLabels", edgeLabels);
+    this.sigma.setSetting('renderLabels', nodeLabels);
+    this.sigma.setSetting('renderEdgeLabels', edgeLabels);
   }
 
   // ---------------------------------------------------------------- lifecycle
@@ -455,6 +467,7 @@ class SigmaAdapter {
     this.layoutTransitionCancel = null;
     clearTimeout(this.resizeDebounce);
     this.resizeObserver.disconnect();
+    this.dprWatchCleanup?.();
     this.flowAnimator.destroy();
     this.heatmapLayer.destroy();
     this.bubbleLayer.destroy();
@@ -520,7 +533,7 @@ class SigmaAdapter {
     } else if (layout.layoutType) {
       await this.cache.lm.persistNodePositions();
       delete layout.layoutType;
-      this.cache.ui.debug("Initial layout positions persisted");
+      this.cache.ui.debug('Initial layout positions persisted');
     }
   }
 
@@ -586,7 +599,7 @@ class SigmaAdapter {
       // Graphology is y-up; the app model (and everything persisted from it)
       // stays y-down — flip on the way out, mirror of the mapper's flip in.
       ref.style.y = flipY(attrs.y);
-      ref.style.visibility = attrs.hidden ? "hidden" : "visible";
+      ref.style.visibility = attrs.hidden ? 'hidden' : 'visible';
       ref.states = [...(this.elementStates.get(ref.id) ?? [])];
       views.push(ref);
     }
@@ -602,7 +615,7 @@ class SigmaAdapter {
     for (const ref of refs) {
       if (!this.graph.hasEdge(ref.id)) continue;
       const attrs = this.graph.getEdgeAttributes(ref.id);
-      ref.style.visibility = attrs.hidden ? "hidden" : "visible";
+      ref.style.visibility = attrs.hidden ? 'hidden' : 'visible';
       ref.states = [...(this.elementStates.get(ref.id) ?? [])];
       views.push(ref);
     }
@@ -630,7 +643,7 @@ class SigmaAdapter {
    * Triggers the draw choreography (selection UI sync happens there).
    */
   async setElementState(mapOrId, states) {
-    if (typeof mapOrId === "string") {
+    if (typeof mapOrId === 'string') {
       this.#setStates(mapOrId, states ?? []);
     } else {
       for (const [id, elementStates] of Object.entries(mapOrId ?? {})) {
@@ -662,14 +675,14 @@ class SigmaAdapter {
 
   #setHidden(ids, hidden) {
     if (this.killed) return;
-    const visibility = hidden ? "hidden" : "visible";
+    const visibility = hidden ? 'hidden' : 'visible';
     for (const id of Array.isArray(ids) ? ids : [ids]) {
       if (this.graph.hasNode(id)) {
-        this.graph.setNodeAttribute(id, "hidden", hidden);
+        this.graph.setNodeAttribute(id, 'hidden', hidden);
         const ref = this.cache.nodeRef.get(id);
         if (ref) ref.style.visibility = visibility;
       } else if (this.graph.hasEdge(id)) {
-        this.graph.setEdgeAttribute(id, "hidden", hidden);
+        this.graph.setEdgeAttribute(id, 'hidden', hidden);
         const ref = this.cache.edgeRef.get(id);
         if (ref) ref.style.visibility = visibility;
       }
@@ -700,11 +713,11 @@ class SigmaAdapter {
     const spanY = Math.abs(p2.y - p1.y) || 1;
     const scale = Math.max(
       spanX / Math.max(width - 2 * FIT_PADDING_PX, 1),
-      spanY / Math.max(height - 2 * FIT_PADDING_PX, 1),
+      spanY / Math.max(height - 2 * FIT_PADDING_PX, 1)
     );
     const ratio = Math.max(camera.getState().ratio * scale, 1 / MAX_FIT_ZOOM);
     const center = this.sigma.viewportToFramedGraph(
-      this.sigma.graphToViewport({ x: (minX + maxX) / 2, y: (minY + maxY) / 2 }),
+      this.sigma.graphToViewport({ x: (minX + maxX) / 2, y: (minY + maxY) / 2 })
     );
     camera.setState({ x: center.x, y: center.y, ratio });
   }
@@ -812,7 +825,7 @@ class SigmaAdapter {
 
     // Build graph-space targets (y-flipped) only for nodes that still exist.
     const { targets, count } = buildLayoutTransitionTargets(positionsMap, (id) =>
-      this.graph.hasNode(id),
+      this.graph.hasNode(id)
     );
     if (count === 0) return;
 
@@ -833,8 +846,8 @@ class SigmaAdapter {
         this.layoutTransitionCancel = animateNodes(
           this.graph,
           targets,
-          { duration: LAYOUT_TRANSITION_MS, easing: "cubicInOut" },
-          resolve,
+          { duration: LAYOUT_TRANSITION_MS, easing: 'cubicInOut' },
+          resolve
         );
       });
       this.layoutTransitionCancel = null;
@@ -876,7 +889,7 @@ class SigmaAdapter {
    *   plain group key
    */
   getPluginInstance(key) {
-    const group = key.startsWith("bubbleSetPlugin-") ? key.slice("bubbleSetPlugin-".length) : key;
+    const group = key.startsWith('bubbleSetPlugin-') ? key.slice('bubbleSetPlugin-'.length) : key;
     return this.bubbleLayer.getGroupHandle(group);
   }
 
@@ -914,7 +927,7 @@ class SigmaAdapter {
     const probedSide = webglMaxCanvasSide();
     const maxSide = Math.min(
       probedSide != null ? probedSide * WEBGL_SAFE_SIDE_FRACTION : Infinity,
-      MAX_CANVAS_SIDE,
+      MAX_CANVAS_SIDE
     );
     let appliedScale = clampExportScale(scale, dims, dpr, { maxSide });
     const background = this.#stageBackgroundColor();
@@ -931,10 +944,10 @@ class SigmaAdapter {
     }
 
     try {
-      const out = document.createElement("canvas");
+      const out = document.createElement('canvas');
       out.width = sigmaImage.width;
       out.height = sigmaImage.height;
-      const ctx = out.getContext("2d");
+      const ctx = out.getContext('2d');
       // Opaque stage background first: export-image renders sigma transparent,
       // so without this the PNG shows through to whatever the viewer paints
       // behind alpha (which reads as "dark mode" regardless of the theme).
@@ -950,7 +963,7 @@ class SigmaAdapter {
       // Group labels sit above sigma's node labels on screen (their own canvas
       // at afterLayer "labels"); composite them last to keep that z-order.
       this.bubbleLayer.drawExportLabels(ctx, bubbleGroups, dpr * appliedScale);
-      return { url: out.toDataURL("image/png"), requestedScale: scale, appliedScale };
+      return { url: out.toDataURL('image/png'), requestedScale: scale, appliedScale };
     } catch (error) {
       throw new Error(`Graph image export failed: ${error?.message ?? error}`);
     } finally {
@@ -980,7 +993,7 @@ class SigmaAdapter {
     const restoreDpr = scale !== 1 ? overrideDevicePixelRatio(dpr * scale) : null;
     let blob;
     try {
-      blob = await exportImage.toBlob(this.sigma, { format: "png" });
+      blob = await exportImage.toBlob(this.sigma, { format: 'png' });
     } finally {
       restoreDpr?.();
     }
@@ -996,7 +1009,7 @@ class SigmaAdapter {
    */
   toSVG() {
     const dims = this.sigma.getDimensions();
-    const measureCtx = document.createElement("canvas").getContext("2d");
+    const measureCtx = document.createElement('canvas').getContext('2d');
     const measureText = (text, font) => {
       measureCtx.font = font;
       return measureCtx.measureText(text).width;
@@ -1019,13 +1032,13 @@ class SigmaAdapter {
    * @returns {string} a CSS color usable as a 2d fillStyle
    */
   #stageBackgroundColor() {
-    const fallback = "#ffffff";
+    const fallback = '#ffffff';
     try {
       const el = this.sigma.getContainer?.();
-      if (!el || typeof getComputedStyle !== "function") return fallback;
+      if (!el || typeof getComputedStyle !== 'function') return fallback;
       const bg = getComputedStyle(el).backgroundColor;
       // Transparent container → fall back (otherwise we'd re-introduce alpha).
-      if (!bg || bg === "transparent" || bg === "rgba(0, 0, 0, 0)") return fallback;
+      if (!bg || bg === 'transparent' || bg === 'rgba(0, 0, 0, 0)') return fallback;
       return bg;
     } catch {
       return fallback;

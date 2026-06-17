@@ -8,6 +8,7 @@
  * vitest.
  */
 import {
+  Graph,
   circular,
   circlepack,
   random,
@@ -18,8 +19,8 @@ import {
   ConcentricLayout,
   MDSLayout,
   DagreLayout,
-} from "../lib/graphology.bundle.mjs";
-import { LAYOUT_WORKER_SOURCE } from "../lib/layout_worker_source.js";
+} from '../lib/graphology.bundle.mjs';
+import { LAYOUT_WORKER_SOURCE } from '../lib/layout_worker_source.js';
 
 const FORCE_ITERATIONS = 200;
 const GRID_SPACING = 100;
@@ -57,7 +58,7 @@ async function executeForceAnimated(graph, Supervisor) {
   animatingGraphs.add(graph);
   const budgetMs = Math.min(
     FORCE_ANIMATE_MAX_MS,
-    FORCE_ANIMATE_BASE_MS + graph.order * FORCE_ANIMATE_PER_NODE_MS,
+    FORCE_ANIMATE_BASE_MS + graph.order * FORCE_ANIMATE_PER_NODE_MS
   );
   let layout = null;
   try {
@@ -125,7 +126,7 @@ let layoutWorkerUrl = null;
 function defaultLayoutWorkerFactory() {
   if (layoutWorkerUrl === null) {
     const blob = new Blob([LAYOUT_WORKER_SOURCE], {
-      type: "application/javascript",
+      type: 'application/javascript',
     });
     layoutWorkerUrl = URL.createObjectURL(blob);
   }
@@ -157,7 +158,7 @@ async function executeAntvLayoutWorker(graph, type, options, negateY, workerFact
         }
       };
       worker.onerror = (event) => {
-        reject(new Error(event.message || "Layout worker failed"));
+        reject(new Error(event.message || 'Layout worker failed'));
       };
       worker.postMessage({ type, options, nodes, edges });
     });
@@ -190,6 +191,78 @@ export function applyNoverlap(graph) {
 }
 
 /**
+ * Lay out a *subset* of nodes in isolation and recenter the result on a target
+ * point. Used by the "Arrange Selection" tools: build a throwaway graphology
+ * graph from the selection (plus the edges internal to it), run a synchronous
+ * graphology layout, then translate every node so the subset's new centroid
+ * lands on `center`. This reuses the same battle-tested layouts as the
+ * whole-graph path instead of hand-rolled geometry.
+ *
+ * Synchronous on purpose: a selection subgraph is tiny, so the worker-supervised
+ * animated FA2 path (executeBaseLayout) would be pure overhead. y-orientation is
+ * irrelevant — these layouts synthesize fresh positions, and the caller applies
+ * the recentered output directly in app-model (y-down) space.
+ *
+ * @param {Array<{id: string, x?: number, y?: number, size?: number}>} nodes
+ *   selected nodes with their current positions (FA2 seed) and sizes.
+ * @param {Array<{source: string, target: string}>} edges  edges whose endpoints
+ *   are both in the selection (ignored by circular/random, used by force).
+ * @param {"force"|"circular"|"random"} type  layout to apply.
+ * @param {{x: number, y: number}} center  target centroid for the arrangement.
+ * @returns {Map<string, {x: number, y: number}>} id → recentered position.
+ */
+export function layoutSelectionSubgraph(nodes, edges, type, center) {
+  const positions = new Map();
+  if (!nodes?.length) return positions;
+
+  const graph = new Graph();
+  nodes.forEach((node, i) => {
+    if (graph.hasNode(node.id)) return;
+    // Seed from current positions; a tiny per-index offset guarantees distinct
+    // coordinates so FA2 never sees coincident nodes (zero-distance → NaN).
+    graph.addNode(node.id, {
+      x: (Number.isFinite(node.x) ? node.x : 0) + i * 1e-3,
+      y: (Number.isFinite(node.y) ? node.y : 0) + i * 1e-3,
+      size: Number.isFinite(node.size) ? node.size : 1,
+    });
+  });
+  for (const edge of edges ?? []) {
+    if (
+      graph.hasNode(edge.source) &&
+      graph.hasNode(edge.target) &&
+      !graph.hasEdge(edge.source, edge.target)
+    ) {
+      graph.addEdge(edge.source, edge.target);
+    }
+  }
+
+  if (type === 'circular') {
+    circular.assign(graph, { scale: Math.max(100, 12 * Math.sqrt(graph.order)) });
+  } else if (type === 'random') {
+    random.assign(graph, { center: 0, scale: Math.max(200, 24 * Math.sqrt(graph.order)) });
+  } else if (graph.order >= 2) {
+    // 'force' → forceAtlas2 (needs ≥2 nodes for inferSettings).
+    forceAtlas2.assign(graph, {
+      iterations: FORCE_ITERATIONS,
+      settings: forceAtlas2.inferSettings(graph),
+    });
+  }
+
+  let sumX = 0;
+  let sumY = 0;
+  graph.forEachNode((id, attrs) => {
+    sumX += attrs.x;
+    sumY += attrs.y;
+  });
+  const avgX = sumX / graph.order;
+  const avgY = sumY / graph.order;
+  graph.forEachNode((id, attrs) => {
+    positions.set(id, { x: center.x + (attrs.x - avgX), y: center.y + (attrs.y - avgY) });
+  });
+  return positions;
+}
+
+/**
  * Execute a layout spec against a graphology graph, assigning x/y per node.
  * @param {import('graphology').default} graph
  * @param {{type?: string, noverlap?: boolean}|null|undefined} spec  type + the
@@ -211,14 +284,14 @@ export async function executeLayout(graph, spec, testOverrides = {}) {
 /** The pre-post-pass layout dispatch — see executeLayout. */
 async function executeBaseLayout(graph, spec, testOverrides) {
   const { type, ...options } = spec;
-  if (type === "circular") {
+  if (type === 'circular') {
     // graphology's circular ignores the G6-era startRadius/endRadius options.
     circular.assign(graph, {
       scale: Math.max(100, 12 * Math.sqrt(graph.order)),
     });
     return;
   }
-  if (type === "grid") {
+  if (type === 'grid') {
     const cols = Math.ceil(Math.sqrt(graph.order)) || 1;
     let i = 0;
     graph.forEachNode((id) => {
@@ -230,14 +303,14 @@ async function executeBaseLayout(graph, spec, testOverrides) {
     });
     return;
   }
-  if (type === "circlepack") {
+  if (type === 'circlepack') {
     // d3-hierarchy circle packing; each node's circle radius is its `size`
     // attribute (sigma radius, set by graph_model's node mapper). center:0
     // packs the cluster around the origin. Assigns x/y in place.
     circlepack.assign(graph, { center: 0 });
     return;
   }
-  if (type === "random") {
+  if (type === 'random') {
     // Uniform scatter around the origin. center:0 shifts random's [0,scale)
     // range to [-scale/2, scale/2); scale tracks node count so the cloud grows
     // with the graph instead of collapsing toward a point.
@@ -256,7 +329,7 @@ async function executeBaseLayout(graph, spec, testOverrides) {
     // positions, just on-thread.
     const workerFactory =
       testOverrides.LayoutWorkerFactory ??
-      (typeof Worker === "undefined" ? null : defaultLayoutWorkerFactory);
+      (typeof Worker === 'undefined' ? null : defaultLayoutWorkerFactory);
     if (workerFactory) {
       await executeAntvLayoutWorker(graph, type, options, antv.negateY, workerFactory);
     } else {
@@ -268,8 +341,7 @@ async function executeBaseLayout(graph, spec, testOverrides) {
   // Electron renderer) the FA2 worker supervisor animates the layout live;
   // under node (vitest) Worker is undefined → deterministic synchronous path.
   const Supervisor =
-    testOverrides.ForceSupervisor ??
-    (typeof Worker === "undefined" ? null : FA2Layout);
+    testOverrides.ForceSupervisor ?? (typeof Worker === 'undefined' ? null : FA2Layout);
   if (Supervisor) {
     await executeForceAnimated(graph, Supervisor);
     return;
