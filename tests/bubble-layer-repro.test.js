@@ -45,7 +45,7 @@ function makeSigma(camera, dims) {
     set textBaseline(_v) {}, get textBaseline() { return "middle"; },
   };
   const canvas = {
-    width: 0, height: 0,
+    width: 0, height: 0, style: {},
     getContext: () => ctx,
     remove: () => {},
   };
@@ -54,7 +54,7 @@ function makeSigma(camera, dims) {
   const labelTexts = [];
   const labelCtx = { ...ctx, fillText: (t, x, y) => labelTexts.push({ t, x, y }) };
   const labelCanvas = {
-    width: 0, height: 0,
+    width: 0, height: 0, style: {},
     getContext: () => labelCtx,
     remove: () => {},
   };

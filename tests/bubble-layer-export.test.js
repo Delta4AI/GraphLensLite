@@ -48,9 +48,9 @@ function makeRecordingCtx() {
 
 function makeSigma(camera, dims) {
   const ctx = makeRecordingCtx();
-  const canvas = { width: 0, height: 0, getContext: () => ctx, remove: () => {} };
+  const canvas = { width: 0, height: 0, style: {}, getContext: () => ctx, remove: () => {} };
   const labelCtx = makeRecordingCtx();
-  const labelCanvas = { width: 0, height: 0, getContext: () => labelCtx, remove: () => {} };
+  const labelCanvas = { width: 0, height: 0, style: {}, getContext: () => labelCtx, remove: () => {} };
 
   const sigma = {
     pixelRatio: 1,
