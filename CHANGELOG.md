@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.15.1 — 2026-06-17
+
+Saved graph files load unchanged — this release is bug fixes only.
+
+### Fixes
+
+* **Arrange Selection tools now work.** All six tools (shrink/expand/circle/force/grid/random) were silent no-ops: positions were persisted before being pushed to the graph, and the persist path re-synced node state from graphology — clobbering the freshly computed coordinates before they reached the renderer. Positions are now pushed to the graph first, then persisted. The circle/force/random geometry is also rebuilt on graphology layouts (circular/forceAtlas2/random) run over a subgraph of the selection and recentered on the selection centroid, replacing the hand-rolled force sim that drifted toward world-origin.
+* **Bubble and heatmap overlays stay aligned across DPR changes.** Moving the window to a monitor with a different device-pixel-ratio left bubble groups and the heatmap field misaligned until a sidebar toggle forced a resize. A DPR watcher now forces a full sigma resize and re-render on every ratio change, and the overlay canvases own their CSS display size so they stay 1:1 with the WebGL layers regardless of resize timing.
+
 ## 1.15.0 — 2026-06-16
 
 Existing graph files (including version-less JSON saved by 1.14.x) load unchanged — this release adds and replaces functionality without breaking the saved-file format.
