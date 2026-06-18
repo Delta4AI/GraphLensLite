@@ -1,4 +1,5 @@
 import { StaticUtilities } from '../utilities/static.js';
+import { findShortestPath } from './shortest_path.js';
 
 class GraphSelectionManager {
   constructor(cache) {
@@ -291,6 +292,38 @@ class GraphSelectionManager {
     await update();
   }
 
+  /**
+   * Adds the unweighted shortest path between the two currently selected
+   * nodes — its nodes and the edges between them — to the selection. Computed
+   * on the visible subgraph so it honours active filters. Requires exactly two
+   * selected nodes (warns otherwise); reuses updateSelectedState so the path
+   * lights up through the existing selection machinery.
+   */
+  async selectShortestPathBetweenSelected() {
+    if (!this.cache.graph) return;
+
+    const selected = this.cache.selectedNodes;
+    if (selected.length !== 2) {
+      this.cache.ui.warning('Select exactly two nodes to find the shortest path between them.');
+      return;
+    }
+
+    const [source, target] = selected;
+    const { found, nodes, edges } = findShortestPath(this.cache, source, target);
+
+    if (!found) {
+      this.cache.ui.warning('No path connects the two selected nodes in the visible graph.');
+      return;
+    }
+
+    const elemData = [
+      ...nodes.map((id) => this.cache.nodeRef.get(id)),
+      ...edges.map((id) => this.cache.edgeRef.get(id)),
+    ].filter(Boolean);
+
+    await this.updateSelectedState(elemData, true);
+  }
+
   updateSelectionCache() {
     const { selectedNodes, selectedEdges, selectionMemory, selectedMemoryIndex } = this.cache;
 
@@ -383,6 +416,7 @@ class GraphSelectionManager {
       }
     }
     const moreThanOneNodeSelected = selectedNodesCount > 1;
+    const exactlyTwoNodesSelected = selectedNodesCount === 2;
 
     this.cache.ui.toggleStyleElementsThatRequireAtLeastOneSelectedNode(atLeastOneNodeSelected);
     this.cache.ui.toggleStyleElementsThatRequireAtLeastOneSelectedEdge(atLeastOneEdgeSelected);
@@ -390,6 +424,7 @@ class GraphSelectionManager {
       atLeastOneNodeOrEdgeSelected
     );
     this.cache.ui.toggleStyleElementsThatRequireMoreThanOneSelectedNode(moreThanOneNodeSelected);
+    this.cache.ui.toggleStyleElementsThatRequireExactlyTwoSelectedNodes(exactlyTwoNodesSelected);
 
     this.updateSelectionCache();
     this.updateEnabledStateUndoRedoSelectionButtons();
