@@ -150,6 +150,10 @@ class UIManager {
     this.toggleDisabledElements(["Arrange Selection"], enable);
   }
 
+  toggleStyleElementsThatRequireExactlyTwoSelectedNodes(enable) {
+    this.toggleDisabledElements(["Shortest Path"], enable);
+  }
+
   toggleDisabledElements(headingLabels, enable) {
     for (let elemID of headingLabels) {
       const elem = document.getElementById(elemID);

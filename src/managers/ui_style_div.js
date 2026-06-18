@@ -684,6 +684,11 @@ function createStyleDiv(cache) {
       "Remove the outermost layer of selected neighbor nodes (and their edges) from the ",
       async () => await cache.sm.toggleSelectionByNeighbors("reduce-neighbors"));
 
+    const rowShortestPath = createNewRow(selDiv);
+    appendButton(rowShortestPath, "Shortest Path",
+      "Add the shortest path connecting the two selected nodes — its nodes and the edges between them — to the selection.\nComputed on the visible graph, so it honours active filters.\nRequires exactly two selected nodes.",
+      async () => await cache.sm.selectShortestPathBetweenSelected());
+
     appendHorizontalRule(selDiv);
 
     const rowFour = createNewRow(selDiv);

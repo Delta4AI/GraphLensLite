@@ -39,6 +39,7 @@ function makeCache() {
       toggleStyleElementsThatRequireAtLeastOneSelectedEdge: vi.fn(),
       toggleStyleElementsThatRequireAtLeastOneSelectedNodeOrEdge: vi.fn(),
       toggleStyleElementsThatRequireMoreThanOneSelectedNode: vi.fn(),
+      toggleStyleElementsThatRequireExactlyTwoSelectedNodes: vi.fn(),
     },
   };
 }
