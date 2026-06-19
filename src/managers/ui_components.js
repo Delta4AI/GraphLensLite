@@ -941,9 +941,9 @@ class UIComponentManager {
         }
       } else if (dropdown) {
         if (this.cache.CFG.QUERY_BTN_USE_CURRENT_FILTER) {
-          queryFragment = `${propID} IN [${[...dropdown.selectedCategories].join(",")}]`
+          queryFragment = `${propID} IN [${[...dropdown.selectedCategories].map(cat => StaticUtilities.escapeQueryValue(cat)).join(",")}]`
         } else {
-          queryFragment = `${propID} IN [${[...dropdown.categories].join(",")}]`
+          queryFragment = `${propID} IN [${[...dropdown.categories].map(cat => StaticUtilities.escapeQueryValue(cat)).join(",")}]`
         }
       }
 

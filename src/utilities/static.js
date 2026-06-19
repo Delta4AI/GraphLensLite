@@ -146,6 +146,41 @@ class StaticUtilities {
     return propId.split("::");
   }
 
+  // The query DSL uses [ ] , ( ) and \ as grammar. Categorical values can
+  // contain any of these (e.g. free-text "Evidence sample" cells), so they are
+  // backslash-escaped when written into a query string and unescaped when the
+  // query is decoded back into category tokens.
+  static escapeQueryValue(value) {
+    return String(value).replace(/[\\[\],()]/g, "\\$&");
+  }
+
+  static unescapeQueryValue(value) {
+    return String(value).replace(/\\(.)/g, "$1");
+  }
+
+  // Split a category list on unescaped commas only, keeping escape sequences
+  // intact in each token (they are unescaped later, at decode time).
+  static splitQueryList(listStr) {
+    const out = [];
+    let cur = "";
+    for (let i = 0; i < listStr.length; i++) {
+      const ch = listStr[i];
+      if (ch === "\\" && i + 1 < listStr.length) {
+        cur += ch + listStr[i + 1];
+        i++;
+        continue;
+      }
+      if (ch === ",") {
+        out.push(cur);
+        cur = "";
+        continue;
+      }
+      cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
+
   static setsAreEqual(setA, setB) {
     if (setA.size !== setB.size) return false;
     for (let item of setA) {

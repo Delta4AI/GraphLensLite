@@ -2,6 +2,46 @@ import { describe, it, expect } from 'vitest'
 import { StaticUtilities } from '../src/utilities/static.js'
 
 // ==========================================================================
+// Query DSL category escaping — round-trips values containing the grammar
+// characters [ ] , ( ) and \ so categorical filters survive auto-query
+// generation (regression: bracketed values hid the entire graph).
+// ==========================================================================
+
+describe('StaticUtilities query-value escaping', () => {
+  const roundTrip = (v) =>
+    StaticUtilities.unescapeQueryValue(StaticUtilities.escapeQueryValue(v))
+
+  it('escapes every DSL grammar character', () => {
+    expect(StaticUtilities.escapeQueryValue('a[b]c,d(e)f\\g')).toBe(
+      'a\\[b\\]c\\,d\\(e\\)f\\\\g'
+    )
+  })
+
+  it('round-trips bracketed/comma/paren values exactly', () => {
+    for (const v of [
+      'protects [B,12]; located_in [B,4]; binds [B,2]',
+      'Jacob et al. (HES vs saline) effect [PMID 30654825]',
+      'weird \\ backslash, and (paren)',
+      'plain value',
+      '',
+    ]) {
+      expect(roundTrip(v)).toBe(v)
+    }
+  })
+
+  it('splits a category list only on unescaped commas', () => {
+    const escaped = ['protects [B,12]', 'located_in [B,3]']
+      .map((c) => StaticUtilities.escapeQueryValue(c))
+      .join(',')
+    const tokens = StaticUtilities.splitQueryList(escaped)
+    expect(tokens.map((t) => StaticUtilities.unescapeQueryValue(t))).toEqual([
+      'protects [B,12]',
+      'located_in [B,3]',
+    ])
+  })
+})
+
+// ==========================================================================
 // StaticUtilities — pure function unit tests
 // ==========================================================================
 
