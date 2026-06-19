@@ -181,6 +181,24 @@ class StaticUtilities {
     return out;
   }
 
+  // Decide where a dropdown panel should open relative to its anchor: flip
+  // upward when there is more room above than below, and cap the height (with
+  // scroll) to the chosen side so it never spills past the window edge.
+  // Pure function of measured geometry so the flip logic stays unit-testable.
+  static computeDropdownPlacement({anchorRect, dropdownHeight, viewportHeight, margin = 4}) {
+    const spaceBelow = viewportHeight - anchorRect.bottom - margin;
+    const spaceAbove = anchorRect.top - margin;
+    const openUp = dropdownHeight > spaceBelow && spaceAbove > spaceBelow;
+    const available = Math.max(0, openUp ? spaceAbove : spaceBelow);
+    const height = Math.min(dropdownHeight, available);
+    return {
+      openUp,
+      left: anchorRect.left - 3,
+      top: openUp ? anchorRect.top - height : anchorRect.bottom,
+      maxHeight: dropdownHeight > available ? available : null,
+    };
+  }
+
   static setsAreEqual(setA, setB) {
     if (setA.size !== setB.size) return false;
     for (let item of setA) {
