@@ -1,6 +1,6 @@
 {
   "name": "graph-lens-lite",
-  "version": "1.15.1",
+  "version": "1.15.3",
   "main": "src/package/electron_app.js",
   "description": "Visualise and explore property graphs in a lightweight desktop app.",
   "homepage": "https://github.com/Delta4AI/GraphLensLite",
@@ -114,6 +114,7 @@
     "graphology-layout-forceatlas2": "^0.10.1",
     "graphology-layout-noverlap": "^0.4.2",
     "graphology-metrics": "^2.4.0",
+    "graphology-shortest-path": "^2.1.0",
     "marked": "^18.0.2",
     "polygon-clipping": "^0.15.7",
     "sigma": "^3.0.3"

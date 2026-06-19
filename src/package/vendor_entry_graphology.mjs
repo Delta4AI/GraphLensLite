@@ -29,3 +29,6 @@ export {default as diameter} from 'graphology-metrics/graph/diameter.js';
 export {default as modularity} from 'graphology-metrics/graph/modularity.js';
 // Louvain community detection (pure JS, node-safe).
 export {default as louvain} from 'graphology-communities-louvain';
+// Unweighted (BFS) shortest path (pure JS, node-safe). bidirectional finds the
+// shortest hop-count path between two nodes — used by graph/shortest_path.js.
+export {bidirectional} from 'graphology-shortest-path/unweighted';

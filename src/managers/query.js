@@ -236,9 +236,8 @@ class QueryManager {
     );
 
     /* 5-3 Categorical Values (Dropdown): "IN [" up to "]"  --------- */
-    asciiStr = asciiStr.replace(/IN\s*\[([^\]]*?)]/g, (_match, list) => {
-        const encodedCategories = list
-          .split(",")
+    asciiStr = asciiStr.replace(/IN\s*\[((?:\\.|[^\]\\])*)]/g, (_match, list) => {
+        const encodedCategories = StaticUtilities.splitQueryList(list)
           .map(cat => `<span class='q-string' data-encoded>${StaticUtilities.escapeHtml(cat)}</span>`)
           .join(`<span class='q-comma' data-encoded>,</span>`);
 
@@ -408,7 +407,7 @@ class QueryManager {
       for (const [propID, fo] of this.cache.data.layouts[this.cache.data.selectedLayout].filters.entries()) {
         if (fo.active) {
           if (fo.isCategory) {
-            queryEntries.push(`${propID} IN [${[...fo.categories].map(cat => cat).join(",")}]`);
+            queryEntries.push(`${propID} IN [${[...fo.categories].map(cat => StaticUtilities.escapeQueryValue(cat)).join(",")}]`);
           } else if (fo.isInverted) {
             queryEntries.push(`${propID} LOWER THAN ${fo.upperThreshold} OR GREATER THAN ${fo.lowerThreshold}`);
           } else {
@@ -629,7 +628,7 @@ class QueryManager {
       'q-in-cat-bracket-open': () => ({type: 'KW', value: 'IN ['}),
 
       // category strings
-      'q-string': el => ({type: 'STR', value: el.textContent}),
+      'q-string': el => ({type: 'STR', value: StaticUtilities.unescapeQueryValue(el.textContent)}),
 
       // whole property path ("A::B::C")
       'q-property-wrapper': el => {

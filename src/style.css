@@ -3181,6 +3181,10 @@ input:checked + .slider:before {
 
 .dropdown-check-list ul.items {
     position: fixed;
+    /* Include padding+border in the height so the JS max-height cap (which uses
+       the available space) matches the rendered box and the panel never spills
+       over the anchor when a huge list opens upward. */
+    box-sizing: border-box;
     padding: 2px;
     display: none;
     margin: 0 0 0 3px;
