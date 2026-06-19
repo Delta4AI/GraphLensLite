@@ -146,6 +146,59 @@ class StaticUtilities {
     return propId.split("::");
   }
 
+  // The query DSL uses [ ] , ( ) and \ as grammar. Categorical values can
+  // contain any of these (e.g. free-text "Evidence sample" cells), so they are
+  // backslash-escaped when written into a query string and unescaped when the
+  // query is decoded back into category tokens.
+  static escapeQueryValue(value) {
+    return String(value).replace(/[\\[\],()]/g, "\\$&");
+  }
+
+  static unescapeQueryValue(value) {
+    return String(value).replace(/\\(.)/g, "$1");
+  }
+
+  // Split a category list on unescaped commas only, keeping escape sequences
+  // intact in each token (they are unescaped later, at decode time).
+  static splitQueryList(listStr) {
+    const out = [];
+    let cur = "";
+    for (let i = 0; i < listStr.length; i++) {
+      const ch = listStr[i];
+      if (ch === "\\" && i + 1 < listStr.length) {
+        cur += ch + listStr[i + 1];
+        i++;
+        continue;
+      }
+      if (ch === ",") {
+        out.push(cur);
+        cur = "";
+        continue;
+      }
+      cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
+
+  // Decide where a dropdown panel should open relative to its anchor: flip
+  // upward when there is more room above than below, and cap the height (with
+  // scroll) to the chosen side so it never spills past the window edge.
+  // Pure function of measured geometry so the flip logic stays unit-testable.
+  static computeDropdownPlacement({anchorRect, dropdownHeight, viewportHeight, margin = 4}) {
+    const spaceBelow = viewportHeight - anchorRect.bottom - margin;
+    const spaceAbove = anchorRect.top - margin;
+    const openUp = dropdownHeight > spaceBelow && spaceAbove > spaceBelow;
+    const available = Math.max(0, openUp ? spaceAbove : spaceBelow);
+    const height = Math.min(dropdownHeight, available);
+    return {
+      openUp,
+      left: anchorRect.left - 3,
+      top: openUp ? anchorRect.top - height : anchorRect.bottom,
+      maxHeight: dropdownHeight > available ? available : null,
+    };
+  }
+
   static setsAreEqual(setA, setB) {
     if (setA.size !== setB.size) return false;
     for (let item of setA) {

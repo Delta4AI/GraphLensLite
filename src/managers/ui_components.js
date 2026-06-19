@@ -133,17 +133,18 @@ class DropdownChecklist {
       this.itemsList.style.display = "";
       this.itemsList.style.visibility = "";
 
-      const anchorRect = this.anchor.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const availableHeight = viewportHeight - anchorRect.bottom;
+      const {left, top, maxHeight} = StaticUtilities.computeDropdownPlacement({
+        anchorRect: this.anchor.getBoundingClientRect(),
+        dropdownHeight,
+        viewportHeight: window.innerHeight,
+      });
 
-      // Set position of the dropdown
-      this.itemsList.style.top = `${anchorRect.bottom}px`;
-      this.itemsList.style.left = `${anchorRect.left - 3}px`;
+      this.itemsList.style.left = `${left}px`;
+      this.itemsList.style.top = `${top}px`;
 
-      // Make the dropdown scrollable if there's not enough space
-      if (dropdownHeight > availableHeight) {
-        this.itemsList.style.maxHeight = `${availableHeight}px`;
+      // Cap height and scroll only when even the chosen side is too small.
+      if (maxHeight != null) {
+        this.itemsList.style.maxHeight = `${maxHeight}px`;
         this.itemsList.style.overflowY = "auto";
       } else {
         this.itemsList.style.maxHeight = "";
@@ -941,9 +942,9 @@ class UIComponentManager {
         }
       } else if (dropdown) {
         if (this.cache.CFG.QUERY_BTN_USE_CURRENT_FILTER) {
-          queryFragment = `${propID} IN [${[...dropdown.selectedCategories].join(",")}]`
+          queryFragment = `${propID} IN [${[...dropdown.selectedCategories].map(cat => StaticUtilities.escapeQueryValue(cat)).join(",")}]`
         } else {
-          queryFragment = `${propID} IN [${[...dropdown.categories].join(",")}]`
+          queryFragment = `${propID} IN [${[...dropdown.categories].map(cat => StaticUtilities.escapeQueryValue(cat)).join(",")}]`
         }
       }
 

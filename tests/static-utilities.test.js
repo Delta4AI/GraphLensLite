@@ -2,6 +2,90 @@ import { describe, it, expect } from 'vitest'
 import { StaticUtilities } from '../src/utilities/static.js'
 
 // ==========================================================================
+// Query DSL category escaping — round-trips values containing the grammar
+// characters [ ] , ( ) and \ so categorical filters survive auto-query
+// generation (regression: bracketed values hid the entire graph).
+// ==========================================================================
+
+describe('StaticUtilities query-value escaping', () => {
+  const roundTrip = (v) =>
+    StaticUtilities.unescapeQueryValue(StaticUtilities.escapeQueryValue(v))
+
+  it('escapes every DSL grammar character', () => {
+    expect(StaticUtilities.escapeQueryValue('a[b]c,d(e)f\\g')).toBe(
+      'a\\[b\\]c\\,d\\(e\\)f\\\\g'
+    )
+  })
+
+  it('round-trips bracketed/comma/paren values exactly', () => {
+    for (const v of [
+      'protects [B,12]; located_in [B,4]; binds [B,2]',
+      'Jacob et al. (HES vs saline) effect [PMID 30654825]',
+      'weird \\ backslash, and (paren)',
+      'plain value',
+      '',
+    ]) {
+      expect(roundTrip(v)).toBe(v)
+    }
+  })
+
+  it('splits a category list only on unescaped commas', () => {
+    const escaped = ['protects [B,12]', 'located_in [B,3]']
+      .map((c) => StaticUtilities.escapeQueryValue(c))
+      .join(',')
+    const tokens = StaticUtilities.splitQueryList(escaped)
+    expect(tokens.map((t) => StaticUtilities.unescapeQueryValue(t))).toEqual([
+      'protects [B,12]',
+      'located_in [B,3]',
+    ])
+  })
+})
+
+// ==========================================================================
+// Dropdown placement — flips a filter dropdown upward when it would be cut
+// off at the bottom of the window, scrolling only when even the larger side
+// is too small (regression: bottom-of-panel dropdowns were unusable).
+// ==========================================================================
+
+describe('StaticUtilities.computeDropdownPlacement', () => {
+  const rect = (top, bottom, left = 100) => ({ top, bottom, left })
+
+  it('opens below the anchor when there is room', () => {
+    const p = StaticUtilities.computeDropdownPlacement({
+      anchorRect: rect(100, 120),
+      dropdownHeight: 200,
+      viewportHeight: 800,
+    })
+    expect(p.openUp).toBe(false)
+    expect(p.top).toBe(120) // anchor bottom
+    expect(p.left).toBe(97) // anchor left - 3
+    expect(p.maxHeight).toBeNull() // fits, no scroll
+  })
+
+  it('flips upward when the anchor sits near the bottom edge', () => {
+    const p = StaticUtilities.computeDropdownPlacement({
+      anchorRect: rect(560, 580),
+      dropdownHeight: 200,
+      viewportHeight: 600, // only 16px below, 556px above
+    })
+    expect(p.openUp).toBe(true)
+    expect(p.top).toBe(360) // anchorTop(560) - height(200)
+    expect(p.maxHeight).toBeNull() // fits above without scroll
+  })
+
+  it('caps height and scrolls when even the larger side is too small', () => {
+    const p = StaticUtilities.computeDropdownPlacement({
+      anchorRect: rect(300, 320),
+      dropdownHeight: 400,
+      viewportHeight: 600, // below: 276, above: 296 -> flip up, still < 400
+    })
+    expect(p.openUp).toBe(true)
+    expect(p.maxHeight).toBe(296) // spaceAbove - margin
+    expect(p.top).toBe(4) // anchorTop(300) - height(296)
+  })
+})
+
+// ==========================================================================
 // StaticUtilities — pure function unit tests
 // ==========================================================================
 
