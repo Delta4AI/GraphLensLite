@@ -1,76 +1,84 @@
 %%
-%% Journal submission driver.
-%% Shares the body in shared/content.tex with the bioRxiv flavor; only the
-%% preamble differs (sans-serif, super-script numbered citations, flush-left
-%% title block).
+%% Journal submission driver -- Oxford University Press `oup-authoring-template'.
 %%
-\documentclass[12pt,letterpaper]{article}
+%% REQUIRES the OUP template bundle. It ships in recent TeX Live
+%% (oup-authoring-template); if the class is reported missing, copy
+%% oup-authoring-template.cls and the oup-*.bst files from the OUP template
+%% (https://www.overleaf.com/latex/templates/oup-general-template/ybpypwncdxyb)
+%% into this directory, or build on Overleaf (upload this file + ../shared/).
+%%
+%% Frontmatter (title, authors, abstract, keywords) is template-specific and
+%% lives here. The body is the shared single source: shared/body.tex, with the
+%% abstract and keywords injected into the OUP macros from shared/abstract.tex
+%% and shared/keywords.tex (no prose duplicated across flavors).
+%%
+%% Set \journaltitle (and \appnotes) to the target venue at submission time.
+%%
+\documentclass[unnumsec,webpdf,contemporary,large,numbered]{oup-authoring-template}
 
-\usepackage[a4paper, total={7in, 10in}]{geometry}
-\renewcommand{\familydefault}{\sfdefault}
-\usepackage{helvet}
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-
-\usepackage{graphicx}
-\usepackage{hyperref}
-\usepackage{url}
-\usepackage{xcolor}
+% Packages the OUP class does not preload but the shared body needs.
+\usepackage[T1]{fontenc}   % ogonek (K\k{e}ska), eszett (Stra\ss e), etc.
 \usepackage{amsmath,amssymb}
-\usepackage{authblk}
-\usepackage{orcidlink}
 \usepackage{booktabs}
 \usepackage{tabularx}
-\usepackage[super,comma,sort&compress]{natbib}
-\bibliographystyle{numbered}
-\usepackage[right]{lineno}
-\linenumbers
+\usepackage{url}
 
 \graphicspath{{../shared/Fig/}}
 
-% Headings are written as \section*{UPPERCASE}; suppress automatic numbering.
-\setcounter{secnumdepth}{-2}
-
-% Flush-left title block.
-\makeatletter
-\renewcommand{\maketitle}{\bgroup\setlength{\parindent}{0pt}
-\begin{flushleft}
-  \textbf{\@title}\par\medskip
-  \@author
-\end{flushleft}\egroup}
-\makeatother
-
-\title{Graph Lens Lite: An interactive biological network viewer for displaying, exploring, and sharing disease pathobiology and drug mechanism of action models}
-\date{}
-
-\author[1,2,4,*,\orcidlink{0000-0001-6853-8542}]{Matthias Ley}
-\author[1,\orcidlink{0000-0002-4329-1499}]{Kinga K\k{e}ska-Izworska}
-\author[1,\orcidlink{0000-0001-5341-8097}]{Lucas Fillinger}
-\author[1,\orcidlink{0000-0002-6868-5654}]{Samuel M Walter}
-\author[1,\orcidlink{0009-0000-0243-2673}]{Fabio Baumg\"{a}rtel}
-\author[1,2,\orcidlink{0009-0007-7272-5034}]{Enrico Bono}
-\author[1,2,\orcidlink{0009-0008-5176-2802}]{Louiza Galou}
-\author[1,\orcidlink{0009-0003-3492-4017}]{Peter Andorfer}
-\author[3]{Pirmin Hauser}
-\author[3,\orcidlink{0000-0002-7884-9827}]{Johannes Leierer}
-\author[1,2,5,**,\orcidlink{0000-0003-0803-614X}]{Klaus Kratochwill}
-\author[1,3,5,\orcidlink{0000-0003-2087-5691}]{Paul Perco}
-
-\affil[1]{Delta4 GmbH, Alser Stra\ss{}e 23/30, 1080 Vienna, Austria}
-\affil[2]{Division of Pediatric Nephrology and Gastroenterology, Department of Pediatrics and Adolescent Medicine, Comprehensive Center for Pediatrics, Medical University Vienna, Waehringer Guertel 18-20, 1090 Vienna, Austria}
-\affil[3]{Department of Internal Medicine IV, Medical University Innsbruck, Anichstrasse 35, 6020 Innsbruck, Austria}
-\affil[4]{Lead contact}
-\affil[5]{These authors contributed equally}
-\affil[*]{Correspondence: matthias.ley@delta4.ai}
-\affil[**]{Correspondence: klaus.kratochwill@delta4.ai}
+% Line numbers for peer review
+\usepackage[mathlines, switch]{lineno}
+\linenumbers
 
 \begin{document}
 
+\journaltitle{Journal Title}
+\DOI{DOI added during production}
+\copyrightyear{2026}
+\pubyear{2026}
+\vol{00}
+\issue{0}
+\access{Advance Access Publication Date: Day Month Year}
+\appnotes{Paper}
+
+\firstpage{1}
+
+\title[Graph Lens Lite]{Graph Lens Lite: An interactive biological network viewer for displaying, exploring, and sharing disease pathobiology and drug mechanism of action models}
+
+\author[1,2,$\ast$]{Matthias Ley\ORCID{0000-0001-6853-8542}}
+\author[1]{Kinga K\k{e}ska-Izworska\ORCID{0000-0002-4329-1499}}
+\author[1]{Lucas Fillinger\ORCID{0000-0001-5341-8097}}
+\author[1]{Samuel M Walter\ORCID{0000-0002-6868-5654}}
+\author[1]{Fabio Baumg\"{a}rtel\ORCID{0009-0000-0243-2673}}
+\author[1,2]{Enrico Bono\ORCID{0009-0007-7272-5034}}
+\author[1,2]{Louiza Galou\ORCID{0009-0008-5176-2802}}
+\author[1]{Peter Andorfer\ORCID{0009-0003-3492-4017}}
+\author[3]{Pirmin Hauser}
+\author[3]{Johannes Leierer\ORCID{0000-0002-7884-9827}}
+\author[1,2,$\dagger$,$\ast\ast$]{Klaus Kratochwill\ORCID{0000-0003-0803-614X}}
+\author[1,3,$\dagger$]{Paul Perco\ORCID{0000-0003-2087-5691}}
+
+\address[1]{\orgname{Delta4 GmbH}, \orgaddress{\street{Alser Stra\ss{}e 23/30}, \postcode{1080}, \state{Vienna}, \country{Austria}}}
+\address[2]{\orgdiv{Division of Pediatric Nephrology and Gastroenterology, Department of Pediatrics and Adolescent Medicine, Comprehensive Center for Pediatrics}, \orgname{Medical University Vienna}, \orgaddress{\street{Waehringer Guertel 18-20}, \postcode{1090}, \state{Vienna}, \country{Austria}}}
+\address[3]{\orgdiv{Department of Internal Medicine IV}, \orgname{Medical University Innsbruck}, \orgaddress{\street{Anichstrasse 35}, \postcode{6020}, \state{Innsbruck}, \country{Austria}}}
+
+\corresp[$\ast$]{Corresponding author. \href{mailto:matthias.ley@delta4.ai}{matthias.ley@delta4.ai}}
+\corresp[$\ast\ast$]{Correspondence may also be addressed to \href{mailto:klaus.kratochwill@delta4.ai}{klaus.kratochwill@delta4.ai}}
+\corresp[$\dagger$]{These authors contributed equally.}
+
+\received{Date}{0}{Year}
+\revised{Date}{0}{Year}
+\accepted{Date}{0}{Year}
+
+\abstract{\input{../shared/abstract}}
+
+\keywords{\input{../shared/keywords}}
+
 \maketitle
 
-% Shared body
-\input{../shared/content}
+% Shared body (Introduction through Conflict of interest)
+\input{../shared/body}
 
+\bibliographystyle{oup-plain}
 \bibliography{../shared/reference}
 
 \end{document}
