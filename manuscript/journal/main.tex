@@ -1,27 +1,25 @@
-%%
-%% Journal submission driver -- Oxford University Press `oup-authoring-template'.
-%%
-%% REQUIRES the OUP template bundle. It ships in recent TeX Live
-%% (oup-authoring-template); if the class is reported missing, copy
-%% oup-authoring-template.cls and the oup-*.bst files from the OUP template
+%% Template-specific Frontmatter
+%% 
+%% Requires the OUP template bundle (ships in recent TeX Live versions) (oup-authoring-template)
+%% Alternatively, copy oup-authoring-template.cls and the oup-*.bst files from the OUP template
 %% (https://www.overleaf.com/latex/templates/oup-general-template/ybpypwncdxyb)
-%% into this directory, or build on Overleaf (upload this file + ../shared/).
+%% into this directory.
 %%
-%% Frontmatter (title, authors, abstract, keywords) is template-specific and
-%% lives here. The body is the shared single source: shared/body.tex, with the
-%% abstract and keywords injected into the OUP macros from shared/abstract.tex
-%% and shared/keywords.tex (no prose duplicated across flavors).
-%%
-%% Set \journaltitle (and \appnotes) to the target venue at submission time.
-%%
-\documentclass[unnumsec,webpdf,contemporary,large,numbered]{oup-authoring-template}
+%% Shared document bodies: 
+%%   shared/body.tex
+%%   shared/abstract.tex
+%%   shared/keywords.tex
 
-% Packages the OUP class does not preload but the shared body needs.
-\usepackage[T1]{fontenc}   % ogonek (K\k{e}ska), eszett (Stra\ss e), etc.
+\documentclass[unnumsec,webpdf,contemporary,large]{oup-authoring-template}
+
+\usepackage[T1]{fontenc}   % special characters (ȩ, ß)
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{tabularx}
 \usepackage{url}
+
+% Numbered citations in round parentheses, in order of appearance
+\setcitestyle{numbers,round,comma}
 
 \graphicspath{{../shared/Fig/}}
 
@@ -75,10 +73,9 @@
 
 \maketitle
 
-% Shared body (Introduction through Conflict of interest)
 \input{../shared/body}
 
-\bibliographystyle{oup-plain}
+\bibliographystyle{unsrt}
 \bibliography{../shared/reference}
 
 \end{document}
