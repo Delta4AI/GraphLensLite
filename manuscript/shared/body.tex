@@ -126,15 +126,15 @@ The molecular model can subsequently be used to (i) screen for compounds showing
 \section{DISCUSSION}
 Table~\ref{tab:tools} compares GLL against biomedical network exploration tools across their deployment surface (web, desktop, or single-file HTML), offline usability versus server dependency, portability of the exploration state, editability of the underlying data, the presence of a query language for complex filtering, and the availability of an AI assistant.
 
-\begin{table*}[!htbp]
+\begin{table}[!htbp]
 \centering
 \caption{Comparison of selected network analysis and visualization tools for biomedical research. \emph{Single-file HTML}: the entire application is one HTML file that runs locally with no install procedure or server. \emph{Offline-ready}: core functionality works without an external server or third-party API (optional demo data loaders may still require network access). \emph{Portable state}: the complete application state (data, view, filters, layout, and styling) exports and re-imports as a single file. \emph{Data editor}: nodes, edges, and custom properties can be created, edited, and deleted from the GUI. \emph{Query DSL}: a domain-specific query language for complex graph filtering is available. \emph{AI assistant}: built-in assistant powered by a locally hosted open-source model for natural-language interaction. Cells: \checkmark{} present, -- absent.}
 \label{tab:tools}
-\small
-\setlength{\tabcolsep}{6pt}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
 \renewcommand{\arraystretch}{1.1}
 \newcommand{\rh}[1]{\rotatebox[origin=l]{90}{#1}}
-\begin{tabularx}{\textwidth}{@{}X *{8}{>{\centering\arraybackslash}p{1.4cm}}@{}}
+\begin{tabularx}{\columnwidth}{@{}X *{8}{>{\centering\arraybackslash}p{0.55cm}}@{}}
 \toprule
 Tool & \rh{Web} & \rh{Desktop} & \rh{Single-file HTML} & \rh{Offline-ready} & \rh{Portable state} & \rh{Data editor} & \rh{Query DSL} & \rh{AI assistant} \\
 \midrule
@@ -146,17 +146,17 @@ Gephi Lite \citep{jacomyGephiGephilite2025}                      & \checkmark & 
 Graphia \citep{freemanGraphiaPlatformGraphbased2022}             & \checkmark & \checkmark & --         & \checkmark & \checkmark          & \checkmark         & \checkmark\textsuperscript{c}         & --         \\
 OmicsNet 2.0 \citep{zhouOmicsNet20Webbased2022}                  & \checkmark & --         & --         & --         & \checkmark\textsuperscript{d}          & --         & --         & --         \\
 STRING \citep{szklarczykSTRINGDatabase20252025}                  & \checkmark\textsuperscript{e} & --         & --         & --         & \checkmark         & --         & --         & --         \\
-Reactome Pathway Browser \citep{milacicReactomePathwayKnowledgebase2024}		& \checkmark\textsuperscript{e} & -- & -- & -- & \checkmark & -- & -- & -- \\
+Reactome \citep{milacicReactomePathwayKnowledgebase2024}		& \checkmark\textsuperscript{e} & -- & -- & -- & \checkmark & -- & -- & -- \\
   \bottomrule
 \addlinespace[2pt]
-\multicolumn{9}{@{}p{\textwidth}@{}}{\footnotesize
+\multicolumn{9}{@{}p{\columnwidth}@{}}{\scriptsize
 	\textsuperscript{a}Cytoscape offers Lucene full-text search and a GUI filter builder, but no unified query language.\quad
 	\textsuperscript{b}Cytoscape Web supports OpenAI via API key, but no local model.\quad
 	\textsuperscript{c}Graphia's transform GUI is backed by a DSL internally but is not user-queryable.\quad
 	\textsuperscript{d}OmicsNet 2.0 offers JSON export, but re-import was unreliable in our testing.\quad
 	\textsuperscript{e}STRING and Reactome Pathway Browser encode a shareable state in a URL, not a full workspace.\quad}
 \end{tabularx}
-\end{table*}
+\end{table}
 
 GLL is designed for portability with a focus on extensive visual customization. The entire application, together with a graph of average size with about 1,000 nodes, can be packed into an archive of a few megabytes. Unlike comparable tools that may require installation, GLL requires only a web browser for core functionality. Next to platform-independent, self-contained HTML files, GLL is distributed as platform-specific Electron bundles for Windows, macOS, and Linux. This minimal footprint makes GLL suitable for handing over both data and visualization engine in a compact package, enabling collaboration, long-term stability, and offline operation.
 
