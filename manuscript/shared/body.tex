@@ -73,27 +73,20 @@ The main GUI elements are shown in Figure 1.
 \textbf{(13) Graph assistant:} Optional, context-aware AI assistant that answers natural-language questions about the network, translates them into runnable queries, and summarizes the current selection. \\
 
 \subsection{Application usage}
-\subsubsection{Loading data}
 GLL starts by loading network data from spreadsheet files containing node and edge tables (Figure 1.2) or from JSON files. User-supplied properties (coordinates, styling options) are applied where specified. Alternatively, users can fetch demo data from the STRING database. The workspace management panel (Figure 1.3) allows switching between independent environments, each preserving its own aesthetics, layouts, filters, and queries.
 
-\subsubsection{Exploring the network}
 Once loaded, users can explore the network structure through multiple approaches. The selection panel (Figure 1.10) enables element search, selection, expansion to connected neighbors, and tracing the shortest path between two selected nodes on the currently visible network. Metadata for selected node and edge elements appear in specific tooltips (Figure 1.8). For deeper analysis, GLL computes five node-centrality measures (degree \citep{freemanSetMeasuresCentrality1977a}, betweenness \citep{freemanSetMeasuresCentrality1977a}, closeness \citep{bavelasCommunicationPatternsTaskOriented1950a}, eigenvector \citep{newmanMathematicsNetworks2018a} and PageRank \citep{ brinAnatomyLargescaleHypertextual1998a}) together with graph-level statistics including network density and centralization, to identify key nodes (Figure 1.9). Users can select a metric and examine one or more highly ranked nodes, with graph-level statistics displayed in the metric panel. In-app documentation describes each metric's methodology and provides references to relevant literature. The network can be arranged with a range of layout algorithms: live-animating force-directed, hierarchical, circular, radial, concentric, and circle-packing, applied either to a selection or across the entire workspace, with animated transitions between layouts and an optional overlap-removal pass.
 
-\subsubsection{Filtering the network}
 GLL supports network filtering through graphical controls (Figure 1.7), an edit mode for precise numeric input (Figure 1.12), and a query editor for complex, nested operations (Figure 1.5). All interfaces act on the same node and edge properties and are synchronized. The query language is a small, purpose-built domain-specific language (DSL) rather than a free-text search. The editor validates as the user types, highlighting empty clauses, missing connectors, and unmatched brackets. Validation is grounded in the property hierarchy. Valid queries compile to an expression tree evaluated per element, so that single statements drive both filtering and selection while staying consistent with the GUI controls. Contextual help is accessible via an adjacent icon.
 
-\subsubsection{Querying the network via graph assistant}
 GLL integrates an optional, locally hosted, context-aware AI assistant (Figure 1.13), lowering the barrier to exploration by translating questions into instructions, queries and summaries. Each request embeds a snapshot of the current workspace, including node and edge counts, the property hierarchy with data types, active filters, the current query, and the currently selected nodes and edges including their property values and computed network metrics. Responses are grounded in the live graph state. When asked for a query, the assistant constructs a schema-constrained structured query representation based on the loaded graph's properties. Rather than unchecked query text, responses are validated and reference real properties with supported operators, rather than checking only after the fact. Results can be applied to select elements via rendered action buttons, or loaded into the query editor for further refinements.
 
 The assistant communicates with an Ollama server and is local by default, with configuration handled in the panel's settings. Enabling it requires a running Ollama installation and a downloaded instruction-following model capable of reliably creating structured JSON output. Response quality depends on the chosen model. In our testing, \texttt{qwen3.5:9b} produced strong results while running efficiently on consumer-grade graphics processing units (GPUs) \citep{teamQwen35OmniTechnicalReport2026}. Running a local endpoint prevents transmission of potentially sensitive network data to third-party services. A context-budget indicator reports how much of the selected model's context window the next request will consume and warns users when a request would exceed the threshold and be truncated.
 
-\subsubsection{Styling the network}
 The styling panel (Figure 1.11) offers extensive visual customization options for nodes, edges, and groups. Properties such as geometry (shape, size), color (fill, border, line), labels (text, placement, font), and annotations (badges, halos, arrows) can be configured independently for each element type. Edges can additionally render animated directional flow, with selectable flow styles (e.g. comet or chevron), adjustable opacity and density, to express directionality or magnitude. A node-density heatmap can be drawn to highlight dense regions of the layout, with controls for intensity, opacity, radius, contrast, thresholds, and predefined color maps. Up to four bubble sets allow visual grouping of nodes with adjustable appearance, populated manually or automatically through Louvain community detection. Numeric and categorical attributes, whether user-supplied or computed from network metrics, can be dynamically mapped to visual features like color and size to highlight importance. Nodes can be rendered as pie charts that encode several numeric or categorical properties as wedges, adding a data dimension beyond color and size.
 
-\subsubsection{Editing network data}
 GLL includes an integrated data editor (Figure 1.4) for modifying network data in tabular format. Supported operations include column sorting, cell editing, node and edge addition or deletion, table reset, and export to spreadsheet format. Users can also add new columns to define custom properties for nodes or edges, which become immediately available in the filtering and styling interfaces, enabling graph creation and manipulation entirely within the application.
 
-\subsubsection{Exporting results}
 A graph can be exported in GLL's native JSON format or as a high-resolution image (Figure 1.6). JSON exports preserve the complete application state, including views, filters, coordinates, and styling, enabling session restoration and collaborative sharing.
 
 \subsection{Application use cases}
@@ -171,6 +164,27 @@ While the current export/import flow reliably handles GLL's JSON format, support
 
 Keeping GLL's query language and GUI synchronized proved difficult, as nested statements and negotions (AND/NOT) do not map cleanly to graphical controls given the current design. The GUI therefore defaults to an OR logic. When modifying raw queries and applying them to filter the graph, the GUI filtering panel gets locked and flagged with a note that the query takes precedence, with the option to unlock it again by resetting the query to match the GUI's state. Value changes and property selections remain synchronized as the query is edited, but nesting and AND/NOT conditions currently do not.
 
+\section{ACKNOWLEDGEMENTS}
+The authors want to thank all working group members of the EU COST Action Program PerMediK (Personalized Medicine in Chronic Kidney Disease: Improved outcome based on Big Data) for fruitful discussions during the regular COST Action project meetings. Paul Perco and Matthias Ley are members of the EU COST Action Program PerMediK, CA21165.
+
+\section{AUTHOR CONTRIBUTIONS}
+M.L.: conceptualization; resources; software; visualization; writing - original draft, review \& editing. K.K.-I.: data curation; validation; writing - review \& editing. L.F.: validation; writing - review \& editing. S.W.: validation; writing - review \& editing. F.B.: validation; writing - review \& editing. E.B.: validation; writing - review \& editing. L.G.: validation; writing - review \& editing. P.A.: validation; writing - review \& editing. P.H.: data curation; validation; writing - review \& editing. J.L.: data curation; funding acquisition; validation; writing - review \& editing. P.P.: conceptualization; data curation; funding acquisition; supervision; validation; writing - original draft, review \& editing. K.K.: funding acquisition; supervision; validation; writing - review \& editing.
+
+\section{SUPPLEMENTARY DATA}
+\begin{itemize}
+  \item Data S1. ADPKD molecular model input file (spreadsheet) used in the first application use case.
+  \item Data S2. Iguratimod drug mechanism of action model input file (spreadsheet) used in the second application use case.
+\end{itemize}
+
+\section{CONFLICT OF INTEREST STATEMENT}
+K.K. is a co-founder of Delta4 GmbH (Vienna, Austria). M.L., K.K.-I., L.F., S.W., F.B., E.B., L.G., P.A., and P.P. are employed at Delta4 GmbH (Vienna, Austria).
+
+\section{FUNDING}
+% REVIEW: split out of the former ACKNOWLEDGMENTS into a dedicated Funding
+% section; confirm grant numbers and add any required open-access funder
+% wording before submission.
+This project has received funding from the Austrian Research Promotion Agency (FFG) under grant agreement number 915133 (ADPKD Drug Discovery). Enrico Bono is supported by a grant from the European Union's Horizon Europe Marie Skłodowska-Curie Actions Doctoral Networks program project PICKED (HORIZON-MSCA-2023-DN-01, grant number 101168626). Louiza Galou is supported by a grant from the European Union's Horizon Europe Marie Skłodowska-Curie Actions Doctoral Networks Industrial Doctorates program project PROMOTE (HORIZON-MSCA-2023-DN-01, grant number 101169245). This work was further supported by COST Action CA21165 (PerMediK), funded by COST (European Cooperation in Science and Technology).
+
 \section{DATA AVAILABILITY}
 \begin{itemize}
 	% TODO: zenodo URL
@@ -180,24 +194,3 @@ Keeping GLL's query language and GUI synchronized proved difficult, as nested st
     \item The curated iguratimod mechanism of action model used in the second application use case is provided as supplementary data file S2 and is publicly available as of the date of publication.
     \item Any additional information required to reproduce the analyses reported in this paper is available from the lead contact upon request.
 \end{itemize}
-
-\section{SUPPLEMENTARY DATA}
-\begin{itemize}
-  \item Data S1. ADPKD molecular model input file (spreadsheet) used in the first application use case.
-  \item Data S2. Iguratimod drug mechanism of action model input file (spreadsheet) used in the second application use case.
-\end{itemize}
-
-\section{AUTHOR CONTRIBUTIONS}
-M.L.: conceptualization; resources; software; visualization; writing - original draft, review \& editing. K.K.-I.: data curation; validation; writing - review \& editing. L.F.: validation; writing - review \& editing. S.W.: validation; writing - review \& editing. F.B.: validation; writing - review \& editing. E.B.: validation; writing - review \& editing. L.G.: validation; writing - review \& editing. P.A.: validation; writing - review \& editing. P.H.: data curation; validation; writing - review \& editing. J.L.: data curation; funding acquisition; validation; writing - review \& editing. P.P.: conceptualization; data curation; funding acquisition; supervision; validation; writing - original draft, review \& editing. K.K.: funding acquisition; supervision; validation; writing - review \& editing.
-
-\section{ACKNOWLEDGEMENTS}
-The authors want to thank all working group members of the EU COST Action Program PerMediK (Personalized Medicine in Chronic Kidney Disease: Improved outcome based on Big Data) for fruitful discussions during the regular COST Action project meetings. Paul Perco and Matthias Ley are members of the EU COST Action Program PerMediK, CA21165.
-
-\section{FUNDING}
-% REVIEW: split out of the former ACKNOWLEDGMENTS into a dedicated Funding
-% section; confirm grant numbers and add any required open-access funder
-% wording before submission.
-This project has received funding from the Austrian Research Promotion Agency (FFG) under grant agreement number 915133 (ADPKD Drug Discovery). Enrico Bono is supported by a grant from the European Union's Horizon Europe Marie Skłodowska-Curie Actions Doctoral Networks program project PICKED (HORIZON-MSCA-2023-DN-01, grant number 101168626). Louiza Galou is supported by a grant from the European Union's Horizon Europe Marie Skłodowska-Curie Actions Doctoral Networks Industrial Doctorates program project PROMOTE (HORIZON-MSCA-2023-DN-01, grant number 101169245). This work was further supported by COST Action CA21165 (PerMediK), funded by COST (European Cooperation in Science and Technology).
-
-\section{CONFLICT OF INTEREST STATEMENT}
-K.K. is a co-founder of Delta4 GmbH (Vienna, Austria). M.L., K.K.-I., L.F., S.W., F.B., E.B., L.G., P.A., and P.P. are employed at Delta4 GmbH (Vienna, Austria).
