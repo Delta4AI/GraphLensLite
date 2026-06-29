@@ -80,4 +80,5 @@ manuscript/**
 !manuscript/**/*.sty
 !manuscript/**/*.md
 !manuscript/**/
+!manuscript/graphical-abstract.html
 
