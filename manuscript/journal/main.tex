@@ -1,17 +1,17 @@
 %%
-%% Cell Press -- Patterns (Resource Article)
-%% Based on the Cell Press LaTeX template v1.10.
+%% Journal submission driver.
+%% Shares the body in shared/content.tex with the bioRxiv flavor; only the
+%% preamble differs (sans-serif, super-script numbered citations, flush-left
+%% title block).
 %%
 \documentclass[12pt,letterpaper]{article}
 
-% ── Page geometry & fonts (per Cell Press template) ──────────────────────────
 \usepackage[a4paper, total={7in, 10in}]{geometry}
 \renewcommand{\familydefault}{\sfdefault}
 \usepackage{helvet}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 
-% ── Common packages ──────────────────────────────────────────────────────────
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{url}
@@ -28,10 +28,10 @@
 
 \graphicspath{{../shared/Fig/}}
 
-% Cell Press: do not number sections or subsections.
+% Headings are written as \section*{UPPERCASE}; suppress automatic numbering.
 \setcounter{secnumdepth}{-2}
 
-% Cell-Press flush-left title block (template default).
+% Flush-left title block.
 \makeatletter
 \renewcommand{\maketitle}{\bgroup\setlength{\parindent}{0pt}
 \begin{flushleft}
@@ -40,18 +40,9 @@
 \end{flushleft}\egroup}
 \makeatother
 
-% ── Title ────────────────────────────────────────────────────────────────────
-% AI-DRAFTED -- REVIEW
-% Current title is ~153 characters; Cell Press limit is 145 (incl. spaces).
-% Suggested trim ideas (pick / rewrite):
-%   "Graph Lens Lite: an interactive browser-based viewer for disease
-%    pathobiology and drug mechanism networks" (~106 chars)
-%   "Graph Lens Lite: interactive visualization of disease pathobiology and
-%    drug mechanism networks in the browser" (~108 chars)
 \title{Graph Lens Lite: An interactive biological network viewer for displaying, exploring, and sharing disease pathobiology and drug mechanism of action models}
 \date{}
 
-% ── Authors & affiliations ───────────────────────────────────────────────────
 \author[1,2,4,*,\orcidlink{0000-0001-6853-8542}]{Matthias Ley}
 \author[1,\orcidlink{0000-0002-4329-1499}]{Kinga K\k{e}ska-Izworska}
 \author[1,\orcidlink{0000-0001-5341-8097}]{Lucas Fillinger}
@@ -77,10 +68,9 @@
 
 \maketitle
 
-% ── Shared body (SUMMARY through SUPPLEMENTAL INFORMATION INDEX) ─────────────
+% Shared body
 \input{../shared/content}
 
-% ── Bibliography ─────────────────────────────────────────────────────────────
 \bibliography{../shared/reference}
 
 \end{document}

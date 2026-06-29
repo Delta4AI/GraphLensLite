@@ -1,13 +1,13 @@
 # Graph Lens Lite — Publication
 
 LaTeX setup for the Graph Lens Lite paper. The body content lives in
-`shared/content.tex` and is rendered by two venue-specific drivers that share
-the same section structure (Cell Press *Patterns* Resource Article style):
+`shared/content.tex` and is rendered by venue-specific drivers that share the
+same section structure:
 
-| Directory   | Target venue                                  |
+| Directory   | Output                                        |
 |-------------|-----------------------------------------------|
 | `biorxiv/`  | bioRxiv preprint                              |
-| `patterns/` | Cell Press *Patterns* (Resource Article)      |
+| `journal/`  | Journal submission                            |
 
 Drivers differ only in preamble (document class, citation style, fonts, line
 numbering). The shared body uses `\section*{UPPERCASE}` headings and works
@@ -17,7 +17,7 @@ identically in both.
 
 Look for these markers when reviewing the draft:
 
-- `% AI-DRAFTED -- REVIEW` — prose drafted by the AI assistant during the
+- `% AI-DRAFTED -- REVIEW` — prose drafted by an AI assistant during the
   manuscript restructure. Treat as a starting point; revise in your own voice
   before submission. Anything not marked is user-original prose preserved
   verbatim from the prior draft.
@@ -81,30 +81,30 @@ latexmk -pdf main
 
 Output: `biorxiv/main.pdf`
 
-### Cell Press Patterns (Resource Article)
+### Journal
 
 ```bash
-cd patterns/
+cd journal/
 latexmk -pdf main
 ```
 
-Output: `patterns/main.pdf`
+Output: `journal/main.pdf`
 
-Uses the generic Cell Press LaTeX template (v1.10) with the bundled
-`numbered.bst` (AMA-style numbered citations) and `numcompress.sty`.
+Uses the bundled `numbered.bst` (numbered citations) and `numcompress.sty`
+for range-compression of numeric citations.
 
 ### Build both flavors at once
 
 From the `manuscript/` directory:
 
 ```bash
-for dir in biorxiv patterns; do (cd "$dir" && latexmk -pdf main); done
+for dir in biorxiv journal; do (cd "$dir" && latexmk -pdf main); done
 ```
 
 ### Clean auxiliary files
 
 ```bash
-cd biorxiv/   # or patterns/
+cd biorxiv/   # or journal/
 latexmk -C
 ```
 
@@ -132,9 +132,9 @@ shared/
 biorxiv/
   main.tex                 Preprint driver (article class, natbib author-year)
 
-patterns/
-  main.tex                 Cell Press Patterns driver (Resource Article)
-  numbered.bst             AMA-style numbered bibliography
+journal/
+  main.tex                 Journal driver (sans-serif, numbered citations)
+  numbered.bst             Numbered bibliography style
   numcompress.sty          Range-compression for numeric citations
 
 ../scripts/
@@ -143,9 +143,3 @@ patterns/
 
 Both drivers `\input{../shared/content}` — edit the shared body once, both
 flavors pick up the changes.
-
-> **Note on word counts.** Cell Press *Patterns* Resource Articles are
-> typically 5,000–7,000 words (vs. ~2,500 in the prior bioRxiv draft).
-> The METHODS section and the Limitations subsection are intentionally
-> scaffolded with TODO placeholders so they can absorb the expansion before
-> submission.

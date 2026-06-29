@@ -1,19 +1,17 @@
 %%
 %% bioRxiv preprint
 %%
-%% Same body and section structure as the Cell Press Patterns flavor; only the
-%% preamble differs (article class, natbib author-year citations, lineno line
-%% numbers expected for preprints).
+%% Same body and section structure as the journal flavor; only the preamble
+%% differs (article class, natbib author-year citations, lineno line numbers
+%% expected for preprints).
 %%
 \documentclass[11pt]{article}
 
-% ── Page geometry & fonts ────────────────────────────────────────────────────
 \usepackage[a4paper, margin=2.5cm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 
-% ── Common packages ──────────────────────────────────────────────────────────
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{url}
@@ -28,14 +26,12 @@
 
 \graphicspath{{../shared/Fig/}}
 
-% Match the Patterns flavor: no automatic section numbering, since headings
+% Match the journal flavor: no automatic section numbering, since headings
 % are written as \section*{UPPERCASE} in shared/content.tex.
 \setcounter{secnumdepth}{-2}
 
-% ── Title ────────────────────────────────────────────────────────────────────
 \title{Graph Lens Lite: An interactive biological network viewer for displaying, exploring, and sharing disease pathobiology and drug mechanism of action models}
 
-% ── Authors & affiliations ───────────────────────────────────────────────────
 \renewcommand\Authfont{\normalsize}
 \renewcommand\Affilfont{\small}
 \renewcommand\Authsep{, }
@@ -66,10 +62,9 @@
 \begin{document}
 \maketitle
 
-% ── Shared body (SUMMARY through SUPPLEMENTAL INFORMATION INDEX) ─────────────
+% Shared body
 \input{../shared/content}
 
-% ── Bibliography ─────────────────────────────────────────────────────────────
 \bibliographystyle{unsrtnat}
 \bibliography{../shared/reference}
 
