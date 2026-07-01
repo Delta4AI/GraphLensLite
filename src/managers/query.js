@@ -1,5 +1,5 @@
-import {Popup} from "../utilities/popup.js";
-import {StaticUtilities} from "../utilities/static.js";
+import { Popup } from '../utilities/popup.js';
+import { StaticUtilities } from '../utilities/static.js';
 
 class QueryAST {
   constructor(instructions) {
@@ -34,7 +34,7 @@ class QueryAST {
     /* ---------- 2. leaf detection --------------------------------------- */
     const isLeaf =
       expr.length > 0 &&
-      !Array.isArray(expr[0]) &&          // first item is NOT another list
+      !Array.isArray(expr[0]) && // first item is NOT another list
       typeof expr[0] === 'object' &&
       expr[0]?.type === 'property';
 
@@ -49,7 +49,7 @@ class QueryAST {
 
       // walk through the chain left-to-right
       for (let i = 1; i < expr.length; i += 2) {
-        const op = expr[i];           // "AND" | "OR" | "NOT"
+        const op = expr[i]; // "AND" | "OR" | "NOT"
         const rhs = this.#evalExpr(expr[i + 1], element, requestedMainGroup);
 
         switch (op) {
@@ -72,9 +72,8 @@ class QueryAST {
     }
 
     /* ---------- 4. nothing matched  ------------------------------------ */
-    return false;   // fallback - shouldn't be reached with valid input
+    return false; // fallback - shouldn't be reached with valid input
   }
-
 
   // Evaluate a single property expression
   #evalLeaf(tokens, element, requestedMainGroup) {
@@ -84,7 +83,23 @@ class QueryAST {
           2+: values / further KW
     */
     const propTok = tokens[0];
-    const opTok = tokens[1];  // KW: "BETWEEN" | "LOWER THAN" | "IN [""]
+    const opTok = tokens[1]; // KW: "BETWEEN" | "LOWER THAN" | "IN [""] | "IS MISSING"
+
+    // --- IS MISSING: neutral filler used by the non-strict AND join. ----
+    // True when the property does not apply to this element type OR its
+    // value is absent/empty. Wrapping each conjunct as "(cond) OR (prop IS
+    // MISSING)" lets a conjunction skip elements that simply lack the
+    // property (or belong to the other element type) instead of excluding
+    // them. Handled before the null-guard below so a missing value returns
+    // true here rather than falling through to false.
+    if (opTok?.value === 'IS MISSING') {
+      if (propTok.main !== requestedMainGroup) return true;
+      const v = this.#readValue(element, propTok);
+      return (
+        v === undefined || v === null || v === '' || (typeof v === 'number' && Number.isNaN(v))
+      );
+    }
+
     const value = this.#readValue(element, propTok);
 
     if (value === undefined || value === null) return false;
@@ -107,19 +122,22 @@ class QueryAST {
 
     // --- LOWER THAN a OR GREATER THAN b -------------------------------
     if (op === 'LOWER THAN') {
-      const low = tokens[2].value;  // a
-      const high = tokens[4].value;  // b
+      const low = tokens[2].value; // a
+      const high = tokens[4].value; // b
       validated = typeof propVal === 'number' && (propVal <= low || propVal >= high);
     }
 
     // --- IN [ a, b, c ] -------------------------------------------------
     if (op.startsWith('IN')) {
-      const set = tokens.slice(2).map(t => t.value);
+      const set = tokens.slice(2).map((t) => t.value);
       // Split pipe-separated values and check if any match
       const values = String(propVal).includes('|')
-        ? String(propVal).split('|').map(v => v.trim()).filter(v => v !== '')
+        ? String(propVal)
+            .split('|')
+            .map((v) => v.trim())
+            .filter((v) => v !== '')
         : [propVal];
-      validated = values.some(val => set.includes(val));
+      validated = values.some((val) => set.includes(val));
     }
 
     element.featureIsWithinThreshold.set(tokens[0].propID, validated);
@@ -127,7 +145,7 @@ class QueryAST {
   }
 
   // Safely pull the data from the D4Data hierarchy
-  #readValue(element, {main, sub, prop}) {
+  #readValue(element, { main, sub, prop }) {
     try {
       return element?.D4Data?.[main]?.[sub]?.[prop];
     } catch {
@@ -135,7 +153,6 @@ class QueryAST {
     }
   }
 }
-
 
 class QueryManager {
   #validationTimer = 0;
@@ -159,37 +176,27 @@ class QueryManager {
     // ------------------------------------------------------------------
     // 2. Check for empty instructions "()"
     // ------------------------------------------------------------------
-    asciiStr = asciiStr.replace(
-      /\(\s*\)/g,
-      match => {
-        this.cache.query.valid = false;
-        return `<span class="q-error-empty-instruction" data-encoded>${match}</span>`;
-      }
-    );
+    asciiStr = asciiStr.replace(/\(\s*\)/g, (match) => {
+      this.cache.query.valid = false;
+      return `<span class="q-error-empty-instruction" data-encoded>${match}</span>`;
+    });
 
     // ------------------------------------------------------------------
     // 3. Check for missing connectors between instructions ")("
     // ------------------------------------------------------------------
-    asciiStr = asciiStr.replace(
-      /\)\s*\(/g,
-      match => {
-        this.cache.query.valid = false;
-        return (
-          `<span class="q-error-missing-connector" data-encoded>` +
-          match +
-          `</span>`
-        );
-      }
-    );
+    asciiStr = asciiStr.replace(/\)\s*\(/g, (match) => {
+      this.cache.query.valid = false;
+      return `<span class="q-error-missing-connector" data-encoded>` + match + `</span>`;
+    });
 
     /* ------------------------------------------------------------------ */
     /* 4. Encode Property names (main group::sub group::property)                */
     /* ------------------------------------------------------------------ */
     asciiStr = asciiStr.replace(
-      /(Node filters|Edge filters)::([^:]+)::([^:]+)(?=\s(?:IN|BETWEEN|LOWER\sTHAN|\)))/g,
+      /(Node filters|Edge filters)::([^:]+)::([^:]+)(?=\s(?:IN|BETWEEN|LOWER\sTHAN|IS\sMISSING|\)))/g,
       (match, mainGroup, subGroup, prop) => {
         const mgok = mainGroup in this.cache.uniquePropHierarchy;
-        const sgok = mgok && (subGroup in this.cache.uniquePropHierarchy[mainGroup]);
+        const sgok = mgok && subGroup in this.cache.uniquePropHierarchy[mainGroup];
         const pok = sgok && this.cache.uniquePropHierarchy[mainGroup][subGroup].has(prop);
 
         const mainGroupEncoded = `<span class="${mgok ? 'q-maingroup' : 'q-error-unrecognized'}" data-encoded>${StaticUtilities.escapeHtml(mainGroup)}</span>`;
@@ -197,11 +204,15 @@ class QueryManager {
         const propEncoded = `<span class="${pok ? 'q-property' : 'q-error-unrecognized'}" data-encoded>${StaticUtilities.escapeHtml(prop)}</span>`;
         const sep = `<span class="q-prop-group-separator" data-encoded>::</span>`;
 
-        return `<span class="q-property-wrapper" data-encoded>`
-          + mainGroupEncoded + sep
-          + subGroupEncoded + sep
-          + propEncoded
-          + `</span>`;
+        return (
+          `<span class="q-property-wrapper" data-encoded>` +
+          mainGroupEncoded +
+          sep +
+          subGroupEncoded +
+          sep +
+          propEncoded +
+          `</span>`
+        );
       }
     );
 
@@ -213,40 +224,49 @@ class QueryManager {
     asciiStr = asciiStr.replace(
       /(BETWEEN)\s+(-?\d+(?:\.\d+)?)\s+(AND)\s+(-?\d+(?:\.\d+)?)/gi,
       (_m, betweenKw, low, andKw, high) =>
-        `<span class='q-kw-between' data-encoded>${betweenKw}</span>`
-        + space
-        + `<span class='q-number' data-encoded>${low}</span>`
-        + space
-        + `<span class='q-kw-between-and' data-encoded>${andKw}</span>`
-        + space
-        + `<span class='q-number' data-encoded>${high}</span>`
+        `<span class='q-kw-between' data-encoded>${betweenKw}</span>` +
+        space +
+        `<span class='q-number' data-encoded>${low}</span>` +
+        space +
+        `<span class='q-kw-between-and' data-encoded>${andKw}</span>` +
+        space +
+        `<span class='q-number' data-encoded>${high}</span>`
     );
 
     /* 5-2 Inverted Numerical Values (Slider): "LOWER THAN X OR GREATER THAN Y" ------ */
     asciiStr = asciiStr.replace(
       /(LOWER THAN)\s+(-?\d+(?:\.\d+)?)\s+(OR GREATER THAN)\s+(-?\d+(?:\.\d+)?)/gi,
       (_m, lowerThanKw, low, andGreaterThanKw, high) =>
-        `<span class='q-lower-than' data-encoded>${lowerThanKw}</span>`
-        + space
-        + `<span class='q-number' data-encoded>${low}</span>`
-        + space
-        + `<span class='q-or-greater-than' data-encoded>${andGreaterThanKw}</span>`
-        + space
-        + `<span class='q-number' data-encoded>${high}</span>`
+        `<span class='q-lower-than' data-encoded>${lowerThanKw}</span>` +
+        space +
+        `<span class='q-number' data-encoded>${low}</span>` +
+        space +
+        `<span class='q-or-greater-than' data-encoded>${andGreaterThanKw}</span>` +
+        space +
+        `<span class='q-number' data-encoded>${high}</span>`
     );
 
     /* 5-3 Categorical Values (Dropdown): "IN [" up to "]"  --------- */
     asciiStr = asciiStr.replace(/IN\s*\[((?:\\.|[^\]\\])*)]/g, (_match, list) => {
-        const encodedCategories = StaticUtilities.splitQueryList(list)
-          .map(cat => `<span class='q-string' data-encoded>${StaticUtilities.escapeHtml(cat)}</span>`)
-          .join(`<span class='q-comma' data-encoded>,</span>`);
+      const encodedCategories = StaticUtilities.splitQueryList(list)
+        .map(
+          (cat) => `<span class='q-string' data-encoded>${StaticUtilities.escapeHtml(cat)}</span>`
+        )
+        .join(`<span class='q-comma' data-encoded>,</span>`);
 
-        return [
-          `<span class='q-in-cat-bracket-open' data-encoded>IN${space}[</span>`,
-          encodedCategories,
-          `<span class='q-cat-bracket-close' data-encoded>]</span>`
-        ].join("");
-      }
+      return [
+        `<span class='q-in-cat-bracket-open' data-encoded>IN${space}[</span>`,
+        encodedCategories,
+        `<span class='q-cat-bracket-close' data-encoded>]</span>`,
+      ].join('');
+    });
+
+    /* 5-4 Missing-value predicate (non-strict AND filler): "IS MISSING" - */
+    asciiStr = asciiStr.replace(
+      /\bIS\s+MISSING\b/gi,
+      // Single span with a literal inner space (not a nested q-space span,
+      // which would break the non-greedy encoded-chunk splitter in step 10).
+      () => `<span class='q-kw-ismissing' data-encoded>IS MISSING</span>`
     );
 
     /* ------------------------------------------------------------------ */
@@ -258,13 +278,13 @@ class QueryManager {
     asciiStr = asciiStr.replace(
       /\)\s*(OR|AND|NOT)\s*\(/gi,
       (_m, connector) =>
-        connectorClosingBracket
-        + `<span class='q-connector-${connector.toLowerCase()}' data-encoded>`
-        + ' '
-        + connector.toUpperCase()
-        + ' '
-        + `</span>`
-        + connectorOpeningBracket
+        connectorClosingBracket +
+        `<span class='q-connector-${connector.toLowerCase()}' data-encoded>` +
+        ' ' +
+        connector.toUpperCase() +
+        ' ' +
+        `</span>` +
+        connectorOpeningBracket
     );
 
     /* ------------------------------------------------------------------ */
@@ -294,7 +314,7 @@ class QueryManager {
         else unmatchedSet.add(idx);
       }
     });
-    stack.forEach(idx => unmatchedSet.add(idx));
+    stack.forEach((idx) => unmatchedSet.add(idx));
 
     if (unmatchedSet.size) {
       this.cache.query.valid = false;
@@ -304,36 +324,40 @@ class QueryManager {
     let bracketLevel = 0;
     let bracketIdx = 0;
 
-    asciiStr = bracketChunks.map(chunk => {
-      if (chunk.startsWith('<span') && chunk.includes('data-encoded')) return chunk;
+    asciiStr = bracketChunks
+      .map((chunk) => {
+        if (chunk.startsWith('<span') && chunk.includes('data-encoded')) return chunk;
 
-      return [...chunk].map(ch => {
-        if (ch === '(') {
-          bracketLevel++;
-          const lvl = Math.min(bracketLevel, 5);
-          const cls = [
-            `q-bracket-open-lvl-${lvl}`,
-            unmatchedSet.has(bracketIdx) ? 'q-error-unmatched-opening-bracket' : ''
-          ].join(' ');
-          bracketIdx++;
-          return `<span class='${cls.trim()}' data-encoded>(</span>`;
-        }
+        return [...chunk]
+          .map((ch) => {
+            if (ch === '(') {
+              bracketLevel++;
+              const lvl = Math.min(bracketLevel, 5);
+              const cls = [
+                `q-bracket-open-lvl-${lvl}`,
+                unmatchedSet.has(bracketIdx) ? 'q-error-unmatched-opening-bracket' : '',
+              ].join(' ');
+              bracketIdx++;
+              return `<span class='${cls.trim()}' data-encoded>(</span>`;
+            }
 
-        if (ch === ')') {
-          const lvl = Math.min(bracketLevel, 5);
-          const cls = [
-            `q-bracket-close-lvl-${lvl}`,
-            unmatchedSet.has(bracketIdx) ? 'q-error-unmatched-closing-bracket' : ''
-          ].join(' ');
-          bracketIdx++;
-          const html = `<span class='${cls.trim()}' data-encoded>)</span>`;
-          bracketLevel = Math.max(bracketLevel - 1, 0);
-          return html;
-        }
+            if (ch === ')') {
+              const lvl = Math.min(bracketLevel, 5);
+              const cls = [
+                `q-bracket-close-lvl-${lvl}`,
+                unmatchedSet.has(bracketIdx) ? 'q-error-unmatched-closing-bracket' : '',
+              ].join(' ');
+              bracketIdx++;
+              const html = `<span class='${cls.trim()}' data-encoded>)</span>`;
+              bracketLevel = Math.max(bracketLevel - 1, 0);
+              return html;
+            }
 
-        return ch;
-      }).join('');
-    }).join('');
+            return ch;
+          })
+          .join('');
+      })
+      .join('');
 
     // ------------------------------------------------------------------
     // 8. substitute &nbsp; with space span (important for copy/paste)
@@ -341,15 +365,14 @@ class QueryManager {
     asciiStr = asciiStr
       // split into "already encoded" vs "plain" parts
       .split(/(<span\b[^>]*data-encoded[^>]*>[\s\S]*?<\/span>)/g)
-      .map(chunk => {
+      .map((chunk) => {
         // keep every part that is already marked as encoded
         if (chunk.startsWith('<span') && chunk.includes('data-encoded')) {
           return chunk;
         }
         // in all other chunks replace real blanks, NBSP (char 160) and "&nbsp;"
         // with the standard encoded-space element
-        return chunk
-          .replace(/&nbsp;|\u00a0| /g, space);
+        return chunk.replace(/&nbsp;|\u00a0| /g, space);
       })
       .join('');
 
@@ -372,52 +395,114 @@ class QueryManager {
     asciiStr = asciiStr
       // split out only the already-encoded chunks vs everything else
       .split(/(<span\b[^>]*data-encoded[^>]*>[\s\S]*?<\/span>)/g)
-      .map(chunk => {
+      .map((chunk) => {
         // if it's one of our data-encoded spans, keep it
-        if ((chunk.startsWith('<span') && chunk.includes('data-encoded'))
-          || chunk === "" || chunk === "</span> " || chunk === "</span>" || chunk === "[</span>") {
+        if (
+          (chunk.startsWith('<span') && chunk.includes('data-encoded')) ||
+          chunk === '' ||
+          chunk === '</span> ' ||
+          chunk === '</span>' ||
+          chunk === '[</span>'
+        ) {
           return chunk;
         }
 
         this.cache.query.valid = false;
-        return chunk.replace(/\S+/g, txt =>
-          `<span class="q-error-unrecognized">${txt}</span>`
-        );
+        return chunk.replace(/\S+/g, (txt) => `<span class="q-error-unrecognized">${txt}</span>`);
       })
       .join('');
 
-    const updateQueryBtn = document.getElementById("queryUpdateBtn");
-    const selectQueryBtn = document.getElementById("querySelectBtn");
+    const updateQueryBtn = document.getElementById('queryUpdateBtn');
+    const selectQueryBtn = document.getElementById('querySelectBtn');
     if (this.cache.query.valid) {
-      updateQueryBtn.classList.remove("disabled");
-      selectQueryBtn.classList.remove("disabled");
+      updateQueryBtn.classList.remove('disabled');
+      selectQueryBtn.classList.remove('disabled');
     } else {
-      updateQueryBtn.classList.add("disabled");
-      selectQueryBtn.classList.add("disabled");
+      updateQueryBtn.classList.add('disabled');
+      selectQueryBtn.classList.add('disabled');
     }
 
     return asciiStr;
   }
 
+  // A filter is "narrowed" when it deviates from its default (loaded) state:
+  // a categorical with fewer than all values selected, or a slider whose bounds
+  // moved or was inverted. Used to decide which filters constrain an AND join.
+  // Without a recorded default (e.g. in tests) a filter is treated as narrowed.
+  #isFilterNarrowed(propID, fo) {
+    const def = this.cache.data.filterDefaults?.get(propID);
+    if (!def) return true;
+    if (fo.isCategory) {
+      const cur = fo.categories;
+      const base = def.categories;
+      if (!cur || !base) return true;
+      if (cur.size !== base.size) return true;
+      for (const c of base) {
+        if (!cur.has(c)) return true;
+      }
+      return false;
+    }
+    return (
+      !!fo.isInverted !== !!def.isInverted ||
+      fo.lowerThreshold !== def.lowerThreshold ||
+      fo.upperThreshold !== def.upperThreshold
+    );
+  }
+
   updateQueryTextArea() {
-    let queryStr = this.cache.data.layouts[this.cache.data.selectedLayout]["query"] || "";
+    let queryStr = this.cache.data.layouts[this.cache.data.selectedLayout]['query'] || '';
 
     if (!queryStr) {
+      const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
+      const joinMode = layout.filterJoinMode === 'AND' ? 'AND' : 'OR';
       let queryEntries = [];
-      for (const [propID, fo] of this.cache.data.layouts[this.cache.data.selectedLayout].filters.entries()) {
+      for (const [propID, fo] of layout.filters.entries()) {
         if (fo.active) {
+          let cond;
           if (fo.isCategory) {
-            queryEntries.push(`${propID} IN [${[...fo.categories].map(cat => StaticUtilities.escapeQueryValue(cat)).join(",")}]`);
+            cond = `${propID} IN [${[...fo.categories].map((cat) => StaticUtilities.escapeQueryValue(cat)).join(',')}]`;
           } else if (fo.isInverted) {
-            queryEntries.push(`${propID} LOWER THAN ${fo.upperThreshold} OR GREATER THAN ${fo.lowerThreshold}`);
+            cond = `${propID} LOWER THAN ${fo.upperThreshold} OR GREATER THAN ${fo.lowerThreshold}`;
           } else {
-            queryEntries.push(`${propID} BETWEEN ${fo.lowerThreshold} AND ${fo.upperThreshold}`);
+            cond = `${propID} BETWEEN ${fo.lowerThreshold} AND ${fo.upperThreshold}`;
           }
+          queryEntries.push({ propID, cond, narrowed: this.#isFilterNarrowed(propID, fo) });
         }
       }
 
       if (queryEntries.length) {
-        queryStr = `(${queryEntries.join(") OR (")})`;
+        if (joinMode === 'AND') {
+          // Only filters the user actually narrowed constrain an AND. A filter
+          // left at its default (all categories selected / slider at full range)
+          // means "don't care about this property"; counting it would exclude
+          // every element that trips any single un-narrowed filter (dirty
+          // numeric values, rounded slider bounds, etc.) and empty the graph.
+          const andEntries = queryEntries.filter((e) => e.narrowed);
+          if (!andEntries.length) {
+            queryStr = ''; // nothing narrowed → no constraint → full graph
+          } else if (layout.filterStrict === true) {
+            // Strict (complete cases): AND within each element type, OR between
+            // the two type groups, so a node is judged only on node filters (an
+            // edge only on edge filters) while a same-type absent value excludes.
+            const groups = [];
+            for (const main of ['Node filters', 'Edge filters']) {
+              const conds = andEntries
+                .filter((e) => e.propID.startsWith(`${main}::`))
+                .map((e) => `(${e.cond})`);
+              if (conds.length) groups.push(`(${conds.join(' AND ')})`);
+            }
+            queryStr = groups.join(' OR ');
+          } else {
+            // Non-strict AND: each conjunct is OR-ed with an "IS MISSING" escape
+            // hatch, so a property an element lacks (or that belongs to the
+            // other element type) never disqualifies it.
+            queryStr = andEntries
+              .map(({ propID, cond }) => `((${cond}) OR (${propID} IS MISSING))`)
+              .join(' AND ');
+          }
+        } else {
+          queryStr = `(${queryEntries.map((e) => e.cond).join(') OR (')})`;
+        }
       }
     }
 
@@ -426,9 +511,9 @@ class QueryManager {
   }
 
   clearQuery() {
-    this.cache.query.text.textContent = "";
+    this.cache.query.text.textContent = '';
     this.handleQueryValidationEvent(true);
-    this.cache.query.caret.style.display = "none";
+    this.cache.query.caret.style.display = 'none';
   }
 
   getCursorPosition() {
@@ -528,9 +613,10 @@ class QueryManager {
     this.cache.query.overlay.scrollLeft = this.cache.query.text.scrollLeft;
 
     if (this.cache.query.valid) {
-      this.cache.data.layouts[this.cache.data.selectedLayout]["query"] = this.cache.query.text.textContent;
+      this.cache.data.layouts[this.cache.data.selectedLayout]['query'] =
+        this.cache.query.text.textContent;
     } else {
-      this.cache.data.layouts[this.cache.data.selectedLayout]["query"] = undefined;
+      this.cache.data.layouts[this.cache.data.selectedLayout]['query'] = undefined;
     }
   }
 
@@ -540,32 +626,43 @@ class QueryManager {
     try {
       this.updateUIFromQueryInstructions();
       this.cache.ui.updateFilterLockState(); // Show lock status bar
-      await this.cache.fm.handleFilterEvent("Updating Graph from Query", this.cache.query.text.textContent, null, false);
+      await this.cache.fm.handleFilterEvent(
+        'Updating Graph from Query',
+        this.cache.query.text.textContent,
+        null,
+        false
+      );
     } finally {
       this.cache.EVENT_LOCKS.QUERY_UPDATE_EVENT = false;
     }
   }
 
   async handleQuerySelectEvent() {
-    await this.cache.ui.showLoading("Updating Selection", `Modifying selection from query`);
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    await this.cache.ui.showLoading('Updating Selection', `Modifying selection from query`);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
 
     this.cache.EVENT_LOCKS.QUERY_SELECTION_EVENT = true;
 
     this.decodeQueryAndBuildAST();
 
-    const nodeIDsToSelect = this.cache.nodeRef.values()
-      .filter(node => this.cache.query.ast.testNode(node) && this.cache.nodeIDsToBeShown.has(node.id))
-      .map(node => node.id);
+    const nodeIDsToSelect = this.cache.nodeRef
+      .values()
+      .filter(
+        (node) => this.cache.query.ast.testNode(node) && this.cache.nodeIDsToBeShown.has(node.id)
+      )
+      .map((node) => node.id);
 
-    const edgeIDsToSelect = this.cache.edgeRef.values()
-      .filter(edge => this.cache.query.ast.testEdge(edge) && this.cache.edgeIDsToBeShown.has(edge.id))
-      .map(edge => edge.id);
+    const edgeIDsToSelect = this.cache.edgeRef
+      .values()
+      .filter(
+        (edge) => this.cache.query.ast.testEdge(edge) && this.cache.edgeIDsToBeShown.has(edge.id)
+      )
+      .map((edge) => edge.id);
 
     await this.cache.sm.selectNodes(nodeIDsToSelect);
     await this.cache.sm.selectEdges(edgeIDsToSelect);
     await this.cache.ui.hideLoading();
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
   }
 
   /**
@@ -595,8 +692,11 @@ class QueryManager {
      * ----------------------------------------------------------- */
     const tokens = [];
     const parser = new DOMParser();
-    const doc = parser.parseFromString(`<div>${this.cache.query.overlay.innerHTML}</div>`, 'text/html');
-    const root = doc.body.firstElementChild;        // wrapper <div>
+    const doc = parser.parseFromString(
+      `<div>${this.cache.query.overlay.innerHTML}</div>`,
+      'text/html'
+    );
+    const root = doc.body.firstElementChild; // wrapper <div>
 
     // helper: map CSS classes → token factory
     const classMap = {
@@ -606,35 +706,39 @@ class QueryManager {
       'q-connector-not': () => 'NOT',
 
       // brackets (depth-colored and connector-adjacent)
-      'q-bracket-open-lvl-1': () => ({type: '(', value: '('}),
-      'q-bracket-open-lvl-2': () => ({type: '(', value: '('}),
-      'q-bracket-open-lvl-3': () => ({type: '(', value: '('}),
-      'q-bracket-open-lvl-4': () => ({type: '(', value: '('}),
-      'q-bracket-open-lvl-5': () => ({type: '(', value: '('}),
-      'q-bracket-close-lvl-1': () => ({type: ')', value: ')'}),
-      'q-bracket-close-lvl-2': () => ({type: ')', value: ')'}),
-      'q-bracket-close-lvl-3': () => ({type: ')', value: ')'}),
-      'q-bracket-close-lvl-4': () => ({type: ')', value: ')'}),
-      'q-bracket-close-lvl-5': () => ({type: ')', value: ')'}),
-      'q-connector-opening-bracket': () => ({type: '(', value: '('}),
-      'q-connector-closing': () => ({type: ')', value: ')'}),
+      'q-bracket-open-lvl-1': () => ({ type: '(', value: '(' }),
+      'q-bracket-open-lvl-2': () => ({ type: '(', value: '(' }),
+      'q-bracket-open-lvl-3': () => ({ type: '(', value: '(' }),
+      'q-bracket-open-lvl-4': () => ({ type: '(', value: '(' }),
+      'q-bracket-open-lvl-5': () => ({ type: '(', value: '(' }),
+      'q-bracket-close-lvl-1': () => ({ type: ')', value: ')' }),
+      'q-bracket-close-lvl-2': () => ({ type: ')', value: ')' }),
+      'q-bracket-close-lvl-3': () => ({ type: ')', value: ')' }),
+      'q-bracket-close-lvl-4': () => ({ type: ')', value: ')' }),
+      'q-bracket-close-lvl-5': () => ({ type: ')', value: ')' }),
+      'q-connector-opening-bracket': () => ({ type: '(', value: '(' }),
+      'q-connector-closing': () => ({ type: ')', value: ')' }),
 
       // numbers & keywords
-      'q-number': el => ({type: 'NUM', value: Number(el.textContent)}),
-      'q-kw-between': () => ({type: 'KW', value: 'BETWEEN'}),
-      'q-kw-between-and': () => ({type: 'KW', value: 'AND'}),
-      'q-lower-than': () => ({type: 'KW', value: 'LOWER THAN'}),
-      'q-or-greater-than': () => ({type: 'KW', value: 'OR GREATER THAN'}),
-      'q-in-cat-bracket-open': () => ({type: 'KW', value: 'IN ['}),
+      'q-number': (el) => ({ type: 'NUM', value: Number(el.textContent) }),
+      'q-kw-between': () => ({ type: 'KW', value: 'BETWEEN' }),
+      'q-kw-between-and': () => ({ type: 'KW', value: 'AND' }),
+      'q-lower-than': () => ({ type: 'KW', value: 'LOWER THAN' }),
+      'q-or-greater-than': () => ({ type: 'KW', value: 'OR GREATER THAN' }),
+      'q-in-cat-bracket-open': () => ({ type: 'KW', value: 'IN [' }),
+      'q-kw-ismissing': () => ({ type: 'KW', value: 'IS MISSING' }),
 
       // category strings
-      'q-string': el => ({type: 'STR', value: StaticUtilities.unescapeQueryValue(el.textContent)}),
+      'q-string': (el) => ({
+        type: 'STR',
+        value: StaticUtilities.unescapeQueryValue(el.textContent),
+      }),
 
       // whole property path ("A::B::C")
-      'q-property-wrapper': el => {
+      'q-property-wrapper': (el) => {
         const [main, sub, prop] = el.textContent.split('::');
-        return {type: 'property', main, sub, prop, propID: el.textContent};
-      }
+        return { type: 'property', main, sub, prop, propID: el.textContent };
+      },
     };
 
     // depth-first walk
@@ -669,11 +773,13 @@ class QueryManager {
       while (idx < tokens.length) {
         const tok = tokens[idx];
 
-        if (tok.type === ')') {               // end of this group
+        if (tok.type === ')') {
+          // end of this group
           return [group, idx + 1];
         }
 
-        if (tok.type === '(') {               // begin sub-group
+        if (tok.type === '(') {
+          // begin sub-group
           const [subGroup, next] = readGroup(idx + 1);
           group.push(subGroup);
           idx = next;
@@ -684,10 +790,10 @@ class QueryManager {
         idx += 1;
       }
 
-      return [group, idx];                    // top-level done
+      return [group, idx]; // top-level done
     }
 
-    const [instructions] = readGroup();       // start at index 0
+    const [instructions] = readGroup(); // start at index 0
     return instructions;
   }
 
@@ -702,24 +808,28 @@ class QueryManager {
 
   setFilter(obj) {
     // normal slider
-    if (obj[1].type === "KW" && obj[1].value === "BETWEEN") {
+    if (obj[1].type === 'KW' && obj[1].value === 'BETWEEN') {
       this.cache.ui.checkCheckbox(obj[0].propID, true);
-      this.cache.propIDToInvertibleRangeSliders.get(obj[0].propID).setTo(obj[2].value, obj[4].value, false);
+      this.cache.propIDToInvertibleRangeSliders
+        .get(obj[0].propID)
+        .setTo(obj[2].value, obj[4].value, false);
     }
 
     // inverted slider
-    else if (obj[1].type === "KW" && obj[1].value === "LOWER THAN") {
+    else if (obj[1].type === 'KW' && obj[1].value === 'LOWER THAN') {
       this.cache.ui.checkCheckbox(obj[0].propID, true);
-      this.cache.propIDToInvertibleRangeSliders.get(obj[0].propID).setTo(obj[2].value, obj[4].value, true);
+      this.cache.propIDToInvertibleRangeSliders
+        .get(obj[0].propID)
+        .setTo(obj[2].value, obj[4].value, true);
     }
 
     // category
-    else if (obj[1].type === "KW" && obj[1].value === "IN [") {
+    else if (obj[1].type === 'KW' && obj[1].value === 'IN [') {
       this.cache.ui.checkCheckbox(obj[0].propID, true);
       const dropdown = this.cache.propIDToDropdownChecklists.get(obj[0].propID);
       dropdown.deselectAllCategories(true);
       for (const dropdownElem of obj) {
-        if (dropdownElem.type === "STR") {
+        if (dropdownElem.type === 'STR') {
           dropdown.selectCategory(dropdownElem.value);
         }
       }
@@ -728,7 +838,7 @@ class QueryManager {
 
   refreshUI(obj) {
     if (obj.constructor === Array) {
-      if (obj[0].constructor === Object && obj[0].type === "property") {
+      if (obj[0].constructor === Object && obj[0].type === 'property') {
         this.setFilter(obj);
       } else {
         // nested instruction
@@ -740,11 +850,12 @@ class QueryManager {
   }
 
   moveCaretToEnd() {
-    const el = this.cache.query.text;               // the editable element
+    const el = this.cache.query.text; // the editable element
     if (!el) return;
 
     /* -------- textarea / input ---------- */
-    if ('selectionStart' in el) {        // true for <input> / <textarea>
+    if ('selectionStart' in el) {
+      // true for <input> / <textarea>
       el.selectionStart = el.selectionEnd = el.value.length;
       el.focus();
       return;
@@ -752,8 +863,8 @@ class QueryManager {
 
     /* -------- contenteditable ----------- */
     const range = document.createRange();
-    range.selectNodeContents(el);        // select the whole content
-    range.collapse(false);               // collapse to the end
+    range.selectNodeContents(el); // select the whole content
+    range.collapse(false); // collapse to the end
 
     const sel = window.getSelection();
     sel.removeAllRanges();
@@ -762,9 +873,9 @@ class QueryManager {
   }
 
   resetQuery() {
-    delete this.cache.data.layouts[this.cache.data.selectedLayout]["query"];
-    this.cache.query.text.textContent = "";
-    this.cache.query.overlay.innerHTML = "";
+    delete this.cache.data.layouts[this.cache.data.selectedLayout]['query'];
+    this.cache.query.text.textContent = '';
+    this.cache.query.overlay.innerHTML = '';
     this.updateQueryTextArea();
     this.moveCaretToEnd();
 
@@ -778,7 +889,11 @@ class QueryManager {
   }
 
   restoreQuery() {
-    if (this.cache.query.textCache === undefined || this.cache.query.textCache === null || this.cache.query.textCache === "") {
+    if (
+      this.cache.query.textCache === undefined ||
+      this.cache.query.textCache === null ||
+      this.cache.query.textCache === ''
+    ) {
       return;
     }
     this.cache.query.text.textContent = this.cache.query.textCache;
@@ -788,7 +903,8 @@ class QueryManager {
   }
 
   showQueryHelp() {
-    this.cache.popup = new Popup(`
+    this.cache.popup = new Popup(
+      `
 <p>Build complex filters using nested AND, OR and NOT expressions.</p>
 
 <div class="alert-warning">
@@ -876,7 +992,9 @@ class QueryManager {
   <li>Invalid syntax is <span class="q-error-unrecognized">highlighted like this</span></li>
 </ul>
 
-`, {title: 'Query Editor', width: '80vw', height: '75vh', lineHeight: '1.5em'});
+`,
+      { title: 'Query Editor', width: '80vw', height: '75vh', lineHeight: '1.5em' }
+    );
   }
 
   decodeQueryAndBuildAST() {
@@ -887,7 +1005,10 @@ class QueryManager {
   performANDFilterLogic() {
     // we want to kick out elements where not all thresholds are met
     for (let nodeID of this.cache.nodeIDsToBeShown) {
-      let propertiesNotWithinThresholds = this.cache.fm.getPropertiesNotWithinThresholds(nodeID, null);
+      let propertiesNotWithinThresholds = this.cache.fm.getPropertiesNotWithinThresholds(
+        nodeID,
+        null
+      );
       if (propertiesNotWithinThresholds.length > 0) {
         this.cache.nodeIDsToBeShown.delete(nodeID);
         this.cache.fm.removeFromPropIDsToNodeIDsToBeShown(nodeID);
@@ -895,14 +1016,17 @@ class QueryManager {
     }
 
     for (let edgeID of this.cache.edgeIDsToBeShown) {
-      let propertiesNotWithinThresholds = this.cache.fm.getPropertiesNotWithinThresholds(null, edgeID);
+      let propertiesNotWithinThresholds = this.cache.fm.getPropertiesNotWithinThresholds(
+        null,
+        edgeID
+      );
       if (propertiesNotWithinThresholds.length > 0) {
         this.cache.edgeIDsToBeShown.delete(edgeID);
         this.cache.fm.removeFromPropIDsToEdgeIDsToBeShown(edgeID);
       } else {
         // we have edges in an AND-filtered graph, so we want to remember the connected nodes, since all other dangling
         // nodes should be removed
-        const [source, target] = edgeID.split("::");
+        const [source, target] = edgeID.split('::');
         this.cache.remainingEdgeRelatedNodes.add(source);
         this.cache.remainingEdgeRelatedNodes.add(target);
       }
@@ -931,4 +1055,4 @@ class QueryManager {
   }
 }
 
-export {QueryManager, QueryAST};
+export { QueryManager, QueryAST };
