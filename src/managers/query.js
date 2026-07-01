@@ -927,6 +927,7 @@ class QueryManager {
 <p><strong>Filtering panel:</strong></p>
 <ul>
   <li><span class="add-to-query-button show tt">📝</span> - Add a single parameter to the query</li>
+  <li>Under <strong>⚙ Details</strong>: an <strong>OR / AND</strong> toggle sets how active filters combine (OR = match any, AND = match all). AND counts only the filters you've narrowed. The <strong>Complete cases only</strong> option makes AND also hide elements missing any of those filters.</li>
 </ul>
 
 <hr>
@@ -970,6 +971,7 @@ class QueryManager {
   <li><span class="q-kw-between">BETWEEN</span>&nbsp;<span class="q-number">0</span>&nbsp;<span class="q-kw-between-and">AND</span>&nbsp;<span class="q-number">1.3</span> - Keep numerical values in range (inclusive)</li>
   <li><span class="q-lower-than">LOWER THAN</span>&nbsp;<span class="q-number">0.2</span>&nbsp;<span class="q-or-greater-than">OR GREATER THAN</span>&nbsp;<span class="q-number">0.8</span> - Keep numerical values ≤ 0.2 or ≥ 0.8</li>
   <li><span class="q-in-cat-bracket-open">IN&nbsp;[</span><span class="q-string">foo</span><span class="q-comma">,</span>&nbsp;<span class="q-string">bar</span><span class="q-cat-bracket-close">]</span> - Keep specific categorical values</li>
+  <li><span class="q-kw-ismissing">IS MISSING</span> - True when the property is absent/empty or belongs to the other element type. Auto-added by the filter panel's AND join so a property an element lacks doesn't exclude it; rarely hand-written.</li>
 </ul>
 
 <p><strong>3. Logical Operators</strong></p>

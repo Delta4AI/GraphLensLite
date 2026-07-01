@@ -706,6 +706,10 @@ class GraphLayoutManager {
       filters: structuredClone(this.cache.data.filterDefaults),
       isCustom: true, // All layouts are position-based
       query: undefined,
+      // How active filters combine (see updateQueryTextArea) and whether AND
+      // requires complete cases. Persisted per view via the workspace JSON.
+      filterJoinMode: 'OR',
+      filterStrict: false,
       hideDisconnectedNodes: false,
       // Per-view styles
       nodeStyles: new Map(),

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.15.4 — 2026-07-01
+
+Saved graph files load unchanged; older files default the two new per-view settings to the previous behavior (OR, non-strict).
+
+### Features
+
+* **OR / AND filter combination.** The filter panel (under ⚙ Details) can now combine active filters with **AND** as well as the default **OR**. AND counts only the filters you have actually narrowed, so switching modes while everything is at its default leaves the graph unchanged instead of emptying it. A **Complete cases only** option additionally hides elements that are missing any of those filters (evaluated per element type). The join mode and complete-cases flag are saved per workspace view in exported JSON.
+* Added an `IS MISSING` query-DSL operator — true when a property is absent/empty or belongs to the other element type — used to express the non-strict AND join. The query-editor help, guided tour, and API grammar reference now document it.
+
 ## 1.15.1 — 2026-06-17
 
 Saved graph files load unchanged — this release is bug fixes only.
