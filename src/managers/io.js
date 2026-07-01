@@ -2417,6 +2417,10 @@ class IOManager {
         filters: this.parseFiltersAsMap(layout.filters),
         isCustom: layout.isCustom || false,
         query: layout['query'] || undefined,
+        // Per-view filter-join settings; default for pre-1.15.4 files that
+        // predate them (OR / non-strict = the historical behavior).
+        filterJoinMode: layout.filterJoinMode === 'AND' ? 'AND' : 'OR',
+        filterStrict: layout.filterStrict === true,
         // Per-view styles - check if already Maps
         hideDisconnectedNodes: layout.hideDisconnectedNodes || false,
         nodeStyles:

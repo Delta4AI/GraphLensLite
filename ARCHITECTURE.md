@@ -56,7 +56,7 @@ Business logic and UI:
 - `io.js` — `IOManager`: Excel/JSON loading, export (JSON / PNG / SVG), data
   preprocessing, Excel template generation
 - `ui.js` — loading overlays, UI enable/disable, notifications
-- `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, comparisons)
+- `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, comparisons)
 - `ui_components.js` — filter UI (dropdown checklists, invertible range sliders), tooltips
 - `ui_style_div.js` — the styling panel (node/edge styles, badges, edge flow, density heatmap)
 - `metrics.js` — `NetworkMetrics`: degree/betweenness/closeness/eigenvector centrality, PageRank

@@ -486,9 +486,11 @@ an `active` flag plus slider thresholds or selected categories.
 > Grammar, for reference only: a property path `section::subGroup::property`
 > followed by exactly one condition — `BETWEEN <low> AND <high>`,
 > `LOWER THAN <a> OR GREATER THAN <b>` (always two-sided — there is **no**
-> standalone `LOWER THAN`), or `IN [value1, value2]` — with clauses combined by
-> `AND` / `OR` / `NOT` and grouped in parentheses. There are no `<`, `>`, or `=`
-> operators.
+> standalone `LOWER THAN`), `IN [value1, value2]`, or the unary `IS MISSING`
+> (true when the property is absent/empty or belongs to the other element type;
+> emitted automatically by the filter panel's non-strict AND join) — with
+> clauses combined by `AND` / `OR` / `NOT` and grouped in parentheses. There are
+> no `<`, `>`, or `=` operators.
 
 ---
 

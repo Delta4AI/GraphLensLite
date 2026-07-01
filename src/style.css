@@ -1015,6 +1015,14 @@ h5 {
     color: var(--brand-text);
 }
 
+/* Auto-generated non-strict-AND filler (IS MISSING): muted + italic so it
+   reads as machine-added glue rather than a hand-written constraint. */
+.q-kw-ismissing {
+    color: var(--brand-text);
+    opacity: 0.6;
+    font-style: italic;
+}
+
 .q-cat-bracket-close {
     color: var(--brand-text);
 }
@@ -1493,16 +1501,46 @@ h5 {
     align-items: center;
 }
 
-/* Panel-level "Details" toggle: compact-by-default keeps dense property sets
-   (30-50 properties) scannable; the exact value inputs and per-row group /
-   selection actions are revealed on demand. The toggle rides on the first
-   section header row, right-aligned. */
-.filter-section-headerrow {
+/* Panel-level control bar above all filter sections: the "Details" disclosure
+   on the left, the OR/AND join control (plus its "Complete cases only" option)
+   pushed to the right. Sitting above every section makes clear the join
+   control is global, not scoped to the adjacent section. */
+.filter-toolbar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
-    margin-bottom: 2px;
+    margin-bottom: 6px;
+}
+
+.filter-toolbar-join {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-toolbar .filter-details-toggle {
+    margin-left: auto;
+}
+
+/* The OR/AND join controls are revealed only in Details mode, alongside the
+   exact value inputs and per-row actions. Compact mode shows just the Details
+   button so the panel stays minimal. */
+#filterContainer:not(.show-details) .filter-toolbar-join {
+    display: none;
+}
+
+.filter-strict-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-strong);
+    cursor: pointer;
+}
+
+.filter-strict-checkbox[hidden] {
+    display: none;
 }
 
 .filter-details-toggle {
@@ -1527,6 +1565,41 @@ h5 {
     background: var(--accent-text);
     color: #fff;
     border-color: var(--accent-text);
+}
+
+/* Segmented OR/AND control: how multiple active filters combine. Mirrors the
+   details toggle's pill styling; the active segment is filled so the current
+   mode is always visible (a state, not a morphing action). */
+.filter-join-toggle {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.filter-join-segment {
+    padding: 2px 9px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-strong);
+    background: var(--surface-3);
+    border: none;
+    cursor: pointer;
+}
+
+.filter-join-segment + .filter-join-segment {
+    border-left: 1px solid var(--border-soft);
+}
+
+.filter-join-segment:hover {
+    color: var(--accent-text);
+}
+
+.filter-join-segment.active {
+    background: var(--accent-text);
+    color: #fff;
+    cursor: default;
 }
 
 /* Compact mode: numeric inputs and the circle / +- actions are hidden so the
