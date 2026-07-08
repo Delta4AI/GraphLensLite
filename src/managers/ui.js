@@ -1,15 +1,26 @@
-import {StaticUtilities} from "../utilities/static.js";
-import {DropdownChecklist, InvertibleRangeSlider} from "./ui_components.js";
-import {createStyleDiv} from "./ui_style_div.js";
-import {Popup} from "../utilities/popup.js";
-import {applyTheme, currentTheme, nodeLabelColorForTheme} from "../utilities/theme.js";
-import {EXPORT_SCALES} from "../utilities/export_scale.js";
-import {clampPopoverLeft} from "../utilities/popover_position.js";
+import { StaticUtilities } from '../utilities/static.js';
+import { DropdownChecklist, InvertibleRangeSlider } from './ui_components.js';
+import { createStyleDiv } from './ui_style_div.js';
+import { Popup } from '../utilities/popup.js';
+import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
+import { EXPORT_SCALES } from '../utilities/export_scale.js';
+import { clampPopoverLeft } from '../utilities/popover_position.js';
 
 // Persisted preference: whether the filter panel reveals exact numeric inputs
 // and the per-row group / selection actions. Off keeps rows scannable when a
 // dataset has 30-50 properties.
-const FILTER_DETAILS_KEY = "gll.filterDetails";
+const FILTER_DETAILS_KEY = 'gll.filterDetails';
+
+// Persisted preference: how multiple active filters combine — "OR" (match any)
+// or "AND" (match every, non-strict: a property an element lacks does not
+// exclude it). Stored globally as the default for new layouts.
+const FILTER_JOIN_KEY = 'gll.filterJoinMode';
+
+// Persisted preference: strict ("complete cases only") vs non-strict AND. Only
+// meaningful while the join mode is AND. Off (default) = non-strict: an element
+// is judged only on the filters it has. On = hide elements missing any active
+// same-type filter.
+const FILTER_STRICT_KEY = 'gll.filterStrict';
 
 class UIManager {
   constructor(cache, debugEnabled = false) {
@@ -59,7 +70,7 @@ class UIManager {
     if (this._loadingHolds > 0) this._loadingHolds -= 1;
   }
 
-  async showLoading(header, text = "") {
+  async showLoading(header, text = '') {
     const overlay = document.getElementById('loadingOverlay');
     overlay.style.display = 'flex';
     overlay.style.opacity = '1';
@@ -74,10 +85,10 @@ class UIManager {
     // Force reflow
     overlay.getBoundingClientRect();
 
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
 
     // Wait for next frame to ensure the UI has updated
-    return new Promise(resolve => requestAnimationFrame(resolve));
+    return new Promise((resolve) => requestAnimationFrame(resolve));
   }
 
   async hideLoading() {
@@ -92,9 +103,10 @@ class UIManager {
     overlay.style.opacity = '0';
 
     // Wait for the opacity transition to complete
-    await new Promise(resolve => {
+    await new Promise((resolve) => {
       const transitionDuration = getComputedStyle(overlay).transitionDuration;
-      const durationInMs = parseFloat(transitionDuration) * (transitionDuration.includes('ms') ? 1 : 1000);
+      const durationInMs =
+        parseFloat(transitionDuration) * (transitionDuration.includes('ms') ? 1 : 1000);
       setTimeout(resolve, durationInMs);
     });
 
@@ -107,89 +119,119 @@ class UIManager {
 
     this.toggleStyleElementsThatRequireAtLeastOneVisibleNode(this.cache.nodeIDsToBeShown.size > 0);
     this.toggleStyleElementsThatRequireAtLeastOneVisibleEdge(this.cache.edgeIDsToBeShown.size > 0);
-    this.toggleStyleElementsThatRequireAtLeastOneVisibleNodeOrEdge(this.cache.nodeIDsToBeShown.size > 0 || this.cache.edgeIDsToBeShown.size > 0);
+    this.toggleStyleElementsThatRequireAtLeastOneVisibleNodeOrEdge(
+      this.cache.nodeIDsToBeShown.size > 0 || this.cache.edgeIDsToBeShown.size > 0
+    );
 
-    document.getElementById("visibleNodes").innerHTML = `${this.cache.nodeIDsToBeShown.size - this.cache.hiddenDanglingNodeIDs.size}`;
-    document.getElementById("totalNodes").innerHTML = `${this.cache.data.nodes.length}`;
-    document.getElementById("visibleEdges").innerHTML = `${this.cache.edgeIDsToBeShown.size - this.cache.hiddenDanglingEdgeIDs.size}`;
-    document.getElementById("totalEdges").innerHTML = `${this.cache.data.edges.length}`;
+    document.getElementById('visibleNodes').innerHTML =
+      `${this.cache.nodeIDsToBeShown.size - this.cache.hiddenDanglingNodeIDs.size}`;
+    document.getElementById('totalNodes').innerHTML = `${this.cache.data.nodes.length}`;
+    document.getElementById('visibleEdges').innerHTML =
+      `${this.cache.edgeIDsToBeShown.size - this.cache.hiddenDanglingEdgeIDs.size}`;
+    document.getElementById('totalEdges').innerHTML = `${this.cache.data.edges.length}`;
 
     this.cache.bs.refreshBubbleStyleElements();
   }
 
   toggleStyleElementsThatRequireAtLeastOneSelectedNode(enable) {
-    this.toggleDisabledElements([
-      "Node Configuration", "Expand Edges", "Reduce Edges", "Expand Neighbors", "Reduce Neighbors",
-      "deselectNodesBtn", "focusNodesBtn"
-    ], enable);
+    this.toggleDisabledElements(
+      [
+        'Node Configuration',
+        'Expand Edges',
+        'Reduce Edges',
+        'Expand Neighbors',
+        'Reduce Neighbors',
+        'deselectNodesBtn',
+        'focusNodesBtn',
+      ],
+      enable
+    );
   }
 
   toggleStyleElementsThatRequireAtLeastOneSelectedEdge(enable) {
-    this.toggleDisabledElements(["Edge Configuration", "deselectEdgesBtn", "focusEdgesBtn"], enable);
+    this.toggleDisabledElements(
+      ['Edge Configuration', 'deselectEdgesBtn', 'focusEdgesBtn'],
+      enable
+    );
   }
 
   toggleStyleElementsThatRequireAtLeastOneSelectedNodeOrEdge(enable) {
-    this.toggleDisabledElements(["resetSelectedElementsStyleBtn"], enable);
+    this.toggleDisabledElements(['resetSelectedElementsStyleBtn'], enable);
   }
 
   toggleStyleElementsThatRequireAtLeastOneVisibleNode(enable) {
-    this.toggleDisabledElements(["selectByNodeIDsInput", "Node IDs", "selectByNodeIDsSwitch",
-      "selectByNodeIDsSwitchLabel", "selectByNodeIDsButton"], enable);
+    this.toggleDisabledElements(
+      [
+        'selectByNodeIDsInput',
+        'Node IDs',
+        'selectByNodeIDsSwitch',
+        'selectByNodeIDsSwitchLabel',
+        'selectByNodeIDsButton',
+      ],
+      enable
+    );
   }
 
   toggleStyleElementsThatRequireAtLeastOneVisibleEdge(enable) {
-    this.toggleDisabledElements(["selectByEdgeIDsInput", "Edge IDs", "selectByEdgeIDsSwitch",
-      "selectByEdgeIDsSwitchLabel", "selectByEdgeIDsButton"], enable);
+    this.toggleDisabledElements(
+      [
+        'selectByEdgeIDsInput',
+        'Edge IDs',
+        'selectByEdgeIDsSwitch',
+        'selectByEdgeIDsSwitchLabel',
+        'selectByEdgeIDsButton',
+      ],
+      enable
+    );
   }
 
   toggleStyleElementsThatRequireAtLeastOneVisibleNodeOrEdge(enable) {
-    this.toggleDisabledElements(["Select Elements"], enable);
+    this.toggleDisabledElements(['Select Elements'], enable);
   }
 
   toggleStyleElementsThatRequireMoreThanOneSelectedNode(enable) {
-    this.toggleDisabledElements(["Arrange Selection"], enable);
+    this.toggleDisabledElements(['Arrange Selection'], enable);
   }
 
   toggleStyleElementsThatRequireExactlyTwoSelectedNodes(enable) {
-    this.toggleDisabledElements(["Shortest Path"], enable);
+    this.toggleDisabledElements(['Shortest Path'], enable);
   }
 
   toggleDisabledElements(headingLabels, enable) {
     for (let elemID of headingLabels) {
       const elem = document.getElementById(elemID);
       if (elem) {
-        enable ? elem.classList.remove("disabled") : elem.classList.add("disabled");
+        enable ? elem.classList.remove('disabled') : elem.classList.add('disabled');
       } else {
-        this.debug("Element not found: " + elemID);
+        this.debug('Element not found: ' + elemID);
       }
     }
   }
 
-
-  logMessage(text, colorClass, bold = false, iconPrefix = "") {
+  logMessage(text, colorClass, bold = false, iconPrefix = '') {
     const timestamp = StaticUtilities.getTimestamp();
 
     const container = document.getElementById('sidebarStatusContainer');
-    container.style.height = "8%";
+    container.style.height = '8%';
 
     const p = document.createElement('p');
-    p.style.margin = "0 0 1px 0";
+    p.style.margin = '0 0 1px 0';
 
     const spanTime = document.createElement('span');
     spanTime.textContent = `${timestamp} | `;
-    spanTime.classList.add("grey");
+    spanTime.classList.add('grey');
     p.appendChild(spanTime);
 
     if (iconPrefix) {
       const spanIcon = document.createElement('span');
       spanIcon.textContent = iconPrefix;
-      spanIcon.classList.add("mr");
+      spanIcon.classList.add('mr');
       p.appendChild(spanIcon);
     }
 
     const spanText = document.createElement('span');
     spanText.classList.add(colorClass);
-    spanText.style.fontWeight = bold ? "bold" : "normal";
+    spanText.style.fontWeight = bold ? 'bold' : 'normal';
     spanText.textContent = text;
     p.appendChild(spanText);
 
@@ -198,77 +240,77 @@ class UIManager {
   }
 
   info(message) {
-    this.logMessage(message, "black", false);
+    this.logMessage(message, 'black', false);
   }
 
   warning(message) {
-    this.logMessage(message, "dark-orange", false, "⚠️");
+    this.logMessage(message, 'dark-orange', false, '⚠️');
   }
 
   error(message) {
-    this.logMessage(message, "red", true, "⛔");
+    this.logMessage(message, 'red', true, '⛔');
   }
 
   success(message) {
-    this.logMessage(message, "green", false);
+    this.logMessage(message, 'green', false);
   }
 
   debug(message) {
     console.log(`${StaticUtilities.getTimestamp(true)} | ${message}`);
     if (this.debugEnabled) {
-      this.logMessage(message, "grey", false);
+      this.logMessage(message, 'grey', false);
     }
   }
 
   toggleQueryEditor() {
-    const queryBtn = document.getElementById("queryToggleBtn");
-    const dataBtn = document.getElementById("dataToggleBtn");
-    const shouldEnable = !queryBtn.classList.contains("highlight");
+    const queryBtn = document.getElementById('queryToggleBtn');
+    const dataBtn = document.getElementById('dataToggleBtn');
+    const shouldEnable = !queryBtn.classList.contains('highlight');
 
     if (shouldEnable) {
       this.showEditor('query');
-      queryBtn.classList.add("highlight");
-      dataBtn.classList.remove("highlight");
+      queryBtn.classList.add('highlight');
+      dataBtn.classList.remove('highlight');
     } else {
       this.hideBottomBar();
-      queryBtn.classList.remove("highlight");
+      queryBtn.classList.remove('highlight');
     }
   }
 
   async closeBottomBar() {
-    const queryBtn = document.getElementById("queryToggleBtn");
-    const dataBtn = document.getElementById("dataToggleBtn");
+    const queryBtn = document.getElementById('queryToggleBtn');
+    const dataBtn = document.getElementById('dataToggleBtn');
 
-    if (dataBtn.classList.contains("highlight")) {
+    if (dataBtn.classList.contains('highlight')) {
       await this.toggleDataEditor();
       return;
     }
 
-    if (queryBtn.classList.contains("highlight")) {
+    if (queryBtn.classList.contains('highlight')) {
       this.toggleQueryEditor();
       return;
     }
 
-    const bottomBar = document.getElementById("bottomBar");
-    if (bottomBar.classList.contains("active")) {
+    const bottomBar = document.getElementById('bottomBar');
+    if (bottomBar.classList.contains('active')) {
       this.hideBottomBar();
     }
   }
 
   async toggleDataEditor() {
-    const queryBtn = document.getElementById("queryToggleBtn");
-    const dataBtn = document.getElementById("dataToggleBtn");
-    const shouldEnable = !dataBtn.classList.contains("highlight");
+    const queryBtn = document.getElementById('queryToggleBtn');
+    const dataBtn = document.getElementById('dataToggleBtn');
+    const shouldEnable = !dataBtn.classList.contains('highlight');
 
     if (shouldEnable) {
-      await this.showLoading("Data Editor", "Loading Data Editor ..");
+      await this.showLoading('Data Editor', 'Loading Data Editor ..');
       this.showEditor('data');
-      dataBtn.classList.add("highlight");
-      queryBtn.classList.remove("highlight");
+      dataBtn.classList.add('highlight');
+      queryBtn.classList.remove('highlight');
     } else {
-      await this.showLoading("Data Editor", "Closing Data Editor ..");
+      await this.showLoading('Data Editor', 'Closing Data Editor ..');
       this.hideBottomBar();
-      dataBtn.classList.remove("highlight");
+      dataBtn.classList.remove('highlight');
     }
 
     await this.hideLoading();
@@ -284,56 +326,56 @@ class UIManager {
   }
 
   showEditor(editorType) {
-    const mainContent = document.getElementById("mainContent");
-    const bottomBar = document.getElementById("bottomBar");
-    const queryEditor = document.getElementById("queryEditor");
-    const dataEditor = document.getElementById("dataEditor");
-    const queryButtons = document.querySelector(".query-buttons");
-    const dataButtons = document.querySelector(".data-buttons");
+    const mainContent = document.getElementById('mainContent');
+    const bottomBar = document.getElementById('bottomBar');
+    const queryEditor = document.getElementById('queryEditor');
+    const dataEditor = document.getElementById('dataEditor');
+    const queryButtons = document.querySelector('.query-buttons');
+    const dataButtons = document.querySelector('.data-buttons');
     const queryToggleButtons = document.querySelectorAll('.add-to-query-button');
-    const headerText = document.getElementById("bottomBarHeaderText");
-    const helpBtn = document.getElementById("bottomBarHelpBtn");
+    const headerText = document.getElementById('bottomBarHeaderText');
+    const helpBtn = document.getElementById('bottomBarHelpBtn');
 
     if (this.bottomBarHeight) {
       const mainHeight = window.innerHeight - this.bottomBarHeight;
       bottomBar.style.height = this.bottomBarHeight + 'px';
       mainContent.style.height = mainHeight + 'px';
     } else {
-      mainContent.style.height = "65%";
-      bottomBar.style.height = "35%";
+      mainContent.style.height = '65%';
+      bottomBar.style.height = '35%';
     }
-    bottomBar.classList.add("active");
+    bottomBar.classList.add('active');
 
     if (editorType === 'query') {
-      queryEditor.style.display = "block";
-      dataEditor.style.display = "none";
-      queryButtons.style.display = "flex";
-      dataButtons.style.display = "none";
-      queryToggleButtons.forEach(btn => btn.classList.add("show"));
-      headerText.textContent = "Query Editor";
+      queryEditor.style.display = 'block';
+      dataEditor.style.display = 'none';
+      queryButtons.style.display = 'flex';
+      dataButtons.style.display = 'none';
+      queryToggleButtons.forEach((btn) => btn.classList.add('show'));
+      headerText.textContent = 'Query Editor';
       helpBtn.onclick = () => this.cache.qm.showQueryHelp();
-      helpBtn.title = "Display query editor help";
+      helpBtn.title = 'Display query editor help';
     } else if (editorType === 'data') {
-      queryEditor.style.display = "none";
-      dataEditor.style.display = "block";
-      queryButtons.style.display = "none";
-      dataButtons.style.display = "flex";
-      queryToggleButtons.forEach(btn => btn.classList.remove("show"));
-      headerText.textContent = "Data Editor";
+      queryEditor.style.display = 'none';
+      dataEditor.style.display = 'block';
+      queryButtons.style.display = 'none';
+      dataButtons.style.display = 'flex';
+      queryToggleButtons.forEach((btn) => btn.classList.remove('show'));
+      headerText.textContent = 'Data Editor';
       helpBtn.onclick = () => this.cache.dataTable.help();
-      helpBtn.title = "Display data editor help";
+      helpBtn.title = 'Display data editor help';
     }
   }
 
   hideBottomBar() {
-    const mainContent = document.getElementById("mainContent");
-    const bottomBar = document.getElementById("bottomBar");
+    const mainContent = document.getElementById('mainContent');
+    const bottomBar = document.getElementById('bottomBar');
     const queryToggleButtons = document.querySelectorAll('.add-to-query-button');
 
-    mainContent.style.height = "100%";
-    bottomBar.style.height = "0";
-    bottomBar.classList.remove("active");
-    queryToggleButtons.forEach(btn => btn.classList.remove("show"));
+    mainContent.style.height = '100%';
+    bottomBar.style.height = '0';
+    bottomBar.classList.remove('active');
+    queryToggleButtons.forEach((btn) => btn.classList.remove('show'));
   }
 
   makeBottomBarResizable() {
@@ -349,7 +391,7 @@ class UIManager {
       if (shadowBar) return shadowBar;
 
       shadowBar = document.createElement('div');
-      shadowBar.classList.add("resize-shadow-bar");
+      shadowBar.classList.add('resize-shadow-bar');
       document.body.appendChild(shadowBar);
       return shadowBar;
     }
@@ -412,7 +454,7 @@ class UIManager {
       shadowBar.style.display = 'none';
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
-    }
+    };
 
     window.addEventListener('beforeunload', () => {
       if (shadowBar && shadowBar.parentNode) {
@@ -422,49 +464,49 @@ class UIManager {
   }
 
   toggleStylingPanel() {
-    const rightSidebar = document.getElementById("rightSidebar");
-    const styleBtn = document.getElementById("styleToggleBtn");
-    const outerGraphContainer = document.getElementById("outerGraphContainer");
-    const isActive = rightSidebar.classList.contains("active");
+    const rightSidebar = document.getElementById('rightSidebar');
+    const styleBtn = document.getElementById('styleToggleBtn');
+    const outerGraphContainer = document.getElementById('outerGraphContainer');
+    const isActive = rightSidebar.classList.contains('active');
 
     if (isActive) {
-      rightSidebar.classList.remove("active");
-      styleBtn.classList.remove("highlight");
-      outerGraphContainer.classList.remove("styling-panel-active");
+      rightSidebar.classList.remove('active');
+      styleBtn.classList.remove('highlight');
+      outerGraphContainer.classList.remove('styling-panel-active');
     } else {
-      rightSidebar.classList.add("active");
-      styleBtn.classList.add("highlight");
-      outerGraphContainer.classList.add("styling-panel-active");
+      rightSidebar.classList.add('active');
+      styleBtn.classList.add('highlight');
+      outerGraphContainer.classList.add('styling-panel-active');
     }
   }
 
   toggleSelectionEditor() {
-    const container = document.getElementById("selectedElementsContainer");
-    const panel = document.getElementById("selectionEditorPanel");
-    const toggleBtn = document.getElementById("selectionEditorToggleBtn");
+    const container = document.getElementById('selectedElementsContainer');
+    const panel = document.getElementById('selectionEditorPanel');
+    const toggleBtn = document.getElementById('selectionEditorToggleBtn');
     if (!container || !panel || !toggleBtn) return;
 
-    const isExpanded = container.classList.toggle("expanded");
-    toggleBtn.textContent = isExpanded ? "Tools ▴" : "Tools ▾";
+    const isExpanded = container.classList.toggle('expanded');
+    toggleBtn.textContent = isExpanded ? 'Tools ▴' : 'Tools ▾';
     toggleBtn.title = isExpanded
-      ? "Hide selection tools"
-      : "Show selection tools: select by name, neighbours, or arrange the selection";
-    toggleBtn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+      ? 'Hide selection tools'
+      : 'Show selection tools: select by name, neighbours, or arrange the selection';
+    toggleBtn.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
   }
 
   async toggleLassoSelection() {
-    const lassoWrapper = document.getElementById("lassoWrapper");
-    const enableLasso = !lassoWrapper.classList.contains("active");
-    lassoWrapper.classList.toggle("active", enableLasso);
+    const lassoWrapper = document.getElementById('lassoWrapper');
+    const enableLasso = !lassoWrapper.classList.contains('active');
+    lassoWrapper.classList.toggle('active', enableLasso);
 
     // The lasso overlay owns the pointer while active (camera pan and node
     // drag are swallowed by it); tooltip clicks are routed away too. Hover
     // needs no toggling here: the overlay blocks sigma's mousemove anyway.
-    this.cache.graph.setInteractionEnabled("lasso", enableLasso);
-    this.cache.graph.setInteractionEnabled("drag", !enableLasso);
-    this.cache.graph.setInteractionEnabled("tooltip", !enableLasso);
+    this.cache.graph.setInteractionEnabled('lasso', enableLasso);
+    this.cache.graph.setInteractionEnabled('drag', !enableLasso);
+    this.cache.graph.setInteractionEnabled('tooltip', !enableLasso);
 
-    this.info(enableLasso ? "Switched to lasso selection mode" : "Switched to click and drag mode");
+    this.info(enableLasso ? 'Switched to lasso selection mode' : 'Switched to click and drag mode');
   }
 
   async toggleHoverEffect(btn) {
@@ -472,19 +514,19 @@ class UIManager {
     this.cache.CFG.DISABLE_HOVER_EFFECT = !enable;
 
     if (enable) {
-      btn.classList.remove("red");
-      btn.classList.add("green", "highlight");
-      btn.title = "Disable hover highlight effect (H)";
+      btn.classList.remove('red');
+      btn.classList.add('green', 'highlight');
+      btn.title = 'Disable hover highlight effect (H)';
     } else {
-      btn.classList.remove("green", "highlight");
-      btn.classList.add("red");
-      btn.title = "Enable hover highlight effect (H)";
+      btn.classList.remove('green', 'highlight');
+      btn.classList.add('red');
+      btn.title = 'Enable hover highlight effect (H)';
     }
 
     // Disabling also clears any lingering hover highlight/dim layer;
     // selection states are untouched (they live in elementStates).
-    this.cache.graph.setInteractionEnabled("hover", enable);
-    this.info(enable ? "Hover highlight effect enabled" : "Hover highlight effect disabled");
+    this.cache.graph.setInteractionEnabled('hover', enable);
+    this.info(enable ? 'Hover highlight effect enabled' : 'Hover highlight effect disabled');
   }
 
   /**
@@ -496,7 +538,7 @@ class UIManager {
   }
 
   toggleDarkMode() {
-    const next = currentTheme(document) === "dark" ? "light" : "dark";
+    const next = currentTheme(document) === 'dark' ? 'light' : 'dark';
     applyTheme(document, next);
     this.updateDarkModeButton();
     // Flip the renderer's default label color (per-element labelColor attrs
@@ -504,18 +546,18 @@ class UIManager {
     // refresh; the minimap redraws via its afterRender hook.
     const sigma = this.cache.graph?.sigma;
     if (sigma) {
-      sigma.setSetting("labelColor", { color: nodeLabelColorForTheme(next) });
-      sigma.setSetting("edgeLabelColor", { color: nodeLabelColorForTheme(next) });
+      sigma.setSetting('labelColor', { color: nodeLabelColorForTheme(next) });
+      sigma.setSetting('edgeLabelColor', { color: nodeLabelColorForTheme(next) });
     }
-    this.info(next === "dark" ? "Dark mode enabled" : "Light mode enabled");
+    this.info(next === 'dark' ? 'Dark mode enabled' : 'Light mode enabled');
   }
 
   updateDarkModeButton() {
-    const btn = document.getElementById("darkModeToggleBtn");
+    const btn = document.getElementById('darkModeToggleBtn');
     if (!btn) return;
-    const isDark = currentTheme(document) === "dark";
-    btn.textContent = isDark ? "☀️" : "🌙";
-    btn.title = isDark ? "Switch to light mode" : "Switch to dark mode";
+    const isDark = currentTheme(document) === 'dark';
+    btn.textContent = isDark ? '☀️' : '🌙';
+    btn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
   }
 
   /**
@@ -524,7 +566,7 @@ class UIManager {
    * the "P" shortcut). Built lazily on first open.
    */
   toggleExportResolutionPopover() {
-    if (this._exportPopover?.classList.contains("open")) {
+    if (this._exportPopover?.classList.contains('open')) {
       this.#closeExportResolutionPopover();
       return;
     }
@@ -532,25 +574,25 @@ class UIManager {
   }
 
   #closeExportResolutionPopover() {
-    this._exportPopover?.classList.remove("open");
+    this._exportPopover?.classList.remove('open');
     if (this._exportOutsideHandler) {
-      document.removeEventListener("pointerdown", this._exportOutsideHandler, true);
+      document.removeEventListener('pointerdown', this._exportOutsideHandler, true);
       this._exportOutsideHandler = null;
     }
   }
 
   #openExportResolutionPopover() {
-    const anchor = document.getElementById("exportImage");
+    const anchor = document.getElementById('exportImage');
     if (!anchor) return;
 
     const popover = this.#ensureExportResolutionPopover();
     const current = this.cache.io.exportScale || 1;
-    popover.querySelectorAll(".export-res-option").forEach((btn) => {
-      btn.classList.toggle("active", Number(btn.dataset.scale) === current);
+    popover.querySelectorAll('.export-res-option').forEach((btn) => {
+      btn.classList.toggle('active', Number(btn.dataset.scale) === current);
     });
 
     const rect = anchor.getBoundingClientRect();
-    popover.classList.add("open");
+    popover.classList.add('open');
     // Anchor below the button, clamped to the viewport's right edge.
     popover.style.top = `${rect.bottom + 6}px`;
     popover.style.left = `${clampPopoverLeft(rect.left, popover.offsetWidth, window.innerWidth)}px`;
@@ -558,29 +600,29 @@ class UIManager {
     this._exportOutsideHandler = (e) => {
       if (!popover.contains(e.target) && e.target !== anchor) this.#closeExportResolutionPopover();
     };
-    document.addEventListener("pointerdown", this._exportOutsideHandler, true);
+    document.addEventListener('pointerdown', this._exportOutsideHandler, true);
   }
 
   #ensureExportResolutionPopover() {
     if (this._exportPopover) return this._exportPopover;
-    const popover = document.createElement("div");
-    popover.className = "export-resolution-popover";
-    popover.id = "exportResolutionPopover";
+    const popover = document.createElement('div');
+    popover.className = 'export-resolution-popover';
+    popover.id = 'exportResolutionPopover';
 
-    const title = document.createElement("div");
-    title.className = "export-res-title";
-    title.textContent = "Export image resolution";
+    const title = document.createElement('div');
+    title.className = 'export-res-title';
+    title.textContent = 'Export image resolution';
     popover.appendChild(title);
 
-    const row = document.createElement("div");
-    row.className = "export-res-row";
+    const row = document.createElement('div');
+    row.className = 'export-res-row';
     for (const scale of EXPORT_SCALES) {
-      const btn = document.createElement("button");
-      btn.className = "export-res-option";
+      const btn = document.createElement('button');
+      btn.className = 'export-res-option';
       btn.dataset.scale = String(scale);
       btn.textContent = `${scale}×`;
       btn.title = `Export at ${scale}× viewport resolution`;
-      btn.addEventListener("click", () => {
+      btn.addEventListener('click', () => {
         this.#closeExportResolutionPopover();
         this.cache.io.exportPNG(scale);
       });
@@ -590,11 +632,11 @@ class UIManager {
 
     // Vector output has no resolution to pick — one button, below the PNG
     // scales. SVG never participates in the remembered scale (PNG-only).
-    const svgBtn = document.createElement("button");
-    svgBtn.className = "export-res-option export-res-svg";
-    svgBtn.textContent = "Vector (SVG)";
-    svgBtn.title = "Export as resolution-independent SVG vector graphic";
-    svgBtn.addEventListener("click", () => {
+    const svgBtn = document.createElement('button');
+    svgBtn.className = 'export-res-option export-res-svg';
+    svgBtn.textContent = 'Vector (SVG)';
+    svgBtn.title = 'Export as resolution-independent SVG vector graphic';
+    svgBtn.addEventListener('click', () => {
       this.#closeExportResolutionPopover();
       this.cache.io.exportSVG();
     });
@@ -606,42 +648,44 @@ class UIManager {
   }
 
   updateHoverToggleButton() {
-    const btn = document.getElementById("hoverToggleBtn");
+    const btn = document.getElementById('hoverToggleBtn');
     if (!btn) return;
     if (this.cache.CFG.DISABLE_HOVER_EFFECT) {
-      btn.classList.remove("green", "highlight");
-      btn.classList.add("red");
-      btn.title = "Enable hover highlight effect (H)";
+      btn.classList.remove('green', 'highlight');
+      btn.classList.add('red');
+      btn.title = 'Enable hover highlight effect (H)';
     } else {
-      btn.classList.remove("red");
-      btn.classList.add("green", "highlight");
-      btn.title = "Disable hover highlight effect (H)";
+      btn.classList.remove('red');
+      btn.classList.add('green', 'highlight');
+      btn.title = 'Disable hover highlight effect (H)';
     }
   }
 
   buildUI() {
-    this.cache.query.text = document.getElementById("queryTextArea");
-    this.cache.query.overlay = document.getElementById("queryOverlay");
-    this.cache.query.caret = document.getElementById("queryCaret");
-    this.cache.query.editorDiv = document.getElementById("queryEditor");
+    this.cache.query.text = document.getElementById('queryTextArea');
+    this.cache.query.overlay = document.getElementById('queryOverlay');
+    this.cache.query.caret = document.getElementById('queryCaret');
+    this.cache.query.editorDiv = document.getElementById('queryEditor');
 
-    this.cache.query.sizeObserver = new ResizeObserver(() => requestAnimationFrame(() => this.cache.qm.validateAlignment()))
+    this.cache.query.sizeObserver = new ResizeObserver(() =>
+      requestAnimationFrame(() => this.cache.qm.validateAlignment())
+    );
     this.cache.query.sizeObserver.observe(this.cache.query.editorDiv);
 
-    this.cache.query.text.addEventListener("scroll", () => {
+    this.cache.query.text.addEventListener('scroll', () => {
       this.cache.query.overlay.scrollTop = this.cache.query.text.scrollTop;
       this.cache.query.overlay.scrollLeft = this.cache.query.text.scrollLeft;
     });
 
     this.cache.uiComponents.buildDropdownOptions();
 
-    const div = document.getElementById("metricsContainer");
-    div.innerHTML = "";
+    const div = document.getElementById('metricsContainer');
+    div.innerHTML = '';
     div.appendChild(this.cache.metrics.buildMetricUI());
 
     // Initialize manual bubble group button
-    const manualButtonContainer = document.getElementById("manualBubbleGroupButtonContainer");
-    manualButtonContainer.innerHTML = "";
+    const manualButtonContainer = document.getElementById('manualBubbleGroupButtonContainer');
+    manualButtonContainer.innerHTML = '';
     manualButtonContainer.appendChild(this.cache.uiComponents.createManualBubbleGroupButton());
 
     this.buildFilterUI();
@@ -655,13 +699,15 @@ class UIManager {
   }
 
   buildFilterUI() {
-    const div = document.getElementById("filterContainer");
-    div.innerHTML = "";
+    const div = document.getElementById('filterContainer');
+    div.innerHTML = '';
 
     // Always create lock status bar, show/hide based on lock state
     const statusBar = this.createFilterLockStatusBar();
     statusBar.id = 'filterLockStatusBar';
-    statusBar.style.display = this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY ? 'flex' : 'none';
+    statusBar.style.display = this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY
+      ? 'flex'
+      : 'none';
     div.appendChild(statusBar);
 
     // Add/remove locked class on container
@@ -671,47 +717,56 @@ class UIManager {
       div.classList.remove('locked');
     }
 
-    // A single "Details" toggle reveals exact numeric inputs and per-row
-    // group / selection actions. Compact by default so dense property sets
-    // (30-50 properties) stay scannable. It rides on the first section header.
-    const detailsToggle = this.createFilterDetailsToggle(div);
+    // Panel-level control bar. Sits above every section so its controls read
+    // as global, not scoped to the adjacent section:
+    //  - "Combine filters" OR/AND: how multiple active filters combine.
+    //  - "Details": reveals exact numeric inputs and per-row group / selection
+    //    actions. Compact by default so dense property sets (30-50 properties)
+    //    stay scannable.
+    const toolbar = document.createElement('div');
+    toolbar.className = 'filter-toolbar';
+    // OR/AND join control (left). "Complete cases only" is a modifier of AND,
+    // revealed only under AND (the join toggle drives its visibility). It sits
+    // to the RIGHT of the toggle so switching OR<->AND never shifts the toggle.
+    const strictCheckbox = this.createFilterStrictCheckbox();
+    const joinToggle = this.createFilterJoinToggle((mode) => {
+      strictCheckbox.hidden = mode !== 'AND';
+    });
+    const joinCluster = document.createElement('div');
+    joinCluster.className = 'filter-toolbar-join';
+    joinCluster.append(joinToggle, strictCheckbox);
+    // Details (view option) is pushed to the far right.
+    toolbar.append(joinCluster, this.createFilterDetailsToggle(div));
+    div.appendChild(toolbar);
 
     // Each section (and sub-group) is a collapsible accordion so large
     // property sets can be folded down to just the groups in use.
     const sectionBodies = new Map();
     const subBodies = new Map();
-    const sortedPropIDs = this.cache.CFG.SORT_FILTERS ?
-      [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()].sort() :
-      [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()];
+    const sortedPropIDs = this.cache.CFG.SORT_FILTERS
+      ? [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()].sort()
+      : [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()];
 
     for (let propID of sortedPropIDs) {
       let [section, subSection, prop] = StaticUtilities.decodePropHashId(propID);
       let isCategoricalProperty = this.cache.data.filterDefaults.get(propID).isCategory;
 
       if (!sectionBodies.has(section)) {
-        const sectionWrap = document.createElement("div");
-        sectionWrap.className = "filter-section";
-        const headerDiv = document.createElement("div");
-        headerDiv.className = "header-card";
-        const header = document.createElement("h4");
+        const sectionWrap = document.createElement('div');
+        sectionWrap.className = 'filter-section';
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'header-card';
+        const header = document.createElement('h4');
         header.textContent = section;
-        header.className = "m-0 white";
+        header.className = 'm-0 white';
         headerDiv.appendChild(header);
         headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(false, section));
         headerDiv.appendChild(this.cache.uiComponents.createSectionResetButton(section));
         headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(true, section));
-        const sectionBody = document.createElement("div");
-        sectionBody.className = "filter-section-body";
+        const sectionBody = document.createElement('div');
+        sectionBody.className = 'filter-section-body';
         this.makeFilterGroupCollapsible(sectionWrap, headerDiv);
-        if (sectionBodies.size === 0) {
-          // Pair the first section header with the panel-level Details toggle.
-          const headerRow = document.createElement("div");
-          headerRow.className = "filter-section-headerrow";
-          headerRow.append(headerDiv, detailsToggle);
-          sectionWrap.append(headerRow, sectionBody);
-        } else {
-          sectionWrap.append(headerDiv, sectionBody);
-        }
+        sectionWrap.append(headerDiv, sectionBody);
         div.appendChild(sectionWrap);
         sectionBodies.set(section, sectionBody);
       }
@@ -719,19 +774,25 @@ class UIManager {
 
       const subKey = `${section}::${subSection}`;
       if (!subBodies.has(subKey)) {
-        const subWrap = document.createElement("div");
-        subWrap.className = "filter-subgroup";
-        const subHeaderDiv = document.createElement("div");
-        subHeaderDiv.className = "sub-header-card";
-        const subHeader = document.createElement("h5");
+        const subWrap = document.createElement('div');
+        subWrap.className = 'filter-subgroup';
+        const subHeaderDiv = document.createElement('div');
+        subHeaderDiv.className = 'sub-header-card';
+        const subHeader = document.createElement('h5');
         subHeader.textContent = subSection;
-        subHeader.className = "m-0 inline";
+        subHeader.className = 'm-0 inline';
         subHeaderDiv.appendChild(subHeader);
-        subHeaderDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(false, section, subSection));
-        subHeaderDiv.appendChild(this.cache.uiComponents.createSectionResetButton(section, subSection));
-        subHeaderDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(true, section, subSection));
-        const subBody = document.createElement("div");
-        subBody.className = "filter-subgroup-body";
+        subHeaderDiv.appendChild(
+          this.cache.uiComponents.createSectionToggleButton(false, section, subSection)
+        );
+        subHeaderDiv.appendChild(
+          this.cache.uiComponents.createSectionResetButton(section, subSection)
+        );
+        subHeaderDiv.appendChild(
+          this.cache.uiComponents.createSectionToggleButton(true, section, subSection)
+        );
+        const subBody = document.createElement('div');
+        subBody.className = 'filter-subgroup-body';
         this.makeFilterGroupCollapsible(subWrap, subHeaderDiv);
         subWrap.append(subHeaderDiv, subBody);
         sectionBody.appendChild(subWrap);
@@ -740,13 +801,13 @@ class UIManager {
       const subBody = subBodies.get(subKey);
 
       const row = document.createElement('div');
-      row.className = "filter-row";
+      row.className = 'filter-row';
       const col1 = document.createElement('div');
-      col1.className = "filter-row-col1";
+      col1.className = 'filter-row-col1';
       col1.appendChild(this.cache.uiComponents.createCheckbox(propID, prop));
       row.appendChild(col1);
       const col2 = document.createElement('div');
-      col2.className = "filter-row-col2";
+      col2.className = 'filter-row-col2';
       row.appendChild(col2);
 
       const sliderOrDropdown = isCategoricalProperty
@@ -755,12 +816,12 @@ class UIManager {
 
       sliderOrDropdown.appendTo(col2);
       const col3 = document.createElement('div');
-      col3.className = "filter-row-col3";
+      col3.className = 'filter-row-col3';
       if (this.cache.nodeExclusiveProps.has(propID) || this.cache.mixedProps.has(propID)) {
         col3.appendChild(this.cache.uiComponents.createCircleGroupButtonWithQuadrants(propID));
       } else {
         const placeHolder = document.createElement('div');
-        placeHolder.style.width = "18px";
+        placeHolder.style.width = '18px';
         col3.appendChild(placeHolder);
       }
       col3.appendChild(this.cache.uiComponents.createAddOrRemoveToSelectionGroup(propID));
@@ -812,6 +873,130 @@ class UIManager {
     return detailsBtn;
   }
 
+  // Builds the segmented OR/AND control that sets how multiple active filters
+  // combine. OR shows elements matching any active filter; AND shows elements
+  // matching every active filter (non-strict — a property an element lacks
+  // does not exclude it; see updateQueryTextArea). Changing it re-derives the
+  // query and re-renders, exactly like toggling a filter checkbox.
+  createFilterJoinToggle(onModeChange) {
+    const layout = () => this.cache.data.layouts[this.cache.data.selectedLayout];
+
+    // Seed the layout's mode from the persisted preference if unset.
+    let stored = 'OR';
+    try {
+      stored = window.localStorage.getItem(FILTER_JOIN_KEY) === 'AND' ? 'AND' : 'OR';
+    } catch (err) {
+      this.debug(`Could not read filter-join preference: ${err.message}`);
+    }
+    if (layout().filterJoinMode !== 'AND' && layout().filterJoinMode !== 'OR') {
+      layout().filterJoinMode = stored;
+    }
+
+    const group = document.createElement('div');
+    group.className = 'filter-join-toggle';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', 'Combine active filters with OR or AND');
+    group.title =
+      'How multiple active filters combine.\n' +
+      'OR: show elements matching any active filter.\n' +
+      'AND: show elements matching every active filter ' +
+      '(a property an element lacks does not exclude it).';
+
+    const buttons = new Map();
+    const apply = (mode) => {
+      for (const [m, btn] of buttons) {
+        const on = m === mode;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-pressed', String(on));
+      }
+      onModeChange?.(mode);
+    };
+
+    for (const [mode, tip] of [
+      ['OR', 'Match any active filter'],
+      ['AND', 'Match every active filter'],
+    ]) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'filter-join-segment';
+      btn.textContent = mode;
+      btn.title = tip;
+      btn.addEventListener('click', async () => {
+        if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
+        if (layout().filterJoinMode === mode) return;
+        layout().filterJoinMode = mode;
+        try {
+          window.localStorage.setItem(FILTER_JOIN_KEY, mode);
+        } catch (err) {
+          this.debug(`Could not persist filter-join preference: ${err.message}`);
+        }
+        apply(mode);
+        await this.cache.fm.handleFilterEvent('Filtering', `Combining active filters with ${mode}`);
+      });
+      buttons.set(mode, btn);
+      group.appendChild(btn);
+    }
+
+    apply(layout().filterJoinMode);
+    return group;
+  }
+
+  // Builds the "Complete cases only" checkbox — the strict modifier of the AND
+  // join. Off (default) is non-strict: an element is judged only on the filters
+  // it has. On hides elements missing any active same-type filter. The join
+  // toggle shows/hides this control (only meaningful under AND). Starts hidden;
+  // the join toggle's callback reveals it when AND is active.
+  createFilterStrictCheckbox() {
+    const layout = () => this.cache.data.layouts[this.cache.data.selectedLayout];
+
+    let stored = false;
+    try {
+      stored = window.localStorage.getItem(FILTER_STRICT_KEY) === '1';
+    } catch (err) {
+      this.debug(`Could not read filter-strict preference: ${err.message}`);
+    }
+    if (typeof layout().filterStrict !== 'boolean') {
+      layout().filterStrict = stored;
+    }
+
+    const wrapper = document.createElement('label');
+    wrapper.className = 'filter-strict-checkbox';
+    wrapper.hidden = true;
+    wrapper.title =
+      'Complete cases only.\n' +
+      "On: an element must have a value for every filter you've set — elements " +
+      'missing any of those properties are hidden.\n' +
+      'Off: elements are judged only on the properties they have, so a missing ' +
+      'property never hides them.';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = layout().filterStrict === true;
+
+    const text = document.createElement('span');
+    text.textContent = 'Complete cases only';
+
+    input.addEventListener('change', async () => {
+      if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
+        input.checked = layout().filterStrict === true;
+        return;
+      }
+      layout().filterStrict = input.checked;
+      try {
+        window.localStorage.setItem(FILTER_STRICT_KEY, input.checked ? '1' : '0');
+      } catch (err) {
+        this.debug(`Could not persist filter-strict preference: ${err.message}`);
+      }
+      await this.cache.fm.handleFilterEvent(
+        'Filtering',
+        `Complete cases only: ${input.checked ? 'on' : 'off'}`
+      );
+    });
+
+    wrapper.append(input, text);
+    return wrapper;
+  }
+
   // Prepends a chevron and wires a click on the group header to fold the group
   // body. Clicks on the header's action badges are ignored so they still fire.
   makeFilterGroupCollapsible(wrapper, headerDiv) {
@@ -835,14 +1020,14 @@ class UIManager {
     }
 
     document.querySelectorAll('.showOnLoad').forEach((element) => {
-      element.style.opacity = show ? "1" : "0";
-      element.style.pointerEvents = show ? "auto" : "none";
+      element.style.opacity = show ? '1' : '0';
+      element.style.pointerEvents = show ? 'auto' : 'none';
     });
 
     document.querySelectorAll('.hideOnLoad').forEach((element) => {
-      element.style.opacity = show ? "0" : "1";
-      element.style.pointerEvents = show ? "none" : "auto";
-      element.style.height = show ? "0" : "auto";
+      element.style.opacity = show ? '0' : '1';
+      element.style.pointerEvents = show ? 'none' : 'auto';
+      element.style.height = show ? '0' : 'auto';
     });
 
     const appHeader = document.getElementById('appHeader');
@@ -880,24 +1065,32 @@ class UIManager {
 
   manageDynamicWidgets() {
     let isCustomLayout = this.cache.data.layouts[this.cache.data.selectedLayout].isCustom;
-    let removeLayoutBtnCls = document.getElementById("removeSelectedLayoutButton").classList;
+    let removeLayoutBtnCls = document.getElementById('removeSelectedLayoutButton').classList;
 
-    isCustomLayout ? removeLayoutBtnCls.remove("disabled") : removeLayoutBtnCls.add("disabled");
+    isCustomLayout ? removeLayoutBtnCls.remove('disabled') : removeLayoutBtnCls.add('disabled');
   }
 
   async toggleSection(enable, section) {
     this.toggleCheckboxesForSetOfPropIDs(enable, section);
-    await this.cache.fm.handleFilterEvent(`${enable ? 'Showing' : 'Hiding'} Elements`, `Nodes and related edges for ${section}`);
+    await this.cache.fm.handleFilterEvent(
+      `${enable ? 'Showing' : 'Hiding'} Elements`,
+      `Nodes and related edges for ${section}`
+    );
   }
 
   async toggleSubSection(enable, section, subSection) {
-    this.toggleCheckboxesForSetOfPropIDs(enable, section + "::" + subSection);
-    await this.cache.fm.handleFilterEvent(`${enable ? 'Showing' : 'Hiding'} Elements`, `Nodes and related edges for ${section} ${subSection}`);
+    this.toggleCheckboxesForSetOfPropIDs(enable, section + '::' + subSection);
+    await this.cache.fm.handleFilterEvent(
+      `${enable ? 'Showing' : 'Hiding'} Elements`,
+      `Nodes and related edges for ${section} ${subSection}`
+    );
   }
 
   toggleCheckboxesForSetOfPropIDs(enable, propIDPrefixToSearchFor) {
-    const setOfPropIDs = [...this.cache.propToNodes.keys(), ...this.cache.propToEdgeIDs.keys()]
-      .filter(propID => propID.startsWith(propIDPrefixToSearchFor));
+    const setOfPropIDs = [
+      ...this.cache.propToNodes.keys(),
+      ...this.cache.propToEdgeIDs.keys(),
+    ].filter((propID) => propID.startsWith(propIDPrefixToSearchFor));
     for (let propID of setOfPropIDs) {
       let checkbox = document.getElementById(`filter-${propID}-checkbox`);
       let wrapper = document.getElementById(`filter-${propID}-checkbox-wrapper`);
@@ -911,13 +1104,15 @@ class UIManager {
   }
 
   clearActivePropsCacheOnLayoutChange() {
-  this.cache.activeProps = new Set();
-  for (const [key, value] of this.cache.data.layouts[this.cache.data.selectedLayout].filters.entries()) {
-    if (value.active) {
-      this.cache.activeProps.add(key);
+    this.cache.activeProps = new Set();
+    for (const [key, value] of this.cache.data.layouts[
+      this.cache.data.selectedLayout
+    ].filters.entries()) {
+      if (value.active) {
+        this.cache.activeProps.add(key);
+      }
     }
   }
-}
 
   createFilterLockStatusBar() {
     const statusBar = document.createElement('div');
@@ -951,13 +1146,13 @@ class UIManager {
 
       // Disable/enable all range inputs programmatically to fully prevent interaction
       const rangeInputs = container.querySelectorAll('input[type="range"]');
-      rangeInputs.forEach(input => {
+      rangeInputs.forEach((input) => {
         input.disabled = isLocked;
       });
 
       // Disable/enable number inputs
       const numberInputs = container.querySelectorAll('input[type="number"]');
-      numberInputs.forEach(input => {
+      numberInputs.forEach((input) => {
         input.disabled = isLocked;
       });
     }
@@ -971,25 +1166,30 @@ class UIManager {
     // Apply the reset query without re-locking
     this.cache.EVENT_LOCKS.QUERY_UPDATE_EVENT = true;
     try {
-      await this.cache.fm.handleFilterEvent("Resetting Query", "Syncing filters with UI state", null, false);
+      await this.cache.fm.handleFilterEvent(
+        'Resetting Query',
+        'Syncing filters with UI state',
+        null,
+        false
+      );
     } finally {
       this.cache.EVENT_LOCKS.QUERY_UPDATE_EVENT = false;
     }
   }
 
   buildStylingPanelUI() {
-    const content = document.getElementById("stylingPanelContent");
-    content.innerHTML = "";
+    const content = document.getElementById('stylingPanelContent');
+    content.innerHTML = '';
     content.appendChild(createStyleDiv(this.cache));
     this.mountSelectionEditorCards();
   }
 
   mountSelectionEditorCards() {
-    const selectionPanel = document.getElementById("selectionEditorPanel");
+    const selectionPanel = document.getElementById('selectionEditorPanel');
     if (!selectionPanel) return;
 
-    selectionPanel.innerHTML = "";
-    ["Focus Elements", "Select Elements", "Arrange Selection"].forEach((cardId) => {
+    selectionPanel.innerHTML = '';
+    ['Focus Elements', 'Select Elements', 'Arrange Selection'].forEach((cardId) => {
       const card = document.getElementById(cardId);
       if (card) selectionPanel.appendChild(card);
     });
@@ -999,22 +1199,22 @@ class UIManager {
   // Driven by the current selection so the relevant card is already open when
   // the user reaches for it, without fighting cards they toggled themselves.
   expandStylingCard(label) {
-    const content = document.getElementById("stylingPanelContent");
+    const content = document.getElementById('stylingPanelContent');
     const card = content?.querySelector(`[data-label="${label}"]`);
-    if (!card || !card.classList.contains("collapsed")) return;
-    card.classList.remove("collapsed");
-    const header = card.querySelector(".card-collapse-header");
-    const chevron = card.querySelector(".card-collapse-chevron");
-    if (header) header.setAttribute("aria-expanded", "true");
-    if (chevron) chevron.textContent = "▾";
+    if (!card || !card.classList.contains('collapsed')) return;
+    card.classList.remove('collapsed');
+    const header = card.querySelector('.card-collapse-header');
+    const chevron = card.querySelector('.card-collapse-chevron');
+    if (header) header.setAttribute('aria-expanded', 'true');
+    if (chevron) chevron.textContent = '▾';
   }
 
   // Mirror the live selection onto the styling cards: open Node/Edge config for
   // whatever is selected. Additive only — see expandStylingCard.
   syncStylingCardsToSelection(hasNodes, hasEdges) {
-    if (hasNodes) this.expandStylingCard("Node Configuration");
-    if (hasEdges) this.expandStylingCard("Edge Configuration");
+    if (hasNodes) this.expandStylingCard('Node Configuration');
+    if (hasEdges) this.expandStylingCard('Edge Configuration');
   }
 }
 
-export {UIManager};
+export { UIManager };
