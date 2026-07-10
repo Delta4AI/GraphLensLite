@@ -8,6 +8,10 @@ Saved graph files load unchanged; older files (and files saved by earlier versio
 
 * **Node and edge opacity.** The styling panel (under 🎨) now has an **Opacity** slider for both nodes and edges (1 = opaque, 0 = invisible). It folds into the element's color alpha, so it composes with a color that already carries transparency, and — like the other numeric style knobs — it can be **mapped by data** via the ∿ button to scale opacity from a numeric property. Opacity round-trips through both JSON and the Excel `Opacity` column (documented in the template's readme tab). Being an alpha effect, low opacity composites toward the background: light colors (e.g. the default slate edges) approach white sooner than saturated ones.
 
+### Fixes
+
+* **Exported images now match the on-screen bubble-group z-order.** PNG and SVG exports painted bubble-set hulls *underneath* the nodes and edges, but the live view draws them on top (since 1.15.1). On dense graphs the edge mesh buried the hulls, which also made edges read as more opaque than on screen. Both exporters now composite hulls above nodes/edges and below labels, matching the live layer. Sparse graphs were unaffected, so this was only visible on large graphs.
+
 ## 1.15.4 — 2026-07-01
 
 Saved graph files load unchanged; older files default the two new per-view settings to the previous behavior (OR, non-strict).
