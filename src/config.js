@@ -1,11 +1,11 @@
 /**
  * Defaults for the graph, layouts and UI
  */
-const VERSION = "1.15.4";
+const VERSION = "1.15.5";
 
 const DEFAULTS = {
   NODE: {
-    FILL_COLOR: "#C33D35", SIZE: 20, LINE_WIDTH: 1, TYPE: "hexagon", STROKE_COLOR: null,
+    FILL_COLOR: "#C33D35", SIZE: 20, LINE_WIDTH: 1, TYPE: "hexagon", STROKE_COLOR: null, OPACITY: 1,
     BADGE: {
       FONT_SIZE: 8, COLOR: "#C33D35", SCALE_WITH_NODE: false
     },
@@ -32,7 +32,7 @@ const DEFAULTS = {
     },
   },
   EDGE: {
-    COLOR: "#403C5390", LINE_WIDTH: 0.75, LINE_DASH: 0, TYPE: "line",
+    COLOR: "#403C5390", LINE_WIDTH: 0.75, LINE_DASH: 0, TYPE: "line", OPACITY: 1,
     ARROWS: {
       START: false, END: false, START_SIZE: 8, START_TYPE: "arrow", END_SIZE: 8, END_TYPE: "arrow",
       // null fill → marker inherits the edge stroke color; null border → no border (transparent).

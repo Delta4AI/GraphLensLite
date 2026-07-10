@@ -658,8 +658,9 @@ function bubbleLabelPrimitives({ points, opts = {}, defaults = {} }, measureText
 
 /**
  * Collect the full scene as a flat array of typed primitives, in draw order:
- * bubble bodies → edges → nodes → edge labels → node labels (+badges) →
- * bubble labels. (The background rect is the serializer's job.)
+ * edges → nodes → bubble bodies → edge labels → node labels (+badges) →
+ * bubble labels. Bubble bodies sit above nodes/edges to match the live layer
+ * (afterLayer:"nodes"), below labels. (The background rect is the serializer's job.)
  *
  * @param {object} args  same shape as buildGraphSvg (background unused here)
  * @returns {Array<object>} primitives ({kind: "rect"|"circle"|"path"|
@@ -672,9 +673,9 @@ function collectSvgScene({ sigma, graph, bubbleGroups = [], measureText }) {
   const sortedNodes = sortByZIndex([...nodes.values()]);
 
   const prims = [];
-  for (const group of bubbleGroups) prims.push(...bubbleBodyPrimitives(group));
   for (const edge of edges) prims.push(...edgePrimitives(edge, sigma));
   for (const node of sortedNodes) prims.push(...nodePrimitives(node));
+  for (const group of bubbleGroups) prims.push(...bubbleBodyPrimitives(group));
   if (env.renderEdgeLabels) {
     for (const edge of edges) {
       if (env.edgeLabelSet && !env.edgeLabelSet.has(edge.id)) continue;

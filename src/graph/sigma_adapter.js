@@ -900,7 +900,8 @@ class SigmaAdapter {
    * scene on a temp renderer, which only carries sigma's own layers, so the
    * bubble-set hulls and group labels are re-painted here at the export
    * resolution (BubbleSetLayer.drawExport*) in their on-screen z-order: the
-   * body/outline UNDER the sigma image, the group labels OVER it. An opaque
+   * body/outline OVER the sigma image (the live layer is afterLayer:"nodes",
+   * i.e. above nodes/edges), then the group labels OVER that. An opaque
    * stage-background fill goes down first (export-image renders sigma
    * transparent). The minimap is a viewport control and stays out of exports.
    *
@@ -958,8 +959,14 @@ class SigmaAdapter {
       // scaled exports blurry, and their zoom-bucketed outlines drift from
       // the freshly rendered nodes after a zoom).
       const bubbleGroups = this.bubbleLayer.exportOutlines();
-      this.bubbleLayer.drawExportBodies(ctx, bubbleGroups, dpr * appliedScale);
       ctx.drawImage(sigmaImage, 0, 0);
+      // Bodies/outlines sit ABOVE nodes/edges on screen (afterLayer:"nodes"),
+      // so composite them over the sigma image, not under it — under-painting
+      // let a dense edge mesh bury the hulls and left edges looking un-softened.
+      // ponytail: the flattened sigma image also carries node labels, so a body
+      // (0.25 fill) faintly tints labels it overlaps; a separate label-only
+      // render pass would fix it — not worth it (dense graphs hide labels).
+      this.bubbleLayer.drawExportBodies(ctx, bubbleGroups, dpr * appliedScale);
       // Group labels sit above sigma's node labels on screen (their own canvas
       // at afterLayer "labels"); composite them last to keep that z-order.
       this.bubbleLayer.drawExportLabels(ctx, bubbleGroups, dpr * appliedScale);
