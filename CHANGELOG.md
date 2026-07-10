@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.15.5 — 2026-07-10
+
+Saved graph files load unchanged; older files (and files saved by earlier versions) default the new opacity to fully opaque, so their appearance is identical.
+
+### Features
+
+* **Node and edge opacity.** The styling panel (under 🎨) now has an **Opacity** slider for both nodes and edges (1 = opaque, 0 = invisible). It folds into the element's color alpha, so it composes with a color that already carries transparency, and — like the other numeric style knobs — it can be **mapped by data** via the ∿ button to scale opacity from a numeric property. Opacity round-trips through both JSON and the Excel `Opacity` column (documented in the template's readme tab). Being an alpha effect, low opacity composites toward the background: light colors (e.g. the default slate edges) approach white sooner than saturated ones.
+
 ## 1.15.4 — 2026-07-01
 
 Saved graph files load unchanged; older files default the two new per-view settings to the previous behavior (OR, non-strict).

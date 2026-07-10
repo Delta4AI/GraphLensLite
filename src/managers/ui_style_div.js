@@ -133,6 +133,9 @@ function createStyleDiv(cache) {
       case "Node Border Color":
         await cache.gcm.updateNodes({style: {stroke: value}}, commands);
         break;
+      case "Node Opacity":
+        await cache.gcm.updateNodes({style: {opacity: value}}, commands);
+        break;
       case "Node Label Color":
         await cache.gcm.updateNodes({style: {labelFill: value}}, commands);
         break;
@@ -150,6 +153,9 @@ function createStyleDiv(cache) {
         break;
       case "Edge Width":
         await cache.gcm.updateEdges({style: {lineWidth: value}}, commands);
+        break;
+      case "Edge Opacity":
+        await cache.gcm.updateEdges({style: {opacity: value}}, commands);
         break;
       case "Edge Dash":
         await cache.gcm.updateEdges({style: {lineDash: value}}, commands);
@@ -877,6 +883,14 @@ function createStyleDiv(cache) {
     createColorControls(rowFive, "Node Border Color", cache.DEFAULTS.NODE.STROKE_COLOR,
       cache.DEFAULTS.STYLES.NODE_BORDER_COLORS);
 
+    const rowFiveOpacity = createNewRow(nodeDiv);
+    appendLabel(rowFiveOpacity, "Opacity",
+      "Transparency of the selected nodes (1 = opaque, 0 = invisible). Composes with the fill/border color's own alpha.");
+    createNumericalSlider(rowFiveOpacity, "Node Opacity", cache.DEFAULTS.NODE.OPACITY,
+      {min: 0, max: 1, step: 0.05},
+      "Transparency of the selected nodes (1 = opaque, 0 = invisible). Composes with the fill/border color's own alpha.",
+      true);
+
     appendHorizontalRule(nodeDiv);
 
     const rowSix = createNewRow(nodeDiv);
@@ -943,6 +957,14 @@ function createStyleDiv(cache) {
     const rowFour = createNewRow(edgeDiv);
     appendLabel(rowFour, "Color", "Define the selected edges color.");
     createColorControls(rowFour, "Edge Color", cache.DEFAULTS.EDGE.COLOR, cache.DEFAULTS.STYLES.EDGE_COLORS);
+
+    const rowFourOpacity = createNewRow(edgeDiv);
+    appendLabel(rowFourOpacity, "Opacity",
+      "Transparency of the selected edges (1 = opaque, 0 = invisible). Composes with the edge color's own alpha.");
+    createNumericalSlider(rowFourOpacity, "Edge Opacity", cache.DEFAULTS.EDGE.OPACITY,
+      {min: 0, max: 1, step: 0.05},
+      "Transparency of the selected edges (1 = opaque, 0 = invisible). Composes with the edge color's own alpha.",
+      true);
 
     appendHorizontalRule(edgeDiv);
 
