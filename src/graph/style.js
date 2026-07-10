@@ -47,6 +47,7 @@ class GraphStyleManager {
       fill         : src.fill          ?? d.FILL_COLOR,
       stroke       : src.stroke        ?? d.STROKE_COLOR,
       lineWidth    : src.lineWidth     ?? d.LINE_WIDTH,
+      opacity      : src.opacity       ?? d.OPACITY,
 
       badge        : src.badge         ?? false,
       badges       : src.badges        ?? [],
@@ -111,6 +112,7 @@ class GraphStyleManager {
       lineWidth      : src.lineWidth      ?? d.LINE_WIDTH,
       lineDash       : src.lineDash       ?? d.LINE_DASH,
       stroke         : src.stroke         ?? d.COLOR,
+      opacity        : src.opacity        ?? d.OPACITY,
 
       halo           : src.halo           ?? d.HALO.ENABLED,
       haloStroke     : src.haloStroke     ?? d.HALO.COLOR,

@@ -52,8 +52,8 @@ function nodeAttributesFromStyle(style = {}, type = undefined) {
     // G6 size is a diameter (or [w, h]); sigma size is a radius.
     attrs.size = (Array.isArray(style.size) ? style.size[0] : style.size) / 2;
   }
-  if (style.fill !== undefined) attrs.color = style.fill;
-  if (style.stroke !== undefined) attrs.borderColor = style.stroke;
+  if (style.fill !== undefined) attrs.color = applyHexOpacity(style.fill, style.opacity);
+  if (style.stroke !== undefined) attrs.borderColor = applyHexOpacity(style.stroke, style.opacity);
   if (style.lineWidth !== undefined) attrs.borderSize = style.lineWidth;
 
   if (style.label === false) {
@@ -142,8 +142,11 @@ function badgeScaleFactor(style) {
  *   - native circle/square (color=fill, fillColor/image cleared, borderRatio 0)
  */
 function nodeProgramAttributes(style = {}, type) {
-  const fill = style.fill ?? DEFAULTS.NODE.FILL_COLOR;
-  const stroke = style.stroke ?? null;
+  // Opacity folds into the fill/stroke alpha here so it reaches every program:
+  // the baked SVG texture (shape), the border rings (borderCircle) and the
+  // native circle/square fill alike. applyHexOpacity is null/opaque-safe.
+  const fill = applyHexOpacity(style.fill ?? DEFAULTS.NODE.FILL_COLOR, style.opacity);
+  const stroke = applyHexOpacity(style.stroke ?? null, style.opacity);
   const lineWidth = style.lineWidth ?? 0;
   const hasBorder = Boolean(stroke) && lineWidth > 0;
   const size = Array.isArray(style.size) ? style.size[0] : style.size;
@@ -412,7 +415,7 @@ function edgeMarkerHaloAttributes(style) {
 function edgeAttributesFromStyle(style = {}, type = undefined) {
   const attrs = {};
   if (style.lineWidth !== undefined) attrs.size = style.lineWidth;
-  if (style.stroke !== undefined) attrs.color = style.stroke;
+  if (style.stroke !== undefined) attrs.color = applyHexOpacity(style.stroke, style.opacity);
   if (style.label === false) {
     attrs.label = null;
   } else if (style.label && style.labelText !== undefined) {

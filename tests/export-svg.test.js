@@ -564,6 +564,26 @@ describe("bubble groups", () => {
     expect(svg).toContain('<text x="0"');
   });
 
+  it("layers the body above nodes/edges and below labels (matches live afterLayer:nodes)", () => {
+    const scene = makeScene({
+      nodes: [{ id: "a", x: 1, y: 1, label: "NodeLbl" }],
+      edges: [],
+    });
+
+    const svg = build(scene, {
+      bubbleGroups: [
+        { group: "g", points: SQUARE, opts: { fill: "#e74c3c", stroke: "#111111" }, defaults: {} },
+      ],
+    });
+
+    const nodeAt = svg.indexOf("<circle");
+    const bodyAt = svg.indexOf("<path");
+    const labelAt = svg.indexOf(">NodeLbl</text>");
+    expect(nodeAt).toBeGreaterThanOrEqual(0);
+    expect(nodeAt).toBeLessThan(bodyAt);
+    expect(bodyAt).toBeLessThan(labelAt);
+  });
+
   it("skips groups with fewer than 2 outline points", () => {
     const scene = makeScene();
 

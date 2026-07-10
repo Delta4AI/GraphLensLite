@@ -148,6 +148,20 @@ describe("Excel style round-trip — nodes", () => {
     expect(reimported.type).toBe(DEFAULTS.NODE.TYPE);
     expect(reimported.style).toEqual(original.style);
   });
+
+  it("a column-less node defaults opacity to fully opaque", () => {
+    expect(importNode({ "ID": "n1" }).style.opacity).toBe(DEFAULTS.NODE.OPACITY);
+  });
+
+  it("Opacity column survives the round-trip and fades the sigma fill", () => {
+    const original = importNode({ "ID": "n1", "Shape": "circle", "Fill Color": "#403C53", "Opacity": "0.5" });
+    const row = exportToRow(original, EXCEL_NODE_PROPERTIES);
+
+    expect(row["Opacity"]).toBe(0.5);
+    const reimported = importNode(row);
+    expect(reimported.style.opacity).toBe(0.5);
+    expect(nodeAttributesFromStyle(reimported.style, reimported.type).color).toBe("#403c5380");
+  });
 });
 
 describe("Excel style round-trip — edges", () => {
@@ -226,5 +240,20 @@ describe("Excel style round-trip — edges", () => {
 
     expect(reimported.type).toBe(DEFAULTS.EDGE.TYPE);
     expect(reimported.style).toEqual(original.style);
+  });
+
+  it("a column-less edge defaults opacity to fully opaque", () => {
+    expect(importEdge({ "Source ID": "A", "Target ID": "B" }).style.opacity).toBe(DEFAULTS.EDGE.OPACITY);
+  });
+
+  it("Opacity column survives the round-trip and composes with the color alpha", () => {
+    const original = importEdge({ "Source ID": "A", "Target ID": "B", "Color": "#403C5390", "Opacity": "0.5" });
+    const row = exportToRow(original, EXCEL_EDGE_PROPERTIES);
+
+    expect(row["Opacity"]).toBe(0.5);
+    const reimported = importEdge(row);
+    expect(reimported.style.opacity).toBe(0.5);
+    // 0x90 (144) × 0.5 = 72 = 0x48.
+    expect(edgeAttributesFromStyle(reimported.style, reimported.type).color).toBe("#403c5348");
   });
 });

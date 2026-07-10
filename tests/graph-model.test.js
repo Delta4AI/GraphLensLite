@@ -632,6 +632,76 @@ describe("attribute mapping helpers", () => {
   });
 });
 
+describe("element opacity → color alpha mapping", () => {
+  const TRANSPARENT = "#00000000";
+
+  it("node opacity fades the native circle/square fill", () => {
+    expect(nodeAttributesFromStyle({ fill: "#403c53", opacity: 0.5 }, "circle").color).toBe(
+      "#403c5380",
+    );
+    expect(nodeAttributesFromStyle({ fill: "#403c53", opacity: 0.5 }, "rect").color).toBe(
+      "#403c5380",
+    );
+  });
+
+  it("node opacity fades both the texture fill and the baked-in border", () => {
+    const attrs = nodeAttributesFromStyle(
+      { fill: "#403c53", stroke: "#123456", lineWidth: 2, opacity: 0.5, size: 20 },
+      "hexagon",
+    );
+    // Texture program: real color lives in fillColor + the SVG image, the
+    // quad color stays transparent.
+    expect(attrs.type).toBe("shape");
+    expect(attrs.color).toBe(TRANSPARENT);
+    expect(attrs.fillColor).toBe("#403c5380");
+    expect(attrs.borderColor).toBe("#12345680");
+    expect(attrs.image).toContain(encodeURIComponent("#403c5380"));
+    expect(attrs.image).toContain(encodeURIComponent("#12345680"));
+  });
+
+  it("node opacity fades the bordered-circle fill and border ring", () => {
+    const attrs = nodeAttributesFromStyle(
+      { fill: "#403c53", stroke: "#123456", lineWidth: 2, opacity: 0.5 },
+      "circle",
+    );
+    expect(attrs.type).toBe("borderCircle");
+    expect(attrs.color).toBe("#403c5380");
+    expect(attrs.borderColor).toBe("#12345680");
+  });
+
+  it("edge opacity folds into the stroke color alpha and composes with existing alpha", () => {
+    // Opaque stroke gains an alpha pair.
+    expect(edgeAttributesFromStyle({ stroke: "#403c53", opacity: 0.5 }, "line").color).toBe(
+      "#403c5380",
+    );
+    // A stroke that already carries alpha (the default #403C5390) multiplies:
+    // 0x90 (144) × 0.5 = 72 = 0x48.
+    expect(edgeAttributesFromStyle({ stroke: "#403c5390", opacity: 0.5 }, "line").color).toBe(
+      "#403c5348",
+    );
+  });
+
+  it("opacity of 1 or absent is the identity — no alpha rewrite (backward compatible)", () => {
+    expect(nodeAttributesFromStyle({ fill: "#403c53" }, "circle").color).toBe("#403c53");
+    expect(nodeAttributesFromStyle({ fill: "#403c53", opacity: 1 }, "circle").color).toBe(
+      "#403c53",
+    );
+    expect(edgeAttributesFromStyle({ stroke: "#403c5390" }, "line").color).toBe("#403c5390");
+    expect(edgeAttributesFromStyle({ stroke: "#403c5390", opacity: 1 }, "line").color).toBe(
+      "#403c5390",
+    );
+  });
+
+  it("opacity of 0 makes the element fully transparent", () => {
+    expect(nodeAttributesFromStyle({ fill: "#403c53", opacity: 0 }, "circle").color).toBe(
+      "#403c5300",
+    );
+    expect(edgeAttributesFromStyle({ stroke: "#403c53", opacity: 0 }, "line").color).toBe(
+      "#403c5300",
+    );
+  });
+});
+
 describe("edge marker + halo attribute mapping", () => {
   // The adapter applies updates via mergeEdgeAttributes, so the full
   // marker/halo set must be emitted on every type-bearing mapping — off

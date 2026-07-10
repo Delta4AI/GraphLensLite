@@ -138,6 +138,10 @@ class NumericScalePicker {
           this.minOutput = defaults.LABEL.FONT_SIZE;
           this.maxOutput = 30;
           break;
+        case 'Node Opacity':
+          this.minOutput = 0.2;
+          this.maxOutput = defaults.OPACITY;
+          break;
         default:
           this.minOutput = 0;
           this.maxOutput = 100;
@@ -160,6 +164,10 @@ class NumericScalePicker {
         case 'Edge Halo Width':
           this.minOutput = defaults.HALO.WIDTH;
           this.maxOutput = 10;
+          break;
+        case 'Edge Opacity':
+          this.minOutput = 0.2;
+          this.maxOutput = defaults.OPACITY;
           break;
         default:
           this.minOutput = 0;
