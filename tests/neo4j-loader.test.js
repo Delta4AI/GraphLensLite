@@ -151,11 +151,18 @@ describe('collectGraph', () => {
 });
 
 describe('coerceValue', () => {
-  it('passes primitives through (sanitizing strings)', () => {
+  it('passes numbers through and sanitizes strings', () => {
     expect(coerceValue(3.5)).toBe(3.5);
-    expect(coerceValue(true)).toBe(true);
     expect(coerceValue('plain')).toBe('plain');
     expect(coerceValue('a:b')).toBe('a-b');
+  });
+
+  it('maps booleans to categorical strings so filters can match them', () => {
+    // Raw booleans would become numeric [1,1] sliders whose BETWEEN condition
+    // never validates (query AST requires typeof number) — under an OR join
+    // that hides every element carrying the property.
+    expect(coerceValue(true)).toBe('true');
+    expect(coerceValue(false)).toBe('false');
   });
 
   it('drops null and undefined', () => {

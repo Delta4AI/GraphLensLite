@@ -132,7 +132,12 @@ function collectGraph(results) {
  */
 function coerceValue(value) {
   if (value === null || value === undefined) return undefined;
-  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value;
+  // Booleans become categorical 'true'/'false' strings. Raw booleans would be
+  // classified as numeric by the importer (isNaN(true) === false) and end up
+  // as degenerate [1,1] sliders whose BETWEEN condition never validates
+  // (the query AST requires typeof 'number'), hiding every carrier under OR.
+  if (typeof value === 'boolean') return String(value);
   if (typeof value === 'string') return sanitizeForAST(value);
   if (Array.isArray(value) && value.every((v) => typeof v !== 'object' || v === null)) {
     return value.map((v) => sanitizeForAST(String(v))).join(' | ');
