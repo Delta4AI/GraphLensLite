@@ -1,3 +1,5 @@
+import {StaticUtilities} from './static.js';
+
 class StringDemoDataLoader {
   constructor(cache, genes, species = 9606, amountOfNodes = 50, requiredScore = 400) {
     this.cache = cache;
@@ -241,22 +243,7 @@ _getEdgeColor(score, minScore, maxScore) {
   }
 
   _sanitizeForAST(str) {
-    if (typeof str !== 'string') return str;
-
-    return str
-      .replace(/\(/g, '{')
-      .replace(/\)/g, '}')
-      .replace(/\[/g, '{')
-      .replace(/]/g, '}')
-      .replace(/:/g, '-')
-      .replace(/,/g, ' ')
-      .replace(/&/g, 'and')
-      .replace(/</g, 'less')
-      .replace(/>/g, 'greater')
-      .replace(/"/g, '')
-      .replace(/'/g, '')
-      .replace(/\\/g, '')
-      .replace(/\//g, ' or ');
+    return StaticUtilities.sanitizeForAST(str);
   }
 
   _convertToAppFormat(stringData, annotationData) {

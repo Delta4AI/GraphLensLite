@@ -4,6 +4,28 @@ class StaticUtilities {
   }
 
   /**
+   * Strip characters the query DSL's AST cannot handle from property names
+   * and categorical values.
+   */
+  static sanitizeForAST(str) {
+    if (typeof str !== 'string') return str;
+    return str
+      .replace(/\(/g, '{')
+      .replace(/\)/g, '}')
+      .replace(/\[/g, '{')
+      .replace(/]/g, '}')
+      .replace(/:/g, '-')
+      .replace(/,/g, ' ')
+      .replace(/&/g, 'and')
+      .replace(/</g, 'less')
+      .replace(/>/g, 'greater')
+      .replace(/"/g, '')
+      .replace(/'/g, '')
+      .replace(/\\/g, '')
+      .replace(/\//g, ' or ');
+  }
+
+  /**
    * Escape a value for safe interpolation into an HTML string. Use at every
    * boundary where untrusted text (node/edge/property names, layout names,
    * query fragments loaded from files) is concatenated into innerHTML.
