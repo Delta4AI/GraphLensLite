@@ -20,6 +20,7 @@ import {NumericScalePicker} from './utilities/numeric_scale_picker.js';
 import {PieChartPicker} from './utilities/pie_chart_picker.js';
 import {DataTable, buildDataTable} from "./utilities/data_editor.js";
 import {StringDemoDataLoader} from "./utilities/demo_loader.js";
+import {openNeo4jPopup} from "./utilities/neo4j_loader.js";
 import {Popup} from "./utilities/popup.js";
 import {StaticUtilities} from "./utilities/static.js";
 import {generateTourData, GuidedTour} from "./utilities/tour.js";
@@ -452,6 +453,7 @@ async function startTour() {
 }
 
 window.loadDemoData = loadDemoData;
+window.loadNeo4jData = () => openNeo4jPopup(cache);
 window.startTour = startTour;
 window.cache = cache;
 

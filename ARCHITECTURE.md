@@ -64,12 +64,13 @@ Business logic and UI:
 - `assistant/` — the natural-language Graph Assistant (intent parsing, query
   generation, settings, budget UI)
 
-### Utilities (`src/utilities/`, 12 files)
+### Utilities (`src/utilities/`, 13 files)
 
 - `static.js` — validation, colour math, deep-merge helpers
 - `popup.js` / `popover_position.js` — modal and popover positioning
 - `data_editor.js` — spreadsheet-like data editor (`DataTable`), incl. Excel export
 - `demo_loader.js` — STRING DB protein-interaction demo data
+- `neo4j_loader.js` — Neo4j connector (HTTP transactional Cypher API, no driver dependency)
 - `tour.js` — guided tour with a sample dataset
 - `color_scale_picker.js` / `numeric_scale_picker.js` / `pie_chart_picker.js` — styling pickers
 - `selection_hud.js`, `theme.js`, `export_scale.js`

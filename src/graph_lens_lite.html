@@ -41,6 +41,11 @@
         <span class="landing-card-title">STRING Database</span>
         <span class="landing-card-desc">Explore protein-protein interaction networks from the STRING database</span>
       </button>
+      <button class="landing-card" onclick="loadNeo4jData()">
+        <span class="landing-card-icon">🗄️</span>
+        <span class="landing-card-title">Neo4j Database</span>
+        <span class="landing-card-desc">Fetch a graph from a Neo4j server with a Cypher query</span>
+      </button>
       <button class="landing-card" onclick="startTour()">
         <span class="landing-card-icon">🗺️</span>
         <span class="landing-card-title">Take a Tour</span>
@@ -104,6 +109,8 @@
         <button onclick="cache.io.downloadExcelTemplate()" class="mt-2">📥 Download Excel Template</button>
         <br>
         <button onclick="loadDemoData()" class="mt-2">🔍 Load from STRING Database</button>
+        <br>
+        <button onclick="loadNeo4jData()" class="mt-2">🗄️ Load from Neo4j</button>
         <br>
         <button onclick="startTour()" class="mt-2">🗺️ Take a Tour</button>
       </div>
