@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.16.1 — 2026-07-15
+
+Saved graph files load unchanged — this release is bug fixes only.
+
+### Fixes
+
+* **Boolean properties now filter correctly.** A boolean data property (e.g. `mined: true` on an edge) was classified as numeric and became a degenerate range slider whose condition could never match, silently hiding every element carrying it under an **OR** filter join — while **AND** appeared to work only because un-narrowed filters don't constrain. Booleans from any data source (Neo4j, Excel boolean cells, JSON payloads, live API pushes) are now normalized to categorical `true`/`false` filters at the import boundary. Reload affected data to pick up the fix.
+
 ## 1.16.0 — 2026-07-15
 
 Saved graph files load unchanged — this release adds a new data source.
