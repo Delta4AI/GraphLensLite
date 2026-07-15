@@ -18,8 +18,13 @@
 import { Popup } from './popup.js';
 import { StaticUtilities } from './static.js';
 import { applyGraph } from '../managers/api_client.js';
+import { DEFAULTS } from '../config.js';
 
 const sanitizeForAST = StaticUtilities.sanitizeForAST;
+// Edge strokes get this alpha suffix so auto-colored edges stay subordinate
+// to nodes, matching the translucency of the default edge color.
+const EDGE_COLOR_ALPHA = '90';
+const EXAMPLE_MAX_LENGTH = 40;
 
 const DEFAULT_DATABASE = 'neo4j';
 const LARGE_RESULT_ROW_THRESHOLD = 2000;
@@ -135,29 +140,66 @@ function coerceValue(value) {
   return sanitizeForAST(JSON.stringify(value));
 }
 
+/** @returns {string|null} a display type for a property value, null for empty values */
+function describeType(value) {
+  if (value === null || value === undefined) return null;
+  if (Array.isArray(value)) return 'list';
+  const t = typeof value;
+  if (t === 'number' || t === 'boolean') return t;
+  if (t === 'object') return 'object';
+  return 'text';
+}
+
 /**
- * Union of property keys per element kind, with hints for the exclusion
- * checklist (sample value, large-array detection).
+ * Union of property keys per element kind, with display metadata for the
+ * exclusion checklist: value type ('mixed' when inconsistent), up to two
+ * distinct truncated example values, and large-array detection.
  *
- * @returns {Array<{kind: 'node'|'edge', key: string, largeArray: boolean, sample: *}>}
+ * @returns {Array<{kind: 'node'|'edge', key: string, type: string, examples: string[], largeArray: boolean}>}
  */
 function collectPropertyKeys(nodes, relationships) {
   const collect = (elements, kind) => {
     const byKey = new Map();
     for (const element of elements) {
       for (const [key, value] of Object.entries(element.properties ?? {})) {
-        const existing = byKey.get(key);
-        const largeArray = Array.isArray(value) && value.length > LARGE_ARRAY_THRESHOLD;
-        if (!existing) {
-          byKey.set(key, { kind, key, largeArray, sample: value });
-        } else if (largeArray) {
-          existing.largeArray = true;
+        const type = describeType(value);
+        if (type === null) continue; // null-valued: coerceValue drops these anyway
+        let entry = byKey.get(key);
+        if (!entry) {
+          entry = { kind, key, types: new Set(), examples: [], largeArray: false };
+          byKey.set(key, entry);
+        }
+        entry.types.add(type);
+        if (Array.isArray(value) && value.length > LARGE_ARRAY_THRESHOLD) {
+          entry.largeArray = true;
+        }
+        if (entry.examples.length < 2) {
+          const text = String(coerceValue(value));
+          const short =
+            text.length > EXAMPLE_MAX_LENGTH ? `${text.slice(0, EXAMPLE_MAX_LENGTH - 1)}…` : text;
+          if (short !== '' && !entry.examples.includes(short)) entry.examples.push(short);
         }
       }
     }
-    return [...byKey.values()].sort((a, b) => a.key.localeCompare(b.key));
+    return [...byKey.values()]
+      .map(({ types, ...rest }) => ({
+        ...rest,
+        type: types.size === 1 ? [...types][0] : 'mixed',
+      }))
+      .sort((a, b) => a.key.localeCompare(b.key));
   };
   return [...collect(nodes, 'node'), ...collect(relationships, 'edge')];
+}
+
+/**
+ * Most specific label of a node. Class-hierarchy tooling (neomodel-style)
+ * stores the full ancestor chain as labels with the leaf class last
+ * (e.g. Entity:AddOnCat:Cell → Cell), so the last entry is the primary one.
+ * The complete label set stays filterable via the `Neo4j > Labels` category.
+ */
+function primaryLabel(node) {
+  const labels = node.labels ?? [];
+  return labels.length ? labels[labels.length - 1] : 'Node';
 }
 
 /** Pick a display label for a node from conventional name properties. */
@@ -167,7 +209,45 @@ function nodeDisplayLabel(node) {
   if (candidate !== undefined && candidate !== null && candidate !== '') {
     return String(candidate);
   }
-  return `${node.labels?.[0] ?? 'Node'} ${node.id}`;
+  return `${primaryLabel(node)} ${node.id}`;
+}
+
+/** hsl(h°, s%, l%) → #RRGGBB */
+function hslToHex(h, s, l) {
+  s /= 100;
+  l /= 100;
+  const k = (n) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  const toHex = (x) =>
+    Math.round(255 * x)
+      .toString(16)
+      .padStart(2, '0');
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`.toUpperCase();
+}
+
+/**
+ * Deterministic categorical color: the app's brand palette first, then a
+ * golden-angle hue walk so any number of categories stays distinguishable.
+ */
+function categoryColor(index) {
+  const palette = DEFAULTS.NODE.PIE.SLICE_PALETTE;
+  if (index < palette.length) return palette[index];
+  return hslToHex((index * 137.508) % 360, 55, 55);
+}
+
+/**
+ * Map each category to a color, or null when there are fewer than two
+ * categories (a single category carries no visual information — keep the
+ * app defaults). Categories are sorted so colors are deterministic.
+ *
+ * @param {string[]} categories
+ * @returns {Map<string, string>|null}
+ */
+function buildCategoryColors(categories) {
+  const unique = [...new Set(categories)].sort();
+  if (unique.length < 2) return null;
+  return new Map(unique.map((category, index) => [category, categoryColor(index)]));
 }
 
 /**
@@ -203,17 +283,22 @@ function toAppFormat(nodes, relationships, options = {}) {
     return filters;
   };
 
+  const nodeColors = buildCategoryColors(nodes.map((n) => sanitizeForAST(primaryLabel(n))));
+  const edgeColors = buildCategoryColors(
+    relationships.map((r) => sanitizeForAST(r.type || 'Relationship')),
+  );
+
   const appNodes = nodes.map((node) => {
-    const subGroup = sanitizeForAST(node.labels?.[0] ?? 'Node');
+    const subGroup = sanitizeForAST(primaryLabel(node));
+    // No synthetic type property — the per-label property groups and the
+    // auto-coloring already carry the entity type.
     const filters = {
       [subGroup]: buildFilters(node.properties, subGroup, excludedNodeProps, nodeHeaders),
-      // Multi-label nodes join with ' | ' so each label is its own category.
-      Neo4j: { Labels: (node.labels ?? []).map(sanitizeForAST).join(' | ') || 'none' },
     };
-    addHeader(nodeHeaders, 'Neo4j', 'Labels');
     return {
       id: node.id,
       label: nodeDisplayLabel(node),
+      ...(nodeColors ? { style: { fill: nodeColors.get(subGroup) } } : {}),
       D4Data: { 'Node filters': filters },
     };
   });
@@ -222,14 +307,15 @@ function toAppFormat(nodes, relationships, options = {}) {
     const subGroup = sanitizeForAST(rel.type || 'Relationship');
     const filters = {
       [subGroup]: buildFilters(rel.properties, subGroup, excludedEdgeProps, edgeHeaders),
-      Neo4j: { Type: sanitizeForAST(rel.type) || 'none' },
     };
-    addHeader(edgeHeaders, 'Neo4j', 'Type');
     return {
       id: rel.id,
       source: rel.startNode,
       target: rel.endNode,
       label: rel.type,
+      ...(edgeColors
+        ? { style: { stroke: `${edgeColors.get(subGroup)}${EDGE_COLOR_ALPHA}` } }
+        : {}),
       D4Data: { 'Edge filters': filters },
     };
   });
@@ -277,31 +363,70 @@ function showPropertyChecklist(propertyKeys) {
   return new Promise((resolve) => {
     const content = document.createElement('div');
     const intro = document.createElement('p');
+    intro.className = 'neo4j-hint';
     intro.textContent =
       'Select the properties to import. Deselected properties are dropped before the graph is built.';
     content.appendChild(intro);
 
     const buildSection = (title, entries) => {
       if (entries.length === 0) return;
-      const heading = document.createElement('h4');
-      heading.textContent = title;
+
+      const heading = document.createElement('div');
+      heading.className = 'neo4j-props-heading';
+      const headingLabel = document.createElement('label');
+      const toggleAll = document.createElement('input');
+      toggleAll.type = 'checkbox';
+      headingLabel.appendChild(toggleAll);
+      headingLabel.appendChild(document.createTextNode(` ${title}`));
+      heading.appendChild(headingLabel);
       content.appendChild(heading);
+
+      const list = document.createElement('div');
+      list.className = 'neo4j-props-list';
+      const rowBoxes = [];
       for (const entry of entries) {
         const row = document.createElement('label');
-        row.style.display = 'block';
+        row.className = 'neo4j-prop-row';
+
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.checked = !entry.largeArray;
         checkbox.dataset.kind = entry.kind;
         checkbox.dataset.key = entry.key;
+        rowBoxes.push(checkbox);
         row.appendChild(checkbox);
-        row.appendChild(
-          document.createTextNode(
-            ` ${entry.key}${entry.largeArray ? ' (large array — e.g. embedding)' : ''}`,
-          ),
-        );
-        content.appendChild(row);
+
+        const name = document.createElement('span');
+        name.className = 'neo4j-prop-name';
+        name.textContent = entry.key;
+        row.appendChild(name);
+
+        const type = document.createElement('span');
+        type.className = 'neo4j-prop-type';
+        type.textContent = entry.largeArray ? 'large list' : entry.type;
+        if (entry.largeArray) type.title = 'Long array (e.g. an embedding) — deselected by default';
+        row.appendChild(type);
+
+        if (entry.examples.length) {
+          const examples = document.createElement('span');
+          examples.className = 'neo4j-prop-examples';
+          examples.textContent = `e.g. ${entry.examples.join('  ·  ')}`;
+          row.appendChild(examples);
+        }
+        list.appendChild(row);
       }
+      content.appendChild(list);
+
+      const syncToggleAll = () => {
+        const checked = rowBoxes.filter((box) => box.checked).length;
+        toggleAll.checked = checked === rowBoxes.length;
+        toggleAll.indeterminate = checked > 0 && checked < rowBoxes.length;
+      };
+      syncToggleAll();
+      toggleAll.addEventListener('change', () => {
+        rowBoxes.forEach((box) => (box.checked = toggleAll.checked));
+      });
+      list.addEventListener('change', syncToggleAll);
     };
     buildSection('Node properties', propertyKeys.filter((p) => p.kind === 'node'));
     buildSection('Relationship properties', propertyKeys.filter((p) => p.kind === 'edge'));
@@ -321,7 +446,7 @@ function showPropertyChecklist(propertyKeys) {
     let resolved = false;
     const popup = new Popup(content, {
       title: 'Neo4j Properties',
-      width: '420px',
+      width: '480px',
       showFullscreenButton: false,
       closeOnClickOutside: false,
       onClose: () => {
@@ -332,7 +457,7 @@ function showPropertyChecklist(propertyKeys) {
     importBtn.addEventListener('click', () => {
       const excludedNodeProps = new Set();
       const excludedEdgeProps = new Set();
-      for (const checkbox of content.querySelectorAll('input[type="checkbox"]')) {
+      for (const checkbox of content.querySelectorAll('input[data-key]')) {
         if (checkbox.checked) continue;
         (checkbox.dataset.kind === 'node' ? excludedNodeProps : excludedEdgeProps).add(
           checkbox.dataset.key,
@@ -354,29 +479,31 @@ function showPropertyChecklist(propertyKeys) {
 function buildConnectionForm(saved) {
   const form = document.createElement('div');
   form.innerHTML = `
-    <div style="margin-bottom: 12px;">
-      <label for="neo4j-url" style="display: block; margin-bottom: 4px;">Server URL:</label>
-      <input type="text" id="neo4j-url" placeholder="http://localhost:7474" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+    <div class="neo4j-field">
+      <label for="neo4j-url">Server URL</label>
+      <input type="text" id="neo4j-url" class="p-prompt" placeholder="http://localhost:7474">
     </div>
-    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-      <div style="flex: 1;">
-        <label for="neo4j-username" style="display: block; margin-bottom: 4px;">Username:</label>
-        <input type="text" id="neo4j-username" placeholder="neo4j" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+    <div class="neo4j-field-row">
+      <div class="neo4j-field">
+        <label for="neo4j-username">Username</label>
+        <input type="text" id="neo4j-username" class="p-prompt" placeholder="neo4j">
       </div>
-      <div style="flex: 1;">
-        <label for="neo4j-password" style="display: block; margin-bottom: 4px;">Password:</label>
-        <input type="password" id="neo4j-password" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+      <div class="neo4j-field">
+        <label for="neo4j-password">Password</label>
+        <input type="password" id="neo4j-password" class="p-prompt">
       </div>
     </div>
-    <div style="margin-bottom: 12px;">
-      <label for="neo4j-database" style="display: block; margin-bottom: 4px;">Database (optional):</label>
-      <input type="text" id="neo4j-database" placeholder="${DEFAULT_DATABASE}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+    <div class="neo4j-field">
+      <label for="neo4j-database">Database <span class="neo4j-hint">(optional)</span></label>
+      <input type="text" id="neo4j-database" class="p-prompt" placeholder="${DEFAULT_DATABASE}">
     </div>
-    <div style="margin-bottom: 12px;">
-      <label for="neo4j-query" style="display: block; margin-bottom: 4px;">Cypher query (must return nodes, relationships, or paths):</label>
-      <textarea id="neo4j-query" rows="4" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px; font-family: monospace;">MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 500</textarea>
+    <div class="neo4j-field">
+      <label for="neo4j-query">Cypher query</label>
+      <textarea id="neo4j-query" rows="4" class="p-prompt neo4j-query">MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 500</textarea>
+      <span class="neo4j-hint">Must return nodes, relationships, or paths.</span>
     </div>
-    <div style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 12px; font-size: 12px; color: #666;">
+    <div id="neo4j-error" class="neo4j-error" role="alert" hidden></div>
+    <div class="neo4j-info">
       Uses the Neo4j HTTP API (port 7474/7473). Credentials are sent only to the
       server above and are not stored; the URL, username, database, and query
       are remembered locally. Prefer https:// for remote servers — Basic auth
@@ -407,12 +534,22 @@ async function executeNeo4jImport(cache, config, deps = {}) {
   const confirm = deps.confirm ?? Popup.confirm;
   const checklist = deps.checklist ?? showPropertyChecklist;
   const apply = deps.apply ?? applyGraph;
+  const onError = deps.onError ?? ((message) => cache.ui.error(message));
+  // progress(message) starts/updates a busy indicator, progress(null) clears
+  // it. Defaults to the global loading overlay; the connection popup injects
+  // an in-button spinner instead so the modal stays interactive underneath.
+  const progress =
+    deps.progress ??
+    (async (message) => {
+      if (message) await cache.ui.showLoading('Neo4j', message);
+      else await cache.ui.hideLoading();
+    });
   const opts = deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {};
 
   try {
-    await cache.ui.showLoading('Neo4j', `Counting query results on ${config.url} …`);
+    await progress('Counting matching rows …');
     const rowCount = await countQueryRows(config, config.query, opts);
-    await cache.ui.hideLoading();
+    await progress(null);
 
     if (rowCount !== null && rowCount > LARGE_RESULT_ROW_THRESHOLD) {
       const proceed = await confirm(
@@ -421,22 +558,23 @@ async function executeNeo4jImport(cache, config, deps = {}) {
       if (proceed !== true) return false;
     }
 
-    await cache.ui.showLoading('Neo4j', `Fetching graph from ${config.url} …`);
+    await progress('Fetching graph data …');
     const results = await runCypher(
       config,
       [{ statement: config.query, resultDataContents: ['graph'] }],
       opts,
     );
     const { nodes, relationships } = collectGraph(results);
-    await cache.ui.hideLoading();
+    await progress(null);
 
     if (nodes.length === 0) {
-      cache.ui.error(
+      onError(
         'The query returned no graph elements. Return nodes, relationships, or paths (e.g. MATCH (n)-[r]->(m) RETURN n, r, m).',
       );
       return false;
     }
 
+    deps.onFetched?.();
     const exclusions = await checklist(collectPropertyKeys(nodes, relationships));
     if (!exclusions) return false;
 
@@ -446,14 +584,14 @@ async function executeNeo4jImport(cache, config, deps = {}) {
     }
     return rendered;
   } catch (err) {
-    await cache.ui.hideLoading();
+    await progress(null);
     const hint =
       err.name === 'TimeoutError'
         ? 'The request timed out.'
         : err.message === 'Failed to fetch'
           ? 'Could not reach the server — check the URL, that the HTTP connector is enabled, and CORS settings.'
           : err.message;
-    cache.ui.error(`Neo4j: ${hint}`);
+    onError(`Neo4j: ${hint}`);
     return false;
   }
 }
@@ -466,20 +604,46 @@ async function executeNeo4jImport(cache, config, deps = {}) {
  */
 function openNeo4jPopup(cache) {
   const form = buildConnectionForm(readSavedSettings());
-  // Grab button references before constructing the Popup — it relocates the
+  // Grab element references before constructing the Popup — it relocates the
   // .p-footer out of the content element, so querying the form afterwards
   // would come up empty. The references stay valid across the move.
   const loadBtn = form.querySelector('#neo4j-load-btn');
   const cancelBtn = form.querySelector('#neo4j-cancel-btn');
+  const errorBox = form.querySelector('#neo4j-error');
 
   return new Promise((resolve) => {
+    // Popup.close() always fires onClose, so guard against double-settling
+    // and against the deliberate close after a successful fetch.
+    let settled = false;
+    let dataFetched = false;
+    const settle = (value) => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+
     const popup = new Popup(form, {
       title: 'Load from Neo4j',
       width: '480px',
       showFullscreenButton: false,
       closeOnClickOutside: false,
-      onClose: () => resolve(false),
+      onClose: () => {
+        if (!dataFetched) settle(false);
+      },
     });
+
+    const setBusy = (message) => {
+      loadBtn.disabled = !!message;
+      cancelBtn.disabled = !!message;
+      loadBtn.innerHTML = message
+        ? `<span class="neo4j-btn-spinner"></span>${message}`
+        : 'Fetch';
+    };
+    const showError = (message) => {
+      errorBox.textContent = message;
+      errorBox.hidden = false;
+    };
 
     const readConfig = () => ({
       url: form.querySelector('#neo4j-url').value.trim(),
@@ -490,27 +654,40 @@ function openNeo4jPopup(cache) {
     });
 
     const handleLoad = async () => {
+      errorBox.hidden = true;
       const config = readConfig();
       if (!config.url || !config.query) {
-        cache.ui.error('Server URL and Cypher query are required.');
+        showError('Server URL and Cypher query are required.');
         return;
       }
       try {
         new URL(config.url);
       } catch {
-        cache.ui.error(`Invalid server URL: ${config.url}`);
+        showError(`Invalid server URL: ${config.url}`);
         return;
       }
 
-      popup.close();
       saveSettings(config);
-      resolve(await executeNeo4jImport(cache, config));
+      const rendered = await executeNeo4jImport(cache, config, {
+        progress: (message) => setBusy(message),
+        onError: showError,
+        // Close the connection popup once data has arrived — the property
+        // checklist takes over from here. Failures before this point keep
+        // the popup open with an inline error so inputs are preserved.
+        onFetched: () => {
+          dataFetched = true;
+          popup.close();
+        },
+      });
+
+      if (dataFetched) settle(rendered);
+      else setBusy(null);
     };
 
     loadBtn.addEventListener('click', handleLoad);
     cancelBtn.addEventListener('click', () => {
       popup.close();
-      resolve(false);
+      settle(false);
     });
     setTimeout(() => form.querySelector('#neo4j-url').focus(), 100);
   });
@@ -527,9 +704,14 @@ export {
   collectPropertyKeys,
   toAppFormat,
   coerceValue,
+  describeType,
   buildTxUrl,
   basicAuth,
   nodeDisplayLabel,
+  primaryLabel,
+  categoryColor,
+  buildCategoryColors,
+  hslToHex,
   readSavedSettings,
   saveSettings,
   showPropertyChecklist,

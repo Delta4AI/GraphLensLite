@@ -10,6 +10,9 @@ import {
   collectPropertyKeys,
   toAppFormat,
   coerceValue,
+  categoryColor,
+  buildCategoryColors,
+  primaryLabel,
   sanitizeForAST,
   buildTxUrl,
   basicAuth,
@@ -172,20 +175,73 @@ describe('coerceValue', () => {
 });
 
 describe('collectPropertyKeys', () => {
-  it('unions keys per kind and flags large arrays', () => {
+  it('unions keys per kind with types, examples, and large-array flags', () => {
     const nodes = [
       { properties: { name: 'A', embedding: Array(LARGE_ARRAY_THRESHOLD + 1).fill(0) } },
-      { properties: { age: 3 } },
+      { properties: { name: 'B', age: 3 } },
     ];
     const rels = [{ properties: { weight: 1 } }];
 
     const keys = collectPropertyKeys(nodes, rels);
     expect(keys).toEqual([
-      { kind: 'node', key: 'age', largeArray: false, sample: 3 },
-      { kind: 'node', key: 'embedding', largeArray: true, sample: expect.any(Array) },
-      { kind: 'node', key: 'name', largeArray: false, sample: 'A' },
-      { kind: 'edge', key: 'weight', largeArray: false, sample: 1 },
+      { kind: 'node', key: 'age', type: 'number', examples: ['3'], largeArray: false },
+      {
+        kind: 'node',
+        key: 'embedding',
+        type: 'list',
+        examples: [expect.any(String)],
+        largeArray: true,
+      },
+      { kind: 'node', key: 'name', type: 'text', examples: ['A', 'B'], largeArray: false },
+      { kind: 'edge', key: 'weight', type: 'number', examples: ['1'], largeArray: false },
     ]);
+  });
+
+  it('marks inconsistent value types as mixed and truncates long examples', () => {
+    const nodes = [
+      { properties: { p: 'text value' } },
+      { properties: { p: 42 } },
+      { properties: { q: 'x'.repeat(100) } },
+    ];
+    const keys = collectPropertyKeys(nodes, []);
+    const p = keys.find((k) => k.key === 'p');
+    const q = keys.find((k) => k.key === 'q');
+    expect(p.type).toBe('mixed');
+    expect(q.examples[0].length).toBeLessThanOrEqual(40);
+    expect(q.examples[0].endsWith('…')).toBe(true);
+  });
+
+  it('skips null-valued occurrences', () => {
+    const keys = collectPropertyKeys([{ properties: { p: null } }], []);
+    expect(keys).toEqual([]);
+  });
+});
+
+describe('category colors', () => {
+  it('uses the brand palette first, then generated hues, deterministically', () => {
+    expect(categoryColor(0)).toBe('#C33D35'); // SLICE_PALETTE[0]
+    expect(categoryColor(7)).toMatch(/^#[0-9A-F]{6}$/);
+    expect(categoryColor(7)).toBe(categoryColor(7));
+    expect(categoryColor(7)).not.toBe(categoryColor(8));
+  });
+
+  it('returns null for fewer than two categories', () => {
+    expect(buildCategoryColors(['A', 'A'])).toBeNull();
+    expect(buildCategoryColors([])).toBeNull();
+  });
+
+  it('assigns colors by sorted category order', () => {
+    const colors = buildCategoryColors(['B', 'A', 'B']);
+    expect(colors.get('A')).toBe(categoryColor(0));
+    expect(colors.get('B')).toBe(categoryColor(1));
+  });
+});
+
+describe('primaryLabel', () => {
+  it('uses the last label — leaf class of a stored hierarchy', () => {
+    expect(primaryLabel({ labels: ['Entity', 'AddOnCat', 'Cell'] })).toBe('Cell');
+    expect(primaryLabel({ labels: ['Person'] })).toBe('Person');
+    expect(primaryLabel({ labels: [] })).toBe('Node');
   });
 });
 
@@ -215,16 +271,16 @@ describe('toAppFormat', () => {
     { id: 'r1', type: 'ACTED_IN', startNode: '1', endNode: '2', properties: { roles: ['Neo'] } },
   ];
 
-  it('maps nodes and relationships into the native payload', () => {
+  it('maps nodes and relationships into the native payload (last label = primary)', () => {
     const data = toAppFormat(nodes, relationships);
 
     expect(data.nodes[0]).toEqual({
       id: '1',
       label: 'Keanu',
+      style: { fill: expect.stringMatching(/^#[0-9A-Fa-f]{6}$/) },
       D4Data: {
         'Node filters': {
-          Person: { name: 'Keanu', born: 1964, ignored: 'x' },
-          Neo4j: { Labels: 'Person | Actor' },
+          Actor: { name: 'Keanu', born: 1964, ignored: 'x' },
         },
       },
     });
@@ -236,20 +292,48 @@ describe('toAppFormat', () => {
       D4Data: {
         'Edge filters': {
           ACTED_IN: { roles: 'Neo' },
-          Neo4j: { Type: 'ACTED_IN' },
         },
       },
     });
   });
 
-  it('builds deduplicated headers', () => {
+  it('auto-colors nodes per primary label when there are at least two', () => {
     const data = toAppFormat(nodes, relationships);
-    expect(data.nodeDataHeaders).toContainEqual({ subGroup: 'Person', key: 'name' });
+    expect(data.nodes[0].style.fill).not.toBe(data.nodes[1].style.fill);
+  });
+
+  it('keeps default styling for a single node label / edge type', () => {
+    const single = toAppFormat(
+      [{ id: '1', labels: ['A'], properties: {} }, { id: '2', labels: ['A'], properties: {} }],
+      [{ id: 'r', type: 'REL', startNode: '1', endNode: '2', properties: {} }],
+    );
+    expect(single.nodes[0].style).toBeUndefined();
+    expect(single.edges[0].style).toBeUndefined();
+  });
+
+  it('auto-colors edges per type with translucency', () => {
+    const data = toAppFormat(
+      [{ id: '1', labels: ['A'], properties: {} }],
+      [
+        { id: 'r1', type: 'REL_A', startNode: '1', endNode: '1', properties: {} },
+        { id: 'r2', type: 'REL_B', startNode: '1', endNode: '1', properties: {} },
+      ],
+    );
+    expect(data.edges[0].style.stroke).toMatch(/^#[0-9A-Fa-f]{6}90$/);
+    expect(data.edges[0].style.stroke).not.toBe(data.edges[1].style.stroke);
+  });
+
+  it('builds deduplicated headers without synthetic type properties', () => {
+    const twoActors = [
+      ...nodes,
+      { id: '3', labels: ['Actor'], properties: { name: 'Carrie' } },
+    ];
+    const data = toAppFormat(twoActors, relationships);
+    expect(data.nodeDataHeaders).toContainEqual({ subGroup: 'Actor', key: 'name' });
     expect(data.nodeDataHeaders).toContainEqual({ subGroup: 'Movie', key: 'title' });
-    expect(data.nodeDataHeaders).toContainEqual({ subGroup: 'Neo4j', key: 'Labels' });
-    expect(data.edgeDataHeaders).toContainEqual({ subGroup: 'Neo4j', key: 'Type' });
-    const labelHeaders = data.nodeDataHeaders.filter((h) => h.key === 'Labels');
-    expect(labelHeaders).toHaveLength(1);
+    expect(data.nodeDataHeaders.filter((h) => h.key === 'name')).toHaveLength(1);
+    expect(data.nodeDataHeaders.filter((h) => h.subGroup === 'Neo4j')).toHaveLength(0);
+    expect(data.edgeDataHeaders.filter((h) => h.subGroup === 'Neo4j')).toHaveLength(0);
   });
 
   it('honors property exclusions per kind', () => {
@@ -258,9 +342,9 @@ describe('toAppFormat', () => {
       excludedEdgeProps: new Set(['roles']),
     });
 
-    expect(data.nodes[0].D4Data['Node filters'].Person).toEqual({ name: 'Keanu', born: 1964 });
+    expect(data.nodes[0].D4Data['Node filters'].Actor).toEqual({ name: 'Keanu', born: 1964 });
     expect(data.edges[0].D4Data['Edge filters'].ACTED_IN).toEqual({});
-    expect(data.nodeDataHeaders).not.toContainEqual({ subGroup: 'Person', key: 'ignored' });
+    expect(data.nodeDataHeaders).not.toContainEqual({ subGroup: 'Actor', key: 'ignored' });
   });
 
   it('skips null-valued properties so IS MISSING works', () => {
@@ -404,6 +488,49 @@ describe('executeNeo4jImport', () => {
     expect(cache.ui.error).toHaveBeenCalledWith(expect.stringContaining('Could not reach'));
   });
 
+  it('drives injected progress/onFetched hooks in order', async () => {
+    const cache = makeUiCache();
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ results: [{ data: [{ row: [1] }] }], errors: [] }))
+      .mockResolvedValueOnce(jsonResponse(graphResults));
+    const calls = [];
+    const rendered = await executeNeo4jImport(cache, importConfig, {
+      fetchImpl,
+      progress: (message) => calls.push(['progress', message]),
+      onFetched: () => calls.push(['fetched']),
+      checklist: vi.fn().mockImplementation(() => {
+        calls.push(['checklist']);
+        return Promise.resolve({ excludedNodeProps: new Set(), excludedEdgeProps: new Set() });
+      }),
+      apply: vi.fn().mockResolvedValue(true),
+    });
+
+    expect(rendered).toBe(true);
+    expect(calls).toEqual([
+      ['progress', 'Counting matching rows …'],
+      ['progress', null],
+      ['progress', 'Fetching graph data …'],
+      ['progress', null],
+      ['fetched'],
+      ['checklist'],
+    ]);
+    // Injected progress used — the global overlay stays untouched.
+    expect(cache.ui.showLoading).not.toHaveBeenCalled();
+  });
+
+  it('routes errors to the injected onError handler', async () => {
+    const cache = makeUiCache();
+    const onError = vi.fn();
+    const rendered = await executeNeo4jImport(cache, importConfig, {
+      fetchImpl: vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+      onError,
+    });
+    expect(rendered).toBe(false);
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('Could not reach'));
+    expect(cache.ui.error).not.toHaveBeenCalled();
+  });
+
   it('reports Cypher errors from the data fetch', async () => {
     const cache = makeUiCache();
     const fetchImpl = vi
@@ -448,32 +575,65 @@ describe('openNeo4jPopup', () => {
   });
 
   it('wires the Fetch button after Popup construction (footer is relocated)', async () => {
-    const cache = { ui: { error: vi.fn() } };
-    const promise = openNeo4jPopup(cache);
+    const promise = openNeo4jPopup({ ui: {} });
 
     const loadBtn = document.getElementById('neo4j-load-btn');
     expect(loadBtn).not.toBeNull();
-    loadBtn.click(); // empty form → validation error, popup stays open
-    expect(cache.ui.error).toHaveBeenCalledWith('Server URL and Cypher query are required.');
+    loadBtn.click(); // empty form → inline validation error, popup stays open
+    const errorBox = document.getElementById('neo4j-error');
+    expect(errorBox.hidden).toBe(false);
+    expect(errorBox.textContent).toBe('Server URL and Cypher query are required.');
 
     document.getElementById('neo4j-cancel-btn').click();
     expect(await promise).toBe(false);
   });
 
-  it('rejects an invalid URL without closing the popup', async () => {
-    const cache = { ui: { error: vi.fn() } };
-    const promise = openNeo4jPopup(cache);
+  it('rejects an invalid URL inline without closing the popup', async () => {
+    const promise = openNeo4jPopup({ ui: {} });
 
     document.getElementById('neo4j-url').value = 'not a url';
     document.getElementById('neo4j-load-btn').click();
-    expect(cache.ui.error).toHaveBeenCalledWith('Invalid server URL: not a url');
+    const errorBox = document.getElementById('neo4j-error');
+    expect(errorBox.hidden).toBe(false);
+    expect(errorBox.textContent).toBe('Invalid server URL: not a url');
 
     document.getElementById('neo4j-cancel-btn').click();
     expect(await promise).toBe(false);
+  });
+
+  it('shows fetch failures inline and re-enables the buttons', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+    );
+    try {
+      openNeo4jPopup({ ui: {} });
+      document.getElementById('neo4j-url').value = 'http://localhost:7474';
+
+      const loadBtn = document.getElementById('neo4j-load-btn');
+      loadBtn.click();
+      expect(loadBtn.disabled).toBe(true); // spinner state while working
+      await vi.waitFor(() => {
+        expect(document.getElementById('neo4j-error').hidden).toBe(false);
+      });
+      expect(document.getElementById('neo4j-error').textContent).toContain('Could not reach');
+      expect(loadBtn.disabled).toBe(false);
+      expect(loadBtn.textContent).toBe('Fetch');
+      // Settings were saved even though the fetch failed.
+      expect(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)).url).toBe(
+        'http://localhost:7474',
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
 describe('showPropertyChecklist', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
   it('resolves immediately with no exclusions when there are no properties', async () => {
     expect(await showPropertyChecklist([])).toEqual({
       excludedNodeProps: new Set(),
@@ -483,12 +643,12 @@ describe('showPropertyChecklist', () => {
 
   it('excludes deselected properties (large arrays start deselected)', async () => {
     const promise = showPropertyChecklist([
-      { kind: 'node', key: 'name', largeArray: false, sample: 'A' },
-      { kind: 'node', key: 'embedding', largeArray: true, sample: [] },
-      { kind: 'edge', key: 'weight', largeArray: false, sample: 1 },
+      { kind: 'node', key: 'name', type: 'text', examples: ['A'], largeArray: false },
+      { kind: 'node', key: 'embedding', type: 'list', examples: ['0 | 0'], largeArray: true },
+      { kind: 'edge', key: 'weight', type: 'number', examples: ['1'], largeArray: false },
     ]);
 
-    const checkboxes = [...document.querySelectorAll('.p-custom input[type="checkbox"]')];
+    const checkboxes = [...document.querySelectorAll('.p-custom input[data-key]')];
     expect(checkboxes).toHaveLength(3);
     expect(checkboxes.find((c) => c.dataset.key === 'embedding').checked).toBe(false);
 
@@ -504,10 +664,33 @@ describe('showPropertyChecklist', () => {
 
   it('resolves null on cancel', async () => {
     const promise = showPropertyChecklist([
-      { kind: 'node', key: 'name', largeArray: false, sample: 'A' },
+      { kind: 'node', key: 'name', type: 'text', examples: ['A'], largeArray: false },
     ]);
     const buttons = [...document.querySelectorAll('.p-custom button')];
     buttons.find((b) => b.textContent === 'Cancel').click();
     expect(await promise).toBeNull();
+  });
+
+  it('renders type badges and examples, and section toggle-all works', async () => {
+    const promise = showPropertyChecklist([
+      { kind: 'node', key: 'born', type: 'number', examples: ['1964', '1791'], largeArray: false },
+      { kind: 'node', key: 'name', type: 'text', examples: ['Keanu'], largeArray: false },
+    ]);
+
+    const types = [...document.querySelectorAll('.neo4j-prop-type')].map((el) => el.textContent);
+    expect(types).toEqual(['number', 'text']);
+    expect(document.querySelector('.neo4j-prop-examples').textContent).toBe('e.g. 1964  ·  1791');
+
+    const toggleAll = document.querySelector('.neo4j-props-heading input');
+    expect(toggleAll.checked).toBe(true);
+    toggleAll.checked = false;
+    toggleAll.dispatchEvent(new Event('change'));
+
+    const buttons = [...document.querySelectorAll('.p-custom button')];
+    buttons.find((b) => b.textContent === 'Import').click();
+    expect(await promise).toEqual({
+      excludedNodeProps: new Set(['born', 'name']),
+      excludedEdgeProps: new Set(),
+    });
   });
 });
