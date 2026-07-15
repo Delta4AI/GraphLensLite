@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.16.2 — 2026-07-15
+
+Saved graph files load unchanged — this release is bug fixes only.
+
+### Fixes
+
+* **Same-named properties are distinguishable in the pie-slice picker.** When properties with the same name exist on different groups (common after a Neo4j import, where every label can carry `name`, `score`, …), the **Map Properties to Pie Slices** dialog showed identical rows with no way to tell them apart. Colliding names now show their group in parentheses — `score (Cell)` vs `score (Document)` — in both the property list and the numeric slice-color rows, every property row gets a hover tooltip with its full `group > name` path, and the list is sorted by name so ambiguous twins sit next to each other. Unique names stay short as before.
+
 ## 1.16.1 — 2026-07-15
 
 Saved graph files load unchanged — this release is bug fixes only.
