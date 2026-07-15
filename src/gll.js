@@ -21,6 +21,7 @@ import {PieChartPicker} from './utilities/pie_chart_picker.js';
 import {DataTable, buildDataTable} from "./utilities/data_editor.js";
 import {StringDemoDataLoader} from "./utilities/demo_loader.js";
 import {openNeo4jPopup} from "./utilities/neo4j_loader.js";
+import {expandNeo4jSelection, openNeo4jJoinPopup} from "./utilities/neo4j_session.js";
 import {Popup} from "./utilities/popup.js";
 import {StaticUtilities} from "./utilities/static.js";
 import {generateTourData, GuidedTour} from "./utilities/tour.js";
@@ -454,6 +455,8 @@ async function startTour() {
 
 window.loadDemoData = loadDemoData;
 window.loadNeo4jData = () => openNeo4jPopup(cache);
+window.expandNeo4jSelection = () => expandNeo4jSelection(cache);
+window.openNeo4jJoinPopup = () => openNeo4jJoinPopup(cache);
 window.startTour = startTour;
 window.cache = cache;
 

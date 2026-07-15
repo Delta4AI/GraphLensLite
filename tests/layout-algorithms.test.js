@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Graph, forceAtlas2 } from "../src/lib/graphology.bundle.mjs";
-import { applyNoverlap, executeLayout } from "../src/graph/layout_algorithms.js";
+import { applyNoverlap, executeLayout, settlePinnedForce } from "../src/graph/layout_algorithms.js";
 import { DEFAULTS } from "../src/config.js";
 
 // ==========================================================================
@@ -697,4 +697,51 @@ describe("executeLayout — edge cases", () => {
       }
     },
   );
+});
+
+// ==========================================================================
+// settlePinnedForce — animated FA2 over the full graph with all but the
+// given nodes pinned (Neo4j merge settle). Pinning is iterate-and-restore,
+// so pinned coordinates must be bit-identical afterwards.
+// ==========================================================================
+describe("settlePinnedForce", () => {
+  const fastOpts = { durationMs: 25, raf: (cb) => setTimeout(cb, 0) };
+
+  it("moves only the free nodes; pinned coordinates are bit-identical", async () => {
+    const graph = starGraph(6);
+    const before = new Map(graph.mapNodes((id, a) => [id, { x: a.x, y: a.y }]));
+
+    await settlePinnedForce(graph, ["n0", "n1"], fastOpts);
+
+    let movedFree = 0;
+    graph.forEachNode((id, attrs) => {
+      const prev = before.get(id);
+      if (id === "n0" || id === "n1") {
+        expect(Number.isFinite(attrs.x)).toBe(true);
+        if (attrs.x !== prev.x || attrs.y !== prev.y) movedFree++;
+      } else {
+        expect(attrs.x).toBe(prev.x);
+        expect(attrs.y).toBe(prev.y);
+      }
+    });
+    expect(movedFree).toBeGreaterThan(0);
+  });
+
+  it("no-ops when nothing is free, everything is free, or the graph is tiny", async () => {
+    const graph = starGraph(3);
+    const before = new Map(graph.mapNodes((id, a) => [id, { x: a.x, y: a.y }]));
+
+    await settlePinnedForce(graph, [], fastOpts);
+    await settlePinnedForce(graph, graph.nodes(), fastOpts);
+
+    graph.forEachNode((id, attrs) => {
+      expect(attrs.x).toBe(before.get(id).x);
+      expect(attrs.y).toBe(before.get(id).y);
+    });
+
+    const single = new Graph();
+    single.addNode("only", { x: 1, y: 1 });
+    await settlePinnedForce(single, ["only"], fastOpts);
+    expect(single.getNodeAttribute("only", "x")).toBe(1);
+  });
 });

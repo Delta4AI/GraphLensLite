@@ -71,6 +71,7 @@ Business logic and UI:
 - `data_editor.js` — spreadsheet-like data editor (`DataTable`), incl. Excel export
 - `demo_loader.js` — STRING DB protein-interaction demo data
 - `neo4j_loader.js` — Neo4j connector (HTTP transactional Cypher API, no driver dependency)
+- `neo4j_session.js` — Neo4j session extensions: expand selected nodes, merge additional queries
 - `tour.js` — guided tour with a sample dataset
 - `color_scale_picker.js` / `numeric_scale_picker.js` / `pie_chart_picker.js` — styling pickers
 - `selection_hud.js`, `theme.js`, `export_scale.js`

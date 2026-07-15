@@ -42,7 +42,7 @@
         <span class="landing-card-desc">Explore protein-protein interaction networks from the STRING database</span>
       </button>
       <button class="landing-card" onclick="loadNeo4jData()">
-        <span class="landing-card-icon">🗄️</span>
+        <span class="landing-card-icon">🛢️</span>
         <span class="landing-card-title">Neo4j Database</span>
         <span class="landing-card-desc">Fetch a graph from a Neo4j server with a Cypher query</span>
       </button>
@@ -110,7 +110,7 @@
         <br>
         <button onclick="loadDemoData()" class="mt-2">🔍 Load from STRING Database</button>
         <br>
-        <button onclick="loadNeo4jData()" class="mt-2">🗄️ Load from Neo4j</button>
+        <button onclick="loadNeo4jData()" class="mt-2">🛢️ Load from Neo4j</button>
         <br>
         <button onclick="startTour()" class="mt-2">🗺️ Take a Tour</button>
       </div>
@@ -127,6 +127,9 @@
           <button id="relayoutBtn" class="small-btn" title="Re-layout: recompute positions for the entire workspace with a chosen layout algorithm (overwrites manual positions)" onclick="cache.lm.relayoutWorkspace()">🔄</button>
           <button id="hideDisconnectedBtn" class="small-btn red" title="Hide all nodes and edges that are not connected to any other node or edge" onclick="cache.gcm.toggleCleanUpDanglingElements(this)">🚫</button>
           <button id="hoverToggleBtn" class="small-btn green highlight" title="Disable hover highlight effect (H)" onclick="cache.ui.toggleHoverEffect(this)">✨</button>
+          <button id="neo4jJoinBtn" class="small-btn" style="display: none;" aria-label="Add Neo4j query"
+                  title="Fetch an additional Cypher query from the connected Neo4j server and merge the results into the current graph"
+                  onclick="openNeo4jJoinPopup()">🛢️</button>
           <div id="debugDiv" class="inline"></div>
           <br>
           <h5 class="purple">Shown:
@@ -190,6 +193,9 @@
           </span>
           <button class="sel-hud-btn disabled" title="Reset the style of selected elements to defaults" id="resetSelectedElementsStyleBtn"
                   onclick="cache.style.resetStyleForSelectedElements()">⟳ Reset style</button>
+          <button class="sel-hud-btn disabled" style="display: none;" id="neo4jExpandBtn"
+                  title="Fetch the neighbors of the selected nodes from Neo4j and merge them into the graph"
+                  onclick="expandNeo4jSelection()">🛢️ Expand</button>
         </div>
       </div>
 

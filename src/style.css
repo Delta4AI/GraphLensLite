@@ -5886,6 +5886,33 @@ input:checked + .slider:before {
     overflow-wrap: break-word;
 }
 
+/* Inline size warning in the expand checklist (sum of checked counts).
+   Colors mirror the --danger-text pattern; #E57B3C fails AA contrast at this size. */
+.neo4j-warning {
+    padding: 10px 12px;
+    border: 1px solid #9a5b1f;
+    border-radius: 4px;
+    color: #9a5b1f;
+    font-size: 12.5px;
+    margin: 8px 0 12px;
+    overflow-wrap: break-word;
+}
+
+[data-theme="dark"] .neo4j-warning {
+    border-color: #e0a36a;
+    color: #e0a36a;
+}
+
+/* Stitch checkbox in the join-query popup. */
+.neo4j-stitch-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 12.5px;
+    margin-bottom: 12px;
+    cursor: pointer;
+}
+
 .neo4j-btn-spinner {
     display: inline-block;
     width: 11px;

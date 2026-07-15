@@ -5,6 +5,7 @@ import { Popup } from '../utilities/popup.js';
 import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
 import { clampPopoverLeft } from '../utilities/popover_position.js';
+import { refreshNeo4jSessionUI } from '../utilities/neo4j_loader.js';
 
 // Persisted preference: whether the filter panel reveals exact numeric inputs
 // and the per-row group / selection actions. Off keeps rows scannable when a
@@ -39,6 +40,9 @@ class UIManager {
       label.textContent = text;
       label.title = text;
     }
+    // Every loader stamps the label, so this is the one seam where "another
+    // source replaced the graph" is visible — sync the Neo4j session buttons.
+    refreshNeo4jSessionUI();
   }
 
   /**
@@ -143,6 +147,7 @@ class UIManager {
         'Reduce Neighbors',
         'deselectNodesBtn',
         'focusNodesBtn',
+        'neo4jExpandBtn',
       ],
       enable
     );

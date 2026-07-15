@@ -333,6 +333,69 @@ function toAppFormat(nodes, relationships, options = {}) {
   };
 }
 
+/**
+ * Active Neo4j session — set after a successful import, replaced by the next
+ * one. Enables the expand/join-query features (see neo4j_session.js). Raw
+ * Neo4j entities (not app format) are accumulated so toAppFormat re-computes
+ * auto-colors over the full category set on every merge, keeping colors
+ * stable across fetches. The password lives in memory only — never persisted
+ * (saveSettings strips it).
+ *
+ * The session is never proactively cleared when another loader replaces the
+ * graph; the buttons are simply hidden because the data-source label no
+ * longer starts with `Neo4j:` (see neo4jSessionActive). A stale session is
+ * inert — it is only reachable again through a fresh Neo4j import.
+ */
+let neo4jSession = null;
+
+/**
+ * @param {{url: string, username: string, password: string, database: string}} config
+ * @param {object[]} nodes  raw Neo4j nodes from collectGraph
+ * @param {object[]} relationships  raw Neo4j relationships from collectGraph
+ * @param {{excludedNodeProps: Set<string>, excludedEdgeProps: Set<string>}} exclusions
+ */
+function startNeo4jSession(config, nodes, relationships, exclusions) {
+  neo4jSession = {
+    config,
+    rawNodes: new Map(nodes.map((node) => [node.id, node])),
+    rawRels: new Map(relationships.map((rel) => [rel.id, rel])),
+    exclusions,
+  };
+  refreshNeo4jSessionUI();
+}
+
+function getNeo4jSession() {
+  return neo4jSession;
+}
+
+function clearNeo4jSession() {
+  neo4jSession = null;
+  refreshNeo4jSessionUI();
+}
+
+/**
+ * True while the rendered graph belongs to the Neo4j session. Every loader
+ * stamps the data-source label, so the label check alone detects that another
+ * source has replaced the graph — no lifecycle events needed.
+ */
+function neo4jSessionActive() {
+  const label = document.getElementById('dataSourceLabel')?.textContent ?? '';
+  return neo4jSession !== null && label.startsWith('Neo4j:');
+}
+
+/**
+ * Show/hide the expand and join-query buttons. Called after a Neo4j import
+ * and from ui.setDataSourceLabel — the single choke point every import flow
+ * goes through.
+ */
+function refreshNeo4jSessionUI() {
+  const active = neo4jSessionActive();
+  for (const id of ['neo4jExpandBtn', 'neo4jJoinBtn']) {
+    const btn = document.getElementById(id);
+    if (btn) btn.style.display = active ? '' : 'none';
+  }
+}
+
 /** Persisted connection settings — everything except the password. */
 function readSavedSettings(storage = globalThis.localStorage) {
   try {
@@ -586,6 +649,7 @@ async function executeNeo4jImport(cache, config, deps = {}) {
     const rendered = await apply(cache, toAppFormat(nodes, relationships, exclusions));
     if (rendered) {
       cache.ui.setDataSourceLabel(`Neo4j: ${config.database}`);
+      startNeo4jSession(config, nodes, relationships, exclusions);
     }
     return rendered;
   } catch (err) {
@@ -720,6 +784,10 @@ export {
   readSavedSettings,
   saveSettings,
   showPropertyChecklist,
+  startNeo4jSession,
+  getNeo4jSession,
+  clearNeo4jSession,
+  refreshNeo4jSessionUI,
   DEFAULT_DATABASE,
   LARGE_RESULT_ROW_THRESHOLD,
   LARGE_ARRAY_THRESHOLD,
