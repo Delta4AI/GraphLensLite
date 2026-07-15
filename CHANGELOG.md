@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.16.0 — 2026-07-15
+
+Saved graph files load unchanged — this release adds a new data source.
+
+### Features
+
+* **Neo4j connector.** Fetch a graph straight from a Neo4j server: a new **🗄️ Neo4j Database** card on the landing page (and a sidebar button) opens a connection dialog for server URL, credentials, optional database name, and a Cypher query returning nodes, relationships, or paths. Before fetching, the connector counts the matching rows and asks for confirmation above 2,000; after fetching, a property checklist shows each property's type and example values and lets you drop unwanted ones — long arrays such as embeddings start deselected. Nodes are colored per entity label and edges per relationship type (when there is more than one), property groups use the most specific label of a stored class hierarchy, and list properties become pipe-separated multi-value categories so the regular filters work on them. The connection settings (never the password) are remembered locally. Uses the Neo4j HTTP API on port 7474/7473 with no driver dependency; Neo4j Aura (Bolt-only) is not supported.
+
 ## 1.15.5 — 2026-07-10
 
 Saved graph files load unchanged; older files (and files saved by earlier versions) default the new opacity to fully opaque, so their appearance is identical.
