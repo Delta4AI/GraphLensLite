@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   executeNeo4jImport,
   buildConnectionForm,
+  openNeo4jPopup,
   runCypher,
   countQueryRows,
   collectGraph,
@@ -434,6 +435,41 @@ describe('buildConnectionForm', () => {
     expect(form.querySelector('#neo4j-query').value).toBe('MATCH (n) RETURN n LIMIT 5');
     expect(form.querySelector('img')).toBeNull();
     expect(form.querySelector('#neo4j-password').value).toBe('');
+  });
+});
+
+describe('openNeo4jPopup', () => {
+  // The Popup relocates the .p-footer out of the content element, so these
+  // tests must drive the buttons through the live document, exactly like a
+  // user click — regression coverage for the wiring breaking silently.
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    localStorage.clear();
+  });
+
+  it('wires the Fetch button after Popup construction (footer is relocated)', async () => {
+    const cache = { ui: { error: vi.fn() } };
+    const promise = openNeo4jPopup(cache);
+
+    const loadBtn = document.getElementById('neo4j-load-btn');
+    expect(loadBtn).not.toBeNull();
+    loadBtn.click(); // empty form → validation error, popup stays open
+    expect(cache.ui.error).toHaveBeenCalledWith('Server URL and Cypher query are required.');
+
+    document.getElementById('neo4j-cancel-btn').click();
+    expect(await promise).toBe(false);
+  });
+
+  it('rejects an invalid URL without closing the popup', async () => {
+    const cache = { ui: { error: vi.fn() } };
+    const promise = openNeo4jPopup(cache);
+
+    document.getElementById('neo4j-url').value = 'not a url';
+    document.getElementById('neo4j-load-btn').click();
+    expect(cache.ui.error).toHaveBeenCalledWith('Invalid server URL: not a url');
+
+    document.getElementById('neo4j-cancel-btn').click();
+    expect(await promise).toBe(false);
   });
 });
 

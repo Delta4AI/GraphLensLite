@@ -466,6 +466,11 @@ async function executeNeo4jImport(cache, config, deps = {}) {
  */
 function openNeo4jPopup(cache) {
   const form = buildConnectionForm(readSavedSettings());
+  // Grab button references before constructing the Popup — it relocates the
+  // .p-footer out of the content element, so querying the form afterwards
+  // would come up empty. The references stay valid across the move.
+  const loadBtn = form.querySelector('#neo4j-load-btn');
+  const cancelBtn = form.querySelector('#neo4j-cancel-btn');
 
   return new Promise((resolve) => {
     const popup = new Popup(form, {
@@ -502,8 +507,8 @@ function openNeo4jPopup(cache) {
       resolve(await executeNeo4jImport(cache, config));
     };
 
-    form.querySelector('#neo4j-load-btn').addEventListener('click', handleLoad);
-    form.querySelector('#neo4j-cancel-btn').addEventListener('click', () => {
+    loadBtn.addEventListener('click', handleLoad);
+    cancelBtn.addEventListener('click', () => {
       popup.close();
       resolve(false);
     });
