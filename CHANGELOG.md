@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.16.3 — 2026-07-16
+
+Saved graph files load unchanged — this release is a small usability addition.
+
+### Features
+
+* **Neo4j queries are visible in the status log.** Every Cypher statement the connector sends — the initial fetch, row-count preflights, expansions, additional queries, and stitch passes — now appears as a grey 🛢️-prefixed line in the sidebar status log, so it's always clear what was asked of the server. Long queries are collapsed to one line and truncated to keep the log legible.
+
 ## 1.16.2 — 2026-07-15
 
 Saved graph files load unchanged — this release is bug fixes only.
