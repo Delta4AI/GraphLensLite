@@ -27,6 +27,21 @@ const EDGE_COLOR_ALPHA = '90';
 const EXAMPLE_MAX_LENGTH = 40;
 
 const DEFAULT_DATABASE = 'neo4j';
+// Public read-only demo server run by Neo4j Labs; the credentials are
+// published (username = password = database, github.com/neo4j-graph-examples).
+// The query pulls the best-answered "neo4j"-tagged questions (sort key is
+// `answers`, not answer_count) with their 1-hop neighborhood — ~1.5k nodes /
+// ~1.8k rows, sized to show rendering performance while staying under the
+// LARGE_RESULT_ROW_THRESHOLD confirm popup.
+const DEMO_SETTINGS = {
+  url: 'https://demo.neo4jlabs.com:7473',
+  username: 'stackoverflow',
+  password: 'stackoverflow',
+  database: 'stackoverflow',
+  query: 'MATCH (q:Question)-[:TAGGED]->(:Tag {name: "neo4j"})\n' +
+    'WITH q ORDER BY q.answers DESC LIMIT 200\n' +
+    'MATCH (q)-[r]-(x) RETURN q, r, x LIMIT 2000',
+};
 const LARGE_RESULT_ROW_THRESHOLD = 2000;
 const COUNT_TIMEOUT_MS = 30_000;
 const QUERY_TIMEOUT_MS = 300_000;
@@ -242,17 +257,29 @@ function categoryColor(index) {
 }
 
 /**
+ * Edge palette: the node palette contains pale tones (#EFB0AA, #8CA6D9) that
+ * vanish at EDGE_COLOR_ALPHA against a light background. Edges instead walk
+ * the golden-angle hue wheel at mid lightness, which stays legible over both
+ * light and dark themes (stored styles are static hexes — they cannot adapt
+ * to a theme switch). Offset from blue so index 0 differs from the node red.
+ */
+function edgeCategoryColor(index) {
+  return hslToHex((210 + index * 137.508) % 360, 55, 45);
+}
+
+/**
  * Map each category to a color, or null when there are fewer than two
  * categories (a single category carries no visual information — keep the
  * app defaults). Categories are sorted so colors are deterministic.
  *
  * @param {string[]} categories
+ * @param {(index: number) => string} [colorFn]
  * @returns {Map<string, string>|null}
  */
-function buildCategoryColors(categories) {
+function buildCategoryColors(categories, colorFn = categoryColor) {
   const unique = [...new Set(categories)].sort();
   if (unique.length < 2) return null;
-  return new Map(unique.map((category, index) => [category, categoryColor(index)]));
+  return new Map(unique.map((category, index) => [category, colorFn(index)]));
 }
 
 /**
@@ -291,6 +318,7 @@ function toAppFormat(nodes, relationships, options = {}) {
   const nodeColors = buildCategoryColors(nodes.map((n) => sanitizeForAST(primaryLabel(n))));
   const edgeColors = buildCategoryColors(
     relationships.map((r) => sanitizeForAST(r.type || 'Relationship')),
+    edgeCategoryColor,
   );
 
   const appNodes = nodes.map((node) => {
@@ -572,6 +600,14 @@ function buildConnectionForm(saved) {
     </div>
     <div id="neo4j-error" class="neo4j-error" role="alert" hidden></div>
     <div class="neo4j-info">
+      No server at hand? <a href="#" id="neo4j-demo-link">Fill in the Stack Overflow demo</a> —
+      <a href="https://github.com/neo4j-graph-examples" target="_blank" rel="noopener">Neo4j Labs'</a>
+      public read-only server; content from
+      <a href="https://stackoverflow.com" target="_blank" rel="noopener">Stack Overflow</a>
+      contributors, licensed under
+      <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA</a>.
+    </div>
+    <div class="neo4j-info">
       Uses the Neo4j HTTP API (port 7474/7473). Credentials are sent only to the
       server above and are not stored; the URL, username, database, and query
       are remembered locally. Prefer https:// for remote servers — Basic auth
@@ -586,6 +622,12 @@ function buildConnectionForm(saved) {
   form.querySelector('#neo4j-username').value = saved.username ?? '';
   form.querySelector('#neo4j-database').value = saved.database ?? '';
   if (saved.query) form.querySelector('#neo4j-query').value = saved.query;
+  form.querySelector('#neo4j-demo-link').addEventListener('click', (event) => {
+    event.preventDefault();
+    for (const [field, value] of Object.entries(DEMO_SETTINGS)) {
+      form.querySelector(`#neo4j-${field}`).value = value;
+    }
+  });
   return form;
 }
 
@@ -779,6 +821,7 @@ export {
   nodeDisplayLabel,
   primaryLabel,
   categoryColor,
+  edgeCategoryColor,
   buildCategoryColors,
   hslToHex,
   readSavedSettings,
@@ -789,6 +832,7 @@ export {
   clearNeo4jSession,
   refreshNeo4jSessionUI,
   DEFAULT_DATABASE,
+  DEMO_SETTINGS,
   LARGE_RESULT_ROW_THRESHOLD,
   LARGE_ARRAY_THRESHOLD,
   SETTINGS_STORAGE_KEY,

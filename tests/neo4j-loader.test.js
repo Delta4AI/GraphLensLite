@@ -11,6 +11,7 @@ import {
   toAppFormat,
   coerceValue,
   categoryColor,
+  edgeCategoryColor,
   buildCategoryColors,
   primaryLabel,
   sanitizeForAST,
@@ -21,6 +22,7 @@ import {
   saveSettings,
   showPropertyChecklist,
   DEFAULT_DATABASE,
+  DEMO_SETTINGS,
   LARGE_ARRAY_THRESHOLD,
   SETTINGS_STORAGE_KEY,
   LARGE_RESULT_ROW_THRESHOLD,
@@ -328,6 +330,17 @@ describe('toAppFormat', () => {
     );
     expect(data.edges[0].style.stroke).toMatch(/^#[0-9A-Fa-f]{6}90$/);
     expect(data.edges[0].style.stroke).not.toBe(data.edges[1].style.stroke);
+    expect(data.edges[0].style.stroke).toBe(`${edgeCategoryColor(0)}90`);
+  });
+
+  it('keeps edge auto-colors legible on light backgrounds (mid HSL lightness)', () => {
+    for (let i = 0; i < 8; i++) {
+      const hex = edgeCategoryColor(i);
+      const [r, g, b] = [1, 3, 5].map((o) => parseInt(hex.slice(o, o + 2), 16) / 255);
+      const lightness = (Math.max(r, g, b) + Math.min(r, g, b)) / 2;
+      expect(lightness).toBeGreaterThan(0.3);
+      expect(lightness).toBeLessThan(0.6);
+    }
   });
 
   it('builds deduplicated headers without synthetic type properties', () => {
@@ -569,6 +582,18 @@ describe('buildConnectionForm', () => {
     expect(form.querySelector('#neo4j-query').value).toBe('MATCH (n) RETURN n LIMIT 5');
     expect(form.querySelector('img')).toBeNull();
     expect(form.querySelector('#neo4j-password').value).toBe('');
+  });
+
+  it('fills the public demo settings when the demo link is clicked', () => {
+    const form = buildConnectionForm({ url: 'http://db:7474', username: 'me' });
+
+    form.querySelector('#neo4j-demo-link').click();
+
+    expect(form.querySelector('#neo4j-url').value).toBe(DEMO_SETTINGS.url);
+    expect(form.querySelector('#neo4j-username').value).toBe(DEMO_SETTINGS.username);
+    expect(form.querySelector('#neo4j-password').value).toBe(DEMO_SETTINGS.password);
+    expect(form.querySelector('#neo4j-database').value).toBe(DEMO_SETTINGS.database);
+    expect(form.querySelector('#neo4j-query').value).toBe(DEMO_SETTINGS.query);
   });
 });
 

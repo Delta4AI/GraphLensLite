@@ -5875,6 +5875,11 @@ input:checked + .slider:before {
     margin-bottom: 12px;
 }
 
+/* Browser-default link blue is illegible on the dark surface. */
+.neo4j-info a {
+    color: var(--brand-text);
+}
+
 .neo4j-error {
     padding: 10px 12px;
     border: 1px solid var(--danger-text);
