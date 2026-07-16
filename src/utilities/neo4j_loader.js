@@ -63,6 +63,21 @@ function basicAuth(username, password) {
   return 'Basic ' + btoa(String.fromCharCode(...bytes));
 }
 
+// Status-log lines for executed queries are truncated to keep the log legible.
+const QUERY_LOG_MAX_LENGTH = 160;
+
+/** One grey status-log line per executed Cypher statement (no-op outside the app). */
+function logStatements(statements) {
+  const ui = globalThis.cache?.ui;
+  if (!ui) return;
+  for (const { statement } of statements) {
+    const oneLine = statement.replace(/\s+/g, ' ').trim();
+    const text =
+      oneLine.length > QUERY_LOG_MAX_LENGTH ? `${oneLine.slice(0, QUERY_LOG_MAX_LENGTH)}…` : oneLine;
+    ui.logMessage(text, 'grey', false, '🛢️');
+  }
+}
+
 /**
  * POST one or more Cypher statements to the tx/commit endpoint.
  *
@@ -73,6 +88,7 @@ function basicAuth(username, password) {
  * @throws {Error} on network failure, non-2xx status, or Cypher errors
  */
 async function runCypher(config, statements, opts = {}) {
+  logStatements(statements);
   const fetchImpl = opts.fetchImpl ?? fetch;
   const response = await fetchImpl(buildTxUrl(config.url, config.database), {
     method: 'POST',

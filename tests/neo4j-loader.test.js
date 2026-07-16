@@ -105,6 +105,25 @@ describe('runCypher', () => {
       /SyntaxError: bad query/,
     );
   });
+
+  it('logs each executed statement to the status log, collapsed and truncated', async () => {
+    const logMessage = vi.fn();
+    globalThis.cache = { ui: { logMessage } };
+    try {
+      const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ results: [], errors: [] }));
+      const long = 'MATCH (n)\n  WHERE n.name = "' + 'x'.repeat(200) + '" RETURN n';
+      await runCypher(CONFIG, [{ statement: 'RETURN 1' }, { statement: long }], { fetchImpl });
+
+      expect(logMessage).toHaveBeenCalledTimes(2);
+      expect(logMessage.mock.calls[0][0]).toBe('RETURN 1');
+      const truncated = logMessage.mock.calls[1][0];
+      expect(truncated).toHaveLength(161); // 160 chars + ellipsis
+      expect(truncated.endsWith('…')).toBe(true);
+      expect(truncated).not.toContain('\n');
+    } finally {
+      delete globalThis.cache;
+    }
+  });
 });
 
 describe('countQueryRows', () => {
