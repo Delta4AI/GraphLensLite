@@ -26,7 +26,7 @@
 import { DEFAULTS } from '../config.js';
 import {
   nodeViewportRect,
-  computeOutlinePoints,
+  computeOutlineGeometry,
   polygonSelfIntersects,
   outlineLabelAnchor,
   idsKey,
@@ -54,8 +54,8 @@ class BubbleSetLayer {
     /** @type {Map<string, {members: Map<string, true>, avoidMembers: string[], opts: object}>} */
     this.groups = new Map();
     // Per-group outline cache: identity key (membership, style, positions,
-    // viewport size, ratio bucket) + graph-space points.
-    /** @type {Map<string, {key: string, graphPoints: Array<{x,y}>}>} */
+    // viewport size, ratio bucket) + graph-space rings (outer + avoid holes).
+    /** @type {Map<string, {key: string, graphPoints: Array<{x,y}>, graphHoles: Array<Array<{x,y}>>}>} */
     this.outlines = new Map();
 
     this.rafHandle = null;
@@ -195,9 +195,11 @@ class BubbleSetLayer {
   #drawOutlines(active, sigma) {
     for (const [group, state] of active) {
       // Reprojection assumes camera.angle === 0 (the app never rotates the camera).
-      const points = this.outlines.get(group).graphPoints.map((p) => sigma.graphToViewport(p));
+      const cached = this.outlines.get(group);
+      const points = cached.graphPoints.map((p) => sigma.graphToViewport(p));
+      const holes = (cached.graphHoles ?? []).map((h) => h.map((p) => sigma.graphToViewport(p)));
       const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {};
-      const drawn = this.#drawGroup(this.ctx, points, state, defaults);
+      const drawn = this.#drawGroup(this.ctx, points, state, defaults, holes);
       // Labels paint on the top canvas (afterLayer: "labels") so they read
       // over member-node labels; the body/outline stayed on the bottom one.
       if (drawn && state.opts.label) {
@@ -223,7 +225,9 @@ class BubbleSetLayer {
     const out = [];
     for (const [group, state] of this.groups) {
       if (state.members.size === 0) continue;
-      let graphPoints = this.outlines.get(group)?.graphPoints;
+      const cached = this.outlines.get(group);
+      let graphPoints = cached?.graphPoints;
+      let graphHoles = cached?.graphHoles ?? [];
       if (!graphPoints?.length) {
         const visibleMembers = [];
         for (const id of state.members.keys()) {
@@ -232,12 +236,13 @@ class BubbleSetLayer {
           if (!attrs.hidden) visibleMembers.push({ id, attrs });
         }
         if (visibleMembers.length === 0) continue;
-        graphPoints = this.#fitGraphOutline(state, visibleMembers);
+        ({ outer: graphPoints, holes: graphHoles } = this.#fitGraphOutline(state, visibleMembers));
       }
       if (!graphPoints || graphPoints.length < 2) continue;
       out.push({
         group,
         points: graphPoints.map((p) => sigma.graphToViewport(p)),
+        holes: graphHoles.map((h) => h.map((p) => sigma.graphToViewport(p))),
         opts: state.opts,
         defaults: this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {},
       });
@@ -260,8 +265,8 @@ class BubbleSetLayer {
     ctx.save();
     try {
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      for (const { points, opts, defaults } of groups) {
-        this.#drawGroup(ctx, points, { opts }, defaults);
+      for (const { points, holes, opts, defaults } of groups) {
+        this.#drawGroup(ctx, points, { opts }, defaults, holes ?? []);
       }
     } finally {
       ctx.restore();
@@ -334,14 +339,37 @@ class BubbleSetLayer {
       });
     }
 
+    // Avoid-node MOVES reshape the fit too (their negative field pushes the
+    // outline), so their positions/sizes fold into the key as well — without
+    // this, dragging a non-member into the hull never re-fit it. Skipped when
+    // avoidance is 0 (the fit ignores avoid rects entirely, so their moves
+    // must NOT trigger refits). Cost is bounded: past the config node budget
+    // the manager passes no avoid members at all (see getAvoidMembers).
+    const avoidanceRaw = Number(state.opts.avoidance ?? 1);
+    const avoidanceActive = !Number.isFinite(avoidanceRaw) || avoidanceRaw !== 0;
+    const avoidPositions = [];
+    if (avoidanceActive) {
+      for (const id of state.avoidMembers) {
+        if (!graph.hasNode(id)) continue;
+        const attrs = graph.getNodeAttributes(id);
+        if (attrs.hidden) continue;
+        avoidPositions.push({
+          x: attrs.x,
+          y: attrs.y,
+          s: sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1),
+        });
+      }
+    }
+
     // membersKey/avoidKey are precomputed in #updateGroup, so the per-frame
-    // cost here is the O(n) position checksum. Hidden flips stay correct: an
+    // cost here is the O(n) position checksums. Hidden flips stay correct: an
     // unhide changes visibleMembers.length, and a same-count hidden swap
     // changes the checksum. No camera/viewport term — the graph-space outline
     // is the same at every zoom.
     const key =
       `${state.membersKey}|${state.avoidKey}|${visibleMembers.length}` +
-      `|${styleKey(state.opts)}|${positionsChecksum(memberPositions)}`;
+      `|${styleKey(state.opts)}|${positionsChecksum(memberPositions)}` +
+      `|${positionsChecksum(avoidPositions)}`;
     const cached = this.outlines.get(group);
     if (cached && cached.key === key) return false;
 
@@ -350,36 +378,41 @@ class BubbleSetLayer {
       return cached !== undefined;
     }
 
-    const graphPoints = this.#fitGraphOutline(state, visibleMembers);
-    // computeOutlinePoints repairs self-intersections, so a bad fit here is a
-    // collapse to nothing or the rare unrepairable self-cross. Never let it
+    const { outer: graphPoints, holes: graphHoles } = this.#fitGraphOutline(state, visibleMembers);
+    // computeOutlineGeometry repairs self-intersections, so a bad fit here is
+    // a collapse to nothing or the rare unrepairable self-cross. Never let it
     // replace a good outline.
     const selfIntersects = graphPoints.length >= 4 && polygonSelfIntersects(graphPoints);
     const collapsed = graphPoints.length < 3;
     if (selfIntersects || collapsed) {
       if (cached?.graphPoints.length) {
-        this.outlines.set(group, { key, graphPoints: cached.graphPoints });
+        this.outlines.set(group, {
+          key,
+          graphPoints: cached.graphPoints,
+          graphHoles: cached.graphHoles ?? [],
+        });
         return true;
       }
       // No prior good outline yet: stay absent until a clean fit appears.
       return this.outlines.delete(group);
     }
-    this.outlines.set(group, { key, graphPoints });
+    this.outlines.set(group, { key, graphPoints, graphHoles });
     return true;
   }
 
   /**
    * Fit a group's outline at the ratio-1 REFERENCE viewport scale, then map it
-   * to graph space for the cache. bubblesets-js' field constants are tuned for
-   * on-screen pixels, so the fit must run where node sizes are pixel-scale —
-   * the ratio-1 viewport, which is independent of the current camera. That
+   * to graph space for the cache. The influence field scales with the mean
+   * member radius (bubble_geometry.js), and the ratio-1 viewport gives the
+   * fit real on-screen node radii independent of the current camera. That
    * makes the outline zoom-invariant: a member is always enclosed and the same
    * cached hull reprojects to hug the nodes at any zoom. Shared by
    * #syncGroupOutline and the export path.
    *
    * @param {object} state  group state (avoidMembers, opts)
    * @param {Array<{id: string, attrs: object}>} visibleMembers
-   * @returns {Array<{x: number, y: number}>} graph-space outline (may be empty)
+   * @returns {{outer: Array<{x: number, y: number}>,
+   *   holes: Array<Array<{x: number, y: number}>>}} graph-space rings
    */
   #fitGraphOutline(state, visibleMembers) {
     const graph = this.adapter.graph;
@@ -409,41 +442,49 @@ class BubbleSetLayer {
 
     const outlineOpts = {
       virtualEdges: state.opts.virtualEdges,
-      scale: 1,
       padding: state.opts.padding,
       corridor: state.opts.corridor,
+      avoidance: state.opts.avoidance,
     };
-    let refPoints = computeOutlinePoints(memberRects, avoidRects, outlineOpts);
+    let geometry = computeOutlineGeometry(memberRects, avoidRects, outlineOpts);
     // Safety net: if the avoid nodes' negative field collapses the outline, a
     // hull that ignores avoid nodes beats a vanished group.
-    if (refPoints.length === 0 && avoidRects.length > 0) {
-      refPoints = computeOutlinePoints(memberRects, [], outlineOpts);
+    if (geometry.outer.length === 0 && avoidRects.length > 0) {
+      geometry = computeOutlineGeometry(memberRects, [], outlineOpts);
     }
     // Reference-viewport → graph space (undo the ratio-1 mapping, then the
     // camera): the cache holds zoom-independent graph coords.
-    return refPoints.map((p) =>
-      sigma.viewportToGraph({ x: cx + (p.x - cx) / r, y: cy + (p.y - cy) / r })
-    );
+    const toGraph = (p) =>
+      sigma.viewportToGraph({ x: cx + (p.x - cx) / r, y: cy + (p.y - cy) / r });
+    return {
+      outer: geometry.outer.map(toGraph),
+      holes: geometry.holes.map((h) => h.map(toGraph)),
+    };
   }
 
   /**
-   * Paint one group's body + outline from viewport-projected points. Returns
-   * true when something was painted (false when the outline is too small),
-   * so the caller knows whether a label belongs on the top canvas.
+   * Paint one group's body + outline from viewport-projected rings (outer +
+   * avoid holes, even-odd fill; stroke() outlines every ring). Returns true
+   * when something was painted (false when the outline is too small), so the
+   * caller knows whether a label belongs on the top canvas.
    */
-  #drawGroup(ctx, points, { opts }, defaults) {
+  #drawGroup(ctx, points, { opts }, defaults, holes = []) {
     if (!points || points.length < 2) return false;
 
     const path = new Path2D();
-    path.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) path.lineTo(points[i].x, points[i].y);
-    path.closePath();
+    const addRing = (ring) => {
+      path.moveTo(ring[0].x, ring[0].y);
+      for (let i = 1; i < ring.length; i++) path.lineTo(ring[i].x, ring[i].y);
+      path.closePath();
+    };
+    addRing(points);
+    for (const hole of holes) if (hole.length >= 3) addRing(hole);
 
     ctx.save();
     try {
       ctx.globalAlpha = opts.fillOpacity ?? defaults.fillOpacity ?? 0.25;
       ctx.fillStyle = opts.fill ?? defaults.fill ?? '#403C53';
-      ctx.fill(path);
+      ctx.fill(path, 'evenodd');
       ctx.globalAlpha = opts.strokeOpacity ?? defaults.strokeOpacity ?? 1;
       ctx.strokeStyle = opts.stroke ?? defaults.stroke ?? '#403C53';
       ctx.lineWidth = OUTLINE_STROKE_WIDTH;

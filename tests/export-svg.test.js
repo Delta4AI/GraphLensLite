@@ -519,8 +519,29 @@ describe("bubble groups", () => {
     });
 
     expect(svg).toContain(
-      '<path d="M 100 100 L 200 100 L 200 200 L 100 200 Z" fill="#e74c3c" fill-opacity="0.3" stroke="#111111" stroke-width="2" stroke-opacity="0.8"/>',
+      '<path d="M 100 100 L 200 100 L 200 200 L 100 200 Z" fill="#e74c3c" fill-opacity="0.3" fill-rule="evenodd" stroke="#111111" stroke-width="2" stroke-opacity="0.8"/>',
     );
+  });
+
+  it("renders avoid holes as extra even-odd subpaths", () => {
+    const scene = makeScene();
+
+    const svg = build(scene, {
+      bubbleGroups: [
+        {
+          group: "groupOne",
+          points: SQUARE,
+          holes: [[{ x: 140, y: 140 }, { x: 160, y: 140 }, { x: 160, y: 160 }, { x: 140, y: 160 }]],
+          opts: { fill: "#e74c3c", fillOpacity: 0.3, stroke: "#111111", strokeOpacity: 0.8 },
+          defaults: {},
+        },
+      ],
+    });
+
+    expect(svg).toContain(
+      'd="M 100 100 L 200 100 L 200 200 L 100 200 Z M 140 140 L 160 140 L 160 160 L 140 160 Z"',
+    );
+    expect(svg).toContain('fill-rule="evenodd"');
   });
 
   it("pushes an off-path label along the outward normal by the standoff", () => {
