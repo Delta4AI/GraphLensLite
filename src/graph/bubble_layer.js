@@ -317,6 +317,7 @@ class BubbleSetLayer {
    */
   #syncGroupOutline(group, state) {
     const graph = this.adapter.graph;
+    const sigma = this.adapter.sigma;
     const memberPositions = [];
     const visibleMembers = [];
     for (const id of state.members.keys()) {
@@ -324,7 +325,13 @@ class BubbleSetLayer {
       const attrs = graph.getNodeAttributes(id);
       if (attrs.hidden) continue;
       visibleMembers.push({ id, attrs });
-      memberPositions.push({ x: attrs.x, y: attrs.y });
+      // The ratio-1 radius feeds the fit (see #fitGraphOutline), so fold it
+      // into the checksum: a node-size change must invalidate the outline.
+      memberPositions.push({
+        x: attrs.x,
+        y: attrs.y,
+        s: sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1),
+      });
     }
 
     // membersKey/avoidKey are precomputed in #updateGroup, so the per-frame
@@ -400,7 +407,12 @@ class BubbleSetLayer {
       avoidRects.push(toRefRect(attrs));
     }
 
-    const outlineOpts = { virtualEdges: state.opts.virtualEdges, scale: 1 };
+    const outlineOpts = {
+      virtualEdges: state.opts.virtualEdges,
+      scale: 1,
+      padding: state.opts.padding,
+      corridor: state.opts.corridor,
+    };
     let refPoints = computeOutlinePoints(memberRects, avoidRects, outlineOpts);
     // Safety net: if the avoid nodes' negative field collapses the outline, a
     // hull that ignores avoid nodes beats a vanished group.

@@ -1206,6 +1206,22 @@ function createStyleDiv(cache) {
       createNumericalSlider(rowStrokeOpacity, `Bubble Set ${group} Stroke Opacity`, bs.strokeOpacity,
         {min: 0, max: 1, step: 0.01}, `Define the stroke opacity of bubble set ${tabIndex}.`, false);
 
+      // Padding (node influence field multiplier)
+      const rowPadding = createNewRow(panel);
+      appendLabel(rowPadding, "Padding",
+        "How far the bubble body extends past its member nodes — lower for a tighter hug, higher for more breathing room.");
+      createNumericalSlider(rowPadding, `Bubble Set ${group} Padding`, bs.padding ?? 1,
+        {min: 0.25, max: 3, step: 0.05},
+        `How far bubble set ${tabIndex} extends past its member nodes.`, false);
+
+      // Corridor Width (virtual-edge influence field multiplier)
+      const rowCorridor = createNewRow(panel);
+      appendLabel(rowCorridor, "Corridor Width",
+        "Thickness of the connecting arms that reach outlying member nodes.");
+      createNumericalSlider(rowCorridor, `Bubble Set ${group} Corridor Width`, bs.corridor ?? 1,
+        {min: 0.25, max: 3, step: 0.05},
+        `Thickness of bubble set ${tabIndex}'s connecting arms to outlying members.`, false);
+
       // Label (toggle + text input)
       const rowLabel = createNewRow(panel);
       appendLabel(rowLabel, "Label Text");

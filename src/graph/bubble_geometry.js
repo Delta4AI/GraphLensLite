@@ -34,6 +34,11 @@ const FIELD_EDGE_R0 = 10;
 const FIELD_EDGE_R1 = 20;
 const FIELD_MORPH_BUFFER = 10;
 const FIELD_PIXEL_GROUP = 4;
+// User-tunable multipliers on the influence field (per-group style):
+// padding scales the node field (how far the body extends past members),
+// corridor scales the virtual-edge field (arm thickness to outliers).
+const GEOMETRY_MULTIPLIER_MIN = 0.25;
+const GEOMETRY_MULTIPLIER_MAX = 4;
 // Marching-squares grid cell can never go below 1 px (pixelGroup 0 hangs
 // the library; sub-pixel cells just waste time).
 const FIELD_PIXEL_GROUP_MIN = 1;
@@ -55,7 +60,8 @@ function nodeViewportRect(x, y, radius) {
  *
  * @param {Array<{x,y,width,height}>} memberRects
  * @param {Array<{x,y,width,height}>} avoidRects
- * @param {{virtualEdges?: boolean, scale?: number}} [opts]
+ * @param {{virtualEdges?: boolean, scale?: number, padding?: number,
+ *   corridor?: number}} [opts]
  *   virtualEdges routes connecting corridors around avoid rects (the
  *   per-group style enables it); its cost is O(members × avoid) — see
  *   MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS in config.js
@@ -63,19 +69,26 @@ function nodeViewportRect(x, y, radius) {
  *   scale multiplies the bubblesets influence-field pixel constants so the
  *   field stays proportional to the rects at any zoom (1 = library
  *   defaults; pass sigma's node-size zoom factor).
+ *   padding multiplies the node influence radii (body extent past members);
+ *   corridor multiplies the edge influence radii (arm thickness). Both are
+ *   user style knobs, clamped to [0.25, 4], default 1 = library defaults.
  * @returns {Array<{x: number, y: number}>} closed polygon (empty when no
  *   members or the outline collapsed)
  */
 function computeOutlinePoints(memberRects, avoidRects = [], opts = {}) {
   if (!memberRects || memberRects.length === 0) return [];
   const s = opts.scale ?? 1;
+  const clampMult = (v) =>
+    Math.min(GEOMETRY_MULTIPLIER_MAX, Math.max(GEOMETRY_MULTIPLIER_MIN, Number(v) || 1));
+  const pad = clampMult(opts.padding ?? 1);
+  const cor = clampMult(opts.corridor ?? 1);
   const path = bubblesets.createOutline(memberRects, avoidRects, [], {
     virtualEdges: opts.virtualEdges !== false,
-    nodeR0: FIELD_NODE_R0 * s,
-    nodeR1: FIELD_NODE_R1 * s,
-    edgeR0: FIELD_EDGE_R0 * s,
-    edgeR1: FIELD_EDGE_R1 * s,
-    morphBuffer: FIELD_MORPH_BUFFER * s,
+    nodeR0: FIELD_NODE_R0 * s * pad,
+    nodeR1: FIELD_NODE_R1 * s * pad,
+    edgeR0: FIELD_EDGE_R0 * s * cor,
+    edgeR1: FIELD_EDGE_R1 * s * cor,
+    morphBuffer: FIELD_MORPH_BUFFER * s * Math.max(pad, cor),
     pixelGroup: Math.max(FIELD_PIXEL_GROUP_MIN, FIELD_PIXEL_GROUP * s),
   });
   // Integer stride only (see OUTLINE_SAMPLE_STEP note): Math.round keeps the
@@ -272,9 +285,11 @@ function idsKey(ids) {
  * quantized to 1/8 px plus the index: exact integer arithmetic is immune to
  * IEEE754 accumulation loss at large coordinate magnitudes and member
  * counts, and folding the index in keeps it order-sensitive (transpositions
- * hash differently).
+ * hash differently). An optional per-point `s` (on-screen node radius) folds
+ * in too, so a node-size change invalidates the cached outline — the fit
+ * consumes radii, not just positions.
  *
- * @param {Array<{x: number, y: number}>} points
+ * @param {Array<{x: number, y: number, s?: number}>} points
  * @returns {string}
  */
 function positionsChecksum(points) {
@@ -283,6 +298,7 @@ function positionsChecksum(points) {
   for (const p of points) {
     hash = Math.imul(hash ^ Math.round(p.x * 8), 0x01000193);
     hash = Math.imul(hash ^ Math.round(p.y * 8), 0x01000193);
+    hash = Math.imul(hash ^ Math.round((p.s ?? 0) * 8), 0x01000193);
     hash = Math.imul(hash ^ i, 0x01000193);
     i++;
   }
@@ -297,6 +313,8 @@ const STYLE_KEY_FIELDS = [
   "stroke",
   "strokeOpacity",
   "virtualEdges",
+  "padding",
+  "corridor",
   "label",
   "labelText",
   "labelFill",

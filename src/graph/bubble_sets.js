@@ -95,6 +95,12 @@ class GraphBubbleSetManager {
       case "Stroke Opacity":
         bStyle.strokeOpacity = value;
         break;
+      case "Padding":
+        bStyle.padding = value;
+        break;
+      case "Corridor Width":
+        bStyle.corridor = value;
+        break;
       case "Label":
         bStyle.label = value;
         break;
@@ -176,6 +182,8 @@ class GraphBubbleSetManager {
         if (slider) slider.value = val;
         if (numInput) numInput.value = val;
       };
+      syncSliderInput("Padding", bubbleStyle.padding);
+      syncSliderInput("Corridor Width", bubbleStyle.corridor);
       syncSliderInput("Label Font Size", bubbleStyle.labelFontSize);
       syncSliderInput("Label Offset X", bubbleStyle.labelOffsetX);
       syncSliderInput("Label Offset Y", bubbleStyle.labelOffsetY);

@@ -364,3 +364,74 @@ describe("styleKey", () => {
     expect(styleKey({ fill: null })).toBe(styleKey({}));
   });
 });
+
+// ==========================================================================
+// Geometry knobs (padding / corridor) — user-tunable influence-field
+// multipliers, and node-size in the position checksum.
+// ==========================================================================
+
+const polygonArea = (points) => {
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    area += a.x * b.y - b.x * a.y;
+  }
+  return Math.abs(area / 2);
+};
+
+describe("computeOutlinePoints padding/corridor knobs", () => {
+  const pair = [rectAt(100, 100), rectAt(140, 100)];
+
+  it("padding < 1 shrinks the outline, > 1 grows it (still enclosing members)", () => {
+    const tight = computeOutlinePoints(pair, [], { padding: 0.5 });
+    const base = computeOutlinePoints(pair, [], {});
+    const loose = computeOutlinePoints(pair, [], { padding: 2 });
+    expect(polygonArea(tight)).toBeLessThan(polygonArea(base));
+    expect(polygonArea(base)).toBeLessThan(polygonArea(loose));
+    for (const outline of [tight, base, loose]) {
+      for (const m of pair) {
+        expect(pointInPolygon({ x: m.x + m.width / 2, y: m.y + m.height / 2 }, outline)).toBe(true);
+      }
+    }
+  });
+
+  it("corridor width scales the arm to an outlying member", () => {
+    const spread = [rectAt(50, 50), rectAt(400, 60)];
+    const thin = computeOutlinePoints(spread, [], { corridor: 0.5 });
+    const thick = computeOutlinePoints(spread, [], { corridor: 2.5 });
+    expect(polygonArea(thin)).toBeLessThan(polygonArea(thick));
+    for (const outline of [thin, thick]) {
+      for (const m of spread) {
+        expect(pointInPolygon({ x: m.x + m.width / 2, y: m.y + m.height / 2 }, outline)).toBe(true);
+      }
+    }
+  });
+
+  it("clamps out-of-range multipliers instead of collapsing the outline", () => {
+    expect(computeOutlinePoints(pair, [], { padding: 100 }))
+      .toEqual(computeOutlinePoints(pair, [], { padding: 4 }));
+    expect(computeOutlinePoints(pair, [], { padding: 0 }))
+      .toEqual(computeOutlinePoints(pair, [], {}));
+    expect(computeOutlinePoints(pair, [], { corridor: NaN }))
+      .toEqual(computeOutlinePoints(pair, [], {}));
+  });
+
+  it("styleKey invalidates on padding/corridor changes", () => {
+    expect(styleKey({ padding: 1 })).not.toBe(styleKey({ padding: 1.5 }));
+    expect(styleKey({ corridor: 1 })).not.toBe(styleKey({ corridor: 2 }));
+  });
+});
+
+describe("positionsChecksum node-size fold", () => {
+  it("changes when a member's on-screen radius changes (same positions)", () => {
+    const small = [{ x: 1, y: 2, s: 5 }, { x: 3, y: 4, s: 5 }];
+    const grown = [{ x: 1, y: 2, s: 5 }, { x: 3, y: 4, s: 9 }];
+    expect(positionsChecksum(grown)).not.toBe(positionsChecksum(small));
+  });
+
+  it("treats missing size as stable (legacy point arrays keep working)", () => {
+    const pts = [{ x: 1, y: 2 }, { x: 3, y: 4 }];
+    expect(positionsChecksum(pts)).toBe(positionsChecksum(pts.map((p) => ({ ...p }))));
+  });
+});
