@@ -101,6 +101,9 @@ class GraphBubbleSetManager {
       case "Corridor Width":
         bStyle.corridor = value;
         break;
+      case "Avoidance":
+        bStyle.avoidance = value;
+        break;
       case "Label":
         bStyle.label = value;
         break;
@@ -184,6 +187,7 @@ class GraphBubbleSetManager {
       };
       syncSliderInput("Padding", bubbleStyle.padding);
       syncSliderInput("Corridor Width", bubbleStyle.corridor);
+      syncSliderInput("Avoidance", bubbleStyle.avoidance);
       syncSliderInput("Label Font Size", bubbleStyle.labelFontSize);
       syncSliderInput("Label Offset X", bubbleStyle.labelOffsetX);
       syncSliderInput("Label Offset Y", bubbleStyle.labelOffsetY);
