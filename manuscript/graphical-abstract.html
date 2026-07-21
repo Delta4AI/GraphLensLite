@@ -2,188 +2,225 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Graph Lens Lite — Graphical Abstract</title>
+<title>Graph Lens Lite — Graphical Abstract v3</title>
 <style>
   :root{
-    /* GLL application palette */
-    --ink:#403c53;       /* brand text  */
-    --accent:#c33d35;    /* signature coral-red */
-    --slate:#403c53;     /* groupOne */
-    --salmon:#efb0aa;    /* groupThree */
-    --blue:#8ca6d9;      /* groupFour */
-    --blue-d:#5b78a8;    /* legible blue for chips/text */
-    --green:#015c0c;     /* success */
+    --ink:#403c53;
+    --accent:#c33d35;      /* signature coral-red — the lens */
+    --slate:#403c53;
+    --salmon:#efb0aa;
+    --blue:#8ca6d9;
+    --blue-d:#5b78a8;
+    --teal:#2f5f78;
+    --teal-l:#7fb0c4;
+    --green:#015c0c;
     --grey:#878996;
-    --muted:#66636f; --line:#dddbe2; --edge:#b3b7c6;
-    --surface:#ffffff; --in:#fbece9; --proc:#efeef3; --out:#ecf0f9;
+    --line:#dddbe2;
+    --pill:#e7ebf3;
+    --pill-ink:#3a4658;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:#dfe1e8;font-family:Arial,Helvetica,sans-serif;color:var(--ink);
+  body{margin:0;background:#eef0f5;font-family:Arial,Helvetica,sans-serif;color:var(--ink);
        display:flex;justify-content:center;padding:30px}
-  /* 5:2 landscape canvas (NAR spec). 1250x500 px = 5:2 */
-  .abstract{width:1250px;height:500px;background:var(--surface);border:1px solid var(--line);
-            border-radius:8px;padding:18px 22px;box-shadow:0 8px 30px rgba(40,36,60,.12);
-            display:flex;flex-direction:column}
 
-  /* header */
-  .head{display:flex;align-items:center;gap:12px;border-bottom:2px solid var(--ink);
-        padding-bottom:9px;margin-bottom:12px}
-  .logo{width:30px;height:30px;flex:0 0 auto}
-  .title{font-size:30px;font-weight:800;letter-spacing:-.5px}
-  .title .lite{color:var(--accent)}
-  .tag{font-size:16px;color:var(--muted);margin-left:auto}
+  /* 5:2 NAR canvas */
+  .abstract{position:relative;width:1250px;height:500px;background:#fff;border:1px solid var(--line);
+            border-radius:8px;box-shadow:0 8px 30px rgba(40,36,60,.12);overflow:hidden}
 
-  /* 3-column flow */
-  .flow{flex:1;display:grid;grid-template-columns:215px 52px 1fr 52px 215px;align-items:stretch}
-  .col{border-radius:10px;padding:12px 12px 14px;display:flex;flex-direction:column}
-  .col h3{margin:0 0 11px;font-size:16px;text-transform:uppercase;letter-spacing:1px;text-align:center}
-  .in{background:var(--in)} .out{background:var(--out)} .center{background:var(--proc);position:relative}
+  /* wordmark, top-left */
+  .brand{position:absolute;top:26px;left:34px;display:flex;align-items:center;gap:12px;z-index:6}
+  .brand .logo{width:34px;height:34px;flex:0 0 auto}
+  .brand .wordmark{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  .brand .wordmark .lite{color:var(--accent)}
+  .brand .sub{font-size:14px;color:var(--grey);font-weight:600;margin-top:3px}
 
-  .arrow{display:flex;align-items:center;justify-content:center;color:var(--grey)}
-  .arrow svg{width:38px;height:30px}
+  /* full-canvas network layer */
+  .net{position:absolute;inset:0;width:100%;height:100%;z-index:1}
 
-  /* input / output label cards */
-  .item{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--line);
-        border-radius:8px;padding:9px 11px;margin-bottom:10px;font-size:17px;font-weight:700}
-  .chip{flex:0 0 auto;width:42px;height:30px;border-radius:6px;display:flex;align-items:center;
-        justify-content:center;font-size:13px;font-weight:800;color:#fff;letter-spacing:.3px}
+  /* capability badges — two justified rails framing the graph */
+  .caps{position:absolute;top:128px;display:flex;flex-direction:column;gap:14px;z-index:4}
+  .caps-l{left:34px}
+  .caps-r{right:34px;align-items:flex-end}
+  .tag{display:inline-flex;align-items:center;gap:10px;background:var(--pill);color:var(--pill-ink);
+       border-radius:14px;padding:9px 16px;font-size:16px;font-weight:700;white-space:nowrap;
+       box-shadow:0 3px 9px rgba(40,36,60,.12)}
+  .caps-r .tag{flex-direction:row-reverse}
+  .tag .dot{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+
+  /* import / export rails */
+  .rail{position:absolute;z-index:5;font-size:13.5px;font-weight:700;color:var(--muted,#66636f)}
+  .rail .lab{font-size:11.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--grey);
+             font-weight:800;margin-bottom:8px}
+  .rail .fmt{display:flex;align-items:center;gap:8px;margin-bottom:7px;color:var(--ink)}
+  .rail .fmt b{width:44px;height:24px;border-radius:5px;color:#fff;font-size:11px;font-weight:800;
+               display:flex;align-items:center;justify-content:center;letter-spacing:.3px}
+  .import{left:34px;bottom:30px}
+  .export{right:34px;bottom:30px;text-align:right}
+  .export .fmt{flex-direction:row-reverse}
   .c-xls{background:var(--green)} .c-tsv{background:var(--blue-d)} .c-api{background:var(--accent)}
   .c-str{background:var(--slate)} .c-json{background:var(--accent)} .c-png{background:var(--blue-d)}
   .c-svg{background:var(--slate)}
 
-  /* center stage */
-  .stage{position:relative;flex:1;background:var(--surface);border:1px solid var(--line);
-         border-radius:9px;overflow:hidden}
-  .stage .net{position:absolute;inset:0}
-  .badge{position:absolute;background:var(--surface);border:1px solid var(--line);border-radius:20px;
-         padding:5px 12px 5px 8px;font-size:16px;font-weight:700;display:flex;align-items:center;gap:7px;
-         box-shadow:0 2px 8px rgba(40,36,60,.14);white-space:nowrap}
-  .dot{width:14px;height:14px;border-radius:4px;flex:0 0 auto}
-  .b1{top:10px;left:10px}    .b1 .dot{background:var(--slate)}
-  .b2{top:10px;right:10px}   .b2 .dot{background:var(--accent)}
-  .b3{top:50%;left:8px;transform:translateY(-50%)}  .b3 .dot{background:var(--salmon)}
-  .b4{top:50%;right:8px;transform:translateY(-50%)}  .b4 .dot{background:var(--blue)}
-  .b5{bottom:10px;left:10px} .b5 .dot{background:var(--green)}
-  .b6{bottom:10px;right:10px} .b6 .dot{background:var(--blue-d)}
-  .b7{top:10px;left:50%;transform:translateX(-50%)} .b7 .dot{background:#6b6486}
-  .b8{bottom:10px;left:50%;transform:translateX(-50%)} .b8 .dot{background:var(--grey)}
+  /* the magnifier — real glass that magnifies the network cluster */
+  .lens{position:absolute;top:200px;left:600px;width:250px;height:250px;z-index:3}
+  .lens .glass{position:absolute;inset:0;border-radius:50%;overflow:hidden;
+       border:15px solid var(--accent);background:#fff;
+       box-shadow:0 16px 40px rgba(195,61,53,.34), inset 0 0 30px rgba(64,60,83,.12)}
+  .lens .glare{position:absolute;top:34px;left:46px;width:52px;height:26px;border-radius:50%;
+       background:rgba(255,255,255,.6);transform:rotate(-38deg);z-index:2;pointer-events:none}
+  .lens .handle{position:absolute;bottom:-58px;right:6px;width:30px;height:96px;border-radius:16px;
+       background:var(--accent);transform:rotate(-45deg);transform-origin:top center;
+       box-shadow:0 8px 18px rgba(195,61,53,.3)}
 </style>
 </head>
 <body>
 <div class="abstract">
 
-  <div class="head">
+  <!-- brand -->
+  <div class="brand">
     <svg class="logo" viewBox="0 0 40 40">
-      <line x1="20" y1="20" x2="8" y2="9"  stroke="#c33d35" stroke-width="2.4"/>
-      <line x1="20" y1="20" x2="33" y2="12" stroke="#8ca6d9" stroke-width="2.4"/>
-      <line x1="20" y1="20" x2="11" y2="32" stroke="#efb0aa" stroke-width="2.4"/>
-      <line x1="20" y1="20" x2="31" y2="31" stroke="#015c0c" stroke-width="2.4"/>
+      <line x1="20" y1="20" x2="8"  y2="9"  stroke="#c33d35" stroke-width="2.6"/>
+      <line x1="20" y1="20" x2="33" y2="12" stroke="#8ca6d9" stroke-width="2.6"/>
+      <line x1="20" y1="20" x2="11" y2="32" stroke="#efb0aa" stroke-width="2.6"/>
+      <line x1="20" y1="20" x2="31" y2="31" stroke="#015c0c" stroke-width="2.6"/>
       <circle cx="20" cy="20" r="6" fill="#403c53"/>
-      <circle cx="8" cy="9" r="4" fill="#c33d35"/>
+      <circle cx="8"  cy="9"  r="4" fill="#c33d35"/>
       <circle cx="33" cy="12" r="4" fill="#8ca6d9"/>
       <circle cx="11" cy="32" r="4" fill="#efb0aa"/>
       <circle cx="31" cy="31" r="4" fill="#015c0c"/>
     </svg>
-    <div class="title">Graph Lens <span class="lite">Lite</span></div>
-    <div class="tag">Interactive biological network exploration in the browser</div>
+    <div>
+      <div class="wordmark">Graph Lens <span class="lite">Lite</span></div>
+      <div class="sub">Interactive biological network exploration in the browser</div>
+    </div>
   </div>
 
-  <div class="flow">
+  <!-- full network behind everything -->
+  <svg class="net" viewBox="0 0 1250 500" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <filter id="goo3" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="b"/>
+        <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8"/>
+      </filter>
+    </defs>
+    <!-- shrink graph into the center third; leave gutters for the badge rails -->
+    <g transform="translate(128,50) scale(0.8)">
+    <!-- bubble groups -->
+    <g opacity="0.22"><g filter="url(#goo3)">
+      <circle cx="270" cy="180" r="46" fill="#403c53"/>
+      <circle cx="230" cy="270" r="46" fill="#403c53"/>
+      <circle cx="330" cy="250" r="46" fill="#403c53"/>
+    </g></g>
+    <g opacity="0.20"><g filter="url(#goo3)">
+      <circle cx="980" cy="200" r="46" fill="#8ca6d9"/>
+      <circle cx="1050" cy="290" r="46" fill="#8ca6d9"/>
+      <circle cx="960" cy="320" r="46" fill="#8ca6d9"/>
+    </g></g>
+    <!-- edges -->
+    <g stroke="#b3b7c6" stroke-width="1.8" opacity="0.9">
+      <line x1="270" y1="180" x2="230" y2="270"/>
+      <line x1="270" y1="180" x2="330" y2="250"/>
+      <line x1="230" y1="270" x2="330" y2="250"/>
+      <line x1="330" y1="250" x2="500" y2="230"/>
+      <line x1="500" y1="230" x2="640" y2="300"/>
+      <line x1="500" y1="230" x2="560" y2="120"/>
+      <line x1="640" y1="300" x2="820" y2="280"/>
+      <line x1="820" y1="280" x2="980" y2="200"/>
+      <line x1="820" y1="280" x2="960" y2="320"/>
+      <line x1="980" y1="200" x2="1050" y2="290"/>
+      <line x1="960" y1="320" x2="1050" y2="290"/>
+      <line x1="560" y1="120" x2="720" y2="150"/>
+      <line x1="720" y1="150" x2="820" y2="280"/>
+    </g>
+    <!-- animated-looking directional flow edge -->
+    <line x1="330" y1="250" x2="500" y2="230" stroke="#c33d35" stroke-width="2.6" stroke-dasharray="6 6"/>
+    <!-- nodes -->
+    <g stroke="#fff" stroke-width="2">
+      <circle cx="270" cy="180" r="16" fill="#403c53"/>
+      <circle cx="230" cy="270" r="13" fill="#403c53"/>
+      <circle cx="330" cy="250" r="12" fill="#8ca6d9"/>
+      <circle cx="500" cy="230" r="22" fill="#c33d35"/>
+      <circle cx="560" cy="120" r="12" fill="#efb0aa"/>
+      <circle cx="720" cy="150" r="14" fill="#015c0c"/>
+      <circle cx="640" cy="300" r="13" fill="#8ca6d9"/>
+      <circle cx="820" cy="280" r="18" fill="#403c53"/>
+      <circle cx="980" cy="200" r="15" fill="#8ca6d9"/>
+      <circle cx="1050" cy="290" r="12" fill="#8ca6d9"/>
+      <circle cx="960" cy="320" r="11" fill="#c33d35"/>
+    </g>
+    <!-- pie-chart node -->
+    <g transform="translate(500,230)">
+      <path d="M0 0 L0 -22 A22 22 0 0 1 19 11 Z" fill="#403c53" opacity="0.92"/>
+      <path d="M0 0 L19 11 A22 22 0 0 1 -19 11 Z" fill="#8ca6d9" opacity="0.92"/>
+    </g>
+    </g>
+  </svg>
 
-    <!-- INPUT -->
-    <div class="col in">
-      <h3>Import</h3>
-      <div class="item"><span class="chip c-xls">XLSX</span>Excel</div>
-      <div class="item"><span class="chip c-tsv">TSV</span>CSV / TSV</div>
-      <div class="item"><span class="chip c-api">API</span>REST API</div>
-      <div class="item"><span class="chip c-str">DB</span>STRING</div>
-    </div>
-
-    <div class="arrow">
-      <svg viewBox="0 0 40 30"><path d="M2 15 H30 M22 7 L34 15 L22 23" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </div>
-
-    <!-- CENTER -->
-    <div class="col center">
-      <h3>Explore &amp; analyze</h3>
-      <div class="stage">
-        <svg class="net" viewBox="0 0 560 300" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <filter id="goo" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="b"/>
-              <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8"/>
-            </filter>
-          </defs>
-          <!-- density heatmap hint -->
-          <circle cx="250" cy="150" r="58" fill="#c33d35" opacity="0.06"/>
-          <!-- bubble groups: metaball blobs hugging member nodes -->
-          <g opacity="0.26"><g filter="url(#goo)">
-            <circle cx="150" cy="110" r="38" fill="#c33d35"/>
-            <circle cx="120" cy="185" r="38" fill="#c33d35"/>
-            <circle cx="195" cy="245" r="38" fill="#c33d35"/>
-          </g></g>
-          <g opacity="0.20"><g filter="url(#goo)">
-            <circle cx="360" cy="120" r="38" fill="#403c53"/>
-            <circle cx="445" cy="160" r="38" fill="#403c53"/>
-            <circle cx="380" cy="195" r="38" fill="#403c53"/>
-          </g></g>
-          <!-- edges -->
-          <g stroke="#b3b7c6" stroke-width="1.6" opacity="0.9">
-            <line x1="150" y1="110" x2="250" y2="150"/>
-            <line x1="150" y1="110" x2="120" y2="185"/>
-            <line x1="250" y1="150" x2="120" y2="185"/>
-            <line x1="250" y1="150" x2="360" y2="120"/>
-            <line x1="250" y1="150" x2="380" y2="195"/>
-            <line x1="360" y1="120" x2="445" y2="160"/>
-            <line x1="380" y1="195" x2="445" y2="160"/>
-            <line x1="380" y1="195" x2="300" y2="245"/>
-            <line x1="120" y1="185" x2="195" y2="245"/>
-            <line x1="195" y1="245" x2="300" y2="245"/>
-          </g>
-          <!-- animated directional flow edge -->
-          <line x1="250" y1="150" x2="360" y2="120" stroke="#c33d35" stroke-width="2.4" stroke-dasharray="5 5"/>
-          <!-- nodes (size = metric, colour = property) -->
-          <g stroke="#fff" stroke-width="1.6">
-            <circle cx="250" cy="150" r="20" fill="#c33d35"/>
-            <circle cx="150" cy="110" r="13" fill="#403c53"/>
-            <circle cx="120" cy="185" r="12" fill="#8ca6d9"/>
-            <circle cx="195" cy="245" r="10" fill="#403c53"/>
-            <circle cx="360" cy="120" r="15" fill="#403c53"/>
-            <circle cx="445" cy="160" r="11" fill="#c33d35"/>
-            <circle cx="380" cy="195" r="14" fill="#8ca6d9"/>
-            <circle cx="300" cy="245" r="9" fill="#efb0aa"/>
-          </g>
-          <!-- pie-chart node -->
-          <g transform="translate(250,150)">
-            <path d="M0 0 L0 -20 A20 20 0 0 1 17.3 10 Z" fill="#403c53" opacity="0.92"/>
-            <path d="M0 0 L17.3 10 A20 20 0 0 1 -17.3 10 Z" fill="#8ca6d9" opacity="0.92"/>
-          </g>
-        </svg>
-
-        <div class="badge b1"><span class="dot"></span>Query Editor</div>
-        <div class="badge b2"><span class="dot"></span>Network Metrics</div>
-        <div class="badge b3"><span class="dot"></span>Bubble Groups</div>
-        <div class="badge b4"><span class="dot"></span>Styling Panel</div>
-        <div class="badge b5"><span class="dot"></span>Data Editor</div>
-        <div class="badge b6"><span class="dot"></span>Graph Assistant</div>
-        <div class="badge b7"><span class="dot"></span>Filtering</div>
-        <div class="badge b8"><span class="dot"></span>Layouts</div>
-      </div>
-    </div>
-
-    <div class="arrow">
-      <svg viewBox="0 0 40 30"><path d="M2 15 H30 M22 7 L34 15 L22 23" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </div>
-
-    <!-- OUTPUT -->
-    <div class="col out">
-      <h3>Export &amp; share</h3>
-      <div class="item"><span class="chip c-json">JSON</span>Portable state</div>
-      <div class="item"><span class="chip c-png">PNG</span>Raster image</div>
-      <div class="item"><span class="chip c-svg">SVG</span>Vector image</div>
-    </div>
-
+  <!-- capability badges: left rail -->
+  <div class="caps caps-l">
+    <div class="tag"><span class="dot" style="background:var(--slate)"></span>Query &amp; Filtering</div>
+    <div class="tag"><span class="dot" style="background:var(--blue-d)"></span>Network Metrics</div>
+    <div class="tag"><span class="dot" style="background:var(--green)"></span>Layouts</div>
   </div>
+
+  <!-- capability badges: right rail -->
+  <div class="caps caps-r">
+    <div class="tag"><span class="dot" style="background:var(--salmon)"></span>Rich Styling and Visual Clustering</div>
+    <div class="tag"><span class="dot" style="background:var(--blue)"></span>Local AI Graph Assistant</div>
+    <div class="tag"><span class="dot" style="background:var(--grey)"></span>Data Editor</div>
+  </div>
+
+  <!-- magnifier: shows a zoomed, detailed slice of the same network -->
+  <div class="lens">
+    <div class="glass">
+      <svg viewBox="0 0 250 250" width="250" height="250">
+        <!-- magnified bubble group -->
+        <circle cx="125" cy="120" r="88" fill="#c33d35" opacity="0.09"/>
+        <!-- zoomed edges -->
+        <g stroke="#9aa0b3" stroke-width="3" opacity="0.9">
+          <line x1="125" y1="120" x2="60"  y2="70"/>
+          <line x1="125" y1="120" x2="195" y2="95"/>
+          <line x1="125" y1="120" x2="80"  y2="195"/>
+          <line x1="125" y1="120" x2="185" y2="185"/>
+          <line x1="60"  y1="70"  x2="195" y2="95"/>
+        </g>
+        <!-- zoomed nodes with labels -->
+        <g stroke="#fff" stroke-width="3">
+          <circle cx="125" cy="120" r="30" fill="#c33d35"/>
+          <circle cx="60"  cy="70"  r="19" fill="#403c53"/>
+          <circle cx="195" cy="95"  r="17" fill="#8ca6d9"/>
+          <circle cx="80"  cy="195" r="16" fill="#015c0c"/>
+          <circle cx="185" cy="185" r="18" fill="#efb0aa"/>
+        </g>
+        <g font-size="12" font-weight="700" fill="#403c53" text-anchor="middle">
+          <text x="125" y="165">PKD1</text>
+          <text x="60"  y="46">PKD2</text>
+          <text x="195" y="72">PKHD1</text>
+        </g>
+      </svg>
+      <span class="glare"></span>
+    </div>
+    <div class="handle"></div>
+  </div>
+
+  <!-- import rail -->
+  <div class="rail import">
+    <div class="lab">Import</div>
+    <div class="fmt"><b class="c-xls">XLSX</b> Excel</div>
+    <div class="fmt"><b class="c-tsv">TSV</b> CSV / TSV</div>
+    <div class="fmt"><b class="c-svg">Server</b> App handoff</div>
+    <div class="fmt"><b class="c-api">API</b> REST</div>
+  </div>
+
+  <!-- export rail -->
+  <div class="rail export">
+    <div class="lab">Export</div>
+    <div class="fmt"><b class="c-xls">XLSX</b> Excel</div>
+    <div class="fmt"><b class="c-png">PNG</b> Raster image</div>
+    <div class="fmt"><b class="c-svg">SVG</b> Vector image</div>
+    <div class="fmt"><b class="c-json">JSON</b> Portable state</div>
+  </div>
+
 </div>
 </body>
 </html>
