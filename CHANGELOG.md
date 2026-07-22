@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.16.1 — 2026-07-22
+
+### Fixes
+
+* **Disconnected nodes stay hidden across filter changes.** With "hide disconnected nodes" on, changing a filter could resurface a node that should have stayed hidden, and nodes that became disconnected by the change were never re-hidden. The dangling set is now recomputed against the current filtered view on every change.
+
+### Features
+
+* **Checkmark badge for single-value numeric filters.** Numeric properties with only one value (min === max) have no range to narrow, so they now show a read-only checkmark + value badge instead of an inert slider. The row's include/exclude checkbox still works.
+
+Also includes manuscript revisions (docs only, no app changes).
+
 ## 1.16.0 — 2026-07-22
 
 Saved graph files load unchanged. Stored bubble-set knob values keep applying, with two semantic shifts: padding and corridor width now scale with your configured node size (a value of 1 ≈ one node radius of margin) instead of absolute pixels, and any saved avoidance value above 0 now simply means "on".
