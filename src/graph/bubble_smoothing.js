@@ -11,6 +11,12 @@
 // Catmull-Rom → cubic-Bézier conversion (uniform, tension 1/6): each control
 // point sits a sixth of the neighbor chord from its endpoint.
 const SMOOTH_TENSION_DIVISOR = 6;
+// Control offsets are clamped to this fraction of their own segment's chord.
+// For evenly spaced points the uniform offset is ≤ chord/3, so the clamp is
+// inactive; it binds only where a short segment neighbors a very long one
+// (disc–capsule junctions), where unclamped uniform Catmull-Rom overshoots
+// far enough to cut through the shapes it should hug.
+const SMOOTH_MAX_CONTROL_RATIO = 0.35;
 // Samples per Bézier segment when densifying a ring to what is actually
 // painted (t = 0 reproduces the segment's start vertex).
 const SMOOTH_SAMPLES_PER_SEGMENT = 4;
@@ -34,19 +40,36 @@ function smoothClosedPath(points) {
   if (first.x === last.x && first.y === last.y) ring = ring.slice(0, -1);
   const n = ring.length;
   if (n < 3) return null;
+  const clamp = (vx, vy, maxLen) => {
+    const len = Math.hypot(vx, vy);
+    if (len <= maxLen || len === 0) return [vx, vy];
+    const s = maxLen / len;
+    return [vx * s, vy * s];
+  };
   const segments = [];
   for (let i = 0; i < n; i++) {
     const p0 = ring[(i - 1 + n) % n];
     const p1 = ring[i];
     const p2 = ring[(i + 1) % n];
     const p3 = ring[(i + 2) % n];
+    const maxOffset = Math.hypot(p2.x - p1.x, p2.y - p1.y) * SMOOTH_MAX_CONTROL_RATIO;
+    const [o1x, o1y] = clamp(
+      (p2.x - p0.x) / SMOOTH_TENSION_DIVISOR,
+      (p2.y - p0.y) / SMOOTH_TENSION_DIVISOR,
+      maxOffset
+    );
+    const [o2x, o2y] = clamp(
+      (p3.x - p1.x) / SMOOTH_TENSION_DIVISOR,
+      (p3.y - p1.y) / SMOOTH_TENSION_DIVISOR,
+      maxOffset
+    );
     segments.push({
       x0: p1.x,
       y0: p1.y,
-      c1x: p1.x + (p2.x - p0.x) / SMOOTH_TENSION_DIVISOR,
-      c1y: p1.y + (p2.y - p0.y) / SMOOTH_TENSION_DIVISOR,
-      c2x: p2.x - (p3.x - p1.x) / SMOOTH_TENSION_DIVISOR,
-      c2y: p2.y - (p3.y - p1.y) / SMOOTH_TENSION_DIVISOR,
+      c1x: p1.x + o1x,
+      c1y: p1.y + o1y,
+      c2x: p2.x - o2x,
+      c2y: p2.y - o2y,
       x: p2.x,
       y: p2.y,
     });

@@ -31,11 +31,11 @@ const OUTLINE_MAX_SAMPLED_POINTS = 1200;
 // the dense adaptive-stride spline carries grid-scale micro-wiggle that (a)
 // reads as jaggies and (b) produces near-degenerate segments that make
 // polygon-clipping throw ("Unable to complete output ring"), silently
-// disabling the enclosure guarantee. Half a cell erases the noise without
-// touching real features — the painters render the ring through
-// smoothClosedPath, so FEWER control points mean a smoother curve, not
-// visible facets.
-const OUTLINE_SIMPLIFY_TOLERANCE_RATIO = 0.5;
+// disabling the enclosure guarantee. One full cell erases the noise (and
+// most field-summation scallop) without touching real features — the
+// painters render the ring through smoothClosedPath, so FEWER control
+// points mean a smoother curve, not visible facets.
+const OUTLINE_SIMPLIFY_TOLERANCE_RATIO = 1;
 // Snap grid (px⁻¹) for rings handed to polygon-clipping — collapses the
 // float-noise duplicate/degenerate vertices that trip its sweep line.
 const CLIP_SNAP = 32;
@@ -110,6 +110,11 @@ const FIELD_PIXEL_GROUP_MIN = 1;
 const FIELD_PIXEL_GROUP_MAX = 4;
 // Semicircular cap resolution for the stadium-shaped straggler links.
 const CAPSULE_CAP_SEGMENTS = 8;
+// Visual minimums for the geometric reconstruction (repair discs + capsule
+// corridors): the tightest hull still clears the node body by roughly the
+// outline stroke, and a corridor stays a visible hairline.
+const DISC_PAD_MIN_PX = 2;
+const LINK_HALF_WIDTH_MIN_PX = 1.25;
 
 /**
  * Axis-aligned square around a node's viewport position.
@@ -160,8 +165,8 @@ function meanMemberRadius(memberRects) {
  *   user style knobs, clamped to [0.05, 4]; 1 = one mean-radius of margin.
  *   avoidance is a switch (numeric for JSON back-compat): 0 lets the hull
  *   cover non-members, anything > 0 steers around them and carves holes.
- * @returns {Array<{x: number, y: number}>} closed polygon (empty when no
- *   members or the outline collapsed)
+ * @returns {Array<{x: number, y: number}>} closed polygon (empty only when
+ *   there are no members — a lost field reconstructs geometrically)
  */
 function computeOutlinePoints(memberRects, avoidRects = [], opts = {}) {
   return computeOutlineGeometry(memberRects, avoidRects, opts).outer;
@@ -195,65 +200,78 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
     FIELD_PIXEL_GROUP_MAX,
     Math.max(FIELD_PIXEL_GROUP_MIN, FIELD_PIXEL_GROUP_RATIO * unit)
   );
-  // Resolution floors: marching squares cannot trace a feature thinner than
-  // a grid cell, so ultra-low knob values would silently disconnect the
-  // corridors and drop margins below drawability. The floors keep every
-  // field radius at grid scale (with R1 > R0 preserved).
-  const nodeR0px = Math.max(FIELD_NODE_R0_RATIO * unit * pad, pixelGroupPx);
-  const nodeR1px = Math.max(FIELD_NODE_R1_RATIO * unit * pad, 3 * pixelGroupPx);
-  const edgeR0px = Math.max(FIELD_EDGE_R0_RATIO * unit * cor, pixelGroupPx);
-  const edgeR1px = Math.max(FIELD_EDGE_R1_RATIO * unit * cor, 2 * pixelGroupPx);
+  // Field radii track the knobs all the way down — NO grid floor. A field
+  // thinner than a marching cell simply registers nothing, and the enclosure
+  // guarantee rebuilds the hull geometrically (per-node discs + capsule
+  // corridors), which IS the barely-encapsulating, finger-like minimum the
+  // knobs promise. The old floors fattened minimum knobs to ~half a node
+  // radius on dense graphs where the ratio-1 node radius is small.
+  const nodeR0px = FIELD_NODE_R0_RATIO * unit * pad;
+  const nodeR1px = FIELD_NODE_R1_RATIO * unit * pad;
+  const edgeR0px = FIELD_EDGE_R0_RATIO * unit * cor;
+  const edgeR1px = FIELD_EDGE_R1_RATIO * unit * cor;
+  // Repair-disc padding and capsule half-width keep a small visual minimum
+  // so the tightest hull still clears the node body by the stroke width.
+  const discPadPx = Math.max(nodeR0px, DISC_PAD_MIN_PX);
+  const linkRPx = Math.max(edgeR0px, LINK_HALF_WIDTH_MIN_PX);
   // Avoidance 0 means "ignore non-members" — drop the rects entirely so
   // virtual-edge routing stops detouring around them too (and the
   // O(members × avoid) routing cost disappears with them).
   const effectiveAvoidRects = avoidance === 0 ? [] : avoidRects;
-  const path = bubblesets.createOutline(memberRects, effectiveAvoidRects, [], {
-    virtualEdges: opts.virtualEdges !== false,
-    nodeR0: nodeR0px,
-    nodeR1: nodeR1px,
-    edgeR0: edgeR0px,
-    edgeR1: edgeR1px,
-    morphBuffer: FIELD_MORPH_BUFFER_RATIO * unit,
-    pixelGroup: pixelGroupPx,
-    nonMemberInfluenceFactor: avoidance > 0 ? NON_MEMBER_INFLUENCE_FACTOR : 0,
-  });
-  // Adaptive stride (see OUTLINE_SAMPLE_STEP note): control spacing ≈ 2× the
-  // thinnest field radius, never denser than the point cap allows.
-  const minFeaturePx = Math.min(nodeR0px, edgeR0px);
-  const stride = Math.max(
-    Math.min(OUTLINE_SAMPLE_STEP, Math.round((2 * minFeaturePx) / pixelGroupPx)),
-    1,
-    Math.ceil(path.length / OUTLINE_MAX_SAMPLED_POINTS)
-  );
-  let sampled;
-  try {
-    sampled = path
-      .sample(stride)
-      .simplify(0)
-      .bSplines()
-      .simplify(pixelGroupPx * OUTLINE_SIMPLIFY_TOLERANCE_RATIO);
-  } catch {
-    // Boundary guard for bubblesets-js: a degenerate/collapsed outline must
-    // resolve to "no outline" (this function's documented contract) rather
-    // than throwing into the render loop and freezing the bubble canvas.
-    return { outer: [], holes: [] };
+  // Sub-grid fields cannot register on the marching grid; skip the whole
+  // pass (and its cost) when nothing could. Sub-grid EDGE fields also skip
+  // virtual-edge routing — the capsule links take over as corridors.
+  const nodeFieldVisible = nodeR1px >= pixelGroupPx;
+  const edgeFieldVisible = edgeR1px >= pixelGroupPx;
+  let outline = [];
+  if (nodeFieldVisible || edgeFieldVisible) {
+    const path = bubblesets.createOutline(memberRects, effectiveAvoidRects, [], {
+      virtualEdges: opts.virtualEdges !== false && edgeFieldVisible,
+      nodeR0: nodeR0px,
+      nodeR1: nodeR1px,
+      edgeR0: edgeR0px,
+      edgeR1: edgeR1px,
+      morphBuffer: FIELD_MORPH_BUFFER_RATIO * unit,
+      pixelGroup: pixelGroupPx,
+      nonMemberInfluenceFactor: avoidance > 0 ? NON_MEMBER_INFLUENCE_FACTOR : 0,
+    });
+    // Adaptive stride (see OUTLINE_SAMPLE_STEP note): control spacing ≈ 2×
+    // the thinnest TRACEABLE feature — nothing below a grid cell can appear,
+    // so the stride never drops below one cell's worth of spacing.
+    const minFeaturePx = Math.max(pixelGroupPx, Math.min(nodeR0px, edgeR0px));
+    const stride = Math.max(
+      Math.min(OUTLINE_SAMPLE_STEP, Math.round((2 * minFeaturePx) / pixelGroupPx)),
+      1,
+      Math.ceil(path.length / OUTLINE_MAX_SAMPLED_POINTS)
+    );
+    try {
+      const sampled = path
+        .sample(stride)
+        .simplify(0)
+        .bSplines()
+        .simplify(pixelGroupPx * OUTLINE_SIMPLIFY_TOLERANCE_RATIO);
+      outline = pointPathToArray(sampled);
+    } catch {
+      // Boundary guard for bubblesets-js: a degenerate/collapsed outline
+      // must never throw into the render loop — fall through with an empty
+      // ring and let the geometric reconstruction below take over.
+      outline = [];
+    }
+    // bubblesets can return a self-intersecting ring — virtualEdges corridor
+    // routing crosses itself at some scales, and the bSpline smoothing
+    // overshoots into self-loops when members spread faster than the field
+    // grows. Drawn directly these paint as phantom chords / lobes. Repair via
+    // polygon self-union, which resolves the crossings into valid simple
+    // rings; keep the largest.
+    if (polygonSelfIntersects(outline)) {
+      const repaired = repairSelfIntersections(outline);
+      if (repaired.length >= 3) outline = repaired;
+    }
   }
-  let outline = pointPathToArray(sampled);
-  // bubblesets can return a self-intersecting ring — virtualEdges corridor
-  // routing crosses itself at some scales, and the bSpline smoothing overshoots
-  // into self-loops when members spread faster than the influence field grows.
-  // Drawn directly these paint as phantom chords / lobes (and a downstream
-  // convex-hull fallback was worse). Repair via polygon self-union, which
-  // resolves the crossings into valid simple rings; keep the largest. The
-  // result still hugs every member — never a blocky hull.
-  if (polygonSelfIntersects(outline)) {
-    const repaired = repairSelfIntersections(outline);
-    if (repaired.length >= 3) outline = repaired;
-  }
-  outline = ensureMembersEnclosed(outline, memberRects, nodeR0px, edgeR0px);
-  // Hole breathing room = the padding radius: carved non-members get the
-  // same visual gap members do (symmetric, does not scale with avoidance).
-  return carveAvoidHoles(outline, memberRects, effectiveAvoidRects, nodeR0px, nodeR0px);
+  outline = ensureMembersEnclosed(outline, memberRects, discPadPx, linkRPx);
+  // Hole breathing room = the disc padding: carved non-members get the same
+  // visual gap members do (symmetric, does not scale with avoidance).
+  return carveAvoidHoles(outline, memberRects, effectiveAvoidRects, discPadPx, discPadPx);
 }
 
 /**
@@ -355,18 +373,20 @@ function subtractHoleDiscs(geometry, memberRects, discs) {
  * When the union comes back in several pieces (a member the field lost
  * entirely — its disc floats beside the hull), the pieces are joined with
  * corridor-width capsule links so the result is always ONE ring that holds
- * every member.
+ * every member. An EMPTY input ring (the field registered nothing — sub-grid
+ * knobs) reconstructs the whole hull geometrically: every member gets a disc
+ * and the capsule links become the corridors.
  *
- * @param {Array<{x: number, y: number}>} points  simple outline ring
+ * @param {Array<{x: number, y: number}>} points  simple outline ring (may be
+ *   empty)
  * @param {Array<{x, y, width, height}>} memberRects
- * @param {number} padPx  intended padding in px (floored nodeR0)
- * @param {number} linkR  capsule half-width for joining pieces (floored edgeR0)
+ * @param {number} padPx  intended padding in px (visual-min-floored nodeR0)
+ * @param {number} linkR  capsule half-width for joining pieces
  * @returns {Array<{x: number, y: number}>}
  */
 function ensureMembersEnclosed(points, memberRects, padPx, linkR) {
-  if (points.length < 3) return points;
   const minClearance = padPx * ENCLOSURE_MIN_CLEARANCE_RATIO;
-  let ring = points;
+  let ring = points.length >= 3 ? points : [];
   // The painters render the Catmull-Rom smoothing of this ring, so clearance
   // is measured against the sampled CURVE — the guarantee stays honest
   // against what is actually painted, not the raw polygon. A repair round
@@ -374,18 +394,23 @@ function ensureMembersEnclosed(points, memberRects, padPx, linkR) {
   // member, so the result is re-checked and retried with a disc grown by one
   // extra padding per round.
   for (let round = 1; round <= ENCLOSURE_MAX_REPAIR_ROUNDS; round++) {
-    const painted = sampleSmoothedRing(ring);
+    const painted = ring.length >= 3 ? sampleSmoothedRing(ring) : null;
     const discs = [];
     for (const rect of memberRects) {
       const radius = Math.max(rect.width, rect.height) / 2;
       const cx = rect.x + rect.width / 2;
       const cy = rect.y + rect.height / 2;
-      const signedDist = pointInPolygon({ x: cx, y: cy }, painted) ? 1 : -1;
-      const clearance = signedDist * distanceToPolygonEdge(cx, cy, painted) - radius;
-      if (clearance < minClearance) discs.push([discRing(cx, cy, radius + padPx * round)]);
+      if (painted) {
+        const signedDist = pointInPolygon({ x: cx, y: cy }, painted) ? 1 : -1;
+        const clearance = signedDist * distanceToPolygonEdge(cx, cy, painted) - radius;
+        if (clearance >= minClearance) continue;
+      }
+      discs.push([discRing(cx, cy, radius + padPx * round)]);
     }
     if (discs.length === 0) return ring;
-    let merged = unionPolygons([[toClipRing(ring)]], ...discs);
+    let merged = ring.length >= 3
+      ? unionPolygons([[toClipRing(ring)]], ...discs)
+      : unionPolygons(discs[0], ...discs.slice(1));
     if (!merged) return ring;
     merged = connectPolygonComponents(merged, Math.max(linkR, 1));
     ring = largestOuterRing(merged) ?? ring;
@@ -430,28 +455,39 @@ function unionPolygons(...geoms) {
 
 /**
  * Join a MultiPolygon's disconnected components into one by unioning
- * capsule links (thin rectangles, endpoints extended by linkR so they
- * overlap both sides) between each secondary component and the point of the
- * largest component nearest to it. Repeats until connected; bails to the
- * current state after a few rounds or on a clipping failure, so the caller
- * degrades to "largest piece" rather than crashing.
+ * capsule links (stadium shapes, caps extended by linkR so they overlap both
+ * sides) between each component and its NEAREST other component —
+ * nearest-neighbor links grow an MST-like tree of short fingers, where
+ * linking everything to the largest piece painted as a star radiating from
+ * one node. Repeats until connected (each round at least halves the
+ * component count); bails to the current state after a few rounds or on a
+ * clipping failure, so the caller degrades to "largest piece" rather than
+ * crashing.
  *
  * @param {Array<Array<Array<[number, number]>>>} multiPolygon
  * @param {number} linkR  capsule half-width (px)
  * @returns {Array<Array<Array<[number, number]>>>}
  */
 function connectPolygonComponents(multiPolygon, linkR) {
-  const MAX_ROUNDS = 4;
+  const MAX_ROUNDS = 8;
   let polys = multiPolygon;
   for (let round = 0; round < MAX_ROUNDS && polys.length > 1; round++) {
-    const sorted = [...polys].sort(
-      (a, b) => Math.abs(ringSignedArea(b[0])) - Math.abs(ringSignedArea(a[0]))
-    );
-    const primary = sorted[0][0];
     const links = [];
-    for (const poly of sorted.slice(1)) {
-      const [a, b] = nearestVertexPair(primary, poly[0]);
-      const capsule = capsuleRing(a, b, linkR);
+    for (let i = 0; i < polys.length; i++) {
+      let best = null;
+      let bestDistSq = Infinity;
+      for (let j = 0; j < polys.length; j++) {
+        if (j === i) continue;
+        const [a, b] = nearestVertexPair(polys[i][0], polys[j][0]);
+        const dx = a[0] - b[0];
+        const dy = a[1] - b[1];
+        const distSq = dx * dx + dy * dy;
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          best = [a, b];
+        }
+      }
+      const capsule = best && capsuleRing(best[0], best[1], linkR);
       if (capsule) links.push([capsule]);
     }
     if (links.length === 0) break;
