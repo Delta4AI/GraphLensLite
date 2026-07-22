@@ -7,6 +7,7 @@ Saved graph files load unchanged. Stored bubble-set knob values keep applying, w
 ### Features
 
 * **Merge-import Excel files into the loaded graph.** A new ⤒ Import button in the data editor header loads a workbook *into* the current graph instead of replacing it. A preview modal shows what the merge will do before anything is applied — new/updated node and edge counts, new property columns, unchanged and skipped rows. Existing workspaces, positions, filters and styles are preserved; a single nodes or edges sheet suffices, and new edges can attach to nodes already in the graph. X/Y coordinates in the file seed positions for new nodes only.
+* **Choose how an import joins the graph.** The import preview offers two modes: **Extend & add** (default) updates matching nodes/edges and adds new ones from the file, while **Extend existing only** updates matches and ignores file rows without a match — including edges onto skipped new nodes, so no dangling edges. The preview counts update live as you switch.
 * **Bubble-set geometry controls.** The Bubble Sets styling card gains **Padding** (how far the body extends past its members) and **Corridor Width** (thickness of the arms reaching outlying members) sliders, range 0.01–3, plus an **Avoid Other Nodes** switch that steers the hull around non-members and carves holes for fully enclosed ones. Defaults: padding 0.1, corridor 0.25, avoidance on.
 * **Smooth, organic bubble outlines at every zoom.** Hulls render as continuous curves instead of polylines — no more faceted or jagged outlines when zooming in — and the PNG and SVG exports paint the exact same curves as the live canvas.
 * **Node-size-aware hulls.** The influence field scales with the group's mean member radius, so bubbles look proportional whatever node size you configure. At minimum padding the hull hugs each node at a fixed fraction of *its own* radius, and minimum-width corridors render as thin, gently arced tubes.
@@ -17,6 +18,7 @@ Saved graph files load unchanged. Stored bubble-set knob values keep applying, w
 * **Bubble hulls no longer clip their own members.** Avoid-node pressure could squeeze the outline through a member's body while its center stayed inside; grazed members now get repaired with proper clearance.
 * **Enclosed non-members are no longer silently swallowed.** With avoidance on, a non-member inside the hull gets a visible carve whenever one is geometrically possible — and one impossible hole no longer discards all the others.
 * **Bubble outlines no longer wobble around dense non-member fields**, and corridors no longer reroute into phantom lobes when widening them.
+* **Re-saved Excel workbooks import cleanly.** Rich cell values (formatted text, hyperlinks, formulas) are normalized to plain values on import, so matched rows no longer all report as "updated" and the filter panel no longer crashes after such an import.
 
 ## 1.15.5 — 2026-07-10
 
