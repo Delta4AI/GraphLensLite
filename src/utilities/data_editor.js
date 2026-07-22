@@ -2,6 +2,7 @@
 import { Popup } from './popup.js';
 import { StaticUtilities } from './static.js';
 import { EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from '../managers/io.js';
+import { computeMergePlan, showMergePreview } from './excel_merge.js';
 
 let dataTable;
 
@@ -961,54 +962,144 @@ class DataTable {
 
       this.pendingChanges.clear();
 
-      await this.cache.graph?.destroy();
-      this.cache.graph = null;
-
-      const status = document.getElementById('sidebarStatusContainer');
-      status.innerHTML = '';
-      status.style.height = '0';
-
-      await this.cache.gcm.destroyGraphAndRollBackUI();
-      this.cache.gcm.resetEventLocks();
-
-      // Reset lasso wrapper visual state to match default behavior (no lasso mode)
-      const lassoWrapper = document.getElementById('lassoWrapper');
-      if (lassoWrapper) {
-        lassoWrapper.classList.remove('active');
-      }
-      this.cache.io.preProcessData(updatedFileData);
-
-      // Clear any saved query to prevent filtering issues with new columns
-      const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
-      if (currentLayout && currentLayout.query) {
-        delete currentLayout.query;
-        this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;
-      }
-
-      // this.cache.initialize(updatedFileData);
-      this.cache.buildDataTable(updatedFileData);
-      this.cache.ui.buildUI();
-      // this.fileData = structuredClone(updatedFileData);
-
-      await this.cache.gcm.createGraphInstance();
-      if (!this.cache.graph) {
-        this.cache.ui.error('Graph not initialized, aborting.');
-        return;
-      }
-      await this.cache.graph.render();
-
-      // Refresh UI to update node/edge counts and filter availability
-      this.cache.ui.refreshUI();
-
-      // Reload data table with updated fileData to ensure headers are in sync
-      this.fileData = updatedFileData;
-      this.loadTabData();
+      await this.rebuildGraph(updatedFileData);
 
       console.log('DATA TABLE UPDATE DONE!');
     } catch (err) {
       this.cache.ui.error(`Error updating graph: ${err}`);
     } finally {
       await this.cache.ui.hideLoading();
+    }
+  }
+
+  /**
+   * Tear down the current graph and rebuild it from updatedFileData (which
+   * must carry the preserved layouts/selectedLayout). Shared by the Apply
+   * button and the Excel import merge.
+   */
+  async rebuildGraph(updatedFileData) {
+    await this.cache.graph?.destroy();
+    this.cache.graph = null;
+
+    const status = document.getElementById('sidebarStatusContainer');
+    status.innerHTML = '';
+    status.style.height = '0';
+
+    await this.cache.gcm.destroyGraphAndRollBackUI();
+    this.cache.gcm.resetEventLocks();
+
+    // Reset lasso wrapper visual state to match default behavior (no lasso mode)
+    const lassoWrapper = document.getElementById('lassoWrapper');
+    if (lassoWrapper) {
+      lassoWrapper.classList.remove('active');
+    }
+    this.cache.io.preProcessData(updatedFileData);
+
+    // Clear any saved query to prevent filtering issues with new columns
+    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
+    if (currentLayout && currentLayout.query) {
+      delete currentLayout.query;
+      this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;
+    }
+
+    this.cache.buildDataTable(updatedFileData);
+    this.cache.ui.buildUI();
+
+    await this.cache.gcm.createGraphInstance();
+    if (!this.cache.graph) {
+      this.cache.ui.error('Graph not initialized, aborting.');
+      return;
+    }
+    await this.cache.graph.render();
+
+    // Refresh UI to update node/edge counts and filter availability
+    this.cache.ui.refreshUI();
+
+    // Reload data table with updated fileData to ensure headers are in sync
+    this.fileData = updatedFileData;
+    this.loadTabData();
+  }
+
+  /** Open a file picker and merge the chosen Excel file into the loaded graph. */
+  importExcel() {
+    if (!this.fileData) {
+      this.cache.ui.error('Load a graph before importing.');
+      return;
+    }
+    if (this.pendingChanges.size > 0) {
+      this.cache.ui.error('Apply or reset the pending data editor changes before importing.');
+      return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx,.xls,.ods';
+    input.addEventListener('change', () => this.handleImportFile(input.files[0]));
+    input.click();
+  }
+
+  async handleImportFile(file) {
+    if (!file) return;
+
+    let incoming = null;
+    await this.cache.ui.showLoading('Import', `Reading ${file.name} ..`);
+    try {
+      const buffer = await file.arrayBuffer();
+      incoming = await this.cache.io.parseExcelToJson(buffer, {
+        merge: true,
+        knownNodeIDs: new Set((this.fileData.nodes || []).map((n) => String(n.id))),
+      });
+    } catch (err) {
+      this.cache.ui.error(`Error reading Excel file: ${err}`);
+    } finally {
+      await this.cache.ui.hideLoading();
+    }
+    if (!incoming) return;
+
+    const plan = computeMergePlan(this.fileData, incoming);
+    const confirmed = await showMergePreview(plan, file.name);
+    if (!confirmed) {
+      this.cache.ui.info('Import canceled');
+      return;
+    }
+
+    await this.cache.ui.showLoading('Import', `Merging ${file.name} into the graph ..`);
+    try {
+      this.seedImportedPositions(plan);
+      await this.rebuildGraph({
+        ...plan.fileData,
+        layouts: this.cache.data.layouts,
+        selectedLayout: this.cache.data.selectedLayout,
+      });
+      const s = plan.stats;
+      this.cache.ui.success(
+        `Imported "${file.name}": ${s.nodes.added.length} new / ${s.nodes.modified.length} updated nodes, ` +
+          `${s.edges.added.length} new / ${s.edges.modified.length} updated edges.`
+      );
+    } catch (err) {
+      this.cache.ui.error(`Error merging Excel file: ${err}`);
+    } finally {
+      await this.cache.ui.hideLoading();
+    }
+  }
+
+  /**
+   * Honour X/Y coordinates from the imported file for NEW nodes by seeding the
+   * current workspace's positions map; existing node positions are never
+   * touched. New nodes without coordinates fall back to the renderer's
+   * deterministic placeholder ring.
+   */
+  seedImportedPositions(plan) {
+    const positions = this.cache.data.layouts[this.cache.data.selectedLayout]?.positions;
+    if (!positions) return;
+
+    const addedIds = new Set(plan.stats.nodes.added);
+    for (const node of plan.fileData.nodes) {
+      const id = String(node.id);
+      if (!addedIds.has(id) || positions.has(id)) continue;
+      if (Number.isFinite(node.style?.x) && Number.isFinite(node.style?.y)) {
+        positions.set(id, { style: { x: node.style.x, y: node.style.y } });
+      }
     }
   }
 
@@ -1386,6 +1477,7 @@ class DataTable {
   <li><span class="tooltip-dummy-buttons blue"><strong>+</strong>&nbsp;Node</span> — Create a new node in the graph</li>
   <li><span class="tooltip-dummy-buttons blue"><strong>+</strong>&nbsp;Edge</span> — Create a new edge between existing nodes</li>
   <li><span class="tooltip-dummy-buttons blue"><strong>+</strong>&nbsp;Column</span> — Add a new property column to the table</li>
+  <li><span class="tooltip-dummy-buttons green">⤒ Import</span> — Merge an Excel file into the loaded graph: extend existing nodes/edges with new columns or values, or add entirely new ones — a preview shows what changes before anything is applied</li>
   <li><span class="tooltip-dummy-buttons green">⤓ Export</span> — Save current view as an Excel file</li>
 </ul>
 
