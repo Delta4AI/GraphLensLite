@@ -718,17 +718,29 @@ class IOManager {
    * Parses an Excel file into the required JSON structure.
    *
    * @param {File} file - The Excel file to be parsed.
+   * @param {Object} [options]
+   * @param {boolean} [options.merge] - Merge mode: a single "nodes" or "edges"
+   *   sheet suffices, and empty sheets are tolerated (one of them must have rows).
+   * @param {Set<string>} [options.knownNodeIDs] - Node ids already in the graph;
+   *   edge endpoints are validated against the file's nodes plus this set.
    * @returns {Object} - Parsed JSON structure compatible with the existing system.
    */
-  async parseExcelToJson(file) {
+  async parseExcelToJson(file, options = {}) {
+    const merge = options.merge === true;
+    const knownNodeIDs = options.knownNodeIDs ?? new Set();
+
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(file);
 
     const nodesSheet = workbook.getWorksheet('nodes');
     const edgesSheet = workbook.getWorksheet('edges');
 
-    if (!nodesSheet || !edgesSheet) {
-      this.cache.ui.error('The Excel file must contain a "nodes" and "edges" sheet.');
+    if (merge ? !nodesSheet && !edgesSheet : !nodesSheet || !edgesSheet) {
+      this.cache.ui.error(
+        merge
+          ? 'The Excel file must contain a "nodes" and/or "edges" sheet.'
+          : 'The Excel file must contain a "nodes" and "edges" sheet.'
+      );
       return;
     }
 
@@ -783,6 +795,8 @@ class IOManager {
     };
 
     const removeEmptyColumns = (sheetJson, sheetDescriptor) => {
+      if (!sheetJson || sheetJson.length === 0) return;
+
       const propertyDefs =
         sheetDescriptor === 'edges' ? EXCEL_EDGE_PROPERTIES : EXCEL_NODE_PROPERTIES;
       const requiredCols = propertyDefs.filter((prop) => prop.required).map((prop) => prop.column);
@@ -834,15 +848,27 @@ class IOManager {
       });
     };
 
+    // ExcelJS surfaces rich cells as objects (rich-text runs, hyperlinks,
+    // formulas, error cells). Normalize to the primitive the user sees in the
+    // sheet — raw objects leaking into D4Data corrupt change detection and
+    // crash the category filters downstream.
+    const cellValueToPrimitive = (value) => {
+      if (value === null || typeof value !== 'object' || value instanceof Date) return value;
+      if (Array.isArray(value.richText)) return value.richText.map((run) => run.text).join('');
+      if (value.text !== undefined) return cellValueToPrimitive(value.text); // hyperlink cell
+      if (value.result !== undefined) return cellValueToPrimitive(value.result); // formula cell
+      return null; // formula without cached result, error cell, unknown shape → empty
+    };
+
     const worksheetToJson = (worksheet) => {
-      if (!worksheet) return [];
+      if (!worksheet) return { headers: [], jsonData: [] };
 
       const jsonData = [];
       const headers = [];
 
       const firstRow = worksheet.getRow(1);
       firstRow.eachCell((cell, colNumber) => {
-        headers[colNumber] = cell.value;
+        headers[colNumber] = cellValueToPrimitive(cell.value);
       });
 
       worksheet.eachRow((row, rowNumber) => {
@@ -853,7 +879,7 @@ class IOManager {
         row.eachCell((cell, colNumber) => {
           const header = headers[colNumber];
           if (header) {
-            rowData[header] = cell.value;
+            rowData[header] = cellValueToPrimitive(cell.value);
           }
         });
 
@@ -897,13 +923,18 @@ class IOManager {
     const nodesData = nodesDataDict.jsonData;
     const edgesData = edgesDataDict.jsonData;
 
-    if (nodesData.length === 0) {
+    if (nodesData.length === 0 && !merge) {
       this.cache.ui.error('The "nodes" sheet is empty or invalid.');
       return;
     }
 
-    if (edgesData.length === 0) {
+    if (edgesData.length === 0 && !merge) {
       this.cache.ui.error('The "edges" sheet is empty or invalid.');
+      return;
+    }
+
+    if (merge && nodesData.length === 0 && edgesData.length === 0) {
+      this.cache.ui.error('The Excel file contains no node or edge rows.');
       return;
     }
 
@@ -913,17 +944,21 @@ class IOManager {
     removeEmptyColumns(nodesData, 'nodes');
     removeEmptyColumns(edgesData, 'edges');
 
-    const firstNodeRowKeys = nodesDataDict.headers.map((k) => k.toLowerCase().trim());
-    const requiredNodeColumns = EXCEL_NODE_PROPERTIES.filter((node) => node.required).map((node) =>
-      node.column.toLowerCase().trim()
-    );
-    validateColumns(requiredNodeColumns, firstNodeRowKeys, 'nodes');
+    if (nodesData.length > 0) {
+      const firstNodeRowKeys = nodesDataDict.headers.map((k) => k.toLowerCase().trim());
+      const requiredNodeColumns = EXCEL_NODE_PROPERTIES.filter((node) => node.required).map(
+        (node) => node.column.toLowerCase().trim()
+      );
+      validateColumns(requiredNodeColumns, firstNodeRowKeys, 'nodes');
+    }
 
-    const firstEdgeRowKeys = edgesDataDict.headers.map((k) => k.toLowerCase().trim());
-    const requiredEdgeColumns = EXCEL_EDGE_PROPERTIES.filter((edge) => edge.required).map((edge) =>
-      edge.column.toLowerCase().trim()
-    );
-    validateColumns(requiredEdgeColumns, firstEdgeRowKeys, 'edges');
+    if (edgesData.length > 0) {
+      const firstEdgeRowKeys = edgesDataDict.headers.map((k) => k.toLowerCase().trim());
+      const requiredEdgeColumns = EXCEL_EDGE_PROPERTIES.filter((edge) => edge.required).map(
+        (edge) => edge.column.toLowerCase().trim()
+      );
+      validateColumns(requiredEdgeColumns, firstEdgeRowKeys, 'edges');
+    }
 
     const nonDataNodeColumns = new Set(
       EXCEL_NODE_PROPERTIES.map((p) => p.column.toLowerCase().trim())
@@ -1110,7 +1145,7 @@ class IOManager {
           return null;
         }
 
-        if (!nodeIDs.has(sourceID)) {
+        if (!nodeIDs.has(sourceID) && !knownNodeIDs.has(String(sourceID))) {
           this.cache.ui.warning(
             `Edge in row ${edgeRowNum} has an invalid/missing Source ID (${sourceID}) and will be skipped.`
           );
@@ -1125,7 +1160,7 @@ class IOManager {
           return null;
         }
 
-        if (!nodeIDs.has(targetID)) {
+        if (!nodeIDs.has(targetID) && !knownNodeIDs.has(String(targetID))) {
           this.cache.ui.warning(
             `Edge in row ${edgeRowNum} has an invalid/missing Target ID (${targetID}) and will be skipped.`
           );
@@ -1165,6 +1200,8 @@ class IOManager {
       edges: parsedEdges,
       nodeDataHeaders: nodeDataHeaders,
       edgeDataHeaders: edgeDataHeaders,
+      skippedNodeRows: nodesData.length - parsedNodes.length,
+      skippedEdgeRows: edgesData.length - parsedEdges.length,
     };
   }
 

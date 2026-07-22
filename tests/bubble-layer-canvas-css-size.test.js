@@ -84,6 +84,7 @@ function makeCache() {
 class FakePath2D {
   moveTo() {}
   lineTo() {}
+  bezierCurveTo() {}
   closePath() {}
 }
 

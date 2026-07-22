@@ -95,6 +95,15 @@ class GraphBubbleSetManager {
       case "Stroke Opacity":
         bStyle.strokeOpacity = value;
         break;
+      case "Padding":
+        bStyle.padding = value;
+        break;
+      case "Corridor Width":
+        bStyle.corridor = value;
+        break;
+      case "Avoidance":
+        bStyle.avoidance = value;
+        break;
       case "Label":
         bStyle.label = value;
         break;
@@ -176,6 +185,8 @@ class GraphBubbleSetManager {
         if (slider) slider.value = val;
         if (numInput) numInput.value = val;
       };
+      syncSliderInput("Padding", bubbleStyle.padding);
+      syncSliderInput("Corridor Width", bubbleStyle.corridor);
       syncSliderInput("Label Font Size", bubbleStyle.labelFontSize);
       syncSliderInput("Label Offset X", bubbleStyle.labelOffsetX);
       syncSliderInput("Label Offset Y", bubbleStyle.labelOffsetY);
@@ -187,6 +198,8 @@ class GraphBubbleSetManager {
       };
       syncSwitch("Label Close To Path", bubbleStyle.labelCloseToPath);
       syncSwitch("Label Auto Rotate", bubbleStyle.labelAutoRotate);
+      // Numeric 0/1 (legacy values > 0 read as ON) → checked state.
+      syncSwitch("Avoidance", (bubbleStyle.avoidance ?? 1) > 0);
 
       // Sync dropdown by data-property attribute
       const placementDropdown = card.querySelector(`[data-property="Bubble Set ${group} Label Placement"]`);

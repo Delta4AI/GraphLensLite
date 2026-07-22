@@ -1206,6 +1206,36 @@ function createStyleDiv(cache) {
       createNumericalSlider(rowStrokeOpacity, `Bubble Set ${group} Stroke Opacity`, bs.strokeOpacity,
         {min: 0, max: 1, step: 0.01}, `Define the stroke opacity of bubble set ${tabIndex}.`, false);
 
+      // Padding (node influence field multiplier)
+      const rowPadding = createNewRow(panel);
+      appendLabel(rowPadding, "Padding",
+        "How far the bubble body extends past its member nodes — lower for a tighter hug, higher for more breathing room.");
+      createNumericalSlider(rowPadding, `Bubble Set ${group} Padding`, bs.padding ?? 1,
+        {min: 0.01, max: 3, step: 0.01},
+        `How far bubble set ${tabIndex} extends past its member nodes.`, false);
+
+      // Corridor Width (virtual-edge influence field multiplier)
+      const rowCorridor = createNewRow(panel);
+      appendLabel(rowCorridor, "Corridor Width",
+        "Thickness of the connecting arms that reach outlying member nodes.");
+      createNumericalSlider(rowCorridor, `Bubble Set ${group} Corridor Width`, bs.corridor ?? 1,
+        {min: 0.01, max: 3, step: 0.01},
+        `Thickness of bubble set ${tabIndex}'s connecting arms to outlying members.`, false);
+
+      // Avoidance (non-member field on/off; persisted numeric 0/1 for
+      // JSON back-compat — legacy saved values > 0 read as ON)
+      const rowAvoidance = createNewRow(panel);
+      appendLabel(rowAvoidance, "Avoid Other Nodes",
+        "Steer the hull around nodes that are not in the group and carve holes for enclosed ones.");
+      const avoidanceSwitch = createSwitch(async () => {
+        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Avoidance`, avoidanceSwitch.isChecked() ? 1 : 0);
+      }, undefined, (bs.avoidance ?? 1) > 0);
+      avoidanceSwitch.dataset.property = `Bubble Set ${group} Avoidance`;
+      // The row label is a separate element, so name the checkbox directly.
+      avoidanceSwitch.querySelector("input").setAttribute("aria-label",
+        `Avoid other nodes (bubble set ${tabIndex})`);
+      rowAvoidance.appendChild(avoidanceSwitch);
+
       // Label (toggle + text input)
       const rowLabel = createNewRow(panel);
       appendLabel(rowLabel, "Label Text");

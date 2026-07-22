@@ -102,6 +102,9 @@ class FakePath2D {
   constructor() { this.points = []; }
   moveTo(x, y) { this.points.push({ x, y }); }
   lineTo(x, y) { this.points.push({ x, y }); }
+  // Record the segment endpoint (= original polygon vertex) — control points
+  // are painter detail.
+  bezierCurveTo(c1x, c1y, c2x, c2y, x, y) { this.points.push({ x, y }); }
   closePath() {}
 }
 

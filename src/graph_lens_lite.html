@@ -274,6 +274,8 @@
         <button onclick="cache.dataTable.addNode()" class="blue" title="Add a node"><strong>+</strong>&nbsp;Node</button>
         <button onclick="cache.dataTable.addEdge()" class="blue" title="Add an edge"><strong>+</strong>&nbsp;Edge</button>
         <button onclick="cache.dataTable.addColumn()" class="blue" title="Add a new property column"><strong>+</strong>&nbsp;Column</button>
+        <button id="importDataTableBtn" onclick="cache.dataTable.importExcel()" class="green"
+                title="Merge an Excel file into the current graph — preview changes and choose to add new nodes/edges or only extend existing ones">⤒ Import</button>
         <button id="exportDataTableBtn" onclick="cache.dataTable.exportToExcel()" class="green"
                 title="Export the data table and styling properties as Excel">⤓ Export</button>
       </div>

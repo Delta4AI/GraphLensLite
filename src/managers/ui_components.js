@@ -19,11 +19,14 @@ class DropdownChecklist {
       : Array.from(this.categories);
 
     catArray.sort((a, b) => {
+      // Category values normally arrive as strings, but hand-crafted JSON (or
+      // historic files saved before rich-cell normalization) may carry other
+      // types — coerce instead of crashing the whole filter panel.
       const getPriority = (val) => {
-        const lower = val.toLowerCase();
-        if (lower === 'low') return 1;
-        if (lower === 'medium') return 2;
-        if (lower === 'high') return 3;
+        const lower = String(val).toLowerCase();
+        if (lower === "low") return 1;
+        if (lower === "medium") return 2;
+        if (lower === "high") return 3;
         return 0; // “other” values
       };
       const priorityA = getPriority(a);
@@ -31,7 +34,7 @@ class DropdownChecklist {
 
       if (priorityA === 0 && priorityB === 0) {
         // Both “other” values → alphabetical
-        return a.localeCompare(b);
+        return String(a).localeCompare(String(b));
       }
       // Sort by priority ascending: 0 → “other”, 1 → “low”, 2 → “medium”, 3 → “high”
       return priorityA - priorityB;
