@@ -30,6 +30,7 @@
  */
 import { DEFAULTS } from "../config.js";
 import { outlineLabelAnchor } from "./bubble_geometry.js";
+import { smoothClosedPath } from "./bubble_smoothing.js";
 import { placementVector, BAKED_DEFAULT_LABEL_COLOR } from "./label_renderers.js";
 
 // Conservative paint-value allowlist (shape_textures.js SAFE_PAINT_RE):
@@ -578,11 +579,22 @@ function edgeLabelPrimitives(edge, env) {
 // --- bubble group primitives ---------------------------------------------------
 
 /** bubble_layer #drawGroup parity: closed body rings (outer + avoid holes,
- *  even-odd fill) + 2px outline on every ring. */
+ *  even-odd fill) + 2px outline on every ring, smoothed with the SAME
+ *  Catmull-Rom control points the live canvas paints (smoothClosedPath). */
 function bubbleBodyPrimitives({ points, holes = [], opts = {}, defaults = {} }) {
   if (!points || points.length < 2) return [];
-  const ringD = (ring) =>
-    ring.map((p, i) => `${i === 0 ? "M" : "L"} ${fmt(p.x)} ${fmt(p.y)}`).join(" ") + " Z";
+  const ringD = (ring) => {
+    const segments = smoothClosedPath(ring);
+    if (!segments)
+      return ring.map((p, i) => `${i === 0 ? "M" : "L"} ${fmt(p.x)} ${fmt(p.y)}`).join(" ") + " Z";
+    return (
+      `M ${fmt(segments[0].x0)} ${fmt(segments[0].y0)} ` +
+      segments
+        .map((s) => `C ${fmt(s.c1x)} ${fmt(s.c1y)} ${fmt(s.c2x)} ${fmt(s.c2y)} ${fmt(s.x)} ${fmt(s.y)}`)
+        .join(" ") +
+      " Z"
+    );
+  };
   const d = [points, ...holes.filter((h) => h.length >= 3)].map(ringD).join(" ");
   return [
     {

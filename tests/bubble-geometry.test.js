@@ -9,6 +9,7 @@ import {
   positionsChecksum,
   styleKey,
 } from "../src/graph/bubble_geometry.js";
+import { smoothClosedPath, sampleSmoothedRing } from "../src/graph/bubble_smoothing.js";
 import { pointInPolygon } from "../src/graph/lasso_geometry.js";
 
 // ==========================================================================
@@ -450,10 +451,22 @@ describe("computeOutlineGeometry avoid holes", () => {
     expect(holes).toEqual([]);
   });
 
-  it("skips the hole when the non-member is squeezed against a member", () => {
-    // Avoid node overlapping a member's clearance zone: carving would eat
-    // into the guarantee, so it must be skipped.
+  it("wedged non-member gets a clearance-limited, body-hugging hole (no silent swallow)", () => {
+    // The (85,60) node is squeezed between members: the full r+gap disc would
+    // eat into a member's guaranteed clearance, so the hole falls back to the
+    // largest clearance-respecting radius — smaller than r+gap but still a
+    // visible carve (≥ 0.35 × its radius).
     const { holes } = computeOutlineGeometry(ringMembers, [rectAt(85, 60, 15)], {});
+    expect(holes.length).toBe(1);
+    const radii = holes[0].map((p) => Math.hypot(p.x - 85, p.y - 60));
+    expect(Math.max(...radii)).toBeLessThan(15 + 20); // below the full r+gap disc
+    expect(Math.min(...radii)).toBeGreaterThanOrEqual(15 * 0.35);
+  });
+
+  it("fully-fused non-member (inside a member's clearance zone) stays covered", () => {
+    // At (100,60) even the minimum readable hole would violate the member
+    // guarantee — the documented ceiling: it stays covered.
+    const { holes } = computeOutlineGeometry(ringMembers, [rectAt(100, 60, 15)], {});
     expect(holes).toEqual([]);
   });
 
@@ -463,10 +476,10 @@ describe("computeOutlineGeometry avoid holes", () => {
   });
 });
 
-describe("computeOutlinePoints avoidance knob", () => {
-  // Two members with a non-member between them: at default avoidance the
-  // corridor routes around it (excluded); at 0 the negative field is off and
-  // the hull may cover it; higher values keep steering around it.
+describe("computeOutlinePoints avoidance switch", () => {
+  // Two members with a non-member between them: avoidance ON routes the
+  // corridor around it (excluded); OFF (0) drops the negative field and the
+  // hull may cover it. Persisted numeric: any legacy value > 0 means ON.
   const members = [rectAt(50, 100), rectAt(250, 100)];
   const avoid = [rectAt(150, 100)];
 
@@ -479,7 +492,7 @@ describe("computeOutlinePoints avoidance knob", () => {
     expect(outline).toEqual(computeOutlinePoints(members, [], { avoidance: 0 }));
   });
 
-  it("default and strong avoidance keep the non-member excluded", () => {
+  it("avoidance ON (default or any legacy value > 0) keeps the non-member excluded", () => {
     for (const avoidance of [undefined, 1, 3]) {
       const outline = computeOutlinePoints(members, avoid, { avoidance });
       expect(pointInPolygon({ x: 50, y: 100 }, outline)).toBe(true);
@@ -488,13 +501,13 @@ describe("computeOutlinePoints avoidance knob", () => {
     }
   });
 
-  it("clamps invalid avoidance values to the default instead of collapsing", () => {
-    expect(computeOutlinePoints(members, avoid, { avoidance: NaN }))
-      .toEqual(computeOutlinePoints(members, avoid, {}));
+  it("normalizes every non-zero/invalid value to plain ON (boolean semantics)", () => {
+    const on = computeOutlinePoints(members, avoid, { avoidance: 1 });
+    expect(computeOutlinePoints(members, avoid, { avoidance: 3 })).toEqual(on);
+    expect(computeOutlinePoints(members, avoid, { avoidance: 100 })).toEqual(on);
+    expect(computeOutlinePoints(members, avoid, { avoidance: NaN })).toEqual(on);
     expect(computeOutlinePoints(members, avoid, { avoidance: -5 }))
       .toEqual(computeOutlinePoints(members, avoid, { avoidance: 0 }));
-    expect(computeOutlinePoints(members, avoid, { avoidance: 100 }))
-      .toEqual(computeOutlinePoints(members, avoid, { avoidance: 4 }));
   });
 });
 
@@ -560,6 +573,8 @@ describe("computeOutlinePoints member-enclosure guarantee", () => {
     // members disconnect and their repair discs float beside the main hull.
     // The union must come back as ONE simple ring (capsule links) that still
     // encloses every member — this exact layout used to drop 5 of 10 members.
+    // Clearance is measured against the SMOOTHED curve (what the painters
+    // render): the polygon is math truth, the curve is visual truth.
     const spots = [
       [250, 200], [300, 180], [280, 250], [220, 270], [340, 230],
       [310, 300], [260, 340], [370, 170], [200, 210], [230, 620],
@@ -568,8 +583,9 @@ describe("computeOutlinePoints member-enclosure guarantee", () => {
     const outline = computeOutlinePoints(members, [], { padding: 0.1, corridor: 0.25 });
     expect(outline.length).toBeGreaterThan(3);
     expect(polygonSelfIntersects(outline)).toBe(false);
+    const curve = sampleSmoothedRing(outline);
     for (const [x, y] of spots) {
-      expect(circleClearance(x, y, 9, outline)).toBeGreaterThanOrEqual(0);
+      expect(circleClearance(x, y, 9, curve)).toBeGreaterThanOrEqual(0);
     }
   });
 
@@ -583,6 +599,61 @@ describe("computeOutlinePoints member-enclosure guarantee", () => {
       expect(circleClearance(m.x + r, m.y + r, r, outline)).toBeGreaterThanOrEqual(0);
     }
   });
+});
+
+// The painters render rings through smoothClosedPath (Catmull-Rom → cubic
+// Bézier, tension 1/6); both the canvas layer and the SVG export consume the
+// same control points, and the enclosure guarantee measures against the
+// sampled curve.
+describe("smoothClosedPath", () => {
+  const square = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 100, y: 100 },
+    { x: 0, y: 100 },
+  ];
+
+  it("returns null for rings too small to smooth", () => {
+    expect(smoothClosedPath([])).toBeNull();
+    expect(smoothClosedPath([{ x: 0, y: 0 }, { x: 1, y: 1 }])).toBeNull();
+  });
+
+  it("emits one segment per vertex, each starting where the previous ended", () => {
+    const segments = smoothClosedPath(square);
+    expect(segments).toHaveLength(4);
+    for (let i = 0; i < segments.length; i++) {
+      const next = segments[(i + 1) % segments.length];
+      expect(segments[i].x).toBe(next.x0);
+      expect(segments[i].y).toBe(next.y0);
+    }
+  });
+
+  it("joins segments C1-continuously (tangent in equals tangent out at every vertex)", () => {
+    const segments = smoothClosedPath(square);
+    for (let i = 0; i < segments.length; i++) {
+      const prev = segments[(i - 1 + segments.length) % segments.length];
+      const s = segments[i];
+      // Uniform Catmull-Rom: outgoing (c1 − p1) and incoming (p1 − c2_prev)
+      // control offsets are both (p2 − p0)/6.
+      expect(s.c1x - s.x0).toBeCloseTo(prev.x - prev.c2x, 10);
+      expect(s.c1y - s.y0).toBeCloseTo(prev.y - prev.c2y, 10);
+    }
+  });
+
+  it("is deterministic and tolerates a duplicated closing vertex", () => {
+    const closed = [...square, { x: 0, y: 0 }];
+    expect(smoothClosedPath(closed)).toEqual(smoothClosedPath(square));
+    expect(smoothClosedPath(square)).toEqual(smoothClosedPath(square));
+  });
+
+  it("sampleSmoothedRing reproduces each vertex at t=0 and densifies between", () => {
+    const sampled = sampleSmoothedRing(square);
+    expect(sampled.length).toBe(square.length * 4);
+    for (const v of square) {
+      expect(sampled.some((p) => p.x === v.x && p.y === v.y)).toBe(true);
+    }
+  });
+
 });
 
 describe("positionsChecksum node-size fold", () => {

@@ -33,6 +33,7 @@ import {
   positionsChecksum,
   styleKey,
 } from './bubble_geometry.js';
+import { smoothClosedPath } from './bubble_smoothing.js';
 
 const LAYER_NAME = 'bubbleSets';
 const LABEL_LAYER_NAME = 'bubbleSetsLabels';
@@ -472,9 +473,19 @@ class BubbleSetLayer {
     if (!points || points.length < 2) return false;
 
     const path = new Path2D();
+    // Rings paint as Catmull-Rom curves (smoothClosedPath — same control
+    // points the SVG export emits); rings too small to smooth fall back to
+    // the polyline. The polygon stays the geometric source of truth.
     const addRing = (ring) => {
-      path.moveTo(ring[0].x, ring[0].y);
-      for (let i = 1; i < ring.length; i++) path.lineTo(ring[i].x, ring[i].y);
+      const segments = smoothClosedPath(ring);
+      if (!segments) {
+        path.moveTo(ring[0].x, ring[0].y);
+        for (let i = 1; i < ring.length; i++) path.lineTo(ring[i].x, ring[i].y);
+        path.closePath();
+        return;
+      }
+      path.moveTo(segments[0].x0, segments[0].y0);
+      for (const s of segments) path.bezierCurveTo(s.c1x, s.c1y, s.c2x, s.c2y, s.x, s.y);
       path.closePath();
     };
     addRing(points);

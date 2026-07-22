@@ -9,6 +9,7 @@
  */
 import { bubblesets, polygonClipping } from "../lib/graphology.bundle.mjs";
 import { pointInPolygon } from "./lasso_geometry.js";
+import { sampleSmoothedRing } from "./bubble_smoothing.js";
 
 // PointPath post-processing per the bubblesets-js README: sample the raw
 // marching-squares outline, B-spline it and drop collinear points. 8 is the
@@ -30,9 +31,11 @@ const OUTLINE_MAX_SAMPLED_POINTS = 1200;
 // the dense adaptive-stride spline carries grid-scale micro-wiggle that (a)
 // reads as jaggies and (b) produces near-degenerate segments that make
 // polygon-clipping throw ("Unable to complete output ring"), silently
-// disabling the enclosure guarantee. A quarter-cell tolerance erases the
-// noise without touching real features.
-const OUTLINE_SIMPLIFY_TOLERANCE_RATIO = 0.25;
+// disabling the enclosure guarantee. Half a cell erases the noise without
+// touching real features — the painters render the ring through
+// smoothClosedPath, so FEWER control points mean a smoother curve, not
+// visible facets.
+const OUTLINE_SIMPLIFY_TOLERANCE_RATIO = 0.5;
 // Snap grid (px⁻¹) for rings handed to polygon-clipping — collapses the
 // float-noise duplicate/degenerate vertices that trip its sweep line.
 const CLIP_SNAP = 32;
@@ -54,28 +57,31 @@ const FIELD_MORPH_BUFFER_RATIO = 10 / REFERENCE_NODE_RADIUS;
 const FIELD_PIXEL_GROUP_RATIO = 4 / REFERENCE_NODE_RADIUS;
 // User-tunable multipliers on the influence field (per-group style):
 // padding scales the node field (how far the body extends past members),
-// corridor scales the virtual-edge field (arm thickness to outliers),
-// avoidance scales the negative field of non-member nodes (0 = the hull may
-// freely cover them, higher = it steers around them harder).
+// corridor scales the virtual-edge field (arm thickness to outliers).
 // morphBuffer deliberately takes NONE of them: it is the obstacle-routing
 // clearance for virtual edges, and scaling it with the corridor knob made
 // wider corridors also REROUTE around avoid nodes in long detours that
 // painted as phantom lobes in empty space.
 const GEOMETRY_MULTIPLIER_MIN = 0.05;
 const GEOMETRY_MULTIPLIER_MAX = 4;
-// bubblesets-js' own default non-member (negative) energy factor; the
-// avoidance knob multiplies it. Unlike padding/corridor, 0 is a valid value
-// (avoidance off — the library skips the negative pass entirely).
+// bubblesets-js' own default non-member (negative) energy factor. Avoidance
+// is a SWITCH, not a multiplier: above ~1× the library's marching iteration
+// fights back (it boosts member energy and decays this factor per iteration
+// until the contour holds all members), so scaling it bought distorted
+// shapes, not more avoidance. Persisted values stay numeric for JSON
+// back-compat: 0 = off, anything > 0 = on.
 const NON_MEMBER_INFLUENCE_FACTOR = -0.8;
-const AVOIDANCE_MAX = 4;
 // Interior avoid-node holes: the energy field can only carve FJORDS from the
 // hull boundary — marching squares yields one outer contour, so a non-member
 // fully inside the hull is topologically invisible to it. carveAvoidHoles
 // punches discs for those via polygon difference instead (rendered with
-// even-odd fill). A hole squeezed by nearby members below this fraction of
-// the node's own radius is skipped — the node lives in a corridor pinch
-// where a carve would read as noise.
-const HOLE_MIN_RADIUS_RATIO = 0.6;
+// even-odd fill). A member-clearance-squeezed hole falls back to the largest
+// radius that still respects the clearance (body-hugging carve) — no silent
+// swallowing — down to this floor, below which a carve no longer reads.
+// ponytail: documented ceiling — a non-member fused into a member's
+// clearance zone (holeR < 0.35 × its radius) stays covered; doing better
+// needs an outline algorithm with organic field-carved holes.
+const HOLE_MIN_RADIUS_RATIO = 0.35;
 // Enclosure guarantee: bubblesets-js only validates that each member's CENTER
 // is inside the contour (PointPath.containsElements), and the B-spline
 // smoothing shrinks lobes inward, so avoid-node pressure can leave a member
@@ -86,6 +92,12 @@ const HOLE_MIN_RADIUS_RATIO = 0.6;
 // ring).
 const ENCLOSURE_MIN_CLEARANCE_RATIO = 0.4;
 const ENCLOSURE_DISC_SEGMENTS = 32;
+// Disc-union junction corners can themselves smooth inward past a member, so
+// the repair re-checks the smoothed result and retries with a grown disc.
+const ENCLOSURE_MAX_REPAIR_ROUNDS = 3;
+// Hole breathing room never drops below this fraction of the carved node's
+// own radius — the grid-floored padding gap reads too snug on large nodes.
+const HOLE_GAP_RADIUS_RATIO = 0.25;
 // Marching-squares grid cell: never below 1 px (pixelGroup 0 hangs the
 // library; sub-pixel cells just waste time) and never above the library's
 // 4 px default — a coarser grid visibly wobbles the outline around large
@@ -93,6 +105,8 @@ const ENCLOSURE_DISC_SEGMENTS = 32;
 // small nodes.
 const FIELD_PIXEL_GROUP_MIN = 1;
 const FIELD_PIXEL_GROUP_MAX = 4;
+// Semicircular cap resolution for the stadium-shaped straggler links.
+const CAPSULE_CAP_SEGMENTS = 8;
 
 /**
  * Axis-aligned square around a node's viewport position.
@@ -141,8 +155,8 @@ function meanMemberRadius(memberRects) {
  *   padding multiplies the node influence radii (body extent past members);
  *   corridor multiplies the edge influence radii (arm thickness). Both are
  *   user style knobs, clamped to [0.05, 4]; 1 = one mean-radius of margin.
- *   avoidance multiplies the negative energy of avoid rects, clamped to
- *   [0, 4]: 0 lets the hull cover non-members, >1 steers around them harder.
+ *   avoidance is a switch (numeric for JSON back-compat): 0 lets the hull
+ *   cover non-members, anything > 0 steers around them and carves holes.
  * @returns {Array<{x: number, y: number}>} closed polygon (empty when no
  *   members or the outline collapsed)
  */
@@ -169,12 +183,10 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
     Math.min(GEOMETRY_MULTIPLIER_MAX, Math.max(GEOMETRY_MULTIPLIER_MIN, Number(v) || 1));
   const pad = clampMult(opts.padding ?? 1);
   const cor = clampMult(opts.corridor ?? 1);
-  // 0 is meaningful for avoidance (off), so NaN/missing fall back to 1
-  // explicitly instead of through the || 1 shortcut the other knobs use.
+  // Avoidance is boolean (see NON_MEMBER_INFLUENCE_FACTOR): any legacy saved
+  // value > 0 means ON; NaN/missing fall back to ON.
   const avoidRaw = Number(opts.avoidance ?? 1);
-  const avoidance = Number.isFinite(avoidRaw)
-    ? Math.min(AVOIDANCE_MAX, Math.max(0, avoidRaw))
-    : 1;
+  const avoidance = Number.isFinite(avoidRaw) && avoidRaw <= 0 ? 0 : 1;
   const unit = meanMemberRadius(memberRects);
   const pixelGroupPx = Math.min(
     FIELD_PIXEL_GROUP_MAX,
@@ -200,7 +212,7 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
     edgeR1: edgeR1px,
     morphBuffer: FIELD_MORPH_BUFFER_RATIO * unit,
     pixelGroup: pixelGroupPx,
-    nonMemberInfluenceFactor: NON_MEMBER_INFLUENCE_FACTOR * avoidance,
+    nonMemberInfluenceFactor: avoidance > 0 ? NON_MEMBER_INFLUENCE_FACTOR : 0,
   });
   // Adaptive stride (see OUTLINE_SAMPLE_STEP note): control spacing ≈ 2× the
   // thinnest field radius, never denser than the point cap allows.
@@ -236,23 +248,25 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
     if (repaired.length >= 3) outline = repaired;
   }
   outline = ensureMembersEnclosed(outline, memberRects, nodeR0px, edgeR0px);
-  const gapPx = Math.min(nodeR0px * avoidance, nodeR1px);
-  return carveAvoidHoles(outline, memberRects, effectiveAvoidRects, gapPx, nodeR0px);
+  // Hole breathing room = the padding radius: carved non-members get the
+  // same visual gap members do (symmetric, does not scale with avoidance).
+  return carveAvoidHoles(outline, memberRects, effectiveAvoidRects, nodeR0px, nodeR0px);
 }
 
 /**
  * Punch interior holes for avoid nodes the hull swallowed. Only nodes whose
  * CENTER lies inside the outer ring get a disc (boundary-adjacent ones are
  * the field's fjord job); each disc is clipped so it never eats into a
- * member's guaranteed clearance, and skipped entirely when that squeezes it
- * below HOLE_MIN_RADIUS_RATIO of the node. If the difference would split the
- * hull so that a member center leaves the largest piece, the holes are
+ * member's guaranteed clearance — a squeezed disc hugs the node body rather
+ * than vanishing, and is only skipped below HOLE_MIN_RADIUS_RATIO of the
+ * node (fused into a member's clearance zone). If the difference would split
+ * the hull so that a member center leaves the largest piece, the holes are
  * dropped wholesale — the one-ring member guarantee outranks avoidance.
  *
  * @param {Array<{x: number, y: number}>} outer  simple hull ring
  * @param {Array<{x, y, width, height}>} memberRects
  * @param {Array<{x, y, width, height}>} avoidRects
- * @param {number} gapPx  visual gap around a carved node (scaled by avoidance)
+ * @param {number} gapPx  visual gap around a carved node (the padding radius)
  * @param {number} padPx  member clearance unit (floored nodeR0)
  * @returns {{outer: Array<{x,y}>, holes: Array<Array<{x,y}>>}}
  */
@@ -266,7 +280,7 @@ function carveAvoidHoles(outer, memberRects, avoidRects, gapPx, padPx) {
     const cx = rect.x + rect.width / 2;
     const cy = rect.y + rect.height / 2;
     if (!pointInPolygon({ x: cx, y: cy }, outer)) continue;
-    let holeR = r + gapPx;
+    let holeR = r + Math.max(gapPx, HOLE_GAP_RADIUS_RATIO * r);
     for (const m of memberRects) {
       const mr = Math.max(m.width, m.height) / 2;
       const dist = Math.hypot(cx - (m.x + m.width / 2), cy - (m.y + m.height / 2));
@@ -322,20 +336,31 @@ function carveAvoidHoles(outer, memberRects, avoidRects, gapPx, padPx) {
 function ensureMembersEnclosed(points, memberRects, padPx, linkR) {
   if (points.length < 3) return points;
   const minClearance = padPx * ENCLOSURE_MIN_CLEARANCE_RATIO;
-  const discs = [];
-  for (const rect of memberRects) {
-    const radius = Math.max(rect.width, rect.height) / 2;
-    const cx = rect.x + rect.width / 2;
-    const cy = rect.y + rect.height / 2;
-    const signedDist = pointInPolygon({ x: cx, y: cy }, points) ? 1 : -1;
-    const clearance = signedDist * distanceToPolygonEdge(cx, cy, points) - radius;
-    if (clearance < minClearance) discs.push([discRing(cx, cy, radius + padPx)]);
+  let ring = points;
+  // The painters render the Catmull-Rom smoothing of this ring, so clearance
+  // is measured against the sampled CURVE — the guarantee stays honest
+  // against what is actually painted, not the raw polygon. A repair round
+  // can itself introduce union-junction corners that smooth inward past a
+  // member, so the result is re-checked and retried with a disc grown by one
+  // extra padding per round.
+  for (let round = 1; round <= ENCLOSURE_MAX_REPAIR_ROUNDS; round++) {
+    const painted = sampleSmoothedRing(ring);
+    const discs = [];
+    for (const rect of memberRects) {
+      const radius = Math.max(rect.width, rect.height) / 2;
+      const cx = rect.x + rect.width / 2;
+      const cy = rect.y + rect.height / 2;
+      const signedDist = pointInPolygon({ x: cx, y: cy }, painted) ? 1 : -1;
+      const clearance = signedDist * distanceToPolygonEdge(cx, cy, painted) - radius;
+      if (clearance < minClearance) discs.push([discRing(cx, cy, radius + padPx * round)]);
+    }
+    if (discs.length === 0) return ring;
+    let merged = unionPolygons([[toClipRing(ring)]], ...discs);
+    if (!merged) return ring;
+    merged = connectPolygonComponents(merged, Math.max(linkR, 1));
+    ring = largestOuterRing(merged) ?? ring;
   }
-  if (discs.length === 0) return points;
-  let merged = unionPolygons([[toClipRing(points)]], ...discs);
-  if (!merged) return points;
-  merged = connectPolygonComponents(merged, Math.max(linkR, 1));
-  return largestOuterRing(merged) ?? points;
+  return ring;
 }
 
 /**
@@ -426,8 +451,10 @@ function nearestVertexPair(ringA, ringB) {
 }
 
 /**
- * Closed rectangle ring of half-width r along segment a→b, extended by r
- * beyond both endpoints so it always overlaps the shapes it links.
+ * Closed stadium ring of half-width r along segment a→b: straight sides with
+ * semicircular caps centered on the endpoints, so straggler links join the
+ * hull without corners (the curve painter rounds them further). The caps
+ * extend r beyond both endpoints, so the shape always overlaps what it links.
  * Null for degenerate (coincident) endpoints.
  *
  * @param {[number, number]} a
@@ -440,19 +467,18 @@ function capsuleRing(a, b, r) {
   const dy = b[1] - a[1];
   const len = Math.hypot(dx, dy);
   if (len < 1e-9) return null;
-  const ux = (dx / len) * r;
-  const uy = (dy / len) * r;
-  const ax = a[0] - ux;
-  const ay = a[1] - uy;
-  const bx = b[0] + ux;
-  const by = b[1] + uy;
-  return [
-    [ax - uy, ay + ux],
-    [bx - uy, by + ux],
-    [bx + uy, by - ux],
-    [ax + uy, ay - ux],
-    [ax - uy, ay + ux],
-  ];
+  const angle = Math.atan2(dy, dx);
+  const ring = [];
+  const arc = (cx, cy, from) => {
+    for (let i = 0; i <= CAPSULE_CAP_SEGMENTS; i++) {
+      const t = from + (Math.PI * i) / CAPSULE_CAP_SEGMENTS;
+      ring.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]);
+    }
+  };
+  arc(b[0], b[1], angle - Math.PI / 2); // cap around b
+  arc(a[0], a[1], angle + Math.PI / 2); // cap around a
+  ring.push([ring[0][0], ring[0][1]]);
+  return ring;
 }
 
 /** Minimum distance from a point to any edge segment of a ring. */

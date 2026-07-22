@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildGraphSvg, collectSvgScene, primitivesToSvg } from "../src/graph/export_svg.js";
+import { smoothClosedPath } from "../src/graph/bubble_smoothing.js";
 import { DEFAULTS } from "../src/config.js";
 
 // ==========================================================================
@@ -504,7 +505,21 @@ describe("bubble groups", () => {
     { x: 100, y: 200 },
   ];
 
-  it("renders the body as a closed path with fill/stroke opacities and 2px outline", () => {
+  // Expected `d` built from the SAME control points the live canvas painter
+  // consumes (smoothClosedPath) — this IS the canvas/SVG parity assertion.
+  const fmt2 = (v) => String(Math.round(v * 100) / 100);
+  const smoothD = (ring) => {
+    const segments = smoothClosedPath(ring);
+    return (
+      `M ${fmt2(segments[0].x0)} ${fmt2(segments[0].y0)} ` +
+      segments
+        .map((s) => `C ${fmt2(s.c1x)} ${fmt2(s.c1y)} ${fmt2(s.c2x)} ${fmt2(s.c2y)} ${fmt2(s.x)} ${fmt2(s.y)}`)
+        .join(" ") +
+      " Z"
+    );
+  };
+
+  it("renders the body as a smoothed closed path with fill/stroke opacities and 2px outline", () => {
     const scene = makeScene();
 
     const svg = build(scene, {
@@ -519,28 +534,27 @@ describe("bubble groups", () => {
     });
 
     expect(svg).toContain(
-      '<path d="M 100 100 L 200 100 L 200 200 L 100 200 Z" fill="#e74c3c" fill-opacity="0.3" fill-rule="evenodd" stroke="#111111" stroke-width="2" stroke-opacity="0.8"/>',
+      `<path d="${smoothD(SQUARE)}" fill="#e74c3c" fill-opacity="0.3" fill-rule="evenodd" stroke="#111111" stroke-width="2" stroke-opacity="0.8"/>`,
     );
   });
 
-  it("renders avoid holes as extra even-odd subpaths", () => {
+  it("renders avoid holes as extra even-odd subpaths (same smoothed control points)", () => {
     const scene = makeScene();
+    const HOLE = [{ x: 140, y: 140 }, { x: 160, y: 140 }, { x: 160, y: 160 }, { x: 140, y: 160 }];
 
     const svg = build(scene, {
       bubbleGroups: [
         {
           group: "groupOne",
           points: SQUARE,
-          holes: [[{ x: 140, y: 140 }, { x: 160, y: 140 }, { x: 160, y: 160 }, { x: 140, y: 160 }]],
+          holes: [HOLE],
           opts: { fill: "#e74c3c", fillOpacity: 0.3, stroke: "#111111", strokeOpacity: 0.8 },
           defaults: {},
         },
       ],
     });
 
-    expect(svg).toContain(
-      'd="M 100 100 L 200 100 L 200 200 L 100 200 Z M 140 140 L 160 140 L 160 160 L 140 160 Z"',
-    );
+    expect(svg).toContain(`d="${smoothD(SQUARE)} ${smoothD(HOLE)}"`);
     expect(svg).toContain('fill-rule="evenodd"');
   });
 

@@ -56,7 +56,7 @@ let rafQueue = [];
 beforeEach(() => {
   rafQueue = [];
   vi.mocked(computeOutlineGeometry).mockReset();
-  globalThis.Path2D = class { moveTo() {} lineTo() {} closePath() {} };
+  globalThis.Path2D = class { moveTo() {} lineTo() {} bezierCurveTo() {} closePath() {} };
   globalThis.requestAnimationFrame = (cb) => { rafQueue.push(cb); return rafQueue.length; };
   globalThis.cancelAnimationFrame = () => {};
   if (!globalThis.window) globalThis.window = {};
