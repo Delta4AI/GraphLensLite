@@ -780,4 +780,54 @@ describe("DataTable import guards and position seeding", () => {
     expect(positions.get("C")).toEqual({ style: { x: 10, y: 20 } });
     expect(positions.has("D")).toBe(false);
   });
+
+  // End-to-end handleImportFile: real preview modal, stubbed parser/rebuild.
+  function setupImportFlow() {
+    document.body.innerHTML = "";
+    cache.ui.showLoading = vi.fn(async () => {});
+    cache.ui.hideLoading = vi.fn(async () => {});
+    cache.ui.success = vi.fn();
+    cache.io = { parseExcelToJson: vi.fn(async () => incomingMixedFixture()) };
+    cache.data.layouts = { Default: { positions: new Map() } };
+    cache.data.selectedLayout = "Default";
+    table.fileData = currentGraphFixture();
+    table.rebuildGraph = vi.fn(async () => {});
+    return { name: "extra.xlsx", arrayBuffer: async () => new ArrayBuffer(0) };
+  }
+
+  const waitForModal = () =>
+    vi.waitFor(() => {
+      if (!document.querySelector(".p-footer .p-button-primary")) {
+        throw new Error("preview modal not open yet");
+      }
+    });
+
+  it("applies the join mode chosen in the preview and reports ignored rows", async () => {
+    const file = setupImportFlow();
+    const done = table.handleImportFile(file);
+    await waitForModal();
+
+    const radio = document.querySelector('.merge-join-modes input[value="left"]');
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change"));
+    document.querySelector(".p-footer .p-button-primary").click();
+    await done;
+
+    const rebuilt = table.rebuildGraph.mock.calls[0][0];
+    expect(rebuilt.nodes.map((n) => n.id)).toEqual(["A", "B"]);
+    expect(rebuilt.edges.map((e) => e.id)).toEqual(["A::B"]);
+    expect(cache.ui.success.mock.calls[0][0]).toContain("3 unmatched file row(s) ignored");
+  });
+
+  it("does not touch the graph when the preview is canceled", async () => {
+    const file = setupImportFlow();
+    const done = table.handleImportFile(file);
+    await waitForModal();
+
+    document.querySelector(".p-footer .p-button-secondary").click();
+    await done;
+
+    expect(table.rebuildGraph).not.toHaveBeenCalled();
+    expect(cache.ui.info).toHaveBeenCalledWith("Import canceled");
+  });
 });

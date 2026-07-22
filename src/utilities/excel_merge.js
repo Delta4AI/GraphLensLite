@@ -299,6 +299,16 @@ function buildJoinModeRow(mode, checked, onSelect) {
   return label;
 }
 
+function buildJoinModePicker(selected, onSelect) {
+  const modes = el('div', 'merge-join-modes');
+  modes.setAttribute('role', 'radiogroup');
+  modes.setAttribute('aria-label', 'Import mode');
+  for (const mode of JOIN_MODES) {
+    modes.appendChild(buildJoinModeRow(mode, mode.value === selected, onSelect));
+  }
+  return modes;
+}
+
 /**
  * Show the import preview modal offering both join modes.
  *
@@ -322,18 +332,12 @@ function showMergePreview(plans, fileName) {
       importBtn.disabled = !plans[selected].stats.hasChanges;
     };
 
-    const modes = el('div', 'merge-join-modes');
-    modes.setAttribute('role', 'radiogroup');
-    modes.setAttribute('aria-label', 'Import mode');
-    for (const mode of JOIN_MODES) {
-      modes.appendChild(
-        buildJoinModeRow(mode, mode.value === selected, (value) => {
-          selected = value;
-          render();
-        })
-      );
-    }
-    content.appendChild(modes);
+    content.appendChild(
+      buildJoinModePicker(selected, (value) => {
+        selected = value;
+        render();
+      })
+    );
     content.appendChild(body);
     render();
 
