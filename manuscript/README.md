@@ -86,6 +86,22 @@ Uses the OUP `oup-authoring-template` class (`webpdf,contemporary,numbered`,
 numbered citations via `oup-plain.bst`). Set `\journaltitle` (and `\appnotes`)
 to the target venue at submission time.
 
+### Preprint / bioRxiv version
+
+```bash
+latexmk -pdf biorxiv
+```
+
+Output: `biorxiv.pdf`
+
+`biorxiv.tex` is a second driver that reuses `body.tex`, `abstract.tex`, and
+`keywords.tex` verbatim under a plain `article` class — no OUP template
+needed. Drops the journal-specific frontmatter (title/DOI/vol/issue, the
+received/revised/accepted dates, two-column styling); keeps numbered
+citations (`natbib` + `unsrtnat`) and line numbers. Edits to the shared prose
+flow to both PDFs. `\ORCID{}` is a no-op here (bioRxiv collects ORCIDs in its
+submission form).
+
 **The OUP class must be available.** It ships in recent TeX Live
 (`oup-authoring-template`); if `latexmk` reports the class missing, copy
 `oup-authoring-template.cls` and the `oup-*.bst` files from the OUP template
