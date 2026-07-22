@@ -2,12 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   nodeViewportRect,
   computeOutlinePoints,
+  computeOutlineGeometry,
   polygonSelfIntersects,
   outlineLabelAnchor,
   idsKey,
   positionsChecksum,
   styleKey,
 } from "../src/graph/bubble_geometry.js";
+import { smoothClosedPath, sampleSmoothedRing } from "../src/graph/bubble_smoothing.js";
 import { pointInPolygon } from "../src/graph/lasso_geometry.js";
 
 // ==========================================================================
@@ -102,34 +104,41 @@ describe("computeOutlinePoints", () => {
     expect(pointInPolygon({ x: 75, y: 50 }, outline)).toBe(true);
   });
 
-  describe("scale option (zoom-invariant influence field)", () => {
-    // The avoid-member scenario shrunk by the scale factor must keep its
-    // shape: members enclosed, avoid node excluded. Without scaling the
-    // influence constants, the fixed 50 px negative disc of the avoid node
-    // would swallow the shrunken members' field.
-    it.each([0.25, 0.1])("preserves member/avoid geometry rescaled by %f", (s) => {
+  describe("node-size-aware influence field", () => {
+    // The field derives from the group's MEAN MEMBER RADIUS (the rects carry
+    // the size information), so the same scene rescaled — different node
+    // sizes, or a zoomed-out reference viewport — keeps its shape with no
+    // scale hint: members enclosed, avoid node excluded. Sub-pixel radii are
+    // excluded here: the 1 px marching-grid floor cannot carve a 1 px avoid
+    // node (production ratio-1 radii are ≥ 7.5 px).
+    it.each([1, 0.25])("preserves member/avoid geometry rescaled by %f", (s) => {
       const members = [rectAt(50 * s, 100 * s, 10 * s), rectAt(250 * s, 100 * s, 10 * s)];
       const avoid = [rectAt(150 * s, 100 * s, 10 * s)];
-      const outline = computeOutlinePoints(members, avoid, { scale: s });
+      const outline = computeOutlinePoints(members, avoid);
       expect(outline.length).toBeGreaterThan(3);
       expect(pointInPolygon({ x: 50 * s, y: 100 * s }, outline)).toBe(true);
       expect(pointInPolygon({ x: 250 * s, y: 100 * s }, outline)).toBe(true);
       expect(pointInPolygon({ x: 150 * s, y: 100 * s }, outline)).toBe(false);
     });
 
+    // The legacy opts.scale hint is gone; passing it must not change the fit.
+    it("ignores a legacy scale option (field self-scales from the rects)", () => {
+      const members = [rectAt(10, 10, 5), rectAt(60, 30, 5)];
+      expect(computeOutlinePoints(members, [], { scale: 0.1 }))
+        .toEqual(computeOutlinePoints(members, []));
+    });
+
     // Regression: bubblesets-js sample(step) uses `step` as an array index
-    // stride, so a fractional OUTLINE_SAMPLE_STEP * scale used to index between
-    // points and return undefined, crashing bSplines()/simplify() with
-    // "Cannot read properties of undefined". These scales are the real zoom
-    // field factors (1/sqrt(camera.ratio)) that produce fractional 8*scale
-    // strides (e.g. 8*0.354 = 2.83) — the exact ones that froze the bubble
-    // canvas on zoom. They must produce a valid outline, never throw.
+    // stride — a fractional stride indexes between points and returns
+    // undefined, crashing bSplines()/simplify(). The stride is a constant
+    // integer now, but node sizes that used to produce fractional strides
+    // must keep producing valid outlines at any radius, never throw.
     it.each([0.354, 0.2, 0.7, 1.58, 2.3, 5])(
-      "does not throw and returns a hull at fractional-step scale %f",
+      "does not throw and returns a hull with node radii scaled by %f",
       (s) => {
         const members = [rectAt(0, 0, 20 * s), rectAt(20 * s, 0, 20 * s), rectAt(10 * s, 20 * s, 20 * s)];
         let outline;
-        expect(() => { outline = computeOutlinePoints(members, [], { scale: s }); }).not.toThrow();
+        expect(() => { outline = computeOutlinePoints(members, []); }).not.toThrow();
         expect(outline.length).toBeGreaterThan(3);
         expect(outline.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))).toBe(true);
       },
@@ -146,7 +155,7 @@ describe("computeOutlinePoints", () => {
       const s = 0.3;
       const members = [rectAt(0, 0, 12 * s), rectAt(300 * s, 0, 12 * s), rectAt(600 * s, 0, 12 * s)];
       const avoid = [rectAt(150 * s, 40 * s, 12 * s), rectAt(450 * s, -40 * s, 12 * s)];
-      const outline = computeOutlinePoints(members, avoid, { scale: s });
+      const outline = computeOutlinePoints(members, avoid);
       expect(outline.length).toBeGreaterThan(3);
       expect(polygonSelfIntersects(outline)).toBe(false);
       for (const m of members) {
@@ -154,12 +163,12 @@ describe("computeOutlinePoints", () => {
       }
     });
 
-    it("keeps a dense zoomed-out group intact where unscaled constants lose it", () => {
+    it("keeps a dense zoomed-out group intact (vanishing-outline repro)", () => {
       // Zoomed-out screen geometry: two 1 px members 6 px apart inside two
       // rings of 32 avoid nodes (the dense-graph repro for the vanishing
-      // outline). Unscaled, the avoid nodes' negative field corrupts the
-      // outline (a member ends up outside); scaled it hugs both members
-      // and excludes the ring.
+      // outline). With the absolute-pixel constants this collapsed or leaked
+      // the ring in; the size-aware field hugs both members AND excludes the
+      // ring with no scale hint at all.
       const members = [rectAt(0, 0, 1), rectAt(6, 0, 1)];
       const avoid = [];
       for (const radius of [14, 22]) {
@@ -169,16 +178,11 @@ describe("computeOutlinePoints", () => {
         }
       }
 
-      const unscaled = computeOutlinePoints(members, avoid);
-      const coversBoth = (outline) =>
-        outline.length > 0 &&
-        pointInPolygon({ x: 0, y: 0 }, outline) &&
-        pointInPolygon({ x: 6, y: 0 }, outline);
-      expect(coversBoth(unscaled)).toBe(false);
-
-      const scaled = computeOutlinePoints(members, avoid, { scale: 0.1 });
-      expect(coversBoth(scaled)).toBe(true);
-      expect(pointInPolygon({ x: 17, y: 0 }, scaled)).toBe(false);
+      const outline = computeOutlinePoints(members, avoid);
+      expect(outline.length).toBeGreaterThan(3);
+      expect(pointInPolygon({ x: 0, y: 0 }, outline)).toBe(true);
+      expect(pointInPolygon({ x: 6, y: 0 }, outline)).toBe(true);
+      expect(pointInPolygon({ x: 17, y: 0 }, outline)).toBe(false);
     });
   });
 });
@@ -362,5 +366,320 @@ describe("styleKey", () => {
 
   it("treats null and missing as equal (both paint via group defaults)", () => {
     expect(styleKey({ fill: null })).toBe(styleKey({}));
+  });
+});
+
+// ==========================================================================
+// Geometry knobs (padding / corridor) — user-tunable influence-field
+// multipliers, and node-size in the position checksum.
+// ==========================================================================
+
+const polygonArea = (points) => {
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    area += a.x * b.y - b.x * a.y;
+  }
+  return Math.abs(area / 2);
+};
+
+describe("computeOutlinePoints padding/corridor knobs", () => {
+  const pair = [rectAt(100, 100), rectAt(140, 100)];
+
+  it("padding < 1 shrinks the outline, > 1 grows it (still enclosing members)", () => {
+    const tight = computeOutlinePoints(pair, [], { padding: 0.5 });
+    const base = computeOutlinePoints(pair, [], {});
+    const loose = computeOutlinePoints(pair, [], { padding: 2 });
+    expect(polygonArea(tight)).toBeLessThan(polygonArea(base));
+    expect(polygonArea(base)).toBeLessThan(polygonArea(loose));
+    for (const outline of [tight, base, loose]) {
+      for (const m of pair) {
+        expect(pointInPolygon({ x: m.x + m.width / 2, y: m.y + m.height / 2 }, outline)).toBe(true);
+      }
+    }
+  });
+
+  it("corridor width scales the arm to an outlying member", () => {
+    const spread = [rectAt(50, 50), rectAt(400, 60)];
+    const thin = computeOutlinePoints(spread, [], { corridor: 0.5 });
+    const thick = computeOutlinePoints(spread, [], { corridor: 2.5 });
+    expect(polygonArea(thin)).toBeLessThan(polygonArea(thick));
+    for (const outline of [thin, thick]) {
+      for (const m of spread) {
+        expect(pointInPolygon({ x: m.x + m.width / 2, y: m.y + m.height / 2 }, outline)).toBe(true);
+      }
+    }
+  });
+
+  it("clamps out-of-range multipliers instead of collapsing the outline", () => {
+    expect(computeOutlinePoints(pair, [], { padding: 100 }))
+      .toEqual(computeOutlinePoints(pair, [], { padding: 4 }));
+    expect(computeOutlinePoints(pair, [], { padding: 0 }))
+      .toEqual(computeOutlinePoints(pair, [], {}));
+    expect(computeOutlinePoints(pair, [], { corridor: NaN }))
+      .toEqual(computeOutlinePoints(pair, [], {}));
+  });
+
+  it("styleKey invalidates on padding/corridor/avoidance changes", () => {
+    expect(styleKey({ padding: 1 })).not.toBe(styleKey({ padding: 1.5 }));
+    expect(styleKey({ corridor: 1 })).not.toBe(styleKey({ corridor: 2 }));
+    expect(styleKey({ avoidance: 1 })).not.toBe(styleKey({ avoidance: 0 }));
+  });
+});
+
+// Interior avoid holes: the field can only carve fjords from the boundary,
+// so a non-member fully INSIDE the hull gets a disc hole punched via polygon
+// difference (computeOutlineGeometry.holes; rendered even-odd).
+describe("computeOutlineGeometry avoid holes", () => {
+  // 8 members in a ring leave a covered pocket at (60,60); the avoid node
+  // sits in that pocket, fully interior to the hull.
+  const ringMembers = [
+    [0, 0], [60, 0], [120, 0], [0, 60], [120, 60], [0, 120], [60, 120], [120, 120],
+  ].map(([x, y]) => rectAt(x, y, 20));
+  const interiorAvoid = [rectAt(60, 60, 15)];
+
+  it("punches a hole around an interior non-member", () => {
+    const { outer, holes } = computeOutlineGeometry(ringMembers, interiorAvoid, {});
+    expect(pointInPolygon({ x: 60, y: 60 }, outer)).toBe(true); // interior of the OUTER ring
+    expect(holes.length).toBeGreaterThanOrEqual(1);
+    expect(holes.some((h) => pointInPolygon({ x: 60, y: 60 }, h))).toBe(true);
+  });
+
+  it("punches no holes at avoidance 0", () => {
+    const { holes } = computeOutlineGeometry(ringMembers, interiorAvoid, { avoidance: 0 });
+    expect(holes).toEqual([]);
+  });
+
+  it("wedged non-member gets a clearance-limited, body-hugging hole (no silent swallow)", () => {
+    // The (85,60) node is squeezed between members: the full r+gap disc would
+    // eat into a member's guaranteed clearance, so the hole falls back to the
+    // largest clearance-respecting radius — smaller than r+gap but still a
+    // visible carve (≥ 0.35 × its radius).
+    const { holes } = computeOutlineGeometry(ringMembers, [rectAt(85, 60, 15)], {});
+    expect(holes.length).toBe(1);
+    const radii = holes[0].map((p) => Math.hypot(p.x - 85, p.y - 60));
+    expect(Math.max(...radii)).toBeLessThan(15 + 20); // below the full r+gap disc
+    expect(Math.min(...radii)).toBeGreaterThanOrEqual(15 * 0.35);
+  });
+
+  it("fully-fused non-member (inside a member's clearance zone) stays covered", () => {
+    // At (100,60) even the minimum readable hole would violate the member
+    // guarantee — the documented ceiling: it stays covered.
+    const { holes } = computeOutlineGeometry(ringMembers, [rectAt(100, 60, 15)], {});
+    expect(holes).toEqual([]);
+  });
+
+  it("drops only the corridor-severing hole, keeping the others (per-disc fallback)", () => {
+    // A far member hangs off the ring by a thin arm; an avoid node ON the arm
+    // would sever it (its disc is wider than the corridor), while the pocket
+    // avoid node has a clean hole. The batch difference fails the one-ring
+    // guarantee, so the discs retry one by one: pocket hole survives, arm
+    // node stays covered, far member stays inside.
+    const members = [...ringMembers, rectAt(320, 60, 20)];
+    const pocket = rectAt(60, 60, 15);
+    const onArm = rectAt(225, 60, 15);
+    const { outer, holes } = computeOutlineGeometry(members, [pocket, onArm], {});
+    expect(holes.some((h) => pointInPolygon({ x: 60, y: 60 }, h))).toBe(true);
+    expect(holes.some((h) => pointInPolygon({ x: 225, y: 60 }, h))).toBe(false);
+    expect(pointInPolygon({ x: 320, y: 60 }, outer)).toBe(true);
+  });
+
+  it("computeOutlinePoints returns the same outer ring (holes dropped)", () => {
+    const geometry = computeOutlineGeometry(ringMembers, interiorAvoid, {});
+    expect(computeOutlinePoints(ringMembers, interiorAvoid, {})).toEqual(geometry.outer);
+  });
+});
+
+describe("computeOutlinePoints avoidance switch", () => {
+  // Two members with a non-member between them: avoidance ON routes the
+  // corridor around it (excluded); OFF (0) drops the negative field and the
+  // hull may cover it. Persisted numeric: any legacy value > 0 means ON.
+  const members = [rectAt(50, 100), rectAt(250, 100)];
+  const avoid = [rectAt(150, 100)];
+
+  it("avoidance 0 disables the negative field (hull covers the non-member)", () => {
+    const outline = computeOutlinePoints(members, avoid, { avoidance: 0 });
+    expect(pointInPolygon({ x: 50, y: 100 }, outline)).toBe(true);
+    expect(pointInPolygon({ x: 250, y: 100 }, outline)).toBe(true);
+    expect(pointInPolygon({ x: 150, y: 100 }, outline)).toBe(true);
+    // With the field off, ignoring avoid rects entirely gives the same hull.
+    expect(outline).toEqual(computeOutlinePoints(members, [], { avoidance: 0 }));
+  });
+
+  it("avoidance ON (default or any legacy value > 0) keeps the non-member excluded", () => {
+    for (const avoidance of [undefined, 1, 3]) {
+      const outline = computeOutlinePoints(members, avoid, { avoidance });
+      expect(pointInPolygon({ x: 50, y: 100 }, outline)).toBe(true);
+      expect(pointInPolygon({ x: 250, y: 100 }, outline)).toBe(true);
+      expect(pointInPolygon({ x: 150, y: 100 }, outline)).toBe(false);
+    }
+  });
+
+  it("normalizes every non-zero/invalid value to plain ON (boolean semantics)", () => {
+    const on = computeOutlinePoints(members, avoid, { avoidance: 1 });
+    expect(computeOutlinePoints(members, avoid, { avoidance: 3 })).toEqual(on);
+    expect(computeOutlinePoints(members, avoid, { avoidance: 100 })).toEqual(on);
+    expect(computeOutlinePoints(members, avoid, { avoidance: NaN })).toEqual(on);
+    expect(computeOutlinePoints(members, avoid, { avoidance: -5 }))
+      .toEqual(computeOutlinePoints(members, avoid, { avoidance: 0 }));
+  });
+});
+
+// Enclosure guarantee: bubblesets-js validates only member CENTERS, so
+// avoid-node pressure plus B-spline shrinkage could leave a member circle
+// clipped by its own hull (measured -12 px on the ringed scenario below).
+// computeOutlinePoints must union a padding disc for any grazed member so
+// every member circle sits fully inside the outline.
+describe("computeOutlinePoints member-enclosure guarantee", () => {
+  /** Signed clearance between a member circle and the outline: distance from
+   *  center to the nearest outline edge (negative when the center is outside)
+   *  minus the radius. >= 0 means the full circle is inside. */
+  const circleClearance = (x, y, r, outline) => {
+    let min = Infinity;
+    for (let i = 0; i < outline.length; i++) {
+      const a = outline[i];
+      const b = outline[(i + 1) % outline.length];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const lengthSq = dx * dx + dy * dy;
+      let t = lengthSq === 0 ? 0 : ((x - a.x) * dx + (y - a.y) * dy) / lengthSq;
+      t = Math.max(0, Math.min(1, t));
+      min = Math.min(min, Math.hypot(x - (a.x + t * dx), y - (a.y + t * dy)));
+    }
+    return (pointInPolygon({ x, y }, outline) ? min : -min) - r;
+  };
+
+  it("fully encloses a member ringed by avoid nodes (regression: clipped hull)", () => {
+    // Without the guarantee this exact layout clips the (380,110) member by
+    // ~12 px: the avoid ring squeezes the contour through the node body while
+    // its center stays inside (the only thing bubblesets-js checks).
+    const members = [rectAt(100, 100, 25), rectAt(160, 120, 25), rectAt(380, 110, 25)];
+    const avoid = [rectAt(430, 60, 25), rectAt(440, 160, 25), rectAt(330, 170, 25), rectAt(330, 50, 25)];
+    const outline = computeOutlinePoints(members, avoid);
+    for (const [x, y] of [[100, 100], [160, 120], [380, 110]]) {
+      expect(circleClearance(x, y, 25, outline)).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("keeps every member circle inside across dense mixed fields", () => {
+    const members = [rectAt(100, 100, 20), rectAt(150, 140, 20), rectAt(300, 120, 20), rectAt(420, 200, 20)];
+    const avoid = [
+      rectAt(200, 80, 20), rectAt(240, 140, 20), rectAt(360, 90, 20), rectAt(350, 180, 20),
+      rectAt(460, 140, 20), rectAt(120, 180, 20), rectAt(470, 260, 20),
+    ];
+    const outline = computeOutlinePoints(members, avoid);
+    for (const m of members) {
+      const r = m.width / 2;
+      expect(circleClearance(m.x + r, m.y + r, r, outline)).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("repaired outlines stay simple polygons (no self-intersections)", () => {
+    const members = [rectAt(100, 100, 25), rectAt(160, 120, 25), rectAt(380, 110, 25)];
+    const avoid = [rectAt(430, 60, 25), rectAt(440, 160, 25), rectAt(330, 170, 25), rectAt(330, 50, 25)];
+    const outline = computeOutlinePoints(members, avoid);
+    expect(outline.length).toBeGreaterThan(3);
+    expect(polygonSelfIntersects(outline)).toBe(false);
+  });
+
+  it("connects members the field lost entirely (ultra-low padding, one ring)", () => {
+    // At padding 0.1 the influence field is near grid resolution: distant
+    // members disconnect and their repair discs float beside the main hull.
+    // The union must come back as ONE simple ring (capsule links) that still
+    // encloses every member — this exact layout used to drop 5 of 10 members.
+    // Clearance is measured against the SMOOTHED curve (what the painters
+    // render): the polygon is math truth, the curve is visual truth.
+    const spots = [
+      [250, 200], [300, 180], [280, 250], [220, 270], [340, 230],
+      [310, 300], [260, 340], [370, 170], [200, 210], [230, 620],
+    ];
+    const members = spots.map(([x, y]) => rectAt(x, y, 9));
+    const outline = computeOutlinePoints(members, [], { padding: 0.1, corridor: 0.25 });
+    expect(outline.length).toBeGreaterThan(3);
+    expect(polygonSelfIntersects(outline)).toBe(false);
+    const curve = sampleSmoothedRing(outline);
+    for (const [x, y] of spots) {
+      expect(circleClearance(x, y, 9, curve)).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("guarantee holds for small node radii (zoomed-out reference fit)", () => {
+    const s = 0.25;
+    const members = [rectAt(100 * s, 100 * s, 25 * s), rectAt(160 * s, 120 * s, 25 * s), rectAt(380 * s, 110 * s, 25 * s)];
+    const avoid = [rectAt(430 * s, 60 * s, 25 * s), rectAt(440 * s, 160 * s, 25 * s), rectAt(330 * s, 170 * s, 25 * s), rectAt(330 * s, 50 * s, 25 * s)];
+    const outline = computeOutlinePoints(members, avoid);
+    for (const m of members) {
+      const r = m.width / 2;
+      expect(circleClearance(m.x + r, m.y + r, r, outline)).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
+
+// The painters render rings through smoothClosedPath (Catmull-Rom → cubic
+// Bézier, tension 1/6); both the canvas layer and the SVG export consume the
+// same control points, and the enclosure guarantee measures against the
+// sampled curve.
+describe("smoothClosedPath", () => {
+  const square = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 100, y: 100 },
+    { x: 0, y: 100 },
+  ];
+
+  it("returns null for rings too small to smooth", () => {
+    expect(smoothClosedPath([])).toBeNull();
+    expect(smoothClosedPath([{ x: 0, y: 0 }, { x: 1, y: 1 }])).toBeNull();
+  });
+
+  it("emits one segment per vertex, each starting where the previous ended", () => {
+    const segments = smoothClosedPath(square);
+    expect(segments).toHaveLength(4);
+    for (let i = 0; i < segments.length; i++) {
+      const next = segments[(i + 1) % segments.length];
+      expect(segments[i].x).toBe(next.x0);
+      expect(segments[i].y).toBe(next.y0);
+    }
+  });
+
+  it("joins segments C1-continuously (tangent in equals tangent out at every vertex)", () => {
+    const segments = smoothClosedPath(square);
+    for (let i = 0; i < segments.length; i++) {
+      const prev = segments[(i - 1 + segments.length) % segments.length];
+      const s = segments[i];
+      // Uniform Catmull-Rom: outgoing (c1 − p1) and incoming (p1 − c2_prev)
+      // control offsets are both (p2 − p0)/6.
+      expect(s.c1x - s.x0).toBeCloseTo(prev.x - prev.c2x, 10);
+      expect(s.c1y - s.y0).toBeCloseTo(prev.y - prev.c2y, 10);
+    }
+  });
+
+  it("is deterministic and tolerates a duplicated closing vertex", () => {
+    const closed = [...square, { x: 0, y: 0 }];
+    expect(smoothClosedPath(closed)).toEqual(smoothClosedPath(square));
+    expect(smoothClosedPath(square)).toEqual(smoothClosedPath(square));
+  });
+
+  it("sampleSmoothedRing reproduces each vertex at t=0 and densifies between", () => {
+    const sampled = sampleSmoothedRing(square);
+    expect(sampled.length).toBe(square.length * 4);
+    for (const v of square) {
+      expect(sampled.some((p) => p.x === v.x && p.y === v.y)).toBe(true);
+    }
+  });
+
+});
+
+describe("positionsChecksum node-size fold", () => {
+  it("changes when a member's on-screen radius changes (same positions)", () => {
+    const small = [{ x: 1, y: 2, s: 5 }, { x: 3, y: 4, s: 5 }];
+    const grown = [{ x: 1, y: 2, s: 5 }, { x: 3, y: 4, s: 9 }];
+    expect(positionsChecksum(grown)).not.toBe(positionsChecksum(small));
+  });
+
+  it("treats missing size as stable (legacy point arrays keep working)", () => {
+    const pts = [{ x: 1, y: 2 }, { x: 3, y: 4 }];
+    expect(positionsChecksum(pts)).toBe(positionsChecksum(pts.map((p) => ({ ...p }))));
   });
 });

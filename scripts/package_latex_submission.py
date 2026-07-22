@@ -135,13 +135,12 @@ def clean_build_artifacts(work_dir: Path) -> None:
 
 def main() -> None:
     venue = pick_venue()
-    venue_dir = MANUSCRIPT / venue
     print(f"Packaging '{venue}' submission …\n")
 
     files = collect_files(venue)
     missing = [src for src, _ in files if not src.exists()]
     if missing:
-        die(f"Missing files:\n  " + "\n  ".join(str(p) for p in missing))
+        die("Missing files:\n  " + "\n  ".join(str(p) for p in missing))
 
     # 1. Create temp directory and copy files
     tmp = Path(tempfile.mkdtemp(prefix="gll-submission-"))
@@ -152,10 +151,10 @@ def main() -> None:
 
     # 2. Flatten paths in main.tex
     flatten_main_tex(tmp / "main.tex")
-    print(f"\n  Flattened paths in main.tex")
+    print("\n  Flattened paths in main.tex")
 
     # 3. Compile test PDF
-    print(f"\n  Compiling test PDF …")
+    print("\n  Compiling test PDF …")
     pdf = compile_pdf(tmp)
     print(f"  OK — {pdf.stat().st_size / 1024:.0f} KB\n")
 
@@ -181,7 +180,7 @@ def main() -> None:
     shutil.rmtree(tmp)
 
     print(f"\n  Created {final_zip.relative_to(REPO_ROOT)} ({size_mb:.1f} MB)")
-    print(f"  Temp directory removed.")
+    print("  Temp directory removed.")
 
 
 if __name__ == "__main__":

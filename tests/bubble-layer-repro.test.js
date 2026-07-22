@@ -105,6 +105,9 @@ class FakePath2D {
   constructor() { this.points = []; }
   moveTo(x, y) { this.points.push({ x, y }); }
   lineTo(x, y) { this.points.push({ x, y }); }
+  // Record the segment endpoint (= original polygon vertex) — control points
+  // are painter detail.
+  bezierCurveTo(c1x, c1y, c2x, c2y, x, y) { this.points.push({ x, y }); }
   closePath() {}
 }
 
@@ -168,9 +171,11 @@ describe("BubbleSetLayer — zoom reprojection (symptoms 1-3)", () => {
 
     // ... and the drawn points must equal the cached graph points reprojected
     // at the new camera (same cache, just reprojected — never re-fitted).
+    // The curve painter records moveTo(start) + one endpoint per segment, so
+    // the ring closes back onto its first vertex (length + 1).
     const expected = layer.outlines.get("groupOne").graphPoints.map((g) => sigma.graphToViewport(g));
-    expect(pointsAt04.length).toBe(expected.length);
-    pointsAt04.forEach((p, i) => {
+    expect(pointsAt04.length).toBe(expected.length + 1);
+    pointsAt04.slice(0, -1).forEach((p, i) => {
       expect(p.x).toBeCloseTo(expected[i].x, 5);
       expect(p.y).toBeCloseTo(expected[i].y, 5);
     });
@@ -193,7 +198,9 @@ describe("BubbleSetLayer — zoom reprojection (symptoms 1-3)", () => {
     expect(filledPaths.length, "hull stays drawn during a pan").toBeGreaterThan(before);
     const drawn = filledPaths.at(-1);
     const expected = layer.outlines.get("groupOne").graphPoints.map((g) => sigma.graphToViewport(g));
-    drawn.forEach((p, i) => {
+    // moveTo(start) + per-segment endpoints: the last point closes the ring.
+    expect(drawn.length).toBe(expected.length + 1);
+    drawn.slice(0, -1).forEach((p, i) => {
       expect(p.x).toBeCloseTo(expected[i].x, 5);
       expect(p.y).toBeCloseTo(expected[i].y, 5);
     });
