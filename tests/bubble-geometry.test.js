@@ -470,6 +470,21 @@ describe("computeOutlineGeometry avoid holes", () => {
     expect(holes).toEqual([]);
   });
 
+  it("drops only the corridor-severing hole, keeping the others (per-disc fallback)", () => {
+    // A far member hangs off the ring by a thin arm; an avoid node ON the arm
+    // would sever it (its disc is wider than the corridor), while the pocket
+    // avoid node has a clean hole. The batch difference fails the one-ring
+    // guarantee, so the discs retry one by one: pocket hole survives, arm
+    // node stays covered, far member stays inside.
+    const members = [...ringMembers, rectAt(320, 60, 20)];
+    const pocket = rectAt(60, 60, 15);
+    const onArm = rectAt(225, 60, 15);
+    const { outer, holes } = computeOutlineGeometry(members, [pocket, onArm], {});
+    expect(holes.some((h) => pointInPolygon({ x: 60, y: 60 }, h))).toBe(true);
+    expect(holes.some((h) => pointInPolygon({ x: 225, y: 60 }, h))).toBe(false);
+    expect(pointInPolygon({ x: 320, y: 60 }, outer)).toBe(true);
+  });
+
   it("computeOutlinePoints returns the same outer ring (holes dropped)", () => {
     const geometry = computeOutlineGeometry(ringMembers, interiorAvoid, {});
     expect(computeOutlinePoints(ringMembers, interiorAvoid, {})).toEqual(geometry.outer);

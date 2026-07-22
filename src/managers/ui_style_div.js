@@ -1211,7 +1211,7 @@ function createStyleDiv(cache) {
       appendLabel(rowPadding, "Padding",
         "How far the bubble body extends past its member nodes — lower for a tighter hug, higher for more breathing room.");
       createNumericalSlider(rowPadding, `Bubble Set ${group} Padding`, bs.padding ?? 1,
-        {min: 0.05, max: 3, step: 0.05},
+        {min: 0.01, max: 3, step: 0.01},
         `How far bubble set ${tabIndex} extends past its member nodes.`, false);
 
       // Corridor Width (virtual-edge influence field multiplier)
@@ -1219,7 +1219,7 @@ function createStyleDiv(cache) {
       appendLabel(rowCorridor, "Corridor Width",
         "Thickness of the connecting arms that reach outlying member nodes.");
       createNumericalSlider(rowCorridor, `Bubble Set ${group} Corridor Width`, bs.corridor ?? 1,
-        {min: 0.05, max: 3, step: 0.05},
+        {min: 0.01, max: 3, step: 0.01},
         `Thickness of bubble set ${tabIndex}'s connecting arms to outlying members.`, false);
 
       // Avoidance (non-member field on/off; persisted numeric 0/1 for

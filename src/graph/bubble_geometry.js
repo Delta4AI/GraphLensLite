@@ -62,7 +62,10 @@ const FIELD_PIXEL_GROUP_RATIO = 4 / REFERENCE_NODE_RADIUS;
 // clearance for virtual edges, and scaling it with the corridor knob made
 // wider corridors also REROUTE around avoid nodes in long detours that
 // painted as phantom lobes in empty space.
-const GEOMETRY_MULTIPLIER_MIN = 0.05;
+// Min is near-zero on purpose: the resolution floors below keep every field
+// radius at grid scale, and the enclosure guarantee rebuilds whatever the
+// field loses — so "as tight as it gets" is a valid, safe user choice.
+const GEOMETRY_MULTIPLIER_MIN = 0.01;
 const GEOMETRY_MULTIPLIER_MAX = 4;
 // bubblesets-js' own default non-member (negative) energy factor. Avoidance
 // is a SWITCH, not a multiplier: above ~1× the library's marching iteration
@@ -259,9 +262,11 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
  * the field's fjord job); each disc is clipped so it never eats into a
  * member's guaranteed clearance — a squeezed disc hugs the node body rather
  * than vanishing, and is only skipped below HOLE_MIN_RADIUS_RATIO of the
- * node (fused into a member's clearance zone). If the difference would split
- * the hull so that a member center leaves the largest piece, the holes are
- * dropped wholesale — the one-ring member guarantee outranks avoidance.
+ * node (fused into a member's clearance zone). If the batch difference would
+ * split the hull so that a member center leaves the largest piece, the discs
+ * are retried ONE BY ONE and only the offenders dropped — the one-ring
+ * member guarantee outranks avoidance, but one bad hole must not silently
+ * swallow every other carve.
  *
  * @param {Array<{x: number, y: number}>} outer  simple hull ring
  * @param {Array<{x, y, width, height}>} memberRects
@@ -290,23 +295,48 @@ function carveAvoidHoles(outer, memberRects, avoidRects, gapPx, padPx) {
     discs.push([discRing(cx, cy, holeR)]);
   }
   if (discs.length === 0) return unholed;
+  const batch = subtractHoleDiscs(unholed, memberRects, discs);
+  if (batch) return batch;
+  // The batch severed a corridor (or the clipper failed): retry disc by disc
+  // so only the offending holes are dropped, not all of them.
+  let carved = unholed;
+  for (const disc of discs) {
+    carved = subtractHoleDiscs(carved, memberRects, [disc]) ?? carved;
+  }
+  return carved;
+}
+
+/**
+ * Subtract hole discs from a {outer, holes} geometry via polygon difference,
+ * keeping the largest resulting piece. Null when the result would violate
+ * the one-ring member guarantee (a member center leaves the largest piece,
+ * the ring collapses) or the clipper throws — callers treat null as "these
+ * discs cannot be applied".
+ *
+ * @param {{outer: Array<{x,y}>, holes: Array<Array<{x,y}>>}} geometry
+ * @param {Array<{x, y, width, height}>} memberRects
+ * @param {Array<Array<Array<[number, number]>>>} discs  clip-ready disc rings
+ * @returns {{outer: Array<{x,y}>, holes: Array<Array<{x,y}>>}|null}
+ */
+function subtractHoleDiscs(geometry, memberRects, discs) {
   let result;
   try {
-    result = polygonClipping.difference([toClipRing(outer)], ...discs);
+    result = polygonClipping.difference(
+      [toClipRing(geometry.outer), ...geometry.holes.map(toClipRing)],
+      ...discs
+    );
   } catch {
-    return unholed;
+    return null;
   }
-  if (!result || result.length === 0) return unholed;
+  if (!result || result.length === 0) return null;
   const largest = [...result].sort(
     (a, b) => Math.abs(ringSignedArea(b[0])) - Math.abs(ringSignedArea(a[0]))
   )[0];
   const newOuter = largest[0].slice(0, -1).map(([x, y]) => ({ x, y }));
-  if (newOuter.length < 3) return unholed;
-  // A hole chain may have severed a corridor: every member center must still
-  // live in the surviving piece, else avoidance loses to the guarantee.
+  if (newOuter.length < 3) return null;
   for (const m of memberRects) {
     const c = { x: m.x + m.width / 2, y: m.y + m.height / 2 };
-    if (!pointInPolygon(c, newOuter)) return unholed;
+    if (!pointInPolygon(c, newOuter)) return null;
   }
   const holes = largest
     .slice(1)
