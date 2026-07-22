@@ -1056,9 +1056,14 @@ class DataTable {
     }
     if (!incoming) return;
 
-    const plan = computeMergePlan(this.fileData, incoming);
-    const confirmed = await showMergePreview(plan, file.name);
-    if (!confirmed) {
+    // Both plans up front: computeMergePlan is pure and cheap, so the modal
+    // toggles between ready results without async machinery.
+    const plans = {
+      outer: computeMergePlan(this.fileData, incoming),
+      left: computeMergePlan(this.fileData, incoming, { joinMode: 'left' }),
+    };
+    const plan = await showMergePreview(plans, file.name);
+    if (!plan) {
       this.cache.ui.info('Import canceled');
       return;
     }
@@ -1072,9 +1077,11 @@ class DataTable {
         selectedLayout: this.cache.data.selectedLayout,
       });
       const s = plan.stats;
+      const ignored = s.ignoredNodes.length + s.ignoredEdges.length;
       this.cache.ui.success(
         `Imported "${file.name}": ${s.nodes.added.length} new / ${s.nodes.modified.length} updated nodes, ` +
-          `${s.edges.added.length} new / ${s.edges.modified.length} updated edges.`
+          `${s.edges.added.length} new / ${s.edges.modified.length} updated edges.` +
+          (ignored > 0 ? ` ${ignored} unmatched file row(s) ignored.` : '')
       );
     } catch (err) {
       this.cache.ui.error(`Error merging Excel file: ${err}`);
@@ -1477,7 +1484,7 @@ class DataTable {
   <li><span class="tooltip-dummy-buttons blue"><strong>+</strong>&nbsp;Node</span> — Create a new node in the graph</li>
   <li><span class="tooltip-dummy-buttons blue"><strong>+</strong>&nbsp;Edge</span> — Create a new edge between existing nodes</li>
   <li><span class="tooltip-dummy-buttons blue"><strong>+</strong>&nbsp;Column</span> — Add a new property column to the table</li>
-  <li><span class="tooltip-dummy-buttons green">⤒ Import</span> — Merge an Excel file into the loaded graph: extend existing nodes/edges with new columns or values, or add entirely new ones — a preview shows what changes before anything is applied</li>
+  <li><span class="tooltip-dummy-buttons green">⤒ Import</span> — Merge an Excel file into the loaded graph: extend existing nodes/edges with new columns or values, and either add new ones too ("Extend &amp; add") or ignore unmatched file rows ("Extend existing only") — a preview shows what changes before anything is applied</li>
   <li><span class="tooltip-dummy-buttons green">⤓ Export</span> — Save current view as an Excel file</li>
 </ul>
 

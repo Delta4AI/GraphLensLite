@@ -4,6 +4,21 @@ import { Popup } from './popup.js';
 // Cap the id lists rendered in the preview modal; full counts are always shown.
 const MAX_PREVIEW_IDS = 50;
 
+// Join modes offered in the import preview. 'outer' upserts (default);
+// 'left' only enriches matched rows and ignores unmatched file rows.
+const JOIN_MODES = [
+  {
+    value: 'outer',
+    label: 'Extend & add (full outer join)',
+    description: 'Update matching nodes/edges and add new ones from the file.',
+  },
+  {
+    value: 'left',
+    label: 'Extend existing only (left join)',
+    description: 'Update matching nodes/edges; rows in the file without a match in the graph are ignored.',
+  },
+];
+
 function headerLabel(header) {
   return header.subGroup === CFG.EXCEL_UNCATEGORIZED_SUBHEADER
     ? header.key
@@ -103,11 +118,29 @@ function mergeElements(currentList, incomingList) {
  *
  * @param {Object} current - { nodes, edges, nodeDataHeaders, edgeDataHeaders }
  * @param {Object} incoming - parseExcelToJson result (merge mode)
+ * @param {Object} [options]
+ * @param {'outer'|'left'} [options.joinMode='outer'] - 'outer' upserts;
+ *   'left' only enriches matched rows and ignores unmatched file rows (which
+ *   also drops any incoming edge onto a dropped new node — no dangling edges)
  * @returns {{fileData: Object, stats: Object}} merged fileData plus preview stats
  */
-function computeMergePlan(current, incoming) {
-  const nodes = mergeElements(current.nodes || [], incoming.nodes);
-  const edges = mergeElements(current.edges || [], incoming.edges);
+function computeMergePlan(current, incoming, { joinMode = 'outer' } = {}) {
+  let incomingNodes = incoming.nodes || [];
+  let incomingEdges = incoming.edges || [];
+  const ignoredNodes = [];
+  const ignoredEdges = [];
+  if (joinMode === 'left') {
+    const idsOf = (list) => new Set((list || []).map((el) => String(el.id)));
+    const nodeIds = idsOf(current.nodes);
+    const edgeIds = idsOf(current.edges);
+    ignoredNodes.push(...incomingNodes.filter((n) => !nodeIds.has(String(n.id))).map((n) => String(n.id)));
+    ignoredEdges.push(...incomingEdges.filter((e) => !edgeIds.has(String(e.id))).map((e) => String(e.id)));
+    incomingNodes = incomingNodes.filter((n) => nodeIds.has(String(n.id)));
+    incomingEdges = incomingEdges.filter((e) => edgeIds.has(String(e.id)));
+  }
+
+  const nodes = mergeElements(current.nodes || [], incomingNodes);
+  const edges = mergeElements(current.edges || [], incomingEdges);
   const nodeHeaders = mergeHeaders(current.nodeDataHeaders || [], incoming.nodeDataHeaders);
   const edgeHeaders = mergeHeaders(current.edgeDataHeaders || [], incoming.edgeDataHeaders);
 
@@ -127,10 +160,13 @@ function computeMergePlan(current, incoming) {
       edgeDataHeaders: edgeHeaders.headers,
     },
     stats: {
+      joinMode,
       nodes: { added: nodes.added, modified: nodes.modified, unchanged: nodes.matchedUnchanged },
       edges: { added: edges.added, modified: edges.modified, unchanged: edges.matchedUnchanged },
       newNodeColumns: nodeHeaders.added,
       newEdgeColumns: edgeHeaders.added,
+      ignoredNodes,
+      ignoredEdges,
       skippedNodeRows: incoming.skippedNodeRows || 0,
       skippedEdgeRows: incoming.skippedEdgeRows || 0,
       hasChanges,
@@ -184,6 +220,12 @@ function appendColumnsAndNotes(content, stats) {
         `match the current graph and stay unchanged.`
     );
   }
+  if (stats.ignoredNodes?.length > 0 || stats.ignoredEdges?.length > 0) {
+    notes.push(
+      `${stats.ignoredNodes.length} node row(s) and ${stats.ignoredEdges.length} edge row(s) ` +
+        `have no match in the graph and will be ignored.`
+    );
+  }
   if (stats.skippedNodeRows > 0 || stats.skippedEdgeRows > 0) {
     notes.push(
       `${stats.skippedNodeRows} node row(s) and ${stats.skippedEdgeRows} edge row(s) ` +
@@ -193,9 +235,10 @@ function appendColumnsAndNotes(content, stats) {
   notes.forEach((note) => content.appendChild(el('div', 'merge-preview-note', note)));
 }
 
-function buildMergePreviewContent(stats, fileName) {
-  const content = el('div', 'merge-preview');
-  content.appendChild(el('div', 'merge-preview-file', `📄 ${fileName}`));
+// Everything below the file name / mode picker: stat grid, columns, notes,
+// id lists and the warning. Re-rendered by the modal when the mode toggles.
+function buildStatsBody(stats) {
+  const content = el('div', 'merge-preview-body');
 
   const grid = el('div', 'merge-preview-grid');
   grid.appendChild(statTile(stats.nodes.added.length, 'New nodes', 'add'));
@@ -233,21 +276,67 @@ function buildMergePreviewContent(stats, fileName) {
   return content;
 }
 
-/**
- * Show the import preview modal for a computed merge plan.
- *
- * @param {Object} plan - computeMergePlan result
- * @param {string} fileName - name of the imported file
- * @returns {Promise<boolean>} true when the user confirms the import
- */
-function showMergePreview(plan, fileName) {
-  return new Promise((resolve) => {
-    const content = buildMergePreviewContent(plan.stats, fileName);
+function buildMergePreviewContent(stats, fileName) {
+  const content = el('div', 'merge-preview');
+  content.appendChild(el('div', 'merge-preview-file', `📄 ${fileName}`));
+  content.appendChild(buildStatsBody(stats));
+  return content;
+}
 
+function buildJoinModeRow(mode, checked, onSelect) {
+  const label = el('label', 'merge-join-mode');
+  const radio = el('input');
+  radio.type = 'radio';
+  radio.name = 'merge-join-mode';
+  radio.value = mode.value;
+  radio.checked = checked;
+  radio.addEventListener('change', () => onSelect(mode.value));
+  const text = el('span', 'merge-join-mode-text');
+  text.appendChild(el('strong', null, mode.label));
+  text.appendChild(document.createTextNode(` — ${mode.description}`));
+  label.appendChild(radio);
+  label.appendChild(text);
+  return label;
+}
+
+/**
+ * Show the import preview modal offering both join modes.
+ *
+ * @param {{outer: Object, left: Object}} plans - computeMergePlan results per mode
+ * @param {string} fileName - name of the imported file
+ * @returns {Promise<Object|null>} the chosen plan on Import, null on cancel
+ */
+function showMergePreview(plans, fileName) {
+  return new Promise((resolve) => {
+    const content = el('div', 'merge-preview');
+    content.appendChild(el('div', 'merge-preview-file', `📄 ${fileName}`));
+
+    let selected = 'outer';
+    const body = el('div');
     const footer = el('div', 'p-footer');
     const cancelBtn = el('button', 'p-button p-button-secondary', 'Cancel');
     const importBtn = el('button', 'p-button p-button-primary', '✔ Import');
-    importBtn.disabled = !plan.stats.hasChanges;
+
+    const render = () => {
+      body.replaceChildren(buildStatsBody(plans[selected].stats));
+      importBtn.disabled = !plans[selected].stats.hasChanges;
+    };
+
+    const modes = el('div', 'merge-join-modes');
+    modes.setAttribute('role', 'radiogroup');
+    modes.setAttribute('aria-label', 'Import mode');
+    for (const mode of JOIN_MODES) {
+      modes.appendChild(
+        buildJoinModeRow(mode, mode.value === selected, (value) => {
+          selected = value;
+          render();
+        })
+      );
+    }
+    content.appendChild(modes);
+    content.appendChild(body);
+    render();
+
     footer.appendChild(cancelBtn);
     footer.appendChild(importBtn);
     content.appendChild(footer);
@@ -259,22 +348,22 @@ function showMergePreview(plan, fileName) {
       showFullscreenButton: false,
       closeOnClickOutside: false,
       onClose: () => {
-        if (!isResolved) resolve(false);
+        if (!isResolved) resolve(null);
       },
     });
 
     importBtn.addEventListener('click', () => {
       isResolved = true;
       popup.close();
-      resolve(true);
+      resolve(plans[selected]);
     });
     cancelBtn.addEventListener('click', () => {
       isResolved = true;
       popup.close();
-      resolve(false);
+      resolve(null);
     });
 
-    setTimeout(() => (plan.stats.hasChanges ? importBtn : cancelBtn).focus(), 0);
+    setTimeout(() => (plans.outer.stats.hasChanges ? importBtn : cancelBtn).focus(), 0);
   });
 }
 

@@ -5913,3 +5913,26 @@ input:checked + .slider:before {
     max-height: 120px;
     overflow-y: auto;
 }
+
+.merge-join-modes {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.merge-join-mode {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.merge-join-mode-text {
+    color: var(--text-muted);
+}
+
+.merge-join-mode-text strong {
+    color: var(--text);
+}

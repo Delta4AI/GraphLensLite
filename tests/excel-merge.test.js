@@ -91,6 +91,42 @@ function currentGraphFixture() {
   };
 }
 
+// Incoming data mixing matched updates (node A, edge A::B) with unmatched
+// rows (node C, edge A::C onto the dropped node, edge C::D between two
+// dropped nodes) — exercises both join modes.
+function incomingMixedFixture() {
+  return {
+    nodes: [
+      {
+        id: "A",
+        style: {},
+        D4Data: { [NODE_HEADER]: { "group A": { "Feature Y": 5 } } },
+      },
+      {
+        id: "C",
+        style: {},
+        D4Data: { [NODE_HEADER]: { "group A": { "Feature Y": 3 } } },
+      },
+    ],
+    edges: [
+      {
+        id: "A::B",
+        source: "A",
+        target: "B",
+        style: {},
+        D4Data: { [EDGE_HEADER]: { "group X": { Weight: 0.9 } } },
+      },
+      { id: "A::C", source: "A", target: "C", style: {}, D4Data: {} },
+      { id: "C::D", source: "C", target: "D", style: {}, D4Data: {} },
+    ],
+    nodeDataHeaders: [
+      { subGroup: "group A", key: "Feature X" },
+      { subGroup: "group A", key: "Feature Y" },
+    ],
+    edgeDataHeaders: [{ subGroup: "group X", key: "Weight" }],
+  };
+}
+
 // --------------------------------------------------------------------------
 // computeMergePlan
 // --------------------------------------------------------------------------
@@ -312,6 +348,88 @@ describe("computeMergePlan", () => {
     const plan = computeMergePlan(current, incoming);
     expect(plan.stats.newNodeColumns).toEqual(["Plain"]);
   });
+
+  it("defaults to outer join with empty ignored lists", () => {
+    const plan = computeMergePlan(currentGraphFixture(), incomingMixedFixture());
+
+    expect(plan.stats.joinMode).toBe("outer");
+    expect(plan.stats.ignoredNodes).toEqual([]);
+    expect(plan.stats.ignoredEdges).toEqual([]);
+    expect(plan.stats.nodes.added).toEqual(["C"]);
+    expect(plan.stats.edges.added).toEqual(["A::C", "C::D"]);
+  });
+});
+
+// --------------------------------------------------------------------------
+// computeMergePlan — left join ("Extend existing only")
+// --------------------------------------------------------------------------
+
+describe("computeMergePlan left join", () => {
+  it("drops unmatched nodes and their dependent edges, keeps matched updates", () => {
+    const plan = computeMergePlan(currentGraphFixture(), incomingMixedFixture(), {
+      joinMode: "left",
+    });
+
+    expect(plan.stats.joinMode).toBe("left");
+    expect(plan.stats.nodes.added).toEqual([]);
+    expect(plan.stats.edges.added).toEqual([]);
+    expect(plan.stats.nodes.modified).toEqual(["A"]);
+    expect(plan.stats.edges.modified).toEqual(["A::B"]);
+    expect(plan.stats.ignoredNodes).toEqual(["C"]);
+    expect(plan.stats.ignoredEdges).toEqual(["A::C", "C::D"]);
+    expect(plan.stats.hasChanges).toBe(true);
+
+    expect(plan.fileData.nodes.map((n) => n.id)).toEqual(["A", "B"]);
+    expect(plan.fileData.edges.map((e) => e.id)).toEqual(["A::B"]);
+    // No dangling edges: every edge endpoint exists among the merged nodes
+    const nodeIds = new Set(plan.fileData.nodes.map((n) => String(n.id)));
+    for (const edge of plan.fileData.edges) {
+      expect(nodeIds.has(String(edge.source))).toBe(true);
+      expect(nodeIds.has(String(edge.target))).toBe(true);
+    }
+  });
+
+  it("still applies new property columns to matched rows", () => {
+    const plan = computeMergePlan(currentGraphFixture(), incomingMixedFixture(), {
+      joinMode: "left",
+    });
+
+    expect(plan.stats.newNodeColumns).toEqual(["Feature Y [group A]"]);
+    const mergedA = plan.fileData.nodes.find((n) => n.id === "A");
+    expect(mergedA.D4Data[NODE_HEADER]["group A"]).toEqual({
+      "Feature X": 1,
+      "Feature Y": 5,
+    });
+  });
+
+  it("reports no changes when the file only contains unmatched rows", () => {
+    const incoming = {
+      nodes: [{ id: "Z", style: {}, D4Data: {} }],
+      edges: [{ id: "Z::A", source: "Z", target: "A", style: {}, D4Data: {} }],
+      nodeDataHeaders: [],
+      edgeDataHeaders: [],
+    };
+
+    const outer = computeMergePlan(currentGraphFixture(), incoming);
+    const left = computeMergePlan(currentGraphFixture(), incoming, { joinMode: "left" });
+
+    expect(outer.stats.hasChanges).toBe(true);
+    expect(left.stats.hasChanges).toBe(false);
+    expect(left.stats.ignoredNodes).toEqual(["Z"]);
+    expect(left.stats.ignoredEdges).toEqual(["Z::A"]);
+  });
+
+  it("does not mutate its inputs in left mode", () => {
+    const current = currentGraphFixture();
+    const incoming = incomingMixedFixture();
+    const currentSnapshot = JSON.stringify(current);
+    const incomingSnapshot = JSON.stringify(incoming);
+
+    computeMergePlan(current, incoming, { joinMode: "left" });
+
+    expect(JSON.stringify(current)).toBe(currentSnapshot);
+    expect(JSON.stringify(incoming)).toBe(incomingSnapshot);
+  });
 });
 
 // --------------------------------------------------------------------------
@@ -466,6 +584,7 @@ describe("merge preview modal", () => {
     return {
       fileData: { nodes: [], edges: [], nodeDataHeaders: [], edgeDataHeaders: [] },
       stats: {
+        joinMode: "outer",
         nodes: {
           added: hasChanges ? ["C", "D"] : [],
           modified: hasChanges ? ["A"] : [],
@@ -474,12 +593,46 @@ describe("merge preview modal", () => {
         edges: { added: [], modified: [], unchanged: 2 },
         newNodeColumns: hasChanges ? ["Feature Y [group A]"] : [],
         newEdgeColumns: [],
+        ignoredNodes: [],
+        ignoredEdges: [],
         skippedNodeRows: 0,
         skippedEdgeRows: 1,
         hasChanges,
       },
     };
   }
+
+  function leftPlanFixture(hasChanges = true) {
+    return {
+      fileData: { nodes: [], edges: [], nodeDataHeaders: [], edgeDataHeaders: [] },
+      stats: {
+        joinMode: "left",
+        nodes: { added: [], modified: hasChanges ? ["A"] : [], unchanged: 1 },
+        edges: { added: [], modified: [], unchanged: 2 },
+        newNodeColumns: [],
+        newEdgeColumns: [],
+        ignoredNodes: ["C", "D"],
+        ignoredEdges: ["A::C"],
+        skippedNodeRows: 0,
+        skippedEdgeRows: 0,
+        hasChanges,
+      },
+    };
+  }
+
+  const plansFixture = (outerChanges = true, leftChanges = true) => ({
+    outer: planFixture(outerChanges),
+    left: leftPlanFixture(leftChanges),
+  });
+
+  function selectMode(value) {
+    const radio = document.querySelector(`.merge-join-modes input[value="${value}"]`);
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change"));
+  }
+
+  const statNums = () =>
+    [...document.querySelectorAll(".merge-stat-num")].map((n) => n.textContent);
 
   it("renders counts, columns, notes and id lists", () => {
     const content = buildMergePreviewContent(planFixture().stats, "extra.xlsx");
@@ -500,18 +653,52 @@ describe("merge preview modal", () => {
     expect(content.querySelector(".alert-warning")).not.toBeNull();
   });
 
-  it("resolves true on Import and false on Cancel", async () => {
-    let promise = showMergePreview(planFixture(), "a.xlsx");
+  it("resolves the outer plan on Import and null on Cancel", async () => {
+    let plans = plansFixture();
+    let promise = showMergePreview(plans, "a.xlsx");
     document.querySelector(".p-footer .p-button-primary").click();
-    await expect(promise).resolves.toBe(true);
+    await expect(promise).resolves.toBe(plans.outer);
 
-    promise = showMergePreview(planFixture(), "a.xlsx");
+    plans = plansFixture();
+    promise = showMergePreview(plans, "a.xlsx");
     document.querySelector(".p-footer .p-button-secondary").click();
-    await expect(promise).resolves.toBe(false);
+    await expect(promise).resolves.toBeNull();
+  });
+
+  it("toggles tiles and notes with the join mode and resolves the chosen plan", async () => {
+    const plans = plansFixture();
+    const promise = showMergePreview(plans, "a.xlsx");
+
+    expect(statNums()).toEqual(["+2", "~1", "0", "0"]);
+
+    selectMode("left");
+    expect(statNums()).toEqual(["0", "~1", "0", "0"]);
+    const notes = [...document.querySelectorAll(".merge-preview-note")].map(
+      (n) => n.textContent
+    );
+    expect(
+      notes.some((t) => t.includes("2 node row(s) and 1 edge row(s) have no match"))
+    ).toBe(true);
+
+    document.querySelector(".p-footer .p-button-primary").click();
+    await expect(promise).resolves.toBe(plans.left);
+  });
+
+  it("disables Import when the selected mode yields no changes", () => {
+    showMergePreview(plansFixture(true, false), "a.xlsx");
+    const importBtn = document.querySelector(".p-footer .p-button-primary");
+
+    expect(importBtn.disabled).toBe(false);
+    selectMode("left");
+    expect(importBtn.disabled).toBe(true);
+    expect(document.querySelector(".alert-info").textContent).toContain("No changes detected");
+    selectMode("outer");
+    expect(importBtn.disabled).toBe(false);
+    document.querySelector(".p-footer .p-button-secondary").click();
   });
 
   it("disables Import and shows a notice when nothing changes", () => {
-    showMergePreview(planFixture(false), "same.xlsx");
+    showMergePreview(plansFixture(false, false), "same.xlsx");
 
     const importBtn = document.querySelector(".p-footer .p-button-primary");
     expect(importBtn.disabled).toBe(true);
