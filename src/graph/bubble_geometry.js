@@ -108,13 +108,21 @@ const HOLE_GAP_RADIUS_RATIO = 0.25;
 // small nodes.
 const FIELD_PIXEL_GROUP_MIN = 1;
 const FIELD_PIXEL_GROUP_MAX = 4;
-// Semicircular cap resolution for the stadium-shaped straggler links.
+// Capsule links are gently ARCED tubes (quadratic, deterministic bulge), so
+// the geometric corridors below field resolution read organic rather than
+// ruler-straight. Sagitta is a fraction of the link length, capped relative
+// to the tube width so hairlines stay near-straight.
 const CAPSULE_CAP_SEGMENTS = 8;
-// Visual minimums for the geometric reconstruction (repair discs + capsule
-// corridors): the tightest hull still clears the node body by roughly the
-// outline stroke, and a corridor stays a visible hairline.
-const DISC_PAD_MIN_PX = 2;
-const LINK_HALF_WIDTH_MIN_PX = 1.25;
+const CAPSULE_ARC_SEGMENTS = 12;
+const CAPSULE_ARC_SAGITTA_RATIO = 0.08;
+const CAPSULE_ARC_SAGITTA_MAX_R = 6;
+// Visual minimums for the geometric reconstruction, PROPORTIONAL to node
+// size — the fit runs in ratio-1 reference space, so an absolute px minimum
+// magnifies under zoom and reads as leftover padding on dense graphs.
+// Disc pad: fraction of the member's OWN radius; link half-width: fraction
+// of the group's mean member radius.
+const DISC_PAD_MIN_RATIO = 0.05;
+const LINK_HALF_WIDTH_MIN_RATIO = 0.15;
 
 /**
  * Axis-aligned square around a node's viewport position.
@@ -210,10 +218,9 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
   const nodeR1px = FIELD_NODE_R1_RATIO * unit * pad;
   const edgeR0px = FIELD_EDGE_R0_RATIO * unit * cor;
   const edgeR1px = FIELD_EDGE_R1_RATIO * unit * cor;
-  // Repair-disc padding and capsule half-width keep a small visual minimum
-  // so the tightest hull still clears the node body by the stroke width.
-  const discPadPx = Math.max(nodeR0px, DISC_PAD_MIN_PX);
-  const linkRPx = Math.max(edgeR0px, LINK_HALF_WIDTH_MIN_PX);
+  // Capsule half-width keeps a proportional visual minimum (disc padding
+  // gets its per-member minimum inside ensureMembersEnclosed).
+  const linkRPx = Math.max(edgeR0px, LINK_HALF_WIDTH_MIN_RATIO * unit);
   // Avoidance 0 means "ignore non-members" — drop the rects entirely so
   // virtual-edge routing stops detouring around them too (and the
   // O(members × avoid) routing cost disappears with them).
@@ -268,10 +275,10 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
       if (repaired.length >= 3) outline = repaired;
     }
   }
-  outline = ensureMembersEnclosed(outline, memberRects, discPadPx, linkRPx);
-  // Hole breathing room = the disc padding: carved non-members get the same
-  // visual gap members do (symmetric, does not scale with avoidance).
-  return carveAvoidHoles(outline, memberRects, effectiveAvoidRects, discPadPx, discPadPx);
+  outline = ensureMembersEnclosed(outline, memberRects, nodeR0px, linkRPx);
+  // Hole breathing room = the padding radius (per-node proportional floor
+  // applied inside): carved non-members get the same visual gap members do.
+  return carveAvoidHoles(outline, memberRects, effectiveAvoidRects, nodeR0px, nodeR0px);
 }
 
 /**
@@ -405,7 +412,10 @@ function ensureMembersEnclosed(points, memberRects, padPx, linkR) {
         const clearance = signedDist * distanceToPolygonEdge(cx, cy, painted) - radius;
         if (clearance >= minClearance) continue;
       }
-      discs.push([discRing(cx, cy, radius + padPx * round)]);
+      // Per-member proportional pad floor: at knob minimum the disc hugs the
+      // node at a fixed fraction of ITS radius, at any node scale.
+      const basePad = Math.max(padPx, DISC_PAD_MIN_RATIO * radius);
+      discs.push([discRing(cx, cy, radius + basePad * round)]);
     }
     if (discs.length === 0) return ring;
     let merged = ring.length >= 3
@@ -517,11 +527,14 @@ function nearestVertexPair(ringA, ringB) {
 }
 
 /**
- * Closed stadium ring of half-width r along segment a→b: straight sides with
- * semicircular caps centered on the endpoints, so straggler links join the
- * hull without corners (the curve painter rounds them further). The caps
- * extend r beyond both endpoints, so the shape always overlaps what it links.
- * Null for degenerate (coincident) endpoints.
+ * Closed tube ring of half-width r along a GENTLY ARCED path from a to b
+ * (quadratic Bézier, sagitta CAPSULE_ARC_SAGITTA_RATIO × length, capped at
+ * CAPSULE_ARC_SAGITTA_MAX_R × r), with semicircular caps centered on the
+ * endpoints — straggler links read as organic corridors, not ruler lines.
+ * Endpoints are sorted before picking the bulge side, so the curve is stable
+ * across refits regardless of argument order. The caps extend r beyond both
+ * endpoints, so the shape always overlaps what it links. Null for degenerate
+ * (coincident) endpoints.
  *
  * @param {[number, number]} a
  * @param {[number, number]} b
@@ -529,20 +542,46 @@ function nearestVertexPair(ringA, ringB) {
  * @returns {Array<[number, number]>|null}
  */
 function capsuleRing(a, b, r) {
+  if (b[0] < a[0] || (b[0] === a[0] && b[1] < a[1])) [a, b] = [b, a];
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const len = Math.hypot(dx, dy);
   if (len < 1e-9) return null;
-  const angle = Math.atan2(dy, dx);
-  const ring = [];
-  const arc = (cx, cy, from) => {
-    for (let i = 0; i <= CAPSULE_CAP_SEGMENTS; i++) {
-      const t = from + (Math.PI * i) / CAPSULE_CAP_SEGMENTS;
-      ring.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]);
+  const sag = Math.min(len * CAPSULE_ARC_SAGITTA_RATIO, r * CAPSULE_ARC_SAGITTA_MAX_R);
+  const cx = (a[0] + b[0]) / 2 - (dy / len) * sag;
+  const cy = (a[1] + b[1]) / 2 + (dx / len) * sag;
+  // Point + unit tangent on the quadratic a → (cx, cy) → b.
+  const at = (t) => {
+    const u = 1 - t;
+    const px = u * u * a[0] + 2 * u * t * cx + t * t * b[0];
+    const py = u * u * a[1] + 2 * u * t * cy + t * t * b[1];
+    let tx = u * (cx - a[0]) + t * (b[0] - cx);
+    let ty = u * (cy - a[1]) + t * (b[1] - cy);
+    const tl = Math.hypot(tx, ty) || 1;
+    return [px, py, tx / tl, ty / tl];
+  };
+  const left = [];
+  const right = [];
+  for (let i = 0; i <= CAPSULE_ARC_SEGMENTS; i++) {
+    const [px, py, tx, ty] = at(i / CAPSULE_ARC_SEGMENTS);
+    left.push([px - ty * r, py + tx * r]);
+    right.push([px + ty * r, py - tx * r]);
+  }
+  const ring = [...left];
+  // Semicircular cap at b: from the left offset, through the forward
+  // tangent, to the right offset (interior points only — ends are in the
+  // side arrays already).
+  const capArc = (px, py, fromAngle) => {
+    for (let i = 1; i < CAPSULE_CAP_SEGMENTS; i++) {
+      const t = fromAngle - (Math.PI * i) / CAPSULE_CAP_SEGMENTS;
+      ring.push([px + r * Math.cos(t), py + r * Math.sin(t)]);
     }
   };
-  arc(b[0], b[1], angle - Math.PI / 2); // cap around b
-  arc(a[0], a[1], angle + Math.PI / 2); // cap around a
+  const [bx, by, btx, bty] = at(1);
+  capArc(bx, by, Math.atan2(btx, -bty));
+  for (let i = right.length - 1; i >= 0; i--) ring.push(right[i]);
+  const [ax, ay, atx, aty] = at(0);
+  capArc(ax, ay, Math.atan2(-atx, aty));
   ring.push([ring[0][0], ring[0][1]]);
   return ring;
 }
