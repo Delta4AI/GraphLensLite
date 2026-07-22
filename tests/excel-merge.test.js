@@ -9,6 +9,7 @@ import {
   showMergePreview,
 } from "../src/utilities/excel_merge.js";
 import { CFG, DEFAULTS } from "../src/config.js";
+import { DropdownChecklist } from "../src/managers/ui_components.js";
 
 // ==========================================================================
 // Excel import & merge — the "⤒ Import" data-editor feature. Covers the pure
@@ -370,6 +371,76 @@ describe("parseExcelToJson merge mode", () => {
     );
   });
 
+  it("normalizes rich cell values (richText, hyperlink, formula) to primitives", async () => {
+    // A workbook re-saved by Excel/LibreOffice can turn plain cells into rich
+    // values. Raw objects in D4Data make every matched row look "modified"
+    // and later crash the category filters (val.toLowerCase).
+    const wb = new ExcelJS.Workbook();
+    const ns = wb.addWorksheet("nodes");
+    ns.addRow(["ID", "Feat [g]"]);
+    ns.addRow(["A", 1]);
+    const es = wb.addWorksheet("edges");
+    es.addRow(["Source ID", "Target ID", "Cat [g]", "Link [g]", "Calc [g]"]);
+    es.getCell("A2").value = "A";
+    es.getCell("B2").value = "A";
+    es.getCell("C2").value = { richText: [{ text: "Dummy " }, { text: "Category 1" }] };
+    es.getCell("D2").value = { text: "example", hyperlink: "https://example.org" };
+    es.getCell("E2").value = { formula: "1+1", result: 2 };
+    const buffer = await wb.xlsx.writeBuffer();
+
+    const result = await io.parseExcelToJson(buffer);
+
+    const data = result.edges[0].D4Data[EDGE_HEADER]["g"];
+    expect(data["Cat"]).toBe("Dummy Category 1");
+    expect(data["Link"]).toBe("example");
+    expect(data["Calc"]).toBe(2);
+  });
+
+  it("re-importing the source file of a graph reports no changes", async () => {
+    const buffer = await buildWorkbook(
+      [
+        { ID: "A", Label: "Node A", "Feat [g]": 1 },
+        { ID: "B", Label: "Node B", "Feat [g]": 2 },
+      ],
+      [{ "Source ID": "A", "Target ID": "B", Label: "rel", "Cat [g]": "x" }]
+    );
+
+    const current = await io.parseExcelToJson(buffer);
+    const incoming = await io.parseExcelToJson(buffer, { merge: true });
+    const plan = computeMergePlan(current, incoming);
+
+    expect(plan.stats.hasChanges).toBe(false);
+    expect(plan.stats.nodes.unchanged).toBe(2);
+    expect(plan.stats.edges.unchanged).toBe(1);
+  });
+
+  it("is idempotent: a second merge of the same file reports no changes", async () => {
+    const buffer = await buildWorkbook(
+      [{ ID: "A", Label: "Node A", "Feat [g]": 1 }],
+      [{ "Source ID": "A", "Target ID": "A", Label: "self", "Cat [g]": "x" }]
+    );
+    // Existing graph state as a JSON load would have it: full default styles
+    // that differ from what the parser emits (label flag, label styling keys).
+    const current = {
+      nodes: [{ id: "A", label: "old", style: { label: true, size: 20 }, D4Data: {} }],
+      edges: [
+        { id: "A::A", source: "A", target: "A", style: { label: true }, D4Data: {} },
+      ],
+      nodeDataHeaders: [],
+      edgeDataHeaders: [],
+    };
+
+    const incoming1 = await io.parseExcelToJson(buffer, { merge: true });
+    const plan1 = computeMergePlan(current, incoming1);
+    expect(plan1.stats.hasChanges).toBe(true); // first merge legitimately updates
+
+    const incoming2 = await io.parseExcelToJson(buffer, { merge: true });
+    const plan2 = computeMergePlan(plan1.fileData, incoming2);
+    expect(plan2.stats.hasChanges).toBe(false);
+    expect(plan2.stats.nodes.modified).toEqual([]);
+    expect(plan2.stats.edges.modified).toEqual([]);
+  });
+
   it("rejects a merge workbook with no rows at all", async () => {
     const buffer = await buildWorkbook([], []);
 
@@ -447,6 +518,28 @@ describe("merge preview modal", () => {
     expect(document.querySelector(".alert-info").textContent).toContain("No changes detected");
     expect(document.querySelector(".alert-warning")).toBeNull();
     document.querySelector(".p-footer .p-button-secondary").click();
+  });
+});
+
+// --------------------------------------------------------------------------
+// Category dropdown resilience (crash path of the merge bug report)
+// --------------------------------------------------------------------------
+
+describe("DropdownChecklist.sortCategories", () => {
+  it("tolerates non-string category values instead of crashing", () => {
+    const propID = "p";
+    const cache = {
+      data: {
+        filterDefaults: new Map([[propID, { categories: new Set(["high", 5, "alpha"]) }]]),
+        layouts: { L: { filters: new Map([[propID, { categories: new Set() }]]) } },
+        selectedLayout: "L",
+      },
+      propIDToDropdownChecklists: new Map(),
+    };
+
+    const checklist = new DropdownChecklist(propID, cache);
+    // "high" is a priority keyword and sorts last; others alphabetical
+    expect([...checklist.categories]).toEqual([5, "alpha", "high"]);
   });
 });
 

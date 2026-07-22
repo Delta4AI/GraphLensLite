@@ -848,6 +848,18 @@ class IOManager {
       });
     };
 
+    // ExcelJS surfaces rich cells as objects (rich-text runs, hyperlinks,
+    // formulas, error cells). Normalize to the primitive the user sees in the
+    // sheet — raw objects leaking into D4Data corrupt change detection and
+    // crash the category filters downstream.
+    const cellValueToPrimitive = (value) => {
+      if (value === null || typeof value !== 'object' || value instanceof Date) return value;
+      if (Array.isArray(value.richText)) return value.richText.map((run) => run.text).join('');
+      if (value.text !== undefined) return cellValueToPrimitive(value.text); // hyperlink cell
+      if (value.result !== undefined) return cellValueToPrimitive(value.result); // formula cell
+      return null; // formula without cached result, error cell, unknown shape → empty
+    };
+
     const worksheetToJson = (worksheet) => {
       if (!worksheet) return { headers: [], jsonData: [] };
 
@@ -856,7 +868,7 @@ class IOManager {
 
       const firstRow = worksheet.getRow(1);
       firstRow.eachCell((cell, colNumber) => {
-        headers[colNumber] = cell.value;
+        headers[colNumber] = cellValueToPrimitive(cell.value);
       });
 
       worksheet.eachRow((row, rowNumber) => {
@@ -867,7 +879,7 @@ class IOManager {
         row.eachCell((cell, colNumber) => {
           const header = headers[colNumber];
           if (header) {
-            rowData[header] = cell.value;
+            rowData[header] = cellValueToPrimitive(cell.value);
           }
         });
 
