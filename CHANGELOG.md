@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.16.0 — 2026-07-22
+
+Saved graph files load unchanged. Stored bubble-set knob values keep applying, with two semantic shifts: padding and corridor width now scale with your configured node size (a value of 1 ≈ one node radius of margin) instead of absolute pixels, and any saved avoidance value above 0 now simply means "on".
+
+### Features
+
+* **Bubble-set geometry controls.** The Bubble Sets styling card gains **Padding** (how far the body extends past its members) and **Corridor Width** (thickness of the arms reaching outlying members) sliders, range 0.01–3, plus an **Avoid Other Nodes** switch that steers the hull around non-members and carves holes for fully enclosed ones. Defaults: padding 0.1, corridor 0.25, avoidance on.
+* **Smooth, organic bubble outlines at every zoom.** Hulls render as continuous curves instead of polylines — no more faceted or jagged outlines when zooming in — and the PNG and SVG exports paint the exact same curves as the live canvas.
+* **Node-size-aware hulls.** The influence field scales with the group's mean member radius, so bubbles look proportional whatever node size you configure. At minimum padding the hull hugs each node at a fixed fraction of *its own* radius, and minimum-width corridors render as thin, gently arced tubes.
+* **A member is never lost.** Every member circle is guaranteed inside its group's outline (measured against the curve actually painted); groups whose members drift beyond the field's reach stay connected as one shape via corridor links.
+
+### Fixes
+
+* **Bubble hulls no longer clip their own members.** Avoid-node pressure could squeeze the outline through a member's body while its center stayed inside; grazed members now get repaired with proper clearance.
+* **Enclosed non-members are no longer silently swallowed.** With avoidance on, a non-member inside the hull gets a visible carve whenever one is geometrically possible — and one impossible hole no longer discards all the others.
+* **Bubble outlines no longer wobble around dense non-member fields**, and corridors no longer reroute into phantom lobes when widening them.
+
 ## 1.15.5 — 2026-07-10
 
 Saved graph files load unchanged; older files (and files saved by earlier versions) default the new opacity to fully opaque, so their appearance is identical.
