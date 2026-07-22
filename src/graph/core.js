@@ -1,12 +1,8 @@
-import { StaticUtilities } from "../utilities/static.js";
-import { replaceColorScale } from "../utilities/color_scale_picker.js";
-import { replaceNumericScale } from "../utilities/numeric_scale_picker.js";
-import { initTheme, nodeLabelColorForTheme } from "../utilities/theme.js";
-import {
-  buildGraphologyGraph,
-  makeNodeReducer,
-  makeEdgeReducer,
-} from "./graph_model.js";
+import { StaticUtilities } from '../utilities/static.js';
+import { replaceColorScale } from '../utilities/color_scale_picker.js';
+import { replaceNumericScale } from '../utilities/numeric_scale_picker.js';
+import { initTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
+import { buildGraphologyGraph, makeNodeReducer, makeEdgeReducer } from './graph_model.js';
 // NOTE: sigma_adapter.js is imported lazily in createGraphInstance(), never
 // statically: the sigma vendor bundle probes WebGL at module scope
 // (@sigma/node-image reads MAX_TEXTURE_SIZE from a throwaway context), so a
@@ -16,7 +12,7 @@ import {
   isWebGL2Available,
   renderWebGLUnavailableMessage,
   WEBGL2_ERROR_MESSAGE,
-} from "./webgl_support.js";
+} from './webgl_support.js';
 
 // One-time listener registration guards. These must live at module scope:
 // the Cache singleton is reset *in place* on every file load (Cache.reset()),
@@ -40,19 +36,14 @@ class GraphCoreManager {
     for (let section in nodeOrEdge.D4Data) {
       for (let subsection in nodeOrEdge.D4Data[section]) {
         for (let prop in nodeOrEdge.D4Data[section][subsection]) {
-          yield [
-            section,
-            subsection,
-            prop,
-            nodeOrEdge.D4Data[section][subsection][prop],
-          ];
+          yield [section, subsection, prop, nodeOrEdge.D4Data[section][subsection][prop]];
         }
       }
     }
   }
 
   async decideToRenderOrDraw(forceRender = false) {
-    await this.cache.ui.showLoading("Loading", "Deciding to render or draw ..");
+    await this.cache.ui.showLoading('Loading', 'Deciding to render or draw ..');
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
     if (this.cache.EVENT_LOCKS.QUERY_SELECTION_EVENT) {
@@ -74,7 +65,7 @@ class GraphCoreManager {
         // that flip it while mutating node.style.x/y on cache.nodeRef refs must
         // push their own updateNodeData payload. See layoutSelectedNodes.
         if (this.cache.styleChanged) {
-          await this.cache.ui.showLoading("Loading", "Updating graph ..");
+          await this.cache.ui.showLoading('Loading', 'Updating graph ..');
           await new Promise((resolve) => requestAnimationFrame(resolve));
           await this.cache.graph.updateData({
             nodes: [...this.cache.nodeRef.values()],
@@ -83,11 +74,11 @@ class GraphCoreManager {
           this.cache.styleChanged = false;
           this.cache.labelStyleChanged = false;
         }
-        await this.cache.ui.showLoading("Loading", "Rendering graph ..");
+        await this.cache.ui.showLoading('Loading', 'Rendering graph ..');
         await new Promise((resolve) => requestAnimationFrame(resolve));
         return await this.cache.graph.render();
       } else {
-        await this.cache.ui.showLoading("Loading", "Redrawing graph ..");
+        await this.cache.ui.showLoading('Loading', 'Redrawing graph ..');
         await new Promise((resolve) => requestAnimationFrame(resolve));
         return await this.cache.graph.draw();
       }
@@ -124,7 +115,7 @@ class GraphCoreManager {
     // and leave cache.graph null — the same state as "no data loaded", so
     // the rest of the app chrome keeps working; load paths already guard
     // on a null graph after this call.
-    const containerEl = document.getElementById("innerGraphContainer");
+    const containerEl = document.getElementById('innerGraphContainer');
     if (!isWebGL2Available()) {
       renderWebGLUnavailableMessage(containerEl);
       this.cache.ui.error(WEBGL2_ERROR_MESSAGE);
@@ -140,12 +131,12 @@ class GraphCoreManager {
     // from elementStates so hover can never corrupt selection state.
     const hoverIds = new Set();
     try {
-      const { SigmaAdapter } = await import("./sigma_adapter.js");
+      const { SigmaAdapter } = await import('./sigma_adapter.js');
       // initTheme (not currentTheme): re-resolves stored/OS preference so a
       // graph constructed before the DOMContentLoaded theme boot still gets
       // the right label colors. Idempotent after boot.
       const theme = initTheme(document, window);
-      this.cache.graph = new SigmaAdapter(this.cache, "innerGraphContainer", {
+      this.cache.graph = new SigmaAdapter(this.cache, 'innerGraphContainer', {
         nodeReducer: makeNodeReducer(this.cache, elementStates, hoverIds),
         edgeReducer: makeEdgeReducer(this.cache, elementStates, hoverIds),
         elementStates,
@@ -185,8 +176,7 @@ class GraphCoreManager {
 
     // If layout has no positions yet but has a layoutType, apply that layout algorithm once
     if (layout.positions.size === 0 && layout.layoutType) {
-      const internals =
-        this.cache.DEFAULTS.LAYOUT_INTERNALS[layout.layoutType] || {};
+      const internals = this.cache.DEFAULTS.LAYOUT_INTERNALS[layout.layoutType] || {};
       await this.cache.graph.setLayout({
         type: layout.layoutType,
         ...internals,
@@ -203,43 +193,34 @@ class GraphCoreManager {
     if (this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_RUNNING) return;
 
     try {
-      this.cache.ui.debug("ONCE AFTER RENDER");
-      await this.cache.ui.showLoading("Post-processing", "Post-processing ..");
+      this.cache.ui.debug('ONCE AFTER RENDER');
+      await this.cache.ui.showLoading('Post-processing', 'Post-processing ..');
       await new Promise((resolve) => requestAnimationFrame(resolve));
       this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_RUNNING = true;
 
-      await this.cache.ui.showLoading(
-        "Post-processing",
-        "Registering event listeners ..",
-      );
+      await this.cache.ui.showLoading('Post-processing', 'Registering event listeners ..');
       await new Promise((resolve) => requestAnimationFrame(resolve));
       this.registerHotkeyEvents();
       this.registerGlobalEventListeners();
       await this.registerPluginStates();
 
       // to initially fill caches related to the query/filters, preRenderEvent is called without rendering afterwards
-      await this.cache.ui.showLoading("Post-processing", "Pre-render event ..");
+      await this.cache.ui.showLoading('Post-processing', 'Pre-render event ..');
       await new Promise((resolve) => requestAnimationFrame(resolve));
       await this.preRenderEvent();
 
-      await this.cache.ui.showLoading(
-        "Post-processing",
-        "Updating metrics UI ..",
-      );
+      await this.cache.ui.showLoading('Post-processing', 'Updating metrics UI ..');
       await new Promise((resolve) => requestAnimationFrame(resolve));
       await this.cache.metrics.updateMetricUI();
 
-      await this.cache.ui.showLoading(
-        "Post-processing",
-        "Finalizing rendering ..",
-      );
+      await this.cache.ui.showLoading('Post-processing', 'Finalizing rendering ..');
       await new Promise((resolve) => requestAnimationFrame(resolve));
 
       if (this.cache.EVENT_LOCKS.TRIGGER_SET_LAYOUT_ONCE) {
         // suppresses the info in case of loading from a json model
         if (this.cache.nodePositionsFromExcelImport.size !== 0) {
           this.cache.ui.info(
-            `Created view "${this.cache.DEFAULTS.CUSTOM_LAYOUT_NAME}". Applying ${this.cache.DEFAULTS.LAYOUT} layout to nodes without coordinates ..`,
+            `Created view "${this.cache.DEFAULTS.CUSTOM_LAYOUT_NAME}". Applying ${this.cache.DEFAULTS.LAYOUT} layout to nodes without coordinates ..`
           );
         }
         await this.cache.graph.setLayout({
@@ -252,7 +233,7 @@ class GraphCoreManager {
       await this.cache.graph.render();
 
       if (this.cache.EVENT_LOCKS.TRIGGER_SET_LAYOUT_ONCE) {
-        this.cache.ui.debug("Initially persisting custom layout ..");
+        this.cache.ui.debug('Initially persisting custom layout ..');
         await this.cache.lm.persistNodePositions();
         this.cache.EVENT_LOCKS.TRIGGER_SET_LAYOUT_ONCE = false;
       }
@@ -260,7 +241,7 @@ class GraphCoreManager {
       await this.applyHideDisconnectedState();
     } catch (errorMsg) {
       this.cache.ui.error(`Error in initial AFTER_RENDER: ${errorMsg}`);
-      this.cache.ui.error("Graph setup failed. Please check your input data.");
+      this.cache.ui.error('Graph setup failed. Please check your input data.');
       await this.cache.ui.hideLoading();
     } finally {
       this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_RUNNING = false;
@@ -268,24 +249,21 @@ class GraphCoreManager {
   }
 
   async toggleCleanUpDanglingElements(btn) {
-    const shouldEnable = btn.classList.contains("red");
-    const currentLayout =
-      this.cache.data.layouts[this.cache.data.selectedLayout];
+    const shouldEnable = btn.classList.contains('red');
+    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
 
     if (shouldEnable) {
-      btn.classList.remove("red");
-      btn.classList.add("green", "highlight");
-      btn.title =
-        "Show all nodes and edges, irrespectively of their connectedness.";
-      btn.textContent = "👁";
+      btn.classList.remove('red');
+      btn.classList.add('green', 'highlight');
+      btn.title = 'Show all nodes and edges, irrespectively of their connectedness.';
+      btn.textContent = '👁';
       currentLayout.hideDisconnectedNodes = true;
       await this.hideDanglingElements();
     } else {
-      btn.classList.remove("green", "highlight");
-      btn.classList.add("red");
-      btn.title =
-        "Hide all nodes and edges that are not connected to any other node or edge.";
-      btn.textContent = "🚫";
+      btn.classList.remove('green', 'highlight');
+      btn.classList.add('red');
+      btn.title = 'Hide all nodes and edges that are not connected to any other node or edge.';
+      btn.textContent = '🚫';
       currentLayout.hideDisconnectedNodes = false;
       await this.showDanglingElements();
     }
@@ -316,17 +294,18 @@ class GraphCoreManager {
     return true;
   }
 
-  async hideDanglingElements() {
+  // Pure computation: populate hiddenDanglingNodeIDs/hiddenDanglingEdgeIDs by
+  // iterating the CURRENT show sets until a fixpoint. Hiding a dangling node
+  // can strand its neighbour, so we repeat until no further changes. No side
+  // effects beyond the cache sets — callers own bubble/render updates.
+  computeDanglingElements() {
     let changes;
 
     do {
       changes = false;
 
       for (let nodeID of this.cache.nodeIDsToBeShown) {
-        if (
-          !this.nodeHasAVisibleEdge(nodeID) &&
-          !this.cache.hiddenDanglingNodeIDs.has(nodeID)
-        ) {
+        if (!this.nodeHasAVisibleEdge(nodeID) && !this.cache.hiddenDanglingNodeIDs.has(nodeID)) {
           this.cache.hiddenDanglingNodeIDs.add(nodeID);
           changes = true;
         }
@@ -342,15 +321,19 @@ class GraphCoreManager {
         }
       }
     } while (changes);
+  }
+
+  async hideDanglingElements() {
+    this.computeDanglingElements();
 
     // Update bubble groups to exclude hidden dangling nodes
     await this.cache.bs.updateBubbleSetIfChanged();
 
     await this.cache.fm.handleFilterEvent(
-      "Hiding Elements",
-      "Hiding nodes and edges that are not connected to any other node or edge.",
+      'Hiding Elements',
+      'Hiding nodes and edges that are not connected to any other node or edge.',
       null,
-      false,
+      false
     );
   }
 
@@ -362,36 +345,32 @@ class GraphCoreManager {
     await this.cache.bs.updateBubbleSetIfChanged();
 
     await this.cache.fm.handleFilterEvent(
-      "Showing Elements",
-      "Showing all previously hidden nodes and edges that are not connected to any other node or edge.",
+      'Showing Elements',
+      'Showing all previously hidden nodes and edges that are not connected to any other node or edge.',
       null,
-      false,
+      false
     );
   }
 
   updateHideDisconnectedButtonState() {
-    const btn = document.getElementById("hideDisconnectedBtn");
+    const btn = document.getElementById('hideDisconnectedBtn');
     if (!btn) return;
-    const currentLayout =
-      this.cache.data.layouts[this.cache.data.selectedLayout];
+    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
     if (currentLayout && currentLayout.hideDisconnectedNodes) {
-      btn.classList.remove("red");
-      btn.classList.add("green", "highlight");
-      btn.title =
-        "Show all nodes and edges, irrespectively of their connectedness.";
-      btn.textContent = "👁";
+      btn.classList.remove('red');
+      btn.classList.add('green', 'highlight');
+      btn.title = 'Show all nodes and edges, irrespectively of their connectedness.';
+      btn.textContent = '👁';
     } else {
-      btn.classList.remove("green", "highlight");
-      btn.classList.add("red");
-      btn.title =
-        "Hide all nodes and edges that are not connected to any other node or edge.";
-      btn.textContent = "🚫";
+      btn.classList.remove('green', 'highlight');
+      btn.classList.add('red');
+      btn.title = 'Hide all nodes and edges that are not connected to any other node or edge.';
+      btn.textContent = '🚫';
     }
   }
 
   async applyHideDisconnectedState() {
-    const currentLayout =
-      this.cache.data.layouts[this.cache.data.selectedLayout];
+    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
     this.cache.hiddenDanglingNodeIDs.clear();
     this.cache.hiddenDanglingEdgeIDs.clear();
     this.updateHideDisconnectedButtonState();
@@ -422,15 +401,15 @@ class GraphCoreManager {
     await this.cache.graph.focusElement([...elementIDs]);
 
     const targetMap = isNode ? this.cache.nodeRef : this.cache.edgeRef;
-    await this.cache.sm.selectElements(elementIDs, targetMap, "highlight");
+    await this.cache.sm.selectElements(elementIDs, targetMap, 'highlight');
     setTimeout(async () => {
-      await this.cache.sm.selectElements([], targetMap, "highlight");
+      await this.cache.sm.selectElements([], targetMap, 'highlight');
     }, 2500);
   }
 
   async fitViewToVisibleNodes() {
     const visibleNodeIDs = [...this.cache.nodeIDsToBeShown].filter(
-      (id) => !this.cache.hiddenDanglingNodeIDs.has(id),
+      (id) => !this.cache.hiddenDanglingNodeIDs.has(id)
     );
     await this.fitViewToNodes(visibleNodeIDs);
   }
@@ -470,23 +449,20 @@ class GraphCoreManager {
 
   async updateEdges(overrides = {}, commands = []) {
     let colorMap = null;
-    if (commands.includes("set_continuous_color_scale")) {
-      colorMap = await this.cache.picker.pickColors("edges");
+    if (commands.includes('set_continuous_color_scale')) {
+      colorMap = await this.cache.picker.pickColors('edges');
       if (!colorMap) {
-        this.cache.ui.info("Aborted color picker");
+        this.cache.ui.info('Aborted color picker');
         return;
       }
     }
 
     let numericScaleMap = null;
-    if (commands.includes("set_numeric_scale")) {
+    if (commands.includes('set_numeric_scale')) {
       const propertyName = this.cache.numericPicker.currentProperty || null;
-      numericScaleMap = await this.cache.numericPicker.pickNumericScale(
-        "edges",
-        propertyName,
-      );
+      numericScaleMap = await this.cache.numericPicker.pickNumericScale('edges', propertyName);
       if (!numericScaleMap) {
-        this.cache.ui.info("Aborted numeric scale picker");
+        this.cache.ui.info('Aborted numeric scale picker');
         return;
       }
     }
@@ -495,11 +471,11 @@ class GraphCoreManager {
       const edge = this.cache.edgeRef.get(edgeID);
 
       for (const command of commands) {
-        if (command === "label_set_to_id") {
+        if (command === 'label_set_to_id') {
           edge.style.label = true;
           edge.style.labelText = edge.id;
         }
-        if (command === "label_set_to_label") {
+        if (command === 'label_set_to_label') {
           edge.style.label = true;
           edge.style.labelText = edge.label;
         }
@@ -517,48 +493,41 @@ class GraphCoreManager {
       this.cache.edgeRef.set(edgeID, edge);
 
       // Save to current layout's style map (including type)
-      const currentLayout =
-        this.cache.data.layouts[this.cache.data.selectedLayout];
+      const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
       currentLayout.edgeStyles.set(edgeID, {
         type: edge.type,
         style: structuredClone(edge.style),
       });
     }
 
-    await this.cache.style.handleStyleChangeLoadingEvent(
-      "Style",
-      "Updating Edge Styles",
-    );
+    await this.cache.style.handleStyleChangeLoadingEvent('Style', 'Updating Edge Styles');
   }
 
   async updateNodes(overrides = {}, commands = []) {
     let colorMap = null;
-    if (commands.includes("set_continuous_color_scale")) {
-      colorMap = await this.cache.picker.pickColors("nodes");
+    if (commands.includes('set_continuous_color_scale')) {
+      colorMap = await this.cache.picker.pickColors('nodes');
       if (!colorMap) {
-        this.cache.ui.info("Aborted color picker");
+        this.cache.ui.info('Aborted color picker');
         return;
       }
     }
 
     let numericScaleMap = null;
-    if (commands.includes("set_numeric_scale")) {
+    if (commands.includes('set_numeric_scale')) {
       const propertyName = this.cache.numericPicker.currentProperty || null;
-      numericScaleMap = await this.cache.numericPicker.pickNumericScale(
-        "nodes",
-        propertyName,
-      );
+      numericScaleMap = await this.cache.numericPicker.pickNumericScale('nodes', propertyName);
       if (!numericScaleMap) {
-        this.cache.ui.info("Aborted numeric scale picker");
+        this.cache.ui.info('Aborted numeric scale picker');
         return;
       }
     }
 
     let pieResult = null;
-    if (commands.includes("set_pie_chart")) {
+    if (commands.includes('set_pie_chart')) {
       pieResult = await this.cache.piePicker.pickPie();
       if (!pieResult) {
-        this.cache.ui.info("Aborted pie chart picker");
+        this.cache.ui.info('Aborted pie chart picker');
         return;
       }
     }
@@ -566,7 +535,7 @@ class GraphCoreManager {
     const badgesToAdd = overrides.style?.badges;
     const badgePaletteToAdd = overrides.style?.badgePalette;
 
-    if (commands.includes("badge_add")) {
+    if (commands.includes('badge_add')) {
       delete overrides.style?.badges;
       delete overrides.style?.badgePalette;
     }
@@ -575,12 +544,12 @@ class GraphCoreManager {
       const node = this.cache.nodeRef.get(nodeID);
 
       for (const command of commands) {
-        if (command === "badge_clear") {
+        if (command === 'badge_clear') {
           node.style.badge = false;
           node.style.badges = [];
           node.style.badgePalette = [];
         }
-        if (command === "badge_add") {
+        if (command === 'badge_add') {
           node.style.badge = true;
           node.style.badges = node.style.badges || [];
           node.style.badgePalette = node.style.badgePalette || [];
@@ -595,22 +564,20 @@ class GraphCoreManager {
           if (badgePaletteToAdd) {
             node.style.badgePalette = [
               ...node.style.badgePalette,
-              ...(Array.isArray(badgePaletteToAdd)
-                ? badgePaletteToAdd
-                : [badgePaletteToAdd]),
+              ...(Array.isArray(badgePaletteToAdd) ? badgePaletteToAdd : [badgePaletteToAdd]),
             ];
           }
         }
 
-        if (command === "label_set_to_id") {
+        if (command === 'label_set_to_id') {
           node.style.label = true;
           node.style.labelText = node.id;
         }
-        if (command === "label_set_to_label") {
+        if (command === 'label_set_to_label') {
           node.style.label = true;
           node.style.labelText = node.label;
         }
-        if (command === "clear_pie_chart") {
+        if (command === 'clear_pie_chart') {
           delete node.style.pieSlices;
           delete node.style.pieMode;
           delete node.style.pieProperties;
@@ -638,18 +605,14 @@ class GraphCoreManager {
       this.cache.nodeRef.set(nodeID, node);
 
       // Save to current layout's style map (including type)
-      const currentLayout =
-        this.cache.data.layouts[this.cache.data.selectedLayout];
+      const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
       currentLayout.nodeStyles.set(nodeID, {
         type: node.type,
         style: structuredClone(node.style),
       });
     }
 
-    await this.cache.style.handleStyleChangeLoadingEvent(
-      "Style",
-      `Updating Node Styles`,
-    );
+    await this.cache.style.handleStyleChangeLoadingEvent('Style', `Updating Node Styles`);
   }
 
   getTargetNodes(propID) {
@@ -658,7 +621,7 @@ class GraphCoreManager {
       return [];
     }
     return [...this.cache.propToNodeIDs.get(propID)].filter((nodeID) =>
-      this.cache.nodeIDsToBeShown.has(nodeID),
+      this.cache.nodeIDsToBeShown.has(nodeID)
     );
   }
 
@@ -668,7 +631,7 @@ class GraphCoreManager {
       return [];
     }
     return [...this.cache.propToEdgeIDs.get(propID)].filter((edgeID) =>
-      this.cache.edgeIDsToBeShown.has(edgeID),
+      this.cache.edgeIDsToBeShown.has(edgeID)
     );
   }
 
@@ -739,17 +702,29 @@ class GraphCoreManager {
       }
     }
 
+    // Re-evaluate disconnected elements against the freshly filtered view.
+    // The dangling sets are recomputed from scratch every pass: a node hidden
+    // as dangling under the previous filter state may now be connected (and
+    // vice versa). Without this, a stale dangling node still passing the filter
+    // lands in BOTH idsToShow and idsToHide, and updateElementVisibility's
+    // show-then-hide diff resurfaces it on every filter change.
+    this.cache.hiddenDanglingNodeIDs.clear();
+    this.cache.hiddenDanglingEdgeIDs.clear();
+    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
+    if (currentLayout && currentLayout.hideDisconnectedNodes) {
+      this.computeDanglingElements();
+    }
+
     const nodeIDsToBeHidden = [...this.cache.nodeRef.keys()].filter(
-      (nodeID) => !this.cache.nodeIDsToBeShown.has(nodeID),
+      (nodeID) => !this.cache.nodeIDsToBeShown.has(nodeID)
     );
     const edgeIDsToBeHidden = [...this.cache.edgeRef.keys()].filter(
-      (edgeID) => !this.cache.edgeIDsToBeShown.has(edgeID),
+      (edgeID) => !this.cache.edgeIDsToBeShown.has(edgeID)
     );
 
-    const idsToShow = [
-      ...this.cache.nodeIDsToBeShown,
-      ...this.cache.edgeIDsToBeShown,
-    ];
+    const idsToShow = [...this.cache.nodeIDsToBeShown, ...this.cache.edgeIDsToBeShown].filter(
+      (id) => !this.cache.hiddenDanglingNodeIDs.has(id) && !this.cache.hiddenDanglingEdgeIDs.has(id)
+    );
 
     const idsToHide = [
       ...nodeIDsToBeHidden,
@@ -784,15 +759,15 @@ class GraphCoreManager {
     // isPositionsDirty = false;
     // syncPositionsDebounced.cancel?.();
 
-    const status = document.getElementById("sidebarStatusContainer");
-    status.innerHTML = "";
-    status.style.height = "0";
+    const status = document.getElementById('sidebarStatusContainer');
+    status.innerHTML = '';
+    status.style.height = '0';
   }
 
   registerHotkeyEvents() {
     if (hotkeysRegistered) return;
 
-    document.addEventListener("keydown", async (event) => {
+    document.addEventListener('keydown', async (event) => {
       // Suppress hotkeys while a workspace/layout/render is loading. The overlay
       // blocks pointer input but not keydown, so without this the user could
       // fire export/toggle/fit actions against a graph that is still settling.
@@ -802,43 +777,43 @@ class GraphCoreManager {
 
       // Skip hotkeys if currently focused on an input, textarea, or select element
       if (
-        activeElement.tagName === "INPUT" ||
-        activeElement.tagName === "TEXTAREA" ||
-        activeElement.tagName === "SELECT" ||
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.tagName === 'SELECT' ||
         activeElement.isContentEditable
       ) {
         return;
       }
 
       switch (event.key) {
-        case "p":
+        case 'p':
           await this.cache.io.exportPNG();
           break;
-        case "s":
+        case 's':
           await this.cache.io.exportGraphAsJSON();
           break;
-        case "f":
+        case 'f':
           await this.fitViewToVisibleNodes();
           break;
-        case "d":
+        case 'd':
           await this.cache.ui.toggleDataEditor();
           break;
-        case "q":
+        case 'q':
           this.cache.ui.toggleQueryEditor();
           break;
-        case "m":
+        case 'm':
           this.cache.metrics.toggleUI();
           break;
-        case "y":
+        case 'y':
           this.cache.ui.toggleStylingPanel();
           break;
-        case "l":
+        case 'l':
           await this.cache.ui.toggleLassoSelection();
           break;
-        case "h":
-          await this.cache.ui.toggleHoverEffect(document.getElementById("hoverToggleBtn"));
+        case 'h':
+          await this.cache.ui.toggleHoverEffect(document.getElementById('hoverToggleBtn'));
           break;
-        case "a":
+        case 'a':
           this.cache.assistant.togglePanel();
           break;
         default:
@@ -854,27 +829,13 @@ class GraphCoreManager {
     // are static DOM that survives file loads — same stacking hazard as hotkeys.
     if (globalEventsRegistered) return;
 
-    [
-      "input",
-      "keydown",
-      "keyup",
-      "mousedown",
-      "mouseup",
-      "focus",
-      "blur",
-      "scroll",
-    ].forEach((evt) =>
-      this.cache.query.text.addEventListener(evt, () =>
-        this.cache.qm.moveCaret(),
-      ),
+    ['input', 'keydown', 'keyup', 'mousedown', 'mouseup', 'focus', 'blur', 'scroll'].forEach(
+      (evt) => this.cache.query.text.addEventListener(evt, () => this.cache.qm.moveCaret())
     );
 
-    document.addEventListener("selectionchange", () => {
+    document.addEventListener('selectionchange', () => {
       const sel = window.getSelection();
-      if (
-        sel.rangeCount &&
-        this.cache.query.text.contains(sel.getRangeAt(0).startContainer)
-      ) {
+      if (sel.rangeCount && this.cache.query.text.contains(sel.getRangeAt(0).startContainer)) {
         this.cache.qm.moveCaret();
       }
     });
@@ -887,44 +848,44 @@ class GraphCoreManager {
 
   registerTooltipExpandToggle() {
     window.toggleTooltipExpand = function (button) {
-      const tooltip = button.closest(".tooltip");
+      const tooltip = button.closest('.tooltip');
       if (!tooltip) return;
 
-      const isExpanded = tooltip.classList.contains("expanded");
+      const isExpanded = tooltip.classList.contains('expanded');
 
       if (isExpanded) {
-        tooltip.classList.remove("expanded");
-        button.textContent = "⛶";
-        button.title = "Expand to fit content";
+        tooltip.classList.remove('expanded');
+        button.textContent = '⛶';
+        button.title = 'Expand to fit content';
       } else {
-        tooltip.classList.add("expanded");
-        button.textContent = "⤡";
-        button.title = "Restore size";
+        tooltip.classList.add('expanded');
+        button.textContent = '⤡';
+        button.title = 'Restore size';
       }
     };
 
     window.closeTooltip = function (button) {
-      const tooltip = button.closest(".tooltip");
+      const tooltip = button.closest('.tooltip');
       if (!tooltip) return;
-      tooltip.style.visibility = "hidden";
+      tooltip.style.visibility = 'hidden';
     };
   }
 
   registerTooltipWheelHandler() {
-    const graphContainer = document.getElementById("innerGraphContainer");
+    const graphContainer = document.getElementById('innerGraphContainer');
     if (!graphContainer) return;
 
     graphContainer.addEventListener(
-      "wheel",
+      'wheel',
       (event) => {
         const target = event.target;
-        const tooltip = target.closest(".tooltip");
+        const tooltip = target.closest('.tooltip');
 
         if (tooltip) {
           event.stopPropagation();
         }
       },
-      { passive: false, capture: true },
+      { passive: false, capture: true }
     );
 
     this.makeTooltipDraggable(graphContainer);
@@ -941,17 +902,13 @@ class GraphCoreManager {
       e.stopPropagation();
     };
 
-    graphContainer.addEventListener("pointerdown", (e) => {
-      if (
-        e.target.closest(".tooltip-expand-btn") ||
-        e.target.closest(".tooltip-close-btn")
-      )
-        return;
+    graphContainer.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.tooltip-expand-btn') || e.target.closest('.tooltip-close-btn')) return;
 
-      const header = e.target.closest(".tooltip-header");
+      const header = e.target.closest('.tooltip-header');
       if (!header) return;
 
-      const tooltip = header.closest(".tooltip");
+      const tooltip = header.closest('.tooltip');
       if (!tooltip) return;
 
       isDragging = true;
@@ -962,11 +919,11 @@ class GraphCoreManager {
       offsetX = e.clientX - tooltipRect.left + parentRect.left;
       offsetY = e.clientY - tooltipRect.top + parentRect.top;
 
-      header.style.cursor = "grabbing";
+      header.style.cursor = 'grabbing';
       stopEvent(e);
     });
 
-    document.addEventListener("pointermove", (e) => {
+    document.addEventListener('pointermove', (e) => {
       if (!isDragging || !currentTooltip) return;
 
       currentTooltip.style.left = `${e.clientX - offsetX}px`;
@@ -974,18 +931,18 @@ class GraphCoreManager {
       stopEvent(e);
     });
 
-    document.addEventListener("pointerup", (e) => {
+    document.addEventListener('pointerup', (e) => {
       if (!isDragging) return;
 
       if (currentTooltip) {
-        const header = currentTooltip.querySelector(".tooltip-header");
-        if (header) header.style.cursor = "move";
+        const header = currentTooltip.querySelector('.tooltip-header');
+        if (header) header.style.cursor = 'move';
       }
       isDragging = false;
       currentTooltip = null;
       stopEvent(e);
 
-      window.addEventListener("click", stopEvent, {
+      window.addEventListener('click', stopEvent, {
         capture: true,
         once: true,
       });
@@ -993,10 +950,11 @@ class GraphCoreManager {
   }
 
   async registerPluginStates() {
-    this.cache.ui.debug("Registering bubble set plugin instances ..");
+    this.cache.ui.debug('Registering bubble set plugin instances ..');
     for (const group of this.cache.bs.traverseBubbleSets()) {
-      this.cache.INSTANCES.BUBBLE_GROUPS[group] =
-        await this.cache.graph.getPluginInstance(`bubbleSetPlugin-${group}`);
+      this.cache.INSTANCES.BUBBLE_GROUPS[group] = await this.cache.graph.getPluginInstance(
+        `bubbleSetPlugin-${group}`
+      );
     }
   }
 }

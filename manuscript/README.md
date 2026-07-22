@@ -1,12 +1,32 @@
 # Graph Lens Lite — Publication
 
-Multi-venue LaTeX setup for the Graph Lens Lite paper. The body content lives in
-`shared/content.tex` and is rendered by two venue-specific drivers:
+LaTeX source for the Graph Lens Lite journal paper, targeting the OUP
+`oup-authoring-template` class (Nucleic Acids Research by default).
 
-| Directory  | Target venue           |
-|------------|------------------------|
-| `oxford/`  | Oxford Bioinformatics  |
-| `biorxiv/` | bioRxiv preprint       |
+The folder is flat: one driver (`main.tex`) plus the prose split into small
+`\input` files so each piece can be edited on its own.
+
+- `main.tex` — driver: preamble, frontmatter macros, `\input`s the body
+- `body.tex` — the body, Introduction through Conflict of interest
+- `abstract.tex` — abstract prose (no heading), fed to `\abstract{}`
+- `keywords.tex` — keyword list, fed to `\keywords{}`
+- `reference.bib` — bibliography database
+- `oup-plain.bst` — numbered citation style
+- `Fig/` — figures
+
+The body is in IMRaD order (Introduction → Materials and Methods → Results →
+Discussion); headings are unnumbered under the OUP class (`unnumsec`).
+
+## Author conventions
+
+Look for these markers when reviewing the draft:
+
+- `% AI-DRAFTED -- REVIEW` — prose drafted by an AI assistant during the
+  manuscript restructure. Treat as a starting point; revise in your own voice
+  before submission. Anything not marked is user-original prose preserved
+  verbatim from the prior draft.
+- `% TODO` — structural placeholder. The heading exists, the body is empty,
+  the comment block lists the angles to consider.
 
 ## Prerequisites
 
@@ -56,86 +76,49 @@ sudo tlmgr install natbib acronym preprint lineno enumitem lm
 
 ## Building
 
-Each flavor is compiled from its own directory. A full build requires
-`pdflatex` → `bibtex` → `pdflatex` → `pdflatex` (two extra passes resolve
-cross-references and citations).
-
-### Oxford Bioinformatics
-
 ```bash
-cd oxford/
 latexmk -pdf main
 ```
 
-Output: `oxford/main.pdf`
+Output: `main.pdf`
 
-### bioRxiv
+Uses the OUP `oup-authoring-template` class (`webpdf,contemporary,numbered`,
+numbered citations via `oup-plain.bst`). Set `\journaltitle` (and `\appnotes`)
+to the target venue at submission time.
 
-```bash
-cd biorxiv/
-latexmk -pdf main
-```
-
-Output: `biorxiv/main.pdf`
-
-### Build both at once
-
-From the manuscript directory:
+### Preprint / bioRxiv version
 
 ```bash
-for dir in oxford biorxiv; do
-  (cd "$dir" && latexmk -pdf main)
-done
+latexmk -pdf biorxiv
 ```
+
+Output: `biorxiv.pdf`
+
+`biorxiv.tex` is a second driver that reuses `body.tex`, `abstract.tex`, and
+`keywords.tex` verbatim under a plain `article` class — no OUP template
+needed. Drops the journal-specific frontmatter (title/DOI/vol/issue, the
+received/revised/accepted dates, two-column styling); keeps numbered
+citations (`natbib` + `unsrtnat`) and line numbers. Edits to the shared prose
+flow to both PDFs. `\ORCID{}` is a no-op here (bioRxiv collects ORCIDs in its
+submission form).
+
+**The OUP class must be available.** It ships in recent TeX Live
+(`oup-authoring-template`); if `latexmk` reports the class missing, copy
+`oup-authoring-template.cls` and the `oup-*.bst` files from the OUP template
+(<https://www.overleaf.com/latex/templates/oup-general-template/ybpypwncdxyb>)
+into this directory, or build on Overleaf.
+
+Note: the OUP class does not define the `description` environment — use
+`itemize` in the body.
 
 ### Clean auxiliary files
 
 ```bash
-cd oxford/   # or biorxiv/
 latexmk -C
 ```
 
-## Adding references
+## References
 
-`scripts/add_reference_to_manuscript.py` (in the repo root) fetches a PubMed
-citation by PMID and appends it to `shared/reference.bib`. It requires only
-Python 3 (no extra packages).
-
-```bash
-scripts/add_reference_to_manuscript.py <PMID>
-```
-
-The tool shows the generated BibTeX entry and asks for confirmation before
-writing. Duplicate cite keys are rejected automatically.
-
-## Repository structure
-
-```
-shared/
-  content.tex              Body sections shared across venues
-  abbreviations.tex        Acronym definitions
-  reference.bib            Bibliography database
-  Fig/                     Figures
-
-oxford/
-  main.tex                 OUP driver (structured abstract, journal metadata)
-  oup-authoring-template.cls
-
-biorxiv/
-  main.tex                 Preprint driver (article class, line numbers)
-
-../scripts/
-  add_reference_to_manuscript.py   Fetch PubMed citation → BibTeX (Python 3)
-```
-
-Edit `shared/content.tex` to change the paper body — both flavors pick up the
-changes. For small venue-specific differences inside the shared content, use the
-`\ifbiorxiv` flag:
-
-```latex
-\ifbiorxiv
-  Supplementary data are available at \url{...}
-\else
-  Supplementary data are available at \textit{Bioinformatics} online.
-\fi
-```
+Add entries to `reference.bib` (BibTeX). Citations render numbered in order of
+appearance via `oup-plain.bst`; NAR style shows the first three authors then
+"et al." — append `and others` to an author list to trigger it.

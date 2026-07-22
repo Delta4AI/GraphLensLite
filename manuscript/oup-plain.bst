@@ -31,6 +31,7 @@ ENTRY
     type
     volume
     year
+    doi
   }
   {}
   { label }
@@ -92,9 +93,20 @@ FUNCTION {output.bibitem}
   before.all 'output.state :=
 }
 
+FUNCTION {format.doi}
+{ doi empty$
+    { "" }
+    { "\url{https://doi.org/" doi * "}" * }
+  if$
+}
+
 FUNCTION {fin.entry}
 { add.period$
   write$
+  format.doi duplicate$ empty$
+    'pop$
+    { " " swap$ * write$ }
+  if$
   newline$
 }
 
@@ -1046,9 +1058,9 @@ FUNCTION {presort}
   'sort.key$ :=
 }
 
-ITERATE {presort}
-
-SORT
+% NAR: references numbered in order of appearance, not sorted.
+% ITERATE {presort}
+% SORT
 
 STRINGS { longest.label }
 

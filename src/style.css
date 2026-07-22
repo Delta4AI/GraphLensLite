@@ -1495,6 +1495,27 @@ h5 {
     box-shadow: 0 0 0 2px rgba(195, 61, 53, 0.25);
 }
 
+/* Single-value fallback shown in place of a slider when a numeric property has
+   only one possible value (min === max). Read-only checkmark + value. */
+.filter-single-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    align-self: flex-start;
+    height: 20px;
+    padding: 0 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+}
+
+.filter-single-value-check {
+    color: var(--accent-text);
+    font-weight: 700;
+}
+
 .filter-row-col3 {
     flex: 0 0 auto;
     display: flex;

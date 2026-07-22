@@ -1,0 +1,81 @@
+%% Template-specific Frontmatter
+%% 
+%% Requires the OUP template bundle (ships in recent TeX Live versions) (oup-authoring-template)
+%% Alternatively, copy oup-authoring-template.cls and the oup-*.bst files from the OUP template
+%% (https://www.overleaf.com/latex/templates/oup-general-template/ybpypwncdxyb)
+%% into this directory.
+%%
+%% Document bodies:
+%%   body.tex
+%%   abstract.tex
+%%   keywords.tex
+
+\documentclass[unnumsec,webpdf,contemporary,large]{oup-authoring-template}
+
+\usepackage[T1]{fontenc}   % special characters (ȩ, ß)
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{url}
+
+% Numbered citations in round parentheses, in order of appearance
+\setcitestyle{numbers,round,comma}
+
+\graphicspath{{Fig/}}
+
+% Line numbers for peer review
+\usepackage[mathlines, switch]{lineno}
+\linenumbers
+
+\begin{document}
+
+\journaltitle{Nucleic Acids Research}
+\DOI{DOI added during production}
+\copyrightyear{2026}
+\pubyear{2026}
+\vol{00}
+\issue{0}
+\access{Advance Access Publication Date: Day Month Year}
+\appnotes{Paper}
+
+\firstpage{1}
+
+\title[Graph Lens Lite]{Graph Lens Lite: A browser-based tool for interactive visualization and exploration of biological networks}
+
+\author[1,2,$\ast$]{Matthias Ley\ORCID{0000-0001-6853-8542}}
+\author[1]{Kinga K\k{e}ska-Izworska\ORCID{0000-0002-4329-1499}}
+\author[1]{Lucas Fillinger\ORCID{0000-0001-5341-8097}}
+\author[1]{Samuel M Walter\ORCID{0000-0002-6868-5654}}
+\author[1]{Fabio Baumg\"{a}rtel\ORCID{0009-0000-0243-2673}}
+\author[1,2]{Enrico Bono\ORCID{0009-0007-7272-5034}}
+\author[1,2]{Louiza Galou\ORCID{0009-0008-5176-2802}}
+\author[1]{Peter Andorfer\ORCID{0009-0003-3492-4017}}
+\author[3]{Pirmin Hauser}
+\author[3]{Johannes Leierer\ORCID{0000-0002-7884-9827}}
+\author[1,2,$\dagger$,$\ast\ast$]{Klaus Kratochwill\ORCID{0000-0003-0803-614X}}
+\author[1,3,$\dagger$]{Paul Perco\ORCID{0000-0003-2087-5691}}
+
+\address[1]{\orgname{Delta4 GmbH}, \orgaddress{\street{Alser Stra\ss{}e 23/30}, \postcode{1080}, \state{Vienna}, \country{Austria}}}
+\address[2]{\orgdiv{Division of Pediatric Nephrology and Gastroenterology, Department of Pediatrics and Adolescent Medicine, Comprehensive Center for Pediatrics}, \orgname{Medical University Vienna}, \orgaddress{\street{Waehringer Guertel 18-20}, \postcode{1090}, \state{Vienna}, \country{Austria}}}
+\address[3]{\orgdiv{Department of Internal Medicine IV}, \orgname{Medical University Innsbruck}, \orgaddress{\street{Anichstrasse 35}, \postcode{6020}, \state{Innsbruck}, \country{Austria}}}
+
+\corresp[$\ast$]{Corresponding author. \href{mailto:matthias.ley@delta4.ai}{matthias.ley@delta4.ai}\\}
+\corresp[$\ast\ast$]{Correspondence may also be addressed to \href{mailto:klaus.kratochwill@delta4.ai}{klaus.kratochwill@delta4.ai}\\}
+\corresp[$\dagger$]{These authors contributed equally.}
+
+\received{Date}{0}{Year}
+\revised{Date}{0}{Year}
+\accepted{Date}{0}{Year}
+
+\abstract{\input{abstract}}
+
+\keywords{\input{keywords}}
+
+\maketitle
+
+\input{body}
+
+\bibliographystyle{oup-plain}
+\bibliography{reference}
+
+\end{document}
