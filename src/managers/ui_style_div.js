@@ -1222,13 +1222,19 @@ function createStyleDiv(cache) {
         {min: 0.05, max: 3, step: 0.05},
         `Thickness of bubble set ${tabIndex}'s connecting arms to outlying members.`, false);
 
-      // Avoidance (non-member negative influence multiplier)
+      // Avoidance (non-member field on/off; persisted numeric 0/1 for
+      // JSON back-compat — legacy saved values > 0 read as ON)
       const rowAvoidance = createNewRow(panel);
-      appendLabel(rowAvoidance, "Avoidance",
-        "How strongly the bubble steers around nodes that are not in the group — 0 lets it cover them freely.");
-      createNumericalSlider(rowAvoidance, `Bubble Set ${group} Avoidance`, bs.avoidance ?? 1,
-        {min: 0, max: 3, step: 0.05},
-        `How strongly bubble set ${tabIndex} steers around non-member nodes.`, false);
+      appendLabel(rowAvoidance, "Avoid Other Nodes",
+        "Steer the hull around nodes that are not in the group and carve holes for enclosed ones.");
+      const avoidanceSwitch = createSwitch(async () => {
+        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Avoidance`, avoidanceSwitch.isChecked() ? 1 : 0);
+      }, undefined, (bs.avoidance ?? 1) > 0);
+      avoidanceSwitch.dataset.property = `Bubble Set ${group} Avoidance`;
+      // The row label is a separate element, so name the checkbox directly.
+      avoidanceSwitch.querySelector("input").setAttribute("aria-label",
+        `Avoid other nodes (bubble set ${tabIndex})`);
+      rowAvoidance.appendChild(avoidanceSwitch);
 
       // Label (toggle + text input)
       const rowLabel = createNewRow(panel);
