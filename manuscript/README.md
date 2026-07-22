@@ -1,33 +1,23 @@
 # Graph Lens Lite — Publication
 
-LaTeX setup for the Graph Lens Lite paper. The body is a single source under
-`shared/`, rendered by venue-specific drivers:
+LaTeX source for the Graph Lens Lite journal paper, targeting the OUP
+`oup-authoring-template` class (Nucleic Acids Research by default).
 
-| Directory   | Output                                        |
-|-------------|-----------------------------------------------|
-| `biorxiv/`  | bioRxiv preprint (article class)              |
-| `journal/`  | Journal submission (OUP authoring class)      |
+The folder is flat: one driver (`main.tex`) plus the prose split into small
+`\input` files so each piece can be edited on its own.
 
-Shared body, split so it can feed both the article-class preprint driver and
-the OUP template (which takes the abstract and keywords as frontmatter macros,
-not sections):
-
-- `shared/body.tex` — the body, Introduction through Conflict of interest
-- `shared/abstract.tex` — abstract prose (no heading)
-- `shared/keywords.tex` — keyword list
-- `shared/content.tex` — thin wrapper: emits abstract + keywords as sections,
-  then `\input`s the body. Used by the `biorxiv` driver.
-
-The `journal` driver does **not** use `content.tex`; it injects `abstract.tex`
-and `keywords.tex` into the OUP `\abstract{}` / `\keywords{}` macros and
-`\input`s `body.tex` directly. Edit prose once in `body.tex`/`abstract.tex` —
-both flavors pick it up.
+- `main.tex` — driver: preamble, frontmatter macros, `\input`s the body
+- `body.tex` — the body, Introduction through Conflict of interest
+- `abstract.tex` — abstract prose (no heading), fed to `\abstract{}`
+- `keywords.tex` — keyword list, fed to `\keywords{}`
+- `reference.bib` — bibliography database
+- `oup-plain.bst` — numbered citation style
+- `Fig/` — figures
 
 The body is in IMRaD order (Introduction → Materials and Methods → Results →
-Discussion); section headings are unstarred so they render unnumbered under the
-article class (`secnumdepth=-2`) and styled under the OUP class (`unnumsec`).
+Discussion); headings are unnumbered under the OUP class (`unnumsec`).
 
-## Author conventions in `shared/content.tex`
+## Author conventions
 
 Look for these markers when reviewing the draft:
 
@@ -86,23 +76,11 @@ sudo tlmgr install natbib acronym preprint lineno enumitem lm
 
 ## Building
 
-### bioRxiv
-
 ```bash
-cd biorxiv/
 latexmk -pdf main
 ```
 
-Output: `biorxiv/main.pdf`
-
-### Journal
-
-```bash
-cd journal/
-latexmk -pdf main
-```
-
-Output: `journal/main.pdf`
+Output: `main.pdf`
 
 Uses the OUP `oup-authoring-template` class (`webpdf,contemporary,numbered`,
 numbered citations via `oup-plain.bst`). Set `\journaltitle` (and `\appnotes`)
@@ -112,60 +90,19 @@ to the target venue at submission time.
 (`oup-authoring-template`); if `latexmk` reports the class missing, copy
 `oup-authoring-template.cls` and the `oup-*.bst` files from the OUP template
 (<https://www.overleaf.com/latex/templates/oup-general-template/ybpypwncdxyb>)
-into `journal/`, or build on Overleaf.
+into this directory, or build on Overleaf.
 
 Note: the OUP class does not define the `description` environment — use
-`itemize` in the shared body.
-
-### Build both flavors at once
-
-From the `manuscript/` directory:
-
-```bash
-for dir in biorxiv journal; do (cd "$dir" && latexmk -pdf main); done
-```
+`itemize` in the body.
 
 ### Clean auxiliary files
 
 ```bash
-cd biorxiv/   # or journal/
 latexmk -C
 ```
 
-## Adding references
+## References
 
-`scripts/add_reference_to_manuscript.py` (in the repo root) fetches a PubMed
-citation by PMID and appends it to `shared/reference.bib`. It requires only
-Python 3 (no extra packages).
-
-```bash
-scripts/add_reference_to_manuscript.py <PMID>
-```
-
-The tool shows the generated BibTeX entry and asks for confirmation before
-writing. Duplicate cite keys are rejected automatically.
-
-## Repository structure
-
-```
-shared/
-  body.tex                 Body, Introduction through Conflict of interest
-  abstract.tex             Abstract prose (no heading)
-  keywords.tex             Keyword list
-  content.tex              Wrapper: abstract + keywords as sections, then body
-  reference.bib            Bibliography database
-  Fig/                     Figures
-
-biorxiv/
-  main.tex                 Preprint driver (article class, natbib author-year)
-
-journal/
-  main.tex                 Journal driver (OUP oup-authoring-template, numbered)
-
-../scripts/
-  add_reference_to_manuscript.py   Fetch PubMed citation → BibTeX (Python 3)
-```
-
-`biorxiv` `\input`s `../shared/content`; `journal` injects the frontmatter
-macros and `\input`s `body.tex`. Edit the shared body once — both flavors pick
-up the changes.
+Add entries to `reference.bib` (BibTeX). Citations render numbered in order of
+appearance via `oup-plain.bst`; NAR style shows the first three authors then
+"et al." — append `and others` to an author list to trigger it.

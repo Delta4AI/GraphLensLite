@@ -5,10 +5,10 @@
 %% (https://www.overleaf.com/latex/templates/oup-general-template/ybpypwncdxyb)
 %% into this directory.
 %%
-%% Shared document bodies: 
-%%   shared/body.tex
-%%   shared/abstract.tex
-%%   shared/keywords.tex
+%% Document bodies:
+%%   body.tex
+%%   abstract.tex
+%%   keywords.tex
 
 \documentclass[unnumsec,webpdf,contemporary,large]{oup-authoring-template}
 
@@ -21,7 +21,7 @@
 % Numbered citations in round parentheses, in order of appearance
 \setcitestyle{numbers,round,comma}
 
-\graphicspath{{../shared/Fig/}}
+\graphicspath{{Fig/}}
 
 % Line numbers for peer review
 \usepackage[mathlines, switch]{lineno}
@@ -67,15 +67,15 @@
 \revised{Date}{0}{Year}
 \accepted{Date}{0}{Year}
 
-\abstract{\input{../shared/abstract}}
+\abstract{\input{abstract}}
 
-\keywords{\input{../shared/keywords}}
+\keywords{\input{keywords}}
 
 \maketitle
 
-\input{../shared/body}
+\input{body}
 
 \bibliographystyle{oup-plain}
-\bibliography{reference-nar}
+\bibliography{reference}
 
 \end{document}
