@@ -16,7 +16,6 @@ function createMockCache() {
     DEFAULTS,
     data: {
       filterDefaults: new Map(),
-      booleanTypeOverrides: new Set(),
       nodes: [],
       edges: [],
       layouts: {},
@@ -55,20 +54,14 @@ describe('boolean classification (§6.1)', () => {
     expect(fd.isBoolean).toBe(true);
     expect(fd.isCategory).toBe(true);
     expect([...fd.categories].sort()).toEqual(['false', 'true']);
-    expect(fd.numericBoolSource).toBe(false);
     expect(fd.unusable).toBe(false);
   });
 
-  it('classifies a pure 0/1 numeric column as boolean and override-eligible', () => {
+  it('classifies a pure 0/1 numeric column as boolean', () => {
     feed(io, PROP, [1, 0, 1, 1]);
     io.finalizeFilterClassification();
 
-    const fd = cache.data.filterDefaults.get(PROP);
-    expect(fd.isBoolean).toBe(true);
-    expect(fd.numericBoolSource).toBe(true);
-    // numeric bounds survive so the override can switch back without rescanning
-    expect(fd.lowerThreshold).toBe(0);
-    expect(fd.upperThreshold).toBe(1);
+    expect(cache.data.filterDefaults.get(PROP).isBoolean).toBe(true);
   });
 
   it('classifies mixed encodings (TRUE + 1) as boolean, not unusable', () => {
@@ -77,7 +70,6 @@ describe('boolean classification (§6.1)', () => {
 
     const fd = cache.data.filterDefaults.get(PROP);
     expect(fd.isBoolean).toBe(true);
-    expect(fd.numericBoolSource).toBe(false); // text present → no numeric override
     expect(fd.unusable).toBe(false);
     expect(cache.ui.warning).not.toHaveBeenCalled();
   });
@@ -117,24 +109,23 @@ describe('boolean classification (§6.1)', () => {
     expect(fd.unusable).toBe(false);
   });
 
-  it('honors a persisted numeric override for 0/1 columns', () => {
-    cache.data.booleanTypeOverrides.add(PROP);
+  it('reclassifies to numeric when a rebuild sees a third distinct value', () => {
+    // First load: 0/1 only → boolean.
     feed(io, PROP, [1, 0]);
+    io.finalizeFilterClassification();
+    expect(cache.data.filterDefaults.get(PROP).isBoolean).toBe(true);
+
+    // Data-editor edit adds a 2; the rebuild reruns classification from
+    // scratch (preProcessData resets filterDefaults) → plain numeric slider.
+    cache.data.filterDefaults = new Map();
+    feed(io, PROP, [1, 0, 2]);
     io.finalizeFilterClassification();
 
     const fd = cache.data.filterDefaults.get(PROP);
     expect(fd.isBoolean).toBe(false);
-    expect(fd.numericBoolSource).toBe(true); // still eligible to switch back
+    expect(fd.isCategory).toBe(false);
     expect(fd.lowerThreshold).toBe(0);
-    expect(fd.upperThreshold).toBe(1);
-  });
-
-  it('ignores an override on text-encoded booleans (numeric makes no sense)', () => {
-    cache.data.booleanTypeOverrides.add(PROP);
-    feed(io, PROP, ['TRUE', 'FALSE']);
-    io.finalizeFilterClassification();
-
-    expect(cache.data.filterDefaults.get(PROP).isBoolean).toBe(true);
+    expect(fd.upperThreshold).toBe(2);
   });
 
   it('canonicalizes featureValues on carriers to Set{true|false}', () => {
@@ -186,60 +177,6 @@ describe('mixed-type columns stay visible as unusable (§6.2)', () => {
 
     expect(cache.data.filterDefaults.get('Node filters::g::cat').unusable).toBe(false);
     expect(cache.data.filterDefaults.get('Node filters::g::num').unusable).toBe(false);
-  });
-});
-
-describe('applyBooleanTypeOverride', () => {
-  let io, cache, node;
-
-  beforeEach(() => {
-    cache = createMockCache();
-    io = new IOManager(cache);
-    node = {
-      features: new Set([PROP]),
-      featureValues: new Map(),
-      D4Data: { 'Node filters': { group: { flag: 1 } } },
-    };
-    cache.data.nodes = [node];
-    node.featureValues.set(PROP, 1);
-    feed(io, PROP, [1, 0]);
-    io.finalizeFilterClassification();
-    cache.data.layouts = {
-      Default: { filters: new Map([[PROP, { placeholder: true }]]) },
-    };
-  });
-
-  it('switches to numeric: flags, override set, featureValues from D4Data', () => {
-    io.applyBooleanTypeOverride(PROP, true);
-
-    const fd = cache.data.filterDefaults.get(PROP);
-    expect(fd.isBoolean).toBe(false);
-    expect(fd.isCategory).toBe(false);
-    expect(cache.data.booleanTypeOverrides.has(PROP)).toBe(true);
-    expect(node.featureValues.get(PROP)).toBe(1);
-    // layout filter reset to a clone of the new default
-    expect(cache.data.layouts.Default.filters.get(PROP).isBoolean).toBe(false);
-  });
-
-  it('switches back to boolean: canonical categories and featureValues', () => {
-    io.applyBooleanTypeOverride(PROP, true);
-    io.applyBooleanTypeOverride(PROP, false);
-
-    const fd = cache.data.filterDefaults.get(PROP);
-    expect(fd.isBoolean).toBe(true);
-    expect(cache.data.booleanTypeOverrides.has(PROP)).toBe(false);
-    expect([...node.featureValues.get(PROP)]).toEqual(['true']);
-    expect(cache.data.layouts.Default.filters.get(PROP).isBoolean).toBe(true);
-  });
-
-  it('is a no-op for properties that are not 0/1-encoded', () => {
-    feed(io, 'Node filters::g::text', ['TRUE', 'FALSE']);
-    io.finalizeFilterClassification();
-
-    io.applyBooleanTypeOverride('Node filters::g::text', true);
-
-    expect(cache.data.filterDefaults.get('Node filters::g::text').isBoolean).toBe(true);
-    expect(cache.data.booleanTypeOverrides.has('Node filters::g::text')).toBe(false);
   });
 });
 

@@ -882,11 +882,6 @@ class UIManager {
           : new InvertibleRangeSlider(propID, this.cache);
 
       widget.appendTo(col2);
-      // 0/1-encoded columns can be genuine numeric measures misclassified as
-      // boolean (§6.1 risk) — offer the type switch in both directions.
-      if (filterDefault.numericBoolSource) {
-        col2.appendChild(this.createBooleanTypeOverrideLink(propID, filterDefault.isBoolean));
-      }
       const col3 = document.createElement('div');
       col3.className = 'filter-row-col3';
       if (this.cache.nodeExclusiveProps.has(propID) || this.cache.mixedProps.has(propID)) {
@@ -904,29 +899,6 @@ class UIManager {
 
     this.manageDynamicWidgets();
     this.cache.qm.updateQueryTextArea();
-  }
-
-  // Small type-switch link under the widget of a 0/1-encoded column: inferred
-  // boolean ↔ plain numeric slider (§6.1 misclassification override). The
-  // choice persists in the workspace JSON via cache.data.booleanTypeOverrides.
-  createBooleanTypeOverrideLink(propID, isCurrentlyBoolean) {
-    const link = document.createElement('button');
-    link.type = 'button';
-    link.className = 'filter-type-override';
-    link.textContent = isCurrentlyBoolean ? 'treat as 0/1 numbers' : 'treat as true/false';
-    link.title = isCurrentlyBoolean
-      ? 'This column only holds 0 and 1 — switch to a numeric range slider if they are measures, not booleans'
-      : 'Switch back to the inferred true/false toggle';
-    link.addEventListener('click', async () => {
-      if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
-      this.cache.io.applyBooleanTypeOverride(propID, isCurrentlyBoolean);
-      this.buildFilterUI();
-      await this.cache.fm.handleFilterEvent(
-        'Filtering Elements',
-        `${propID} type switched to ${isCurrentlyBoolean ? 'numeric' : 'boolean'}`
-      );
-    });
-    return link;
   }
 
   // Builds the segmented OR/AND control that sets how multiple active filters

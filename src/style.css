@@ -1426,7 +1426,9 @@ h5 {
    and the slider's min/max inputs all line up). */
 .filter-subgroup-body {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    /* Col2 keeps a readable floor for sliders/dropdowns/inputs; col1 gives up
+       width instead (long property names wrap via .checkboxLabel). */
+    grid-template-columns: minmax(0, auto) minmax(150px, 1fr) auto;
     column-gap: 8px;
     row-gap: 6px;
     align-items: start;
@@ -1620,25 +1622,9 @@ h5 {
 }
 
 /* Boolean filter rows (§6.1): the Any/True/False segment reuses the join
-   toggle's pill styling; the type-override link sits under it as fine print. */
+   toggle's pill styling. */
 .filter-bool-toggle {
     justify-self: start;
-}
-
-.filter-type-override {
-    display: block;
-    margin-top: 2px;
-    padding: 0;
-    border: none;
-    background: none;
-    font-size: 10px;
-    color: var(--text-muted);
-    text-decoration: underline dotted;
-    cursor: pointer;
-}
-
-.filter-type-override:hover {
-    color: var(--accent-text);
 }
 
 /* Mixed-type rows (§6.2): visible but inert, with the reason inline. */
@@ -2380,6 +2366,9 @@ hr {
     padding-left: 2px;
     flex-grow: 1;
     font-size: 12px;
+    /* Long property names wrap (breaking mid-word if unavoidable) so the
+       control column never drops below its readable minimum. */
+    overflow-wrap: anywhere;
 }
 
 .checkbox {

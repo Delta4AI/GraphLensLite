@@ -1262,11 +1262,6 @@ class IOManager {
 
     this.cache.nodePositionsFromExcelImport = new Map();
 
-    // Per-property boolean-type overrides (§6.1): props the user forced back
-    // to numeric. Lives on cache.data so it round-trips through the workspace
-    // JSON (Set → array via the export replacer).
-    this.cache.data.booleanTypeOverrides = new Set(fileData.booleanTypeOverrides || []);
-
     this.populateCacheHeaders(fileData);
 
     this.cache.data.nodes = fileData.nodes.map((node) => {
@@ -1454,11 +1449,11 @@ class IOManager {
       // Boolean classification (§6.1): boolCandidate stays true while every
       // observed value is a boolean encoding (true/TRUE/1 vs false/FALSE/0);
       // finalizeFilterClassification then promotes candidates to isBoolean.
-      // numericBoolSource marks candidates whose values were all numeric
-      // (0/1) — the only ones eligible for the "treat as numbers" override.
+      // Classification is purely data-driven — when the data changes (e.g. a
+      // third distinct number appears via the data editor), the rebuild
+      // reclassifies the column automatically.
       isBoolean: false,
       boolCandidate: true,
-      numericBoolSource: false,
       // Mixed-type accounting (§6.2): a column holding both numeric and text
       // values becomes an unusable (disabled) filter row instead of being
       // deleted; the counts feed the row's explanation.
@@ -1543,28 +1538,22 @@ class IOManager {
    * per-layout filter rebuild, so cloned layout filters inherit the result.
    *
    * - Boolean: every value is a boolean encoding → isBoolean (a refined
-   *   categorical with canonical categories {'true','false'}), unless the
-   *   user overrode a 0/1-numeric column back to numeric (persisted in
-   *   cache.data.booleanTypeOverrides, round-trips through workspace JSON).
+   *   categorical with canonical categories {'true','false'}).
    * - Mixed numeric+text: kept visible but marked unusable (disabled row)
    *   instead of the pre-1.17 silent delete.
    */
   finalizeFilterClassification() {
-    const overrides = this.cache.data.booleanTypeOverrides;
     for (const [propHash, fo] of this.cache.data.filterDefaults.entries()) {
       const hasText = fo.categories.size > 0;
       const hasNumeric = fo.lowerThreshold !== Infinity;
       if (!hasText && !hasNumeric) continue; // header-only property, no values
 
       if (fo.boolCandidate) {
-        fo.numericBoolSource = !hasText;
-        if (!(fo.numericBoolSource && overrides.has(propHash))) {
-          fo.isBoolean = true;
-          fo.isCategory = true;
-          fo.categories = new Set(['true', 'false']);
-          this.#canonicalizeBooleanFeatureValues(propHash);
-        }
-        continue; // an overridden 0/1 column falls through as plain numeric
+        fo.isBoolean = true;
+        fo.isCategory = true;
+        fo.categories = new Set(['true', 'false']);
+        this.#canonicalizeBooleanFeatureValues(propHash);
+        continue;
       }
 
       if (hasText && hasNumeric) {
@@ -1583,7 +1572,7 @@ class IOManager {
   // Set{'true'|'false'} on every carrier, so categorical consumers (color
   // ramps, pies, IN queries) see one value space regardless of the source
   // encoding (TRUE vs 1). Raw D4Data is never touched — exports stay
-  // byte-faithful and the numeric override can restore the original values.
+  // byte-faithful.
   #canonicalizeBooleanFeatureValues(propHash) {
     for (const element of [...this.cache.data.nodes, ...this.cache.data.edges]) {
       if (!element.features?.has(propHash)) continue;
@@ -1594,41 +1583,6 @@ class IOManager {
         canonical.add(StaticUtilities.booleanTokenValue(value) ?? 'false');
       }
       element.featureValues.set(propHash, canonical);
-    }
-  }
-
-  /**
-   * User-facing type override for boolean-classified 0/1 columns (§6.1 risk
-   * mitigation): flips one property between the inferred boolean segment and
-   * a plain numeric range slider. The choice is stored in
-   * cache.data.booleanTypeOverrides and therefore persists in the workspace
-   * JSON. Resets the property's per-layout filter state (a type switch
-   * invalidates any narrowed state) and rebuilds featureValues from D4Data.
-   */
-  applyBooleanTypeOverride(propHash, toNumeric) {
-    const fo = this.cache.data.filterDefaults.get(propHash);
-    if (!fo?.numericBoolSource) return;
-
-    if (toNumeric) {
-      this.cache.data.booleanTypeOverrides.add(propHash);
-      fo.isBoolean = false;
-      fo.isCategory = false;
-      fo.categories = new Set();
-      const [main, sub, prop] = StaticUtilities.decodePropHashId(propHash);
-      for (const element of [...this.cache.data.nodes, ...this.cache.data.edges]) {
-        if (!element.features?.has(propHash)) continue;
-        element.featureValues.set(propHash, element.D4Data?.[main]?.[sub]?.[prop]);
-      }
-    } else {
-      this.cache.data.booleanTypeOverrides.delete(propHash);
-      fo.isBoolean = true;
-      fo.isCategory = true;
-      fo.categories = new Set(['true', 'false']);
-      this.#canonicalizeBooleanFeatureValues(propHash);
-    }
-
-    for (const layoutName in this.cache.data.layouts) {
-      this.cache.data.layouts[layoutName].filters.set(propHash, structuredClone(fo));
     }
   }
 

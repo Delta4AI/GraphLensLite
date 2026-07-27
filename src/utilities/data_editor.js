@@ -1075,7 +1075,6 @@ class DataTable {
         ...plan.fileData,
         layouts: this.cache.data.layouts,
         selectedLayout: this.cache.data.selectedLayout,
-        booleanTypeOverrides: this.cache.data.booleanTypeOverrides,
       });
       const s = plan.stats;
       const ignored = s.ignoredNodes.length + s.ignoredEdges.length;
@@ -1159,7 +1158,6 @@ class DataTable {
       // Preserve existing layouts and selected layout to maintain per-view configurations
       layouts: this.cache.data.layouts,
       selectedLayout: this.cache.data.selectedLayout,
-      booleanTypeOverrides: this.cache.data.booleanTypeOverrides,
       // filterDefaults will be rebuilt by preProcessData() from the headers
     };
 
