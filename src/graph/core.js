@@ -393,6 +393,13 @@ class GraphCoreManager {
     await this.focusElements(edgeIDs);
   }
 
+  /** Center and zoom to the whole selection (nodes and edges) — the rail chip's 🔍. */
+  async focusSelection() {
+    const ids = [...this.cache.selectedNodes, ...this.cache.selectedEdges];
+    if (ids.length === 0) return;
+    await this.focusElements(ids);
+  }
+
   async focusElements(elementIDs, isNode) {
     const zoom = await this.cache.graph.getZoom();
     if (zoom < 2) {

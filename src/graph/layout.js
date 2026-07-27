@@ -418,6 +418,29 @@ class GraphLayoutManager {
     }
   }
 
+  /** Rename the current workspace (the Default workspace keeps its name). */
+  async renameSelectedLayout() {
+    const current = this.cache.data.selectedLayout;
+    if (current === 'Default') {
+      this.cache.ui.error('Cannot rename the Default workspace.');
+      return;
+    }
+
+    const name = await Popup.prompt(`Rename workspace "${current}" to:`);
+    if (!name || name === current) return;
+    if (Object.keys(this.cache.data.layouts).includes(name)) {
+      this.cache.ui.error(`Workspace with name "${name}" already exists.`);
+      return;
+    }
+
+    this.cache.data.layouts[name] = this.cache.data.layouts[current];
+    delete this.cache.data.layouts[current];
+    this.cache.data.selectedLayout = name;
+    this.cache.uiComponents.buildDropdownOptions();
+    this.cache.rail?.refresh();
+    this.cache.ui.info(`Renamed workspace "${current}" to "${name}"`);
+  }
+
   async removeSelectedLayout() {
     // Protect the "Default" layout from deletion
     if (this.cache.data.selectedLayout === 'Default') {
@@ -578,28 +601,32 @@ class GraphLayoutManager {
    * Styles, filters, query and bubble-group membership are untouched — only
    * positions change. Mirrors the template branch of addLayout (setLayout →
    * layout → persist → animated transition) but stays on the current workspace
-   * instead of creating a new one. Defaults the picker to the workspace's
-   * original layout type so it doubles as "redo the layout I started with".
+   * instead of creating a new one. The algorithm comes from the rail's Layout
+   * menu, which marks the workspace's current type.
    */
-  async relayoutWorkspace() {
+  async relayoutWorkspace(layoutType) {
     const currentName = this.cache.data.selectedLayout;
     const currentLayout = this.cache.data.layouts[currentName];
-    if (!currentLayout) return;
+    if (!currentLayout || !layoutType) return;
 
     const nodeCount = this.cache.graphData?.order ?? this.cache.nodeRef.size;
-    const result = await Popup.layoutSelectDialog(this.cache.DEFAULTS.LAYOUT_INTERNALS, {
-      defaultType: currentLayout.layoutType || this.cache.DEFAULTS.LAYOUT,
-      hasPositions: currentLayout.positions?.size > 0,
-      nodeCount,
-      expensiveLayouts: this.cache.DEFAULTS.EXPENSIVE_LAYOUTS,
-      warningThreshold: this.cache.DEFAULTS.LAYOUT_NODE_WARNING_THRESHOLD,
-    });
-    if (!result) {
-      this.cache.ui.info('Re-layout canceled');
-      return;
-    }
 
-    const layoutType = result.templateType;
+    // Chosen from the rail's Layout menu — the expensive-layout guard mirrors
+    // the addLayout template branch.
+    if (
+      this.cache.DEFAULTS.EXPENSIVE_LAYOUTS.includes(layoutType) &&
+      nodeCount > this.cache.DEFAULTS.LAYOUT_NODE_WARNING_THRESHOLD
+    ) {
+      const proceed = await Popup.confirm(
+        `The "${layoutType}" layout is computationally intensive and may ` +
+          `take several minutes on ${nodeCount.toLocaleString()} nodes. The UI stays ` +
+          `blocked until it finishes. Continue?`
+      );
+      if (!proceed) {
+        this.cache.ui.info('Re-layout canceled');
+        return;
+      }
+    }
 
     await this.cache.ui.showLoading('Re-layouting Workspace', `Applying ${layoutType} layout`);
     // Pin the overlay up across the whole re-layout so the inner render's

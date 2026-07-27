@@ -2,21 +2,20 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // ==========================================================================
-// relayoutWorkspace() re-runs a layout algorithm across the ENTIRE current
-// workspace, recomputing every node's position. It mirrors the addLayout
-// template branch (setLayout → layout → persist → animated transition) but
-// stays on the current workspace and only touches positions. The picker
-// defaults to the workspace's original layout type (falling back to
-// DEFAULTS.LAYOUT). Declining the dialog cancels cleanly with nothing applied.
+// relayoutWorkspace(layoutType) re-runs a layout algorithm across the ENTIRE
+// current workspace, recomputing every node's position. It mirrors the
+// addLayout template branch (setLayout → layout → persist → animated
+// transition) but stays on the current workspace and only touches positions.
+// The algorithm comes from the rail's Layout menu; expensive layouts on large
+// graphs ask for confirmation first.
 // ==========================================================================
 
 // Controllable Popup stub (layout.js imports it eagerly at module load).
-const popup = vi.hoisted(() => ({ select: null }));
+const popup = vi.hoisted(() => ({ confirm: true }));
 vi.mock("../src/utilities/popup.js", () => ({
   Popup: {
-    layoutSelectDialog: vi.fn(async () => popup.select),
     layoutCreationDialog: vi.fn(async () => null),
-    confirm: vi.fn(async () => true),
+    confirm: vi.fn(async () => popup.confirm),
   },
 }));
 
@@ -24,7 +23,7 @@ import { Popup } from "../src/utilities/popup.js";
 import { GraphLayoutManager } from "../src/graph/layout.js";
 import { DEFAULTS } from "../src/config.js";
 
-function createCache({ layoutType, positions, nodes = [] } = {}) {
+function createCache({ layoutType, positions, nodes = [], order } = {}) {
   const noop = () => {};
   const asyncNoop = async () => {};
 
@@ -33,7 +32,7 @@ function createCache({ layoutType, positions, nodes = [] } = {}) {
   // Minimal graphology-ish model: forEachNode + hasNode + order.
   const nodeMap = new Map(nodes.map((n) => [n.id, { x: n.x, y: n.y }]));
   const graphData = {
-    order: nodeMap.size,
+    order: order ?? nodeMap.size,
     forEachNode: (cb) => {
       for (const [id, attrs] of nodeMap) cb(id, attrs);
     },
@@ -77,35 +76,26 @@ function createCache({ layoutType, positions, nodes = [] } = {}) {
 
 describe("relayoutWorkspace", () => {
   beforeEach(() => {
-    Popup.layoutSelectDialog.mockClear();
-    popup.select = null;
+    Popup.confirm.mockClear();
+    popup.confirm = true;
   });
 
-  it("cancels cleanly when the dialog is dismissed", async () => {
-    // Arrange
-    popup.select = null;
+  it("is a no-op without a layout type", async () => {
     const cache = createCache({ layoutType: "force" });
     const lm = new GraphLayoutManager(cache);
 
-    // Act
     await lm.relayoutWorkspace();
 
-    // Assert: no layout work, explicit cancel message.
     expect(cache.graph.setLayout).not.toHaveBeenCalled();
     expect(cache.graph.layout).not.toHaveBeenCalled();
-    expect(cache.ui.info).toHaveBeenCalledWith("Re-layout canceled");
   });
 
   it("applies the chosen layout and remembers the type", async () => {
-    // Arrange
-    popup.select = { templateType: "grid" };
     const cache = createCache({ layoutType: "force" });
     const lm = new GraphLayoutManager(cache);
 
-    // Act
-    await lm.relayoutWorkspace();
+    await lm.relayoutWorkspace("grid");
 
-    // Assert
     expect(cache.graph.setLayout).toHaveBeenCalledTimes(1);
     expect(cache.graph.setLayout.mock.calls[0][0]).toMatchObject({ type: "grid" });
     expect(cache.graph.layout).toHaveBeenCalledTimes(1);
@@ -114,93 +104,71 @@ describe("relayoutWorkspace", () => {
   });
 
   it("merges the layout internals into the setLayout spec", async () => {
-    // Arrange: dagre carries non-empty internals.
-    popup.select = { templateType: "dagre" };
+    // dagre carries non-empty internals (and is expensive — small graph, no confirm).
     const cache = createCache({ layoutType: "force" });
     const lm = new GraphLayoutManager(cache);
 
-    // Act
-    await lm.relayoutWorkspace();
+    await lm.relayoutWorkspace("dagre");
 
-    // Assert
+    expect(Popup.confirm).not.toHaveBeenCalled();
     expect(cache.graph.setLayout.mock.calls[0][0]).toMatchObject({
       type: "dagre",
       ...DEFAULTS.LAYOUT_INTERNALS.dagre,
     });
   });
 
-  it("defaults the picker to the workspace's stored layout type", async () => {
-    // Arrange
-    popup.select = { templateType: "force" };
-    const cache = createCache({ layoutType: "radial" });
-    const lm = new GraphLayoutManager(cache);
-
-    // Act
-    await lm.relayoutWorkspace();
-
-    // Assert
-    const opts = Popup.layoutSelectDialog.mock.calls[0][1];
-    expect(opts.defaultType).toBe("radial");
-  });
-
-  it("falls back to DEFAULTS.LAYOUT when the workspace has no stored type", async () => {
-    // Arrange
-    popup.select = { templateType: "grid" };
-    const cache = createCache({ layoutType: undefined });
-    const lm = new GraphLayoutManager(cache);
-
-    // Act
-    await lm.relayoutWorkspace();
-
-    // Assert
-    const opts = Popup.layoutSelectDialog.mock.calls[0][1];
-    expect(opts.defaultType).toBe(DEFAULTS.LAYOUT);
-  });
-
-  it("flags hasPositions when the workspace carries persisted positions", async () => {
-    // Arrange
-    popup.select = { templateType: "grid" };
+  it("asks before an expensive layout on a large graph and cancels on decline", async () => {
+    popup.confirm = false;
     const cache = createCache({
       layoutType: "force",
-      positions: [["a", { style: { x: 1, y: 2 } }]],
+      order: DEFAULTS.LAYOUT_NODE_WARNING_THRESHOLD + 1,
     });
     const lm = new GraphLayoutManager(cache);
 
-    // Act
-    await lm.relayoutWorkspace();
+    await lm.relayoutWorkspace("dagre");
 
-    // Assert
-    const opts = Popup.layoutSelectDialog.mock.calls[0][1];
-    expect(opts.hasPositions).toBe(true);
+    expect(Popup.confirm).toHaveBeenCalledTimes(1);
+    expect(cache.graph.setLayout).not.toHaveBeenCalled();
+    expect(cache.ui.info).toHaveBeenCalledWith("Re-layout canceled");
   });
 
-  it("reports hasPositions false for an empty workspace", async () => {
-    // Arrange
-    popup.select = { templateType: "grid" };
-    const cache = createCache({ layoutType: "force", positions: [] });
+  it("proceeds with an expensive layout when the warning is accepted", async () => {
+    popup.confirm = true;
+    const cache = createCache({
+      layoutType: "force",
+      order: DEFAULTS.LAYOUT_NODE_WARNING_THRESHOLD + 1,
+    });
     const lm = new GraphLayoutManager(cache);
 
-    // Act
-    await lm.relayoutWorkspace();
+    await lm.relayoutWorkspace("dagre");
 
-    // Assert
-    const opts = Popup.layoutSelectDialog.mock.calls[0][1];
-    expect(opts.hasPositions).toBe(false);
+    expect(Popup.confirm).toHaveBeenCalledTimes(1);
+    expect(cache.graph.setLayout).toHaveBeenCalledTimes(1);
+  });
+
+  it("never warns for cheap layouts, regardless of size", async () => {
+    const cache = createCache({
+      layoutType: "force",
+      order: DEFAULTS.LAYOUT_NODE_WARNING_THRESHOLD + 1,
+    });
+    const lm = new GraphLayoutManager(cache);
+
+    await lm.relayoutWorkspace("grid");
+
+    expect(Popup.confirm).not.toHaveBeenCalled();
+    expect(cache.graph.setLayout).toHaveBeenCalledTimes(1);
   });
 
   it("animates from on-screen positions when nodes are present", async () => {
-    // Arrange
-    popup.select = { templateType: "grid" };
     const cache = createCache({
       layoutType: "force",
       nodes: [{ id: "a", x: 10, y: 20 }, { id: "b", x: 30, y: 40 }],
     });
     const lm = new GraphLayoutManager(cache);
 
-    // Act
-    await lm.relayoutWorkspace();
+    await lm.relayoutWorkspace("grid");
 
-    // Assert: tween invoked with the persisted target map.
+    // Tween invoked with the persisted target map.
     expect(cache.graph.runLayoutTransition).toHaveBeenCalledTimes(1);
     expect(cache.graph.runLayoutTransition.mock.calls[0][0]).toBe(
       cache.data.layouts.Default.positions,
@@ -210,30 +178,21 @@ describe("relayoutWorkspace", () => {
   });
 
   it("skips the transition when there is nothing on screen to animate from", async () => {
-    // Arrange
-    popup.select = { templateType: "grid" };
     const cache = createCache({ layoutType: "force", nodes: [] });
     const lm = new GraphLayoutManager(cache);
 
-    // Act
-    await lm.relayoutWorkspace();
+    await lm.relayoutWorkspace("grid");
 
-    // Assert
     expect(cache.graph.runLayoutTransition).not.toHaveBeenCalled();
   });
 
   it("is a no-op when the selected workspace is missing", async () => {
-    // Arrange
-    popup.select = { templateType: "grid" };
     const cache = createCache({ layoutType: "force" });
     cache.data.selectedLayout = "ghost"; // not in layouts
     const lm = new GraphLayoutManager(cache);
 
-    // Act
-    await lm.relayoutWorkspace();
+    await lm.relayoutWorkspace("grid");
 
-    // Assert
-    expect(Popup.layoutSelectDialog).not.toHaveBeenCalled();
     expect(cache.graph.setLayout).not.toHaveBeenCalled();
   });
 });

@@ -97,6 +97,12 @@ class GraphSelectionManager {
     await this.updateSelectedState(edges, enable);
   }
 
+  /** Clear the whole selection — the rail chip's ×. */
+  async clearSelection() {
+    await this.toggleSelectionForAllNodes(false);
+    await this.toggleSelectionForAllEdges(false);
+  }
+
   async syncSelectionCacheAndElementStates() {
     const snapshot = this.cache.selectionMemory[this.cache.selectedMemoryIndex];
 
@@ -370,13 +376,17 @@ class GraphSelectionManager {
   }
 
   async updateSelectedNodesAndEdges() {
-    this.cache.selectedNodes = await this.cache.graph
-      .getNodeData()
-      .filter((n) => n.states?.includes('selected') && this.cache.nodeIDsToBeShown.has(n.id))
+    const selectedNodeStates = (await this.cache.graph.getNodeData()).filter((n) =>
+      n.states?.includes('selected')
+    );
+    const selectedEdgeStates = (await this.cache.graph.getEdgeData()).filter((e) =>
+      e.states?.includes('selected')
+    );
+    this.cache.selectedNodes = selectedNodeStates
+      .filter((n) => this.cache.nodeIDsToBeShown.has(n.id))
       .map((n) => n.id);
-    this.cache.selectedEdges = await this.cache.graph
-      .getEdgeData()
-      .filter((e) => e.states?.includes('selected') && this.cache.edgeIDsToBeShown.has(e.id))
+    this.cache.selectedEdges = selectedEdgeStates
+      .filter((e) => this.cache.edgeIDsToBeShown.has(e.id))
       .map((e) => e.id);
 
     const selectedNodesCount = this.cache.selectedNodes?.length || 0;
@@ -389,8 +399,23 @@ class GraphSelectionManager {
     const atLeastOneEdgeSelected = selectedEdgesCount > 0;
     const atLeastOneNodeOrEdgeSelected = atLeastOneNodeSelected || atLeastOneEdgeSelected;
 
+    // Rail selection chip: swap "Nothing selected" for the live counts, and
+    // warn when filters hide part of the selection (filters and selection are
+    // orthogonal — hidden elements stay selected but actions skip them).
+    document
+      .getElementById('selectionChip')
+      ?.classList.toggle('live', atLeastOneNodeOrEdgeSelected);
+    const hiddenSelectedCount =
+      selectedNodeStates.length - selectedNodesCount +
+      (selectedEdgeStates.length - selectedEdgesCount);
+    const hiddenWarning = document.getElementById('selectionHiddenWarning');
+    if (hiddenWarning) {
+      hiddenWarning.style.display = hiddenSelectedCount > 0 ? '' : 'none';
+      hiddenWarning.textContent = hiddenSelectedCount > 0 ? `${hiddenSelectedCount} hidden` : '';
+    }
+
     // Swap the HUD between its empty state (instructions) and its active
-    // state (counts + actions). CSS keys off the `has-selection` class.
+    // state (actions). CSS keys off the `has-selection` class.
     document
       .getElementById('selectedElementsContainer')
       ?.classList.toggle('has-selection', atLeastOneNodeOrEdgeSelected);

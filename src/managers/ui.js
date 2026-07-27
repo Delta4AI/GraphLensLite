@@ -3,8 +3,6 @@ import { BooleanToggle, DropdownChecklist, InvertibleRangeSlider } from './ui_co
 import { createStyleDiv } from './ui_style_div.js';
 import { Popup } from '../utilities/popup.js';
 import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
-import { EXPORT_SCALES } from '../utilities/export_scale.js';
-import { clampPopoverLeft } from '../utilities/popover_position.js';
 import { refreshNeo4jSessionUI } from '../utilities/neo4j_loader.js';
 
 // Persisted preference: how multiple active filters combine — "OR" (match any)
@@ -146,6 +144,7 @@ class UIManager {
       `${this.cache.edgeIDsToBeShown.size - this.cache.hiddenDanglingEdgeIDs.size}`;
     document.getElementById('totalEdges').innerHTML = `${this.cache.data.edges.length}`;
 
+    this.cache.rail?.refresh();
     this.cache.bs.refreshBubbleStyleElements();
   }
 
@@ -157,8 +156,6 @@ class UIManager {
         'Reduce Edges',
         'Expand Neighbors',
         'Reduce Neighbors',
-        'deselectNodesBtn',
-        'focusNodesBtn',
         'neo4jExpandBtn',
       ],
       enable
@@ -166,14 +163,14 @@ class UIManager {
   }
 
   toggleStyleElementsThatRequireAtLeastOneSelectedEdge(enable) {
-    this.toggleDisabledElements(
-      ['Edge Configuration', 'deselectEdgesBtn', 'focusEdgesBtn'],
-      enable
-    );
+    this.toggleDisabledElements(['Edge Configuration'], enable);
   }
 
   toggleStyleElementsThatRequireAtLeastOneSelectedNodeOrEdge(enable) {
-    this.toggleDisabledElements(['resetSelectedElementsStyleBtn'], enable);
+    this.toggleDisabledElements(
+      ['resetSelectedElementsStyleBtn', 'focusSelectionBtn', 'clearSelectionBtn'],
+      enable
+    );
   }
 
   toggleStyleElementsThatRequireAtLeastOneVisibleNode(enable) {
@@ -343,7 +340,6 @@ class UIManager {
   }
 
   showEditor(editorType) {
-    const mainContent = document.getElementById('mainContent');
     const bottomBar = document.getElementById('bottomBar');
     const queryEditor = document.getElementById('queryEditor');
     const dataEditor = document.getElementById('dataEditor');
@@ -353,14 +349,8 @@ class UIManager {
     const headerText = document.getElementById('bottomBarHeaderText');
     const helpBtn = document.getElementById('bottomBarHelpBtn');
 
-    if (this.bottomBarHeight) {
-      const mainHeight = window.innerHeight - this.bottomBarHeight;
-      bottomBar.style.height = this.bottomBarHeight + 'px';
-      mainContent.style.height = mainHeight + 'px';
-    } else {
-      mainContent.style.height = '65%';
-      bottomBar.style.height = '35%';
-    }
+    // #mainContent flexes to fill whatever the bottom bar leaves free.
+    bottomBar.style.height = this.bottomBarHeight ? this.bottomBarHeight + 'px' : '35%';
     bottomBar.classList.add('active');
 
     if (editorType === 'query') {
@@ -385,11 +375,9 @@ class UIManager {
   }
 
   hideBottomBar() {
-    const mainContent = document.getElementById('mainContent');
     const bottomBar = document.getElementById('bottomBar');
     const queryToggleButtons = document.querySelectorAll('.add-to-query-button');
 
-    mainContent.style.height = '100%';
     bottomBar.style.height = '0';
     bottomBar.classList.remove('active');
     queryToggleButtons.forEach((btn) => btn.classList.remove('show'));
@@ -397,7 +385,6 @@ class UIManager {
 
   makeBottomBarResizable() {
     const bottomBar = document.getElementById('bottomBar');
-    const mainContent = document.getElementById('mainContent');
     const resizeHandle = bottomBar.querySelector('.resize-handle');
     let isResizing = false;
     let startY = 0;
@@ -460,11 +447,7 @@ class UIManager {
       const finalHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
 
       if (finalHeight !== startHeight) {
-        const viewportHeight = window.innerHeight;
-        const newMainHeight = viewportHeight - finalHeight;
-
         bottomBar.style.height = finalHeight + 'px';
-        mainContent.style.height = newMainHeight + 'px';
         this.bottomBarHeight = finalHeight;
       }
 
@@ -512,9 +495,9 @@ class UIManager {
   }
 
   async toggleLassoSelection() {
-    const lassoWrapper = document.getElementById('lassoWrapper');
-    const enableLasso = !lassoWrapper.classList.contains('active');
-    lassoWrapper.classList.toggle('active', enableLasso);
+    const lassoBtn = document.getElementById('lassoToggleBtn');
+    const enableLasso = !lassoBtn.classList.contains('active');
+    lassoBtn.classList.toggle('active', enableLasso);
 
     // The lasso overlay owns the pointer while active (camera pan and node
     // drag are swallowed by it); tooltip clicks are routed away too. Hover
@@ -582,7 +565,7 @@ class UIManager {
    * the adapter, but their outside-click document listeners must not).
    */
   closeAnchoredPopovers() {
-    this.#closeExportResolutionPopover();
+    this.cache.rail?.closeMenus();
   }
 
   toggleDarkMode() {
@@ -606,93 +589,7 @@ class UIManager {
     const isDark = currentTheme(document) === 'dark';
     btn.textContent = isDark ? '☀️' : '🌙';
     btn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
-  }
-
-  /**
-   * Resolution picker anchored to the 📷 button: choose 1×/2×/4× and export
-   * immediately at that scale. The chosen factor is remembered (and reused by
-   * the "P" shortcut). Built lazily on first open.
-   */
-  toggleExportResolutionPopover() {
-    if (this._exportPopover?.classList.contains('open')) {
-      this.#closeExportResolutionPopover();
-      return;
-    }
-    this.#openExportResolutionPopover();
-  }
-
-  #closeExportResolutionPopover() {
-    this._exportPopover?.classList.remove('open');
-    if (this._exportOutsideHandler) {
-      document.removeEventListener('pointerdown', this._exportOutsideHandler, true);
-      this._exportOutsideHandler = null;
-    }
-  }
-
-  #openExportResolutionPopover() {
-    const anchor = document.getElementById('exportImage');
-    if (!anchor) return;
-
-    const popover = this.#ensureExportResolutionPopover();
-    const current = this.cache.io.exportScale || 1;
-    popover.querySelectorAll('.export-res-option').forEach((btn) => {
-      btn.classList.toggle('active', Number(btn.dataset.scale) === current);
-    });
-
-    const rect = anchor.getBoundingClientRect();
-    popover.classList.add('open');
-    // Anchor below the button, clamped to the viewport's right edge.
-    popover.style.top = `${rect.bottom + 6}px`;
-    popover.style.left = `${clampPopoverLeft(rect.left, popover.offsetWidth, window.innerWidth)}px`;
-
-    this._exportOutsideHandler = (e) => {
-      if (!popover.contains(e.target) && e.target !== anchor) this.#closeExportResolutionPopover();
-    };
-    document.addEventListener('pointerdown', this._exportOutsideHandler, true);
-  }
-
-  #ensureExportResolutionPopover() {
-    if (this._exportPopover) return this._exportPopover;
-    const popover = document.createElement('div');
-    popover.className = 'export-resolution-popover';
-    popover.id = 'exportResolutionPopover';
-
-    const title = document.createElement('div');
-    title.className = 'export-res-title';
-    title.textContent = 'Export image resolution';
-    popover.appendChild(title);
-
-    const row = document.createElement('div');
-    row.className = 'export-res-row';
-    for (const scale of EXPORT_SCALES) {
-      const btn = document.createElement('button');
-      btn.className = 'export-res-option';
-      btn.dataset.scale = String(scale);
-      btn.textContent = `${scale}×`;
-      btn.title = `Export at ${scale}× viewport resolution`;
-      btn.addEventListener('click', () => {
-        this.#closeExportResolutionPopover();
-        this.cache.io.exportPNG(scale);
-      });
-      row.appendChild(btn);
-    }
-    popover.appendChild(row);
-
-    // Vector output has no resolution to pick — one button, below the PNG
-    // scales. SVG never participates in the remembered scale (PNG-only).
-    const svgBtn = document.createElement('button');
-    svgBtn.className = 'export-res-option export-res-svg';
-    svgBtn.textContent = 'Vector (SVG)';
-    svgBtn.title = 'Export as resolution-independent SVG vector graphic';
-    svgBtn.addEventListener('click', () => {
-      this.#closeExportResolutionPopover();
-      this.cache.io.exportSVG();
-    });
-    popover.appendChild(svgBtn);
-
-    document.body.appendChild(popover);
-    this._exportPopover = popover;
-    return popover;
+    btn.setAttribute('aria-label', btn.title);
   }
 
   updateHoverToggleButton() {
@@ -897,7 +794,6 @@ class UIManager {
       widget.appendListeners();
     }
 
-    this.manageDynamicWidgets();
     this.cache.qm.updateQueryTextArea();
   }
 
@@ -1040,35 +936,14 @@ class UIManager {
     });
   }
 
+  // Pre-load, the landing page (a full-viewport overlay) covers the shell;
+  // post-load it is hidden. The old showOnLoad/hideOnLoad opacity juggling is
+  // retired with the duplicate sidebar launch block (Concept C decision 6).
   showUI(show) {
     const landing = document.getElementById('landingPage');
     if (landing) {
       if (show) landing.classList.add('hidden');
       else landing.classList.remove('hidden');
-    }
-
-    document.querySelectorAll('.showOnLoad').forEach((element) => {
-      element.style.opacity = show ? '1' : '0';
-      element.style.pointerEvents = show ? 'auto' : 'none';
-    });
-
-    document.querySelectorAll('.hideOnLoad').forEach((element) => {
-      element.style.opacity = show ? '0' : '1';
-      element.style.pointerEvents = show ? 'none' : 'auto';
-      element.style.height = show ? '0' : 'auto';
-    });
-
-    const appHeader = document.getElementById('appHeader');
-    if (appHeader) {
-      if (show) {
-        appHeader.classList.remove('disabled-header');
-        appHeader.classList.add('compact-header');
-        appHeader.title = 'Click to reload application';
-      } else {
-        appHeader.classList.add('disabled-header');
-        appHeader.classList.remove('compact-header');
-        appHeader.title = '';
-      }
     }
   }
 
@@ -1094,13 +969,6 @@ class UIManager {
     enable ? this.cache.activeProps.add(propID) : this.cache.activeProps.delete(propID);
     span.textContent = enable ? '✔' : '';
     wrapper.title = this.cache.uiComponents.getCheckboxTT(enable, propID);
-  }
-
-  manageDynamicWidgets() {
-    let isCustomLayout = this.cache.data.layouts[this.cache.data.selectedLayout].isCustom;
-    let removeLayoutBtnCls = document.getElementById('removeSelectedLayoutButton').classList;
-
-    isCustomLayout ? removeLayoutBtnCls.remove('disabled') : removeLayoutBtnCls.add('disabled');
   }
 
   async toggleSection(enable, section) {

@@ -134,24 +134,25 @@ const TOUR_STEPS = [
     target: null,
   },
   {
-    title: 'App Header & Toolbar',
-    text: `The <strong>header</strong> shows the app name plus three actions:
+    title: 'The Rail',
+    text: `Everything session-level lives on the <strong>rail</strong> at the top:
            <br><br>
-           📷 <strong>Save Image</strong> — export the current view as <strong>PNG</strong> or <strong>SVG</strong>; click to pick the format and resolution
-           <br>💾 <strong>Save Model</strong> — export the full graph (data + styles + layouts) as JSON
-           <br>🌙 <strong>Dark mode</strong> — toggle between the light and dark themes
+           <strong>◆ App menu</strong> — load data, download the Excel template, take this tour, or start over
+           <br><strong>Workspace chip</strong> — which workspace you're in, plus live shown/total counts
+           <br><strong>⛶ Fit · ↻ Layout · ➰ Lasso · ✨ Hover</strong> — the everyday canvas verbs
+           <br><strong>Selection chip</strong> — what's selected, with focus, clear and undo/redo
            <br><br>
-           <em>Clicking the app name reloads the application.</em>
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           The <strong>toolbar pills</strong> below open the main panels:
+           The <strong>tab strip</strong> opens the main panels:
            <br><br>
-           📊 <strong>Metrics</strong> — compute network metrics
-           <br>🔢 <strong>Data</strong> — view and edit your graph data in a spreadsheet
+           🔢 <strong>Data</strong> — view and edit your graph data in a spreadsheet
            <br>📝 <strong>Query</strong> — write filter/selection queries using our query language
-           <br>🤖 <strong>Assistant</strong> — ask natural-language questions about your graph
+           <br>📊 <strong>Metrics</strong> — compute network metrics
+           <br>🤖 <strong>Assist</strong> — ask natural-language questions about your graph
            <br><br>
-           Each pill stays highlighted while its panel is open.`,
-    targets: [{ selector: '.app-toolbar' }, { selector: '.header-row' }],
+           On the right: <strong>⤓ Export</strong> (PNG, SVG, JSON model, Excel data), the theme
+           toggle, and the <strong>?</strong> keyboard cheat sheet. Each tab stays highlighted
+           while its panel is open.`,
+    targets: [{ selector: '#rail' }],
     position: 'below',
   },
   {
@@ -165,15 +166,15 @@ const TOUR_STEPS = [
            <br>• Bubble groups
            <br>• Visual styles applied per workspace
            <br><br>
-           Use the <strong class="tour-green">✚</strong> button to create a new workspace (clone or template-based), and the <strong class="tour-red">✗</strong> button to delete the current one.
+           Click the <strong>workspace chip</strong> to switch workspaces or to create
+           (<strong class="tour-green">✚</strong> clone or template-based), rename, or delete one.
+           Its second line always shows how many nodes and edges the current filters leave visible.
            <br><br>
-           A row of icon buttons acts on the current workspace:
-           <br>• <strong>⛶</strong> — fit the graph to the screen
-           <br>• <strong>↔️</strong> — nudge overlapping nodes apart
-           <br>• <strong>🔄</strong> — re-layout: recompute every node's position with a chosen layout algorithm (overwrites manual positions)
-           <br>• <strong>🚫</strong> — hide disconnected nodes
-           <br>• <strong>✨</strong> — toggle the hover highlight effect`,
-    target: '#workspaceContainer',
+           Next to it, <strong>↻ Layout</strong> is labelled with this workspace's current layout
+           algorithm — its menu re-layouts the whole workspace with a chosen algorithm
+           (overwrites manual positions), nudges overlapping nodes apart (<strong>↔️</strong>),
+           and hides disconnected elements (<strong>🚫</strong>).`,
+    target: '#workspaceChip',
     position: 'below',
   },
   {
@@ -212,9 +213,9 @@ const TOUR_STEPS = [
            <br>• <strong>Categorical properties</strong> get dropdown checklists — check/uncheck values
            <br>• The <strong>checkbox</strong> toggles whether that filter is active.
            Active filters are combined with <strong>OR</strong> logic by default — nodes/edges matching <em>any</em> active filter are shown.
-           Under <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;font-size:11px;font-weight:600;color:#403C53;background:#E4E3EA;border:1px solid #dddbe2;border-radius:12px;vertical-align:middle;">⚙ Details</span>, an
+           The
            <span style="display:inline-flex;align-items:stretch;border:1px solid #dddbe2;border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:#E4E3EA;color:#403C53;">OR</span><span style="padding:2px 9px;background:#C33D35;color:#fff;border-left:1px solid #dddbe2;">AND</span></span>
-           toggle switches to requiring <em>all</em> the filters you've narrowed (AND); its <strong>Complete cases only</strong> option additionally hides elements missing any of those filters.
+           toggle at the top of the panel switches to requiring <em>all</em> the filters you've narrowed (AND); its <strong>Complete cases only</strong> option additionally hides elements missing any of those filters.
            <hr style="margin:6px 0;border-color:#dddbe2;">
            <span style="display:inline-block;width:16px;height:16px;border-radius:50%;overflow:hidden;position:relative;vertical-align:middle;background:#E4E3EA;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
            <strong>Bubble group button</strong> — click a quadrant to assign that filter's matching nodes to one of four colored <strong>bubble set</strong> groups. These are <em>filter-driven</em> and update automatically as filters change (unlike the <em>manual</em> bubble groups in the selection panel).
@@ -244,18 +245,20 @@ const TOUR_STEPS = [
   },
   {
     title: 'Selection Panel',
-    text: `A floating panel pinned to a corner of the canvas — drag its header to move it and it snaps to the nearest corner. It tracks whatever you've selected and gathers every action you can take on that selection, top to bottom:
+    text: `Selections live in two places. The rail's <strong>selection chip</strong> (top) always shows the live
+           <strong>node</strong> and <strong>edge</strong> counts, with <strong>🔍</strong> (zoom to the selection),
+           <strong class="tour-red">×</strong> (clear it) and <strong>↶</strong> / <strong>↷</strong>
+           (undo / redo selection changes, up to 25 states). The rail's <strong>➰ Lasso</strong> toggles a freeform
+           selection area; while active, <strong>Shift+click</strong> adds individual nodes/edges.
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           This floating <strong>Selection panel</strong> gathers the actions — drag its header to move it and it
+           snaps to the nearest corner:
            <hr style="margin:6px 0;border-color:#dddbe2;">
            <strong>Header</strong>
            <br>• <strong>Tools ▾</strong> — expand the advanced selection tools (next step)
            <br>• <strong>✕</strong> — tuck the panel away; a <strong>▸ Selection</strong> tab brings it back
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Toolbar</strong>
-           <br>• <strong>➰ Lasso</strong> — toggle the lasso tool to draw a freeform selection area; while active, <strong>Shift+click</strong> adds individual nodes/edges
-           <br>• <strong>🎨 Style</strong> — open the styling panel to restyle the selection
-           <br>• <strong>↩</strong> / <strong>↪</strong> — undo / redo selection changes (up to 25 states)
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Counts</strong> — live <strong>node</strong> and <strong>edge</strong> totals, each with <strong>🔍</strong> (zoom to fit the selection) and <strong class="tour-red">×</strong> (clear that selection).
+           <strong>🎨 Style</strong> — open the styling panel to restyle the selection
            <hr style="margin:6px 0;border-color:#dddbe2;">
            <strong>Add to group</strong> — the quadrant button
            <span style="display:inline-block;width:14px;height:14px;border-radius:50%;overflow:hidden;position:relative;vertical-align:middle;background:#E4E3EA;border:1px solid black;box-sizing:border-box;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>

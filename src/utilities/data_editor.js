@@ -988,10 +988,10 @@ class DataTable {
     await this.cache.gcm.destroyGraphAndRollBackUI();
     this.cache.gcm.resetEventLocks();
 
-    // Reset lasso wrapper visual state to match default behavior (no lasso mode)
-    const lassoWrapper = document.getElementById('lassoWrapper');
-    if (lassoWrapper) {
-      lassoWrapper.classList.remove('active');
+    // Reset lasso button visual state to match default behavior (no lasso mode)
+    const lassoBtn = document.getElementById('lassoToggleBtn');
+    if (lassoBtn) {
+      lassoBtn.classList.remove('active');
     }
     this.cache.io.preProcessData(updatedFileData);
 

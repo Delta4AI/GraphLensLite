@@ -26,6 +26,7 @@ import {Popup} from "./utilities/popup.js";
 import {StaticUtilities} from "./utilities/static.js";
 import {generateTourData, GuidedTour} from "./utilities/tour.js";
 import {initApiClient} from "./managers/api_client.js";
+import {initRail} from "./managers/rail.js";
 import {initTheme} from "./utilities/theme.js";
 import {initSelectionHud} from "./utilities/selection_hud.js";
 
@@ -475,6 +476,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // Stored preference wins; prefers-color-scheme is only the first-run default.
   initTheme(document, window);
   cache.reset();
+  cache.rail = initRail(cache);
   cache.ui.updateDarkModeButton();
   initSelectionHud();
   // cache.initialize();

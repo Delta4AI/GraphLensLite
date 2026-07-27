@@ -58,13 +58,415 @@ body, html {
     color: var(--text);
 }
 
+/* Shell: rail on top, main content flexes, bottom bar rises from below. */
+body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
 #mainContent {
     display: flex;
     flex-direction: row;
-    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
     overflow: hidden;
-    transition: height 0.3s ease-in-out;
+}
+
+/* ---------- the rail (Concept C phase 3) ---------- */
+#rail {
+    flex: none;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-sizing: border-box;
+    position: relative;
+    z-index: 900;
+}
+
+.rail-mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex: none;
+}
+
+.rail-mark img {
+    height: 22px;
+    width: 22px;
+}
+
+.rail-mark:hover {
+    background: var(--surface-3);
+    border-color: var(--border);
+}
+
+.rail-wschip {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 4px 9px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    cursor: pointer;
+    min-width: 150px;
+    max-width: 240px;
+    flex: none;
+    font: inherit;
+    color: var(--text);
+    text-align: left;
+}
+
+.rail-wschip:hover {
+    border-color: var(--border-strong);
+}
+
+.rail-wschip-l1 {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.rail-wschip-l1 #workspaceChipName {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rail-wschip-car {
+    color: var(--text-faint);
+    font-size: 10px;
+    margin-left: auto;
+}
+
+.rail-wschip-l2 {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.rail-div {
+    width: 1px;
+    height: 26px;
+    background: var(--border);
+    flex: none;
+    margin: 0 2px;
+}
+
+.rail-spacer {
+    flex: 1 1 auto;
+}
+
+.rail-vb {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 44px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: none;
+    cursor: pointer;
+    color: var(--text-strong);
+    flex: none;
+    padding: 0 4px;
+    font: inherit;
+}
+
+.rail-vb-g {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.rail-vb-t {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.rail-vb:hover {
+    background: var(--surface-3);
+    border-color: var(--border);
+}
+
+/* On-state (lasso active, hover highlight enabled — driven by the existing
+   green/highlight and active class conventions). */
+.rail-vb.highlight,
+.rail-vb.active {
+    background: var(--surface-3);
+    border-color: var(--accent-text);
+}
+
+.rail-vb.highlight .rail-vb-t,
+.rail-vb.active .rail-vb-t {
+    color: var(--accent-text);
+}
+
+.rail-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    flex: none;
+}
+
+.rail-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 52px;
+    padding: 3px 0 4px;
+    border-radius: 7px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--text-strong);
+    font: inherit;
+}
+
+.rail-tab:hover {
+    background: var(--surface-3);
+}
+
+.rail-tab.highlight {
+    background: var(--accent-text);
+}
+
+.rail-tab.highlight .rail-vb-t {
+    color: #fff;
+}
+
+.rail-selchip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 34px;
+    padding: 0 6px 0 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text-muted);
+    font-size: 12px;
+    flex: none;
+    white-space: nowrap;
+}
+
+.rail-selchip.live {
+    border-color: var(--accent-text);
+    color: var(--text);
+}
+
+.rail-selchip-counts,
+.rail-selchip.live .rail-selchip-empty {
+    display: none;
+}
+
+.rail-selchip.live .rail-selchip-counts {
+    display: inline;
+}
+
+.rail-selchip-counts strong {
+    color: var(--accent-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.rail-selchip-sep {
+    color: var(--text-faint);
+}
+
+.rail-selchip-warning {
+    font-size: 11px;
+    color: var(--accent-text);
+    font-weight: 600;
+    cursor: help;
+}
+
+.rail-chip-btn {
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--text-strong);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+
+.rail-chip-btn:hover {
+    background: var(--surface-3);
+    border-color: var(--border);
+    color: var(--accent-text);
+}
+
+.rail-mini {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex: none;
+}
+
+.rail-mini:hover {
+    background: var(--surface-3);
+    border-color: var(--border);
+    color: var(--text-strong);
+}
+
+/* Narrow windows: drop the verb/tab labels to icons so the rail never wraps. */
+@media (max-width: 1200px) {
+    .rail-vb .rail-vb-t,
+    .rail-tab .rail-vb-t {
+        display: none;
+    }
+
+    .rail-vb,
+    .rail-tab {
+        min-width: 34px;
+        width: auto;
+        height: 34px;
+    }
+
+    .rail-wschip {
+        min-width: 0;
+    }
+}
+
+/* Rail dropdown menus (app / workspace / layout / export) */
+.rail-menu {
+    position: fixed;
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+    min-width: 210px;
+    padding: 5px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    color: var(--text);
+    font-size: 12.5px;
+}
+
+.rail-menu.open {
+    display: flex;
+}
+
+.rail-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.rail-menu-item:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.rail-menu-icon {
+    width: 18px;
+    text-align: center;
+    flex: none;
+    border: none;
+    background: none;
+    font: inherit;
+    padding: 0;
+}
+
+.rail-menu-label {
+    flex: 1 1 auto;
+}
+
+.rail-menu-check {
+    color: var(--accent-text);
+    font-weight: 700;
+}
+
+.rail-menu-item.checked .rail-menu-label {
+    color: var(--text-strong);
+    font-weight: 600;
+}
+
+.rail-menu-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 2px;
+}
+
+.rail-menu-header {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+    padding: 4px 8px 2px;
+}
+
+.rail-menu-toggle-row .rail-menu-icon {
+    cursor: pointer;
+}
+
+.rail-menu-footer {
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    padding: 6px 8px 3px;
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .inline {
@@ -180,6 +582,7 @@ body, html {
     display: none;
     overflow: hidden;
     box-sizing: border-box;
+    flex: none;
 }
 
 #bottomBar.active {
@@ -584,59 +987,13 @@ body, html {
     color: var(--accent-text);
 }
 
-.sel-hud-icon-btn {
-    font: inherit;
-    font-size: 13px;
-    line-height: 1;
-    color: var(--text-strong);
-    background: var(--input-bg);
-    border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-
-.sel-hud-icon-btn:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-.sel-hud-icon-btn.red:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-/* --- toolbar row: lasso / style / undo / redo (always visible) --- */
+/* --- toolbar row: the Style shortcut (always visible) --- */
 .sel-hud-toolbar {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
     margin-top: 8px;
-}
-
-.sel-hud-toolbar-spacer {
-    flex: 1 1 auto;
-}
-
-#lassoWrapper {
-    display: inline-flex;
-    border-radius: 6px;
-}
-
-#lassoWrapper.active {
-    box-shadow: 0 0 0 2px var(--accent-text);
-}
-
-#lassoWrapper.active .sel-hud-btn {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
 }
 
 /* Inline lasso glyph reused by the guided tour (empty span + --size/--color). */
@@ -706,35 +1063,11 @@ body, html {
     display: block;
 }
 
-.sel-hud-counts {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-}
-
-.sel-count {
-    font-size: 13px;
-    color: var(--text);
-}
-
-.sel-count strong {
-    font-size: 14px;
-}
-
-.sel-count-sep {
-    width: 1px;
-    height: 16px;
-    background: var(--border-soft);
-    margin: 0 4px;
-}
-
 .sel-hud-actions {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-    margin-top: 8px;
 }
 
 .sel-group-control {
@@ -784,10 +1117,6 @@ body, html {
     flex-wrap: wrap;
 }
 
-#selectView {
-    margin-bottom: 10px;
-}
-
 /* Louvain community-detection configurator (anchored to the 🧩 button) */
 .community-detection-popover {
     position: fixed;
@@ -835,59 +1164,6 @@ body, html {
 
 .community-popover-detect {
     align-self: flex-end;
-}
-
-/* Export resolution picker, anchored to the 📷 header button. */
-.export-resolution-popover {
-    position: fixed;
-    z-index: 1000;
-    display: none;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px;
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
-    border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-    color: var(--text);
-    font-size: 12px;
-}
-
-.export-resolution-popover.open {
-    display: flex;
-}
-
-.export-res-title {
-    font-weight: bold;
-    color: var(--text-strong);
-}
-
-.export-res-row {
-    display: flex;
-    gap: 4px;
-}
-
-.export-res-option {
-    font: inherit;
-    font-size: 12px;
-    color: var(--text-strong);
-    background: var(--surface-3);
-    border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    padding: 4px 10px;
-    cursor: pointer;
-    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-
-.export-res-option:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-.export-res-option.active {
-    background: var(--accent-text);
-    color: #fff;
-    border-color: var(--accent-text);
 }
 
 h4 {
@@ -2139,52 +2415,6 @@ hr {
     justify-content: center;
 }
 
-.medium-btn {
-    width: 22px;
-    height: 22px;
-    font-size: 14px;
-    line-height: 22px;
-    padding: 0;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    border: 1px solid transparent;
-    background: transparent;
-}
-
-.medium-btn:hover {
-
-    background: #C33D3580;
-    border: 1px solid #C33D35;
-    border-radius: 6px;
-}
-
-.header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 0.6em;
-    margin-bottom: 0.6em;
-}
-
-.header-title-group {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
-.header-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    flex-shrink: 0;
-}
-
-.header-row h3 {
-    margin: 0;
-}
-
 .data-source-label {
     font-size: 0.7em;
     color: var(--text-faint);
@@ -2206,42 +2436,6 @@ hr {
     border-radius: 6px;
     margin-right: 6px;
     gap: 1px;
-}
-
-/* Labeled app action toolbar (replaces the row of bare-emoji header buttons). */
-.app-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px;
-    margin-bottom: 8px;
-}
-
-.toolbar-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--text-strong);
-    background: var(--surface-3);
-    border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    padding: 3px 8px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-
-.toolbar-pill:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-.toolbar-pill.highlight,
-.toolbar-pill.active {
-    background: var(--accent-text);
-    color: #fff;
-    border-color: var(--accent-text);
 }
 
 .button-separator {
@@ -2308,30 +2502,6 @@ hr {
     pointer-events: none;
     color: var(--text);
     cursor: default;
-}
-
-.showOnLoad {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.hideOnLoad {
-    opacity: 1;
-    pointer-events: auto;
-    height: auto;
-}
-
-.disabled-header {
-    cursor: default !important;
-    pointer-events: none;
-}
-
-#appHeader:not(.disabled-header) {
-    cursor: pointer;
-}
-
-#appHeader.compact-header {
-    font-size: 1.0em;
 }
 
 /*************************

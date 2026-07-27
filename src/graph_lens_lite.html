@@ -76,76 +76,91 @@
     </div>
   </div>
 </div>
+<header id="rail">
+  <button id="appMenuBtn" class="rail-mark" aria-label="App menu" title="Menu — load data, take the tour, reload the app">
+    <img inline src="delta-4-icon.png" alt="Delta4 Icon">
+  </button>
+  <button id="workspaceChip" class="rail-wschip" title="Workspace — switch, create, rename or delete">
+    <span class="rail-wschip-l1"><span id="workspaceChipName">Workspace</span><span class="rail-wschip-car">⌄</span></span>
+    <span class="rail-wschip-l2">
+      <span id="visibleNodes" class="red">0</span>/<span id="totalNodes">0</span> nodes ·
+      <span id="visibleEdges" class="red">0</span>/<span id="totalEdges">0</span> edges
+    </span>
+  </button>
+  <select name="selectView" id="selectView" hidden onchange="cache.lm.changeLayout()" aria-hidden="true" tabindex="-1"></select>
+  <input type="file" id="fileInput" name="fileInput" hidden onchange="cache.io.loadFileWrapper(event);"
+         accept=".json, .xls, .xlsx"/>
+  <div class="rail-div"></div>
+  <button class="rail-vb" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">
+    <span class="rail-vb-g">⛶</span><span class="rail-vb-t">Fit</span>
+  </button>
+  <button id="relayoutBtn" class="rail-vb rail-vb-wide"
+          title="Layout — re-layout the workspace, remove overlaps, hide disconnected elements">
+    <span class="rail-vb-g">↻</span><span class="rail-vb-t"><span id="layoutTypeLabel">Layout</span> ⌄</span>
+  </button>
+  <button id="lassoToggleBtn" class="rail-vb" title="Toggle lasso selection: drag to select elements (L)" onclick="cache.ui.toggleLassoSelection()">
+    <span class="rail-vb-g">➰</span><span class="rail-vb-t">Lasso</span>
+  </button>
+  <button id="hoverToggleBtn" class="rail-vb green highlight" title="Disable hover highlight effect (H)" onclick="cache.ui.toggleHoverEffect(this)">
+    <span class="rail-vb-g">✨</span><span class="rail-vb-t">Hover</span>
+  </button>
+  <div class="rail-div"></div>
+  <div id="selectionChip" class="rail-selchip">
+    <span class="rail-selchip-empty">Nothing selected</span>
+    <span class="rail-selchip-counts">
+      <strong id="selectedNodes">0</strong>&nbsp;nodes <span class="rail-selchip-sep">·</span>
+      <strong id="selectedEdges">0</strong>&nbsp;edges
+    </span>
+    <button id="focusSelectionBtn" class="rail-chip-btn disabled" title="Center and zoom to the selection"
+            aria-label="Center and zoom to the selection" onclick="cache.gcm.focusSelection()">🔍</button>
+    <button id="clearSelectionBtn" class="rail-chip-btn red disabled" title="Clear selection"
+            aria-label="Clear selection" onclick="cache.sm.clearSelection()">×</button>
+    <span id="selectionHiddenWarning" class="rail-selchip-warning" style="display: none;"
+          title="Filters currently hide part of your selection. Hidden elements stay selected, but actions only touch visible ones."></span>
+    <button id="undoSelectionBtn" class="rail-chip-btn disabled" title="Undo selection"
+            aria-label="Undo selection" onclick="cache.sm.undoSelection()">↶</button>
+    <button id="redoSelectionBtn" class="rail-chip-btn disabled" title="Redo selection"
+            aria-label="Redo selection" onclick="cache.sm.redoSelection()">↷</button>
+  </div>
+  <span class="rail-spacer"></span>
+  <div class="rail-tabs">
+    <button id="dataToggleBtn" class="rail-tab" title="Toggle data editor (D)" onclick="cache.ui.toggleDataEditor()">
+      <span class="rail-vb-g">🔢</span><span class="rail-vb-t">Data</span>
+    </button>
+    <button id="queryToggleBtn" class="rail-tab" title="Toggle query editor (Q)" onclick="cache.ui.toggleQueryEditor()">
+      <span class="rail-vb-g">📝</span><span class="rail-vb-t">Query</span>
+    </button>
+    <button id="metricsToggleBtn" class="rail-tab" title="Toggle network metrics panel (M)" onclick="cache.metrics.toggleUI()">
+      <span class="rail-vb-g">📊</span><span class="rail-vb-t">Metrics</span>
+    </button>
+    <button id="assistantToggleBtn" class="rail-tab" title="Toggle Graph Assistant (A)" onclick="cache.assistant.togglePanel()">
+      <span class="rail-vb-g">🤖</span><span class="rail-vb-t">Assist</span>
+    </button>
+  </div>
+  <div class="rail-div"></div>
+  <button id="neo4jJoinBtn" class="rail-vb" style="display: none;" aria-label="Add Neo4j query"
+          title="Fetch an additional Cypher query from the connected Neo4j server and merge the results into the current graph"
+          onclick="openNeo4jJoinPopup()">
+    <span class="rail-vb-g">🛢️</span><span class="rail-vb-t">Join</span>
+  </button>
+  <button id="exportMenuBtn" class="rail-vb"
+          title="Export — PNG, SVG, JSON model, Excel data (P: PNG, S: JSON)">
+    <span class="rail-vb-g">⤓</span><span class="rail-vb-t">Export</span>
+  </button>
+  <button id="darkModeToggleBtn" class="rail-mini" aria-label="Switch to dark mode" title="Switch to dark mode" onclick="cache.ui.toggleDarkMode()">🌙</button>
+  <button id="keyboardSheetBtn" class="rail-mini" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onclick="cache.ui.toggleKeyboardSheet()">?</button>
+</header>
 <div id="mainContent">
   <div id="sidebar">
     <div class="sidebar-resize-handle"></div>
     <div id="sidebarContentContainer">
-      <div class="header-row">
-        <div class="header-title-group">
-          <h3 id="appHeader" class="disabled-header" onclick="cache.ui.reloadApp()">
-            <img inline src="delta-4-icon.png" alt="Delta4 Icon" style="height: 1em; vertical-align: middle; margin-right: 0.3em;">
-            Graph Lens Lite <span id="versionInfo" style="font-size: 0.6em; color: #666; font-weight: normal;"></span>
-          </h3>
-          <span id="dataSourceLabel" class="data-source-label"></span>
-        </div>
-        <div class="header-actions">
-          <button id="exportImage" class="showOnLoad medium-btn" title="Save image (P)" onclick="cache.ui.toggleExportResolutionPopover()">📷</button>
-          <button id="exportModel" class="showOnLoad medium-btn" title="Save model (S)" onclick="cache.io.exportGraphAsJSON()">💾</button>
-          <button id="darkModeToggleBtn" class="medium-btn" title="Switch to dark mode" onclick="cache.ui.toggleDarkMode()">🌙</button>
-        </div>
-      </div>
-      <div class="showOnLoad app-toolbar">
-        <button id="metricsToggleBtn" class="showOnLoad toolbar-pill" title="Toggle network metrics panel (M)" onclick="cache.metrics.toggleUI()">📊 Metrics</button>
-        <button id="dataToggleBtn" class="showOnLoad toolbar-pill" title="Toggle data editor (D)" onclick="cache.ui.toggleDataEditor()">🔢 Data</button>
-        <button id="queryToggleBtn" class="showOnLoad toolbar-pill" title="Toggle query editor (Q)" onclick="cache.ui.toggleQueryEditor()">📝 Query</button>
-        <button id="assistantToggleBtn" class="toolbar-pill" title="Toggle Graph Assistant (A)" onclick="cache.assistant.togglePanel()">🤖 Assistant</button>
-      </div>
-      <div class="hideOnLoad">
-        <input type="file" id="fileInput" name="fileInput" onchange="cache.io.loadFileWrapper(event);"
-               title="Load graph data from Excel (.xlsx, .xls) or Graph Lens Lite exports (.json)"
-               accept=".json, .xls, .xlsx"/>
-      </div>
-      <div class="hideOnLoad">
-        <button onclick="cache.io.downloadExcelTemplate()" class="mt-2">📥 Download Excel Template</button>
-        <br>
-        <button onclick="loadDemoData()" class="mt-2">🔍 Load from STRING Database</button>
-        <br>
-        <button onclick="loadNeo4jData()" class="mt-2">🛢️ Load from Neo4j</button>
-        <br>
-        <button onclick="startTour()" class="mt-2">🗺️ Take a Tour</button>
-      </div>
-      <div class="showOnLoad">
-        <hr>
-        <div id="workspaceContainer">
-          <label for="selectView">Workspace:</label>
-          <select name="selectView" id="selectView" onchange="cache.lm.changeLayout()"></select>
-          <button class="small-btn red disabled" id="removeSelectedLayoutButton" title="Delete current workspace" onclick="cache.lm.removeSelectedLayout()">&nbsp;✗&nbsp;</button>
-          <button class="small-btn green" title="Create new workspace" onclick="cache.lm.addLayout()" >&nbsp;✚&nbsp;</button>
-          <div class="button-separator"></div>
-          <button class="small-btn" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">⛶</button>
-          <button id="removeOverlapsBtn" class="small-btn" title="Remove overlaps: minimally spread overlapping nodes apart (applies to all nodes in this workspace)" onclick="cache.lm.removeNodeOverlaps()">↔️</button>
-          <button id="relayoutBtn" class="small-btn" title="Re-layout: recompute positions for the entire workspace with a chosen layout algorithm (overwrites manual positions)" onclick="cache.lm.relayoutWorkspace()">🔄</button>
-          <button id="hideDisconnectedBtn" class="small-btn red" title="Hide all nodes and edges that are not connected to any other node or edge" onclick="cache.gcm.toggleCleanUpDanglingElements(this)">🚫</button>
-          <button id="hoverToggleBtn" class="small-btn green highlight" title="Disable hover highlight effect (H)" onclick="cache.ui.toggleHoverEffect(this)">✨</button>
-          <button id="neo4jJoinBtn" class="small-btn" style="display: none;" aria-label="Add Neo4j query"
-                  title="Fetch an additional Cypher query from the connected Neo4j server and merge the results into the current graph"
-                  onclick="openNeo4jJoinPopup()">🛢️</button>
-          <div id="debugDiv" class="inline"></div>
-          <br>
-          <h5 class="purple">Shown:
-            <span id="visibleNodes" class="red">0</span>/<span id="totalNodes">0</span> nodes,
-            <span id="visibleEdges" class="red">0</span>/<span id="totalEdges">0</span> edges
-          </h5>
-        </div>
-        <hr>
-        <div id="metricsContainer"></div>
-        <div id="filterContainer"></div>
-      </div>
+      <div id="metricsContainer"></div>
+      <div id="filterContainer"></div>
     </div>
     <div id="sidebarStatusContainer"></div>
   </div>
   <div id="outerGraphContainer">
-    <div id="selectedElementsContainer" class="showOnLoad sel-hud-tr expanded">
+    <div id="selectedElementsContainer" class="sel-hud-tr expanded">
       <div class="sel-hud-header" title="Drag to move — releases to the nearest corner">
         <span class="sel-hud-title">Selection</span>
         <span class="sel-hud-header-tools">
@@ -157,13 +172,7 @@
       </div>
 
       <div class="sel-hud-toolbar">
-        <div id="lassoWrapper" class="showOnLoad"><button id="lassoToggleBtn" class="sel-hud-btn" title="Toggle lasso selection: drag to select elements (L)" onclick="cache.ui.toggleLassoSelection()">➰ Lasso</button></div>
-        <button id="styleToggleBtn" class="sel-hud-btn showOnLoad" title="Open styling panel (Y)" onclick="cache.ui.toggleStylingPanel()">🎨 Style</button>
-        <span class="sel-hud-toolbar-spacer"></span>
-        <button class="sel-hud-icon-btn disabled" title="Undo selection" id="undoSelectionBtn"
-                onclick="cache.sm.undoSelection()">↩</button>
-        <button class="sel-hud-icon-btn disabled" title="Redo selection" id="redoSelectionBtn"
-                onclick="cache.sm.redoSelection()">↪</button>
+        <button id="styleToggleBtn" class="sel-hud-btn" title="Open styling panel (Y)" onclick="cache.ui.toggleStylingPanel()">🎨 Style</button>
       </div>
 
       <div class="sel-hud-empty">
@@ -172,20 +181,6 @@
       </div>
 
       <div class="sel-hud-active">
-        <div class="sel-hud-counts">
-          <span class="sel-count"><strong id="selectedNodes" class="red">0</strong>&nbsp;nodes</span>
-          <button id="focusNodesBtn" class="sel-hud-icon-btn disabled" title="Center and zoom to selected nodes"
-                  onclick="cache.gcm.focusNodes()">🔍</button>
-          <button id="deselectNodesBtn" class="sel-hud-icon-btn red disabled" title="Clear node selection"
-                  onclick="cache.sm.toggleSelectionForAllNodes(false)">×</button>
-          <span class="sel-count-sep"></span>
-          <span class="sel-count"><strong id="selectedEdges" class="red">0</strong>&nbsp;edges</span>
-          <button id="focusEdgesBtn" class="sel-hud-icon-btn disabled" title="Center and zoom to selected edges"
-                  onclick="cache.gcm.focusEdges()">🔍</button>
-          <button id="deselectEdgesBtn" class="sel-hud-icon-btn red disabled" title="Clear edge selection"
-                  onclick="cache.sm.toggleSelectionForAllEdges(false)">×</button>
-        </div>
-
         <div class="sel-hud-actions">
           <span class="sel-group-control">
             <span class="sel-group-label">Add to group:</span>
@@ -211,7 +206,7 @@
 
       <div id="selectionEditorPanel" class="selection-editor-panel"></div>
     </div>
-    <button id="selHudRestoreBtn" class="sel-hud-restore sel-hud-tr showOnLoad" title="Show the selection panel" aria-label="Show selection panel">▸ Selection</button>
+    <button id="selHudRestoreBtn" class="sel-hud-restore sel-hud-tr" title="Show the selection panel" aria-label="Show selection panel">▸ Selection</button>
     <div id="innerGraphContainer"></div>
   </div>
   <div id="rightSidebar">
