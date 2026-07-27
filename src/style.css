@@ -1495,6 +1495,27 @@ h5 {
     box-shadow: 0 0 0 2px rgba(195, 61, 53, 0.25);
 }
 
+/* Single-value fallback shown in place of a slider when a numeric property has
+   only one possible value (min === max). Read-only checkmark + value. */
+.filter-single-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    align-self: flex-start;
+    height: 20px;
+    padding: 0 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+}
+
+.filter-single-value-check {
+    color: var(--accent-text);
+    font-weight: 700;
+}
+
 .filter-row-col3 {
     flex: 0 0 auto;
     display: flex;
@@ -5998,4 +6019,115 @@ input:checked + .slider:before {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* ==== Data editor: Excel import & merge preview ==== */
+
+.merge-preview-file {
+    font-weight: bold;
+    margin-bottom: 10px;
+    word-break: break-all;
+}
+
+.merge-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.merge-stat {
+    background-color: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.merge-stat-num {
+    display: block;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.merge-stat.add .merge-stat-num {
+    color: var(--success-text);
+}
+
+.merge-stat.mod .merge-stat-num {
+    color: var(--brand-text);
+}
+
+.merge-stat.zero .merge-stat-num {
+    color: var(--text-faint);
+}
+
+.merge-stat-label {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.merge-preview-columns {
+    margin-bottom: 10px;
+}
+
+.merge-preview-columns-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.merge-preview-col-badge {
+    display: inline-block;
+    background-color: var(--surface-3);
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin: 0 4px 4px 0;
+    font-size: 12px;
+}
+
+.merge-preview-note {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.merge-preview-details {
+    margin-bottom: 6px;
+}
+
+.merge-preview-details summary {
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.merge-preview-ids {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 4px 0 4px 14px;
+    word-break: break-all;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.merge-join-modes {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.merge-join-mode {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.merge-join-mode-text {
+    color: var(--text-muted);
+}
+
+.merge-join-mode-text strong {
+    color: var(--text);
 }

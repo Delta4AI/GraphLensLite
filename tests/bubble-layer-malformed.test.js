@@ -4,17 +4,17 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // Malformed-fit guard: when bubblesets' bSpline smoothing loops the contour
 // over itself (rough edges / phantom lobe, seen on deep zoom-in), the layer
 // must KEEP the last good outline instead of caching the self-intersecting
-// one. computeOutlinePoints is mocked so we control exactly which fit each
+// one. computeOutlineGeometry is mocked so we control exactly which fit each
 // refit returns; polygonSelfIntersects stays real (it decides the fallback).
 // ==========================================================================
 
 vi.mock("../src/graph/bubble_geometry.js", async (importOriginal) => {
   const actual = await importOriginal();
-  return { ...actual, computeOutlinePoints: vi.fn() };
+  return { ...actual, computeOutlineGeometry: vi.fn() };
 });
 
 import { BubbleSetLayer } from "../src/graph/bubble_layer.js";
-import { computeOutlinePoints } from "../src/graph/bubble_geometry.js";
+import { computeOutlineGeometry } from "../src/graph/bubble_geometry.js";
 
 const CLEAN = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
 // bow-tie: edges (0→1) and (2→3) cross
@@ -55,8 +55,8 @@ const makeCache = () => ({
 let rafQueue = [];
 beforeEach(() => {
   rafQueue = [];
-  vi.mocked(computeOutlinePoints).mockReset();
-  globalThis.Path2D = class { moveTo() {} lineTo() {} closePath() {} };
+  vi.mocked(computeOutlineGeometry).mockReset();
+  globalThis.Path2D = class { moveTo() {} lineTo() {} bezierCurveTo() {} closePath() {} };
   globalThis.requestAnimationFrame = (cb) => { rafQueue.push(cb); return rafQueue.length; };
   globalThis.cancelAnimationFrame = () => {};
   if (!globalThis.window) globalThis.window = {};
@@ -73,13 +73,13 @@ describe("BubbleSetLayer — malformed-fit guard", () => {
     const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
 
     // First fit → clean square, cached.
-    vi.mocked(computeOutlinePoints).mockReturnValue(CLEAN);
+    vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: CLEAN, holes: [] });
     layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
     flush();
     expect(layer.outlines.get("groupOne").graphPoints).toEqual(CLEAN);
 
     // A style change forces an identity-key re-fit; this fit is malformed.
-    vi.mocked(computeOutlinePoints).mockReturnValue(BOWTIE);
+    vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: BOWTIE, holes: [] });
     layer.getGroupHandle("groupOne").update({ ...STYLE, fillOpacity: 0.5 });
     flush();
 
@@ -93,14 +93,14 @@ describe("BubbleSetLayer — malformed-fit guard", () => {
     const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
 
     // First fit → clean square, cached.
-    vi.mocked(computeOutlinePoints).mockReturnValue(CLEAN);
+    vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: CLEAN, holes: [] });
     layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
     flush();
 
     // Export reprojects the cached graph-space outline (zoom-invariant); a
     // later malformed fit can't leak in because export uses the cache, not a
     // fresh fit. Projection is identity in this harness, so points compare equal.
-    vi.mocked(computeOutlinePoints).mockReturnValue(BOWTIE);
+    vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: BOWTIE, holes: [] });
     const groups = layer.exportOutlines();
 
     expect(groups).toHaveLength(1);
@@ -112,12 +112,12 @@ describe("BubbleSetLayer — malformed-fit guard", () => {
     const { sigma } = makeSigma(camera);
     const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
 
-    vi.mocked(computeOutlinePoints).mockReturnValue(CLEAN);
+    vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: CLEAN, holes: [] });
     layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
     flush();
 
     const NEXT = [{ x: 1, y: 1 }, { x: 9, y: 1 }, { x: 9, y: 9 }, { x: 1, y: 9 }];
-    vi.mocked(computeOutlinePoints).mockReturnValue(NEXT);
+    vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: NEXT, holes: [] });
     layer.getGroupHandle("groupOne").update({ ...STYLE, fillOpacity: 0.5 }); // identity-key re-fit
     flush();
 
@@ -131,11 +131,11 @@ describe("BubbleSetLayer — malformed-fit guard", () => {
     const { sigma } = makeSigma(camera);
     const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
 
-    vi.mocked(computeOutlinePoints).mockReturnValue(CLEAN);
+    vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: CLEAN, holes: [] });
     layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
     flush();
 
-    vi.mocked(computeOutlinePoints).mockReturnValue([]); // fit collapses
+    vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: [], holes: [] }); // fit collapses
     layer.getGroupHandle("groupOne").update({ ...STYLE, fillOpacity: 0.5 }); // identity-key re-fit
     flush();
 
@@ -147,11 +147,11 @@ describe("BubbleSetLayer — malformed-fit guard", () => {
     const { sigma } = makeSigma(camera);
     const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
 
-    // computeOutlinePoints repairs self-intersections in the real path; here it
+    // computeOutlineGeometry repairs self-intersections in the real path; here it
     // is mocked to a bow-tie (repair bypassed) with no prior good outline, so
     // the layer must NOT paint the self-crossing ring — it stays absent until a
     // clean fit appears (never a phantom shape or blocky hull).
-    vi.mocked(computeOutlinePoints).mockReturnValue(BOWTIE);
+    vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: BOWTIE, holes: [] });
     layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
     flush();
 
@@ -163,20 +163,20 @@ describe("BubbleSetLayer — malformed-fit guard", () => {
     const { sigma, emit } = makeSigma(camera);
     const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
 
-    vi.mocked(computeOutlinePoints).mockReturnValue(CLEAN);
+    vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: CLEAN, holes: [] });
     layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
     flush();
 
     // Any subsequent fit would change the cached points; assert none happens on
     // zoom. The cached graph outline stays CLEAN and is only reprojected.
-    vi.mocked(computeOutlinePoints).mockClear();
-    vi.mocked(computeOutlinePoints).mockReturnValue(BOWTIE);
+    vi.mocked(computeOutlineGeometry).mockClear();
+    vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: BOWTIE, holes: [] });
     for (const ratio of [8, 0.5, 0.1, 4]) {
       camera.ratio = ratio;
       emit("afterRender");
       flush();
     }
-    expect(computeOutlinePoints).not.toHaveBeenCalled();
+    expect(computeOutlineGeometry).not.toHaveBeenCalled();
     expect(layer.outlines.get("groupOne").graphPoints).toEqual(CLEAN);
   });
 });

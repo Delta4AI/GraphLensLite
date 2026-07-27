@@ -1,7 +1,7 @@
 /**
  * Defaults for the graph, layouts and UI
  */
-const VERSION = "1.16.3";
+const VERSION = "1.16.1";
 
 const DEFAULTS = {
   NODE: {
@@ -202,6 +202,9 @@ const DEFAULTS = {
       stroke: '#C33D35',
       strokeOpacity: 1,
       virtualEdges: true,
+      padding: 0.1,
+      corridor: 0.25,
+      avoidance: 1,
       label: true,
       labelText: 'group one',
       labelFill: '#fff',
@@ -222,6 +225,9 @@ const DEFAULTS = {
       stroke: '#403c53',
       strokeOpacity: 1,
       virtualEdges: true,
+      padding: 0.1,
+      corridor: 0.25,
+      avoidance: 1,
       label: true,
       labelText: 'group two',
       labelFill: '#fff',
@@ -242,6 +248,9 @@ const DEFAULTS = {
       stroke: '#8CA6D9',
       strokeOpacity: 1,
       virtualEdges: true,
+      padding: 0.1,
+      corridor: 0.25,
+      avoidance: 1,
       label: true,
       labelText: 'group three',
       labelFill: '#fff',
@@ -262,6 +271,9 @@ const DEFAULTS = {
       stroke: '#EFB0AA',
       strokeOpacity: 1,
       virtualEdges: true,
+      padding: 0.1,
+      corridor: 0.25,
+      avoidance: 1,
       label: true,
       labelText: 'group four',
       labelFill: '#fff',

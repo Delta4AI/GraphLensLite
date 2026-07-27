@@ -1,0 +1,75 @@
+%% bioRxiv / preprint driver — template-free version of the paper.
+%% Reuses the shared prose (body.tex, abstract.tex, keywords.tex) verbatim.
+%% The NAR flow (main.tex) is untouched: `latexmk -pdf main` still builds it.
+%% Build this one with:  latexmk -pdf biorxiv   ->  biorxiv.pdf
+
+\documentclass[10pt,twocolumn]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[a4paper,margin=0.9in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{url}
+\usepackage[numbers,sort&compress,round]{natbib}
+\usepackage{authblk}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+
+\usepackage[mathlines,switch]{lineno}
+\linenumbers
+
+\graphicspath{{Fig/}}
+
+% OUP frontmatter macro used inline on author names; no-op here (bioRxiv
+% collects ORCIDs in its own submission metadata).
+\newcommand{\ORCID}[1]{}
+
+\title{Graph Lens Lite: A browser-based tool for interactive visualization and exploration of biological networks}
+
+\author[1,2]{Matthias Ley\ORCID{0000-0001-6853-8542}}
+\author[1]{Kinga K\k{e}ska-Izworska\ORCID{0000-0002-4329-1499}}
+\author[1]{Lucas Fillinger\ORCID{0000-0001-5341-8097}}
+\author[1]{Samuel M Walter\ORCID{0000-0002-6868-5654}}
+\author[1]{Fabio Baumg\"{a}rtel\ORCID{0009-0000-0243-2673}}
+\author[1,2]{Enrico Bono\ORCID{0009-0007-7272-5034}}
+\author[1,2]{Louiza Galou\ORCID{0009-0008-5176-2802}}
+\author[1]{Peter Andorfer\ORCID{0009-0003-3492-4017}}
+\author[3]{Pirmin Hauser}
+\author[3]{Johannes Leierer\ORCID{0000-0002-7884-9827}}
+\author[1,2]{Klaus Kratochwill\ORCID{0000-0003-0803-614X}}
+\author[1,3]{Paul Perco\ORCID{0000-0003-2087-5691}}
+
+\affil[1]{Delta4 GmbH, Alser Stra\ss{}e 23/30, 1080 Vienna, Austria}
+\affil[2]{Division of Pediatric Nephrology and Gastroenterology, Department of Pediatrics and Adolescent Medicine, Comprehensive Center for Pediatrics, Medical University Vienna, Waehringer Guertel 18-20, 1090 Vienna, Austria}
+\affil[3]{Department of Internal Medicine IV, Medical University Innsbruck, Anichstrasse 35, 6020 Innsbruck, Austria}
+
+\date{}
+
+\begin{document}
+
+% Title, notes and abstract span the full page width; body flows in two columns.
+\twocolumn[
+  \begin{@twocolumnfalse}
+    \maketitle
+    \noindent\footnotesize
+    Corresponding author: Matthias Ley, \href{mailto:matthias.ley@delta4.ai}{matthias.ley@delta4.ai}.
+    Correspondence may also be addressed to Klaus Kratochwill, \href{mailto:klaus.kratochwill@delta4.ai}{klaus.kratochwill@delta4.ai}.
+    Klaus Kratochwill and Paul Perco contributed equally.\normalsize\medskip
+
+    \begin{abstract}
+    \input{abstract}
+
+    \medskip
+    \noindent\textbf{Keywords:} \input{keywords}
+    \end{abstract}
+    \bigskip
+  \end{@twocolumnfalse}
+]
+
+\input{body}
+
+\bibliographystyle{unsrtnat}
+\bibliography{reference}
+
+\end{document}

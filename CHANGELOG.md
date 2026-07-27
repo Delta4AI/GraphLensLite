@@ -1,41 +1,55 @@
 # Changelog
 
-## 1.16.3 — 2026-07-16
+## Unreleased
 
-Saved graph files load unchanged — this release is a small usability addition.
+Saved graph files load unchanged — this adds a new data source. (Originally released as 1.16.0–1.16.3 on the `feat/neo4j-connector` branch; renumbered into the next release because `main` published its own 1.16.x line in the meantime.)
 
 ### Features
 
 * **Neo4j queries are visible in the status log.** Every Cypher statement the connector sends — the initial fetch, row-count preflights, expansions, additional queries, and stitch passes — now appears as a grey 🛢️-prefixed line in the sidebar status log, so it's always clear what was asked of the server. Long queries are collapsed to one line and truncated to keep the log legible.
-
-## 1.16.2 — 2026-07-15
-
-Saved graph files load unchanged — this release is bug fixes only.
-
-### Fixes
-
-* **Same-named properties are distinguishable in the pie-slice picker.** When properties with the same name exist on different groups (common after a Neo4j import, where every label can carry `name`, `score`, …), the **Map Properties to Pie Slices** dialog showed identical rows with no way to tell them apart. Colliding names now show their group in parentheses — `score (Cell)` vs `score (Document)` — in both the property list and the numeric slice-color rows, every property row gets a hover tooltip with its full `group > name` path, and the list is sorted by name so ambiguous twins sit next to each other. Unique names stay short as before.
-
-## 1.16.1 — 2026-07-15
-
-Saved graph files load unchanged — this release is bug fixes only.
-
-### Fixes
-
-* **Boolean properties now filter correctly.** A boolean data property (e.g. `mined: true` on an edge) was classified as numeric and became a degenerate range slider whose condition could never match, silently hiding every element carrying it under an **OR** filter join — while **AND** appeared to work only because un-narrowed filters don't constrain. Booleans from any data source (Neo4j, Excel boolean cells, JSON payloads, live API pushes) are now normalized to categorical `true`/`false` filters at the import boundary. Reload affected data to pick up the fix.
-
-## 1.16.0 — 2026-07-15
-
-Saved graph files load unchanged — this release adds a new data source.
-
-### Features
-
 * **Neo4j connector.** Fetch a graph straight from a Neo4j server: a new **🛢️ Neo4j Database** card on the landing page (and a sidebar button) opens a connection dialog for server URL, credentials, optional database name, and a Cypher query returning nodes, relationships, or paths. Before fetching, the connector counts the matching rows and asks for confirmation above 2,000; after fetching, a property checklist shows each property's type and example values and lets you drop unwanted ones — long arrays such as embeddings start deselected. Nodes are colored per entity label and edges per relationship type (when there is more than one) — edge colors use a dedicated mid-lightness palette that stays legible over both the light and dark theme backgrounds. Property groups use the most specific label of a stored class hierarchy, and list properties become pipe-separated multi-value categories and booleans true/false categories so the regular filters work on them. The connection settings (never the password) are remembered locally. Uses the Neo4j HTTP API on port 7474/7473 with no driver dependency; Neo4j Aura (Bolt-only) is not supported.
 * **Stack Overflow demo.** No Neo4j server at hand? The connection dialog can fill itself in: a link loads the settings for [Neo4j Labs' public read-only demo server](https://github.com/neo4j-graph-examples) with a query fetching the best-answered `neo4j`-tagged Stack Overflow questions and their askers, answers, and tags (~1,500 nodes / ~1,800 relationships) — review and press **Fetch** to try the connector, expand, and join queries without any setup. Content from [Stack Overflow](https://stackoverflow.com) contributors, licensed [CC BY-SA](https://creativecommons.org/licenses/by-sa/4.0/).
 * **Growing a Neo4j graph in place.** After a Neo4j import, the graph can be extended without starting over — both features live behind the active session (the password is kept in memory only and never persisted) and disappear when another data source replaces the graph:
   * **🛢️ Expand** (selection panel): with nodes selected, a checklist shows what surrounds them — one row per relationship type and neighbor label, with counts, everything preselected — and fetches the checked groups. New neighbors appear next to the node they connect to and float into place with a short force animation that feels the whole network but moves only them; existing nodes never move. The same **Stitch** checkbox as the join-query dialog (on by default) additionally fetches the relationships between the new neighbors and everything already loaded — including among the new neighbors themselves, which the expansion pattern alone never returns.
   * **🛢️ Add query** (workspace toolbar): runs an additional Cypher query against the connected server and merges the results into the current graph, even when they are disconnected from it. The same row-count confirmation as the initial import applies. A **Stitch** checkbox (on by default) runs one extra query that fetches all relationships between the new results and everything already loaded — individual queries only return the relationships their own pattern matched, so without it two queries about different entities never reveal how their neighborhoods interconnect.
   * Merged data reuses the property exclusions chosen at import time (re-import to change them), entity colors stay stable across merges, and node identity follows Neo4j's ids — re-fetched nodes refresh their properties instead of duplicating. Filter narrowing resets on merge. Expansion requires Neo4j 5+ (`elementId`); the plain import keeps working on older servers.
+
+### Fixes
+
+* **Same-named properties are distinguishable in the pie-slice picker.** When properties with the same name exist on different groups (common after a Neo4j import, where every label can carry `name`, `score`, …), the **Map Properties to Pie Slices** dialog showed identical rows with no way to tell them apart. Colliding names now show their group in parentheses — `score (Cell)` vs `score (Document)` — in both the property list and the numeric slice-color rows, every property row gets a hover tooltip with its full `group > name` path, and the list is sorted by name so ambiguous twins sit next to each other. Unique names stay short as before.
+* **Boolean properties now filter correctly.** A boolean data property (e.g. `mined: true` on an edge) was classified as numeric and became a degenerate range slider whose condition could never match, silently hiding every element carrying it under an **OR** filter join — while **AND** appeared to work only because un-narrowed filters don't constrain. Booleans from any data source (Neo4j, Excel boolean cells, JSON payloads, live API pushes) are now normalized to categorical `true`/`false` filters at the import boundary. Reload affected data to pick up the fix.
+
+## 1.16.1 — 2026-07-22
+
+### Fixes
+
+* **Disconnected nodes stay hidden across filter changes.** With "hide disconnected nodes" on, changing a filter could resurface a node that should have stayed hidden, and nodes that became disconnected by the change were never re-hidden. The dangling set is now recomputed against the current filtered view on every change.
+
+### Features
+
+* **Checkmark badge for single-value numeric filters.** Numeric properties with only one value (min === max) have no range to narrow, so they now show a read-only checkmark + value badge instead of an inert slider. The row's include/exclude checkbox still works.
+
+Also includes manuscript revisions (docs only, no app changes).
+
+## 1.16.0 — 2026-07-22
+
+Saved graph files load unchanged. Stored bubble-set knob values keep applying, with two semantic shifts: padding and corridor width now scale with your configured node size (a value of 1 ≈ one node radius of margin) instead of absolute pixels, and any saved avoidance value above 0 now simply means "on".
+
+### Features
+
+* **Merge-import Excel files into the loaded graph.** A new ⤒ Import button in the data editor header loads a workbook *into* the current graph instead of replacing it. A preview modal shows what the merge will do before anything is applied — new/updated node and edge counts, new property columns, unchanged and skipped rows. Existing workspaces, positions, filters and styles are preserved; a single nodes or edges sheet suffices, and new edges can attach to nodes already in the graph. X/Y coordinates in the file seed positions for new nodes only.
+* **Choose how an import joins the graph.** The import preview offers two modes: **Extend & add** (default) updates matching nodes/edges and adds new ones from the file, while **Extend existing only** updates matches and ignores file rows without a match — including edges onto skipped new nodes, so no dangling edges. The preview counts update live as you switch.
+* **Bubble-set geometry controls.** The Bubble Sets styling card gains **Padding** (how far the body extends past its members) and **Corridor Width** (thickness of the arms reaching outlying members) sliders, range 0.01–3, plus an **Avoid Other Nodes** switch that steers the hull around non-members and carves holes for fully enclosed ones. Defaults: padding 0.1, corridor 0.25, avoidance on.
+* **Smooth, organic bubble outlines at every zoom.** Hulls render as continuous curves instead of polylines — no more faceted or jagged outlines when zooming in — and the PNG and SVG exports paint the exact same curves as the live canvas.
+* **Node-size-aware hulls.** The influence field scales with the group's mean member radius, so bubbles look proportional whatever node size you configure. At minimum padding the hull hugs each node at a fixed fraction of *its own* radius, and minimum-width corridors render as thin, gently arced tubes.
+* **A member is never lost.** Every member circle is guaranteed inside its group's outline (measured against the curve actually painted); groups whose members drift beyond the field's reach stay connected as one shape via corridor links.
+
+### Fixes
+
+* **Bubble hulls no longer clip their own members.** Avoid-node pressure could squeeze the outline through a member's body while its center stayed inside; grazed members now get repaired with proper clearance.
+* **Enclosed non-members are no longer silently swallowed.** With avoidance on, a non-member inside the hull gets a visible carve whenever one is geometrically possible — and one impossible hole no longer discards all the others.
+* **Bubble outlines no longer wobble around dense non-member fields**, and corridors no longer reroute into phantom lobes when widening them.
+* **Re-saved Excel workbooks import cleanly.** Rich cell values (formatted text, hyperlinks, formulas) are normalized to plain values on import, so matched rows no longer all report as "updated" and the filter panel no longer crashes after such an import.
 
 ## 1.15.5 — 2026-07-10
 
