@@ -140,6 +140,15 @@ class QueryAST {
       validated = values.some((val) => set.includes(val));
     }
 
+    // --- IS TRUE / IS FALSE ----------------------------------------------
+    // Boolean predicate (§6.1): matches every encoding of the wanted truth
+    // value (true/TRUE/1 vs false/FALSE/0, string or number) so it works on
+    // raw D4Data regardless of how the source file spelled its booleans.
+    if (op === 'IS TRUE' || op === 'IS FALSE') {
+      const want = op === 'IS TRUE' ? 'true' : 'false';
+      validated = StaticUtilities.booleanTokenValue(propVal) === want;
+    }
+
     element.featureIsWithinThreshold.set(tokens[0].propID, validated);
     return validated;
   }
@@ -193,7 +202,7 @@ class QueryManager {
     /* 4. Encode Property names (main group::sub group::property)                */
     /* ------------------------------------------------------------------ */
     asciiStr = asciiStr.replace(
-      /(Node filters|Edge filters)::([^:]+)::([^:]+)(?=\s(?:IN|BETWEEN|LOWER\sTHAN|IS\sMISSING|\)))/g,
+      /(Node filters|Edge filters)::([^:]+)::([^:]+)(?=\s(?:IN|BETWEEN|LOWER\sTHAN|IS\sMISSING|IS\sTRUE|IS\sFALSE|\)))/g,
       (match, mainGroup, subGroup, prop) => {
         const mgok = mainGroup in this.cache.uniquePropHierarchy;
         const sgok = mgok && subGroup in this.cache.uniquePropHierarchy[mainGroup];
@@ -267,6 +276,13 @@ class QueryManager {
       // Single span with a literal inner space (not a nested q-space span,
       // which would break the non-greedy encoded-chunk splitter in step 10).
       () => `<span class='q-kw-ismissing' data-encoded>IS MISSING</span>`
+    );
+
+    /* 5-5 Boolean predicates (§6.1): "IS TRUE" / "IS FALSE" ------------- */
+    asciiStr = asciiStr.replace(
+      /\bIS\s+(TRUE|FALSE)\b/gi,
+      (_m, word) =>
+        `<span class='q-kw-is${word.toLowerCase()}' data-encoded>IS ${word.toUpperCase()}</span>`
     );
 
     /* ------------------------------------------------------------------ */
@@ -457,9 +473,19 @@ class QueryManager {
       const joinMode = layout.filterJoinMode === 'AND' ? 'AND' : 'OR';
       let queryEntries = [];
       for (const [propID, fo] of layout.filters.entries()) {
-        if (fo.active) {
+        if (fo.active && !fo.unusable) {
           let cond;
-          if (fo.isCategory) {
+          if (fo.isBoolean) {
+            // Three-state boolean segment. "Any" (both selected) still emits a
+            // condition — like a fully-selected categorical, it matches every
+            // carrier of the property under an OR join.
+            const wantTrue = fo.categories.has('true');
+            const wantFalse = fo.categories.has('false');
+            cond =
+              wantTrue && wantFalse
+                ? `(${propID} IS TRUE) OR (${propID} IS FALSE)`
+                : `${propID} IS ${wantTrue ? 'TRUE' : 'FALSE'}`;
+          } else if (fo.isCategory) {
             cond = `${propID} IN [${[...fo.categories].map((cat) => StaticUtilities.escapeQueryValue(cat)).join(',')}]`;
           } else if (fo.isInverted) {
             cond = `${propID} LOWER THAN ${fo.upperThreshold} OR GREATER THAN ${fo.lowerThreshold}`;
@@ -727,6 +753,8 @@ class QueryManager {
       'q-or-greater-than': () => ({ type: 'KW', value: 'OR GREATER THAN' }),
       'q-in-cat-bracket-open': () => ({ type: 'KW', value: 'IN [' }),
       'q-kw-ismissing': () => ({ type: 'KW', value: 'IS MISSING' }),
+      'q-kw-istrue': () => ({ type: 'KW', value: 'IS TRUE' }),
+      'q-kw-isfalse': () => ({ type: 'KW', value: 'IS FALSE' }),
 
       // category strings
       'q-string': (el) => ({
@@ -821,6 +849,14 @@ class QueryManager {
       this.cache.propIDToInvertibleRangeSliders
         .get(obj[0].propID)
         .setTo(obj[2].value, obj[4].value, true);
+    }
+
+    // boolean predicate
+    else if (obj[1].type === 'KW' && (obj[1].value === 'IS TRUE' || obj[1].value === 'IS FALSE')) {
+      this.cache.ui.checkCheckbox(obj[0].propID, true);
+      this.cache.propIDToBooleanToggles
+        .get(obj[0].propID)
+        ?.applyFromQuery(obj[1].value === 'IS TRUE' ? 'true' : 'false');
     }
 
     // category
@@ -972,6 +1008,7 @@ class QueryManager {
   <li><span class="q-lower-than">LOWER THAN</span>&nbsp;<span class="q-number">0.2</span>&nbsp;<span class="q-or-greater-than">OR GREATER THAN</span>&nbsp;<span class="q-number">0.8</span> - Keep numerical values ≤ 0.2 or ≥ 0.8</li>
   <li><span class="q-in-cat-bracket-open">IN&nbsp;[</span><span class="q-string">foo</span><span class="q-comma">,</span>&nbsp;<span class="q-string">bar</span><span class="q-cat-bracket-close">]</span> - Keep specific categorical values</li>
   <li><span class="q-kw-ismissing">IS MISSING</span> - True when the property is absent/empty or belongs to the other element type. Auto-added by the filter panel's AND join so a property an element lacks doesn't exclude it; rarely hand-written.</li>
+  <li><span class="q-kw-istrue">IS TRUE</span> / <span class="q-kw-isfalse">IS FALSE</span> - Boolean test; matches every encoding (true/TRUE/1 vs false/FALSE/0)</li>
 </ul>
 
 <p><strong>3. Logical Operators</strong></p>

@@ -64,6 +64,20 @@ class StaticUtilities {
     return false;
   }
 
+  /**
+   * Canonical boolean value of a user-data token, per the Excel template's
+   * stated encoding ("true or TRUE or 1, false or FALSE or 0"): returns
+   * 'true', 'false', or null when the value is not a boolean encoding.
+   * Unlike isBoolean above (reserved style columns), this also accepts the
+   * string forms '1'/'0', which is how spreadsheet cells usually arrive.
+   */
+  static booleanTokenValue(value) {
+    const norm = String(value).trim().toLowerCase();
+    if (norm === 'true' || norm === '1') return 'true';
+    if (norm === 'false' || norm === '0') return 'false';
+    return null;
+  }
+
   static isHexColor(value) {
     if (!this.isString(value)) return false;
     const hexRegex = /^#(?:[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/;

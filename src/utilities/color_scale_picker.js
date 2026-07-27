@@ -153,7 +153,7 @@ class ColorScalePicker {
           : this.cache.edgeRef.get(elementId);
 
       element?.features.forEach((f) => {
-        if (filters.has(f)) available.add(f);
+        if (filters.has(f) && !filters.get(f).unusable) available.add(f);
       });
     });
 

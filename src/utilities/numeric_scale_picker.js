@@ -190,7 +190,7 @@ class NumericScalePicker {
 
       element?.features.forEach(f => {
         const filterObj = filters.get(f);
-        if (filterObj && !filterObj.isCategory) {
+        if (filterObj && !filterObj.isCategory && !filterObj.unusable) {
           available.add(f);
         }
       });

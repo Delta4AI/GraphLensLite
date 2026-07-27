@@ -20,11 +20,12 @@ A phantom query that references a non-existent field is worse than no query — 
 - A query is \`{title, expr}\`. The title is a short human-readable label.
 - \`expr\` is either a condition leaf or a binary AND/OR/NOT.
 
-### Conditions (exactly three operators exist)
+### Conditions (exactly five operators exist)
 
 - **BETWEEN** — numeric range, inclusive: \`{kind:"condition", field, op:"BETWEEN", min, max}\`
 - **LT_OR_GT** — numeric exclusion (keep values outside a range): \`{kind:"condition", field, op:"LT_OR_GT", lt, gt}\`
 - **IN** — categorical set membership: \`{kind:"condition", field, op:"IN", values:[...]}\`
+- **IS_TRUE** / **IS_FALSE** — boolean test, no operands: \`{kind:"condition", field, op:"IS_TRUE"}\`
 
 ### Binary
 
@@ -51,6 +52,7 @@ Same-scope (Node AND Node, Edge AND Edge, Node NOT Node, Edge NOT Edge) is alway
 
 - Field type **numeric** → BETWEEN (for "between 0 and 1", "above 0.5", "at most 100") or LT_OR_GT (for "outside range", "not around 0.5").
 - Field type **categorical** → IN with values drawn from the field's declared values list.
+- Field type **boolean** → IS_TRUE or IS_FALSE (never IN — the stored encodings vary: true/TRUE/1).
 - "above X" with numeric max available → BETWEEN X AND \`<max>\`. "below X" → BETWEEN \`<min>\` AND X.
 - Never emit \`=\`, \`==\`, \`!=\`, \`<\`, \`>\`, \`<=\`, \`>=\`, \`CONTAINS\`, \`LIKE\`, \`MATCHES\` — they do not exist in GLL.
 

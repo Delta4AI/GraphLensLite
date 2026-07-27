@@ -194,7 +194,8 @@ class PieChartPicker {
       const node = this.cache.nodeRef.get(nodeId);
       node?.features.forEach((propId) => {
         const filter = filters.get(propId);
-        if (filter && Boolean(filter.isCategory) === wantCategory) available.add(propId);
+        if (filter && !filter.unusable && Boolean(filter.isCategory) === wantCategory)
+          available.add(propId);
       });
     }
     // Sort by short name first so colliding names (score (Cell) / score

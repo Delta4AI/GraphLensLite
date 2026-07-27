@@ -139,6 +139,7 @@ class Cache {
 
     this.propIDToDropdownChecklists = new Map();
     this.propIDToInvertibleRangeSliders = new Map();
+    this.propIDToBooleanToggles = new Map();
 
     this.lastBubbleSetMembers = new Map();
     this.bubbleSetChanged = false;

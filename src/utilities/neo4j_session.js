@@ -257,6 +257,11 @@ async function mergeAndApply(cache, newNodes, newRels, deps = {}) {
     session.exclusions,
   );
   seedMergedPositions(data, positions);
+  // Same in-memory carry-over as layouts below: a graph rebuild must not
+  // drop the user's boolean-type overrides (§6.1).
+  if (cache.data?.booleanTypeOverrides?.size) {
+    data.booleanTypeOverrides = [...cache.data.booleanTypeOverrides];
+  }
 
   // Declare the (single, current) workspace in the payload so preProcessData
   // takes the JSON-import path: with a layout whose positions cover every

@@ -100,6 +100,8 @@ function readRecentActions(maxLines) {
 function describeProperty(filterDefaults, propID) {
   const def = filterDefaults?.get?.(propID)
   if (!def) return {type: 'unknown'}
+  if (def.unusable) return {type: 'unusable'}
+  if (def.isBoolean) return {type: 'boolean'}
 
   if (def.isCategory) {
     const allValues = def.categories ? [...def.categories] : []

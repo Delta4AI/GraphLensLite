@@ -1,5 +1,5 @@
 import { StaticUtilities } from '../utilities/static.js';
-import { DropdownChecklist, InvertibleRangeSlider } from './ui_components.js';
+import { BooleanToggle, DropdownChecklist, InvertibleRangeSlider } from './ui_components.js';
 import { createStyleDiv } from './ui_style_div.js';
 import { Popup } from '../utilities/popup.js';
 import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
@@ -793,8 +793,6 @@ class UIManager {
 
     for (let propID of sortedPropIDs) {
       let [section, subSection, prop] = StaticUtilities.decodePropHashId(propID);
-      let isCategoricalProperty = this.cache.data.filterDefaults.get(propID).isCategory;
-
       if (!sectionBodies.has(section)) {
         const sectionWrap = document.createElement('div');
         sectionWrap.className = 'filter-section';
@@ -844,6 +842,8 @@ class UIManager {
       }
       const subBody = subBodies.get(subKey);
 
+      const filterDefault = this.cache.data.filterDefaults.get(propID);
+
       const row = document.createElement('div');
       row.className = 'filter-row';
       const col1 = document.createElement('div');
@@ -854,11 +854,39 @@ class UIManager {
       col2.className = 'filter-row-col2';
       row.appendChild(col2);
 
-      const sliderOrDropdown = isCategoricalProperty
-        ? new DropdownChecklist(propID, this.cache)
-        : new InvertibleRangeSlider(propID, this.cache);
+      // Mixed-type property (§6.2): rendered, but disabled with the reason —
+      // no widget, no per-row actions, checkbox inert via the row class.
+      if (filterDefault.unusable) {
+        row.classList.add('filter-row-unusable');
+        const reason = document.createElement('div');
+        reason.className = 'filter-unusable-reason';
+        reason.textContent =
+          `Mixes ${filterDefault.numericCount} numeric and ` +
+          `${filterDefault.textCount} text values — filter disabled`;
+        reason.title =
+          'This column holds both numbers and text, so neither a range slider nor a ' +
+          'category list fits it. Clean the column to a single type to filter by it.';
+        // ponytail: "jump to offending rows in the data table" (spec §6.2)
+        // needs data-editor search/filter support that does not exist yet;
+        // add the link here once the data editor can focus a row subset.
+        col2.appendChild(reason);
+        row.appendChild(document.createElement('div'));
+        subBody.append(row);
+        continue;
+      }
 
-      sliderOrDropdown.appendTo(col2);
+      const widget = filterDefault.isBoolean
+        ? new BooleanToggle(propID, this.cache)
+        : filterDefault.isCategory
+          ? new DropdownChecklist(propID, this.cache)
+          : new InvertibleRangeSlider(propID, this.cache);
+
+      widget.appendTo(col2);
+      // 0/1-encoded columns can be genuine numeric measures misclassified as
+      // boolean (§6.1 risk) — offer the type switch in both directions.
+      if (filterDefault.numericBoolSource) {
+        col2.appendChild(this.createBooleanTypeOverrideLink(propID, filterDefault.isBoolean));
+      }
       const col3 = document.createElement('div');
       col3.className = 'filter-row-col3';
       if (this.cache.nodeExclusiveProps.has(propID) || this.cache.mixedProps.has(propID)) {
@@ -871,11 +899,34 @@ class UIManager {
       col3.appendChild(this.cache.uiComponents.createAddOrRemoveToSelectionGroup(propID));
       row.appendChild(col3);
       subBody.append(row);
-      sliderOrDropdown.appendListeners();
+      widget.appendListeners();
     }
 
     this.manageDynamicWidgets();
     this.cache.qm.updateQueryTextArea();
+  }
+
+  // Small type-switch link under the widget of a 0/1-encoded column: inferred
+  // boolean ↔ plain numeric slider (§6.1 misclassification override). The
+  // choice persists in the workspace JSON via cache.data.booleanTypeOverrides.
+  createBooleanTypeOverrideLink(propID, isCurrentlyBoolean) {
+    const link = document.createElement('button');
+    link.type = 'button';
+    link.className = 'filter-type-override';
+    link.textContent = isCurrentlyBoolean ? 'treat as 0/1 numbers' : 'treat as true/false';
+    link.title = isCurrentlyBoolean
+      ? 'This column only holds 0 and 1 — switch to a numeric range slider if they are measures, not booleans'
+      : 'Switch back to the inferred true/false toggle';
+    link.addEventListener('click', async () => {
+      if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
+      this.cache.io.applyBooleanTypeOverride(propID, isCurrentlyBoolean);
+      this.buildFilterUI();
+      await this.cache.fm.handleFilterEvent(
+        'Filtering Elements',
+        `${propID} type switched to ${isCurrentlyBoolean ? 'numeric' : 'boolean'}`
+      );
+    });
+    return link;
   }
 
   // Builds the segmented OR/AND control that sets how multiple active filters
@@ -1052,6 +1103,11 @@ class UIManager {
   uncheckAllCheckboxes() {
     for (const propID of this.cache.propIDs) {
       this.checkCheckbox(propID, false);
+    }
+    // Boolean toggles resync from the manual query starting from Any, so a
+    // query with only IS TRUE (or only IS FALSE) lands on the right segment.
+    for (const toggle of this.cache.propIDToBooleanToggles.values()) {
+      toggle.resetToAny();
     }
   }
 

@@ -248,6 +248,104 @@ class DropdownChecklist {
   }
 }
 
+/**
+ * Three-state Any / True / False segment for boolean-classified properties
+ * (§6.1). State lives in the layout filter's `categories` Set (mutated in
+ * place, like DropdownChecklist): Any = {'true','false'}, True = {'true'},
+ * False = {'false'} — so query generation, narrowing checks, and JSON
+ * persistence reuse the categorical machinery unchanged.
+ */
+class BooleanToggle {
+  static STATES = [
+    ['any', 'Any', ['true', 'false']],
+    ['true', 'True', ['true']],
+    ['false', 'False', ['false']],
+  ];
+
+  constructor(propID, cache) {
+    this.propID = propID;
+    this.cache = cache;
+    this.selectedCategories =
+      this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID).categories;
+    this.cache.propIDToBooleanToggles.set(propID, this);
+  }
+
+  state() {
+    const hasTrue = this.selectedCategories.has('true');
+    const hasFalse = this.selectedCategories.has('false');
+    if (hasTrue && !hasFalse) return 'true';
+    if (hasFalse && !hasTrue) return 'false';
+    return 'any';
+  }
+
+  appendTo(parent) {
+    this.container = document.createElement('div');
+    this.container.id = this.propID + '-bool-toggle';
+    this.container.className = 'filter-join-toggle filter-bool-toggle';
+    this.segments = new Map();
+
+    for (const [key, label] of BooleanToggle.STATES) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'filter-join-segment';
+      btn.textContent = label;
+      btn.title = `Show elements where this property is ${key === 'any' ? 'true or false' : key}`;
+      btn.addEventListener('click', async () => await this.handleSelection(key));
+      this.segments.set(key, btn);
+      this.container.appendChild(btn);
+    }
+
+    this.updateSegments();
+    parent.appendChild(this.container);
+  }
+
+  // Interface parity with DropdownChecklist / InvertibleRangeSlider —
+  // BooleanToggle wires its listeners in appendTo.
+  appendListeners() {}
+
+  updateSegments() {
+    if (!this.segments) return; // not rendered (e.g. sync before appendTo)
+    const current = this.state();
+    for (const [key, btn] of this.segments.entries()) {
+      btn.classList.toggle('active', key === current);
+    }
+  }
+
+  #setState(key) {
+    const values = BooleanToggle.STATES.find(([k]) => k === key)[2];
+    this.selectedCategories.clear();
+    for (const value of values) this.selectedCategories.add(value);
+    this.updateSegments();
+  }
+
+  async handleSelection(key) {
+    if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
+    if (key === this.state()) return;
+    this.#setState(key);
+    await this.cache.fm.handleFilterEvent(
+      'Filtering Elements',
+      `${this.propID} is ${key === 'any' ? 'true or false' : key}`
+    );
+  }
+
+  // Sync from a manual query (no filter event — the query drives rendering).
+  // Called once per IS TRUE / IS FALSE leaf; two leaves for the same property
+  // union to Any. resetToAny() runs before each sync pass, so the sequence
+  // any → first leaf narrows → second leaf widens back is always correct.
+  applyFromQuery(value) {
+    const current = this.state();
+    if (current === 'any') {
+      this.#setState(value);
+    } else if (current !== value) {
+      this.#setState('any');
+    }
+  }
+
+  resetToAny() {
+    this.#setState('any');
+  }
+}
+
 class InvertibleRangeSlider {
   constructor(propID, cache) {
     this.propID = propID;
@@ -1130,4 +1228,4 @@ class UIComponentManager {
   }
 }
 
-export { DropdownChecklist, InvertibleRangeSlider, UIComponentManager };
+export { BooleanToggle, DropdownChecklist, InvertibleRangeSlider, UIComponentManager };
