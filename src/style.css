@@ -1539,17 +1539,6 @@ h5 {
     gap: 8px;
 }
 
-.filter-toolbar .filter-details-toggle {
-    margin-left: auto;
-}
-
-/* The OR/AND join controls are revealed only in Details mode, alongside the
-   exact value inputs and per-row actions. Compact mode shows just the Details
-   button so the panel stays minimal. */
-#filterContainer:not(.show-details) .filter-toolbar-join {
-    display: none;
-}
-
 .filter-strict-checkbox {
     display: inline-flex;
     align-items: center;
@@ -1564,33 +1553,36 @@ h5 {
     display: none;
 }
 
-.filter-details-toggle {
-    display: inline-flex;
+/* Keyboard cheat sheet (opened with "?"): one key/action row per shortcut. */
+.keyboard-sheet {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 12px;
     align-items: center;
-    gap: 4px;
-    padding: 2px 9px;
+}
+
+.keyboard-sheet-row {
+    display: contents;
+}
+
+.keyboard-sheet kbd {
+    justify-self: center;
+    min-width: 26px;
+    padding: 1px 6px;
+    text-align: center;
+    font-family: inherit;
     font-size: 11px;
     font-weight: 600;
     color: var(--text-strong);
     background: var(--surface-3);
     border: 1px solid var(--border-soft);
-    border-radius: 12px;
-    cursor: pointer;
+    border-bottom-width: 2px;
+    border-radius: 4px;
 }
 
-.filter-details-toggle:hover {
-    border-color: var(--accent-text);
-}
-
-.filter-details-toggle.active {
-    background: var(--accent-text);
-    color: #fff;
-    border-color: var(--accent-text);
-}
-
-/* Segmented OR/AND control: how multiple active filters combine. Mirrors the
-   details toggle's pill styling; the active segment is filled so the current
-   mode is always visible (a state, not a morphing action). */
+/* Segmented OR/AND control: how multiple active filters combine. Pill
+   styling; the active segment is filled so the current mode is always
+   visible (a state, not a morphing action). */
 .filter-join-toggle {
     display: inline-flex;
     align-items: stretch;
@@ -1621,20 +1613,6 @@ h5 {
     background: var(--accent-text);
     color: #fff;
     cursor: default;
-}
-
-/* Compact mode: numeric inputs and the circle / +- actions are hidden so the
-   control uses the full row width. Hiding col3 drops the grid to two columns
-   so the remaining cells stay aligned (a 3-col grid would pull the next row's
-   label into the empty third cell). The hover value bubbles overflow into the
-   canvas via position:fixed, so no right inset is needed. */
-#filterContainer:not(.show-details) .filter-subgroup-body {
-    grid-template-columns: auto minmax(0, 1fr);
-}
-
-#filterContainer:not(.show-details) .filter-input-row,
-#filterContainer:not(.show-details) .filter-row-col3 {
-    display: none;
 }
 
 /* Collapsible filter sections and sub-groups (accordion). Properties within a

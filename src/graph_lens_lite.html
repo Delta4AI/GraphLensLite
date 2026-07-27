@@ -145,13 +145,13 @@
     <div id="sidebarStatusContainer"></div>
   </div>
   <div id="outerGraphContainer">
-    <div id="selectedElementsContainer" class="showOnLoad sel-hud-tr">
+    <div id="selectedElementsContainer" class="showOnLoad sel-hud-tr expanded">
       <div class="sel-hud-header" title="Drag to move — releases to the nearest corner">
         <span class="sel-hud-title">Selection</span>
         <span class="sel-hud-header-tools">
           <button class="sel-hud-tools-toggle" id="selectionEditorToggleBtn"
-                  title="Show selection tools: select by name, neighbours, or arrange the selection"
-                  aria-expanded="false" onclick="cache.ui.toggleSelectionEditor()">Tools ▾</button>
+                  title="Hide selection tools"
+                  aria-expanded="true" onclick="cache.ui.toggleSelectionEditor()">Tools ▴</button>
           <button class="sel-hud-hide-btn" id="selHudHideBtn" title="Hide the selection panel (e.g. for a screenshot)" aria-label="Hide selection panel">✕</button>
         </span>
       </div>

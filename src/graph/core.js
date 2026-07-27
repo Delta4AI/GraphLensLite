@@ -816,6 +816,9 @@ class GraphCoreManager {
         case 'a':
           this.cache.assistant.togglePanel();
           break;
+        case '?':
+          this.cache.ui.toggleKeyboardSheet();
+          break;
         default:
           break;
       }

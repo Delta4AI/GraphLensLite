@@ -7,11 +7,6 @@ import { EXPORT_SCALES } from '../utilities/export_scale.js';
 import { clampPopoverLeft } from '../utilities/popover_position.js';
 import { refreshNeo4jSessionUI } from '../utilities/neo4j_loader.js';
 
-// Persisted preference: whether the filter panel reveals exact numeric inputs
-// and the per-row group / selection actions. Off keeps rows scannable when a
-// dataset has 30-50 properties.
-const FILTER_DETAILS_KEY = 'gll.filterDetails';
-
 // Persisted preference: how multiple active filters combine — "OR" (match any)
 // or "AND" (match every, non-strict: a property an element lacks does not
 // exclude it). Stored globally as the default for new layouts.
@@ -22,6 +17,23 @@ const FILTER_JOIN_KEY = 'gll.filterJoinMode';
 // is judged only on the filters it has. On = hide elements missing any active
 // same-type filter.
 const FILTER_STRICT_KEY = 'gll.filterStrict';
+
+// The keyboard cheat sheet (opened with "?"). Must mirror the hotkey switch
+// in graph/core.js registerHotkeyEvents — update both when a key changes.
+const KEYBOARD_SHORTCUTS = [
+  ['P', 'Export PNG image (at the remembered resolution)'],
+  ['S', 'Save graph as JSON'],
+  ['F', 'Fit view to visible elements'],
+  ['D', 'Toggle data table'],
+  ['Q', 'Toggle query editor'],
+  ['M', 'Toggle metrics panel'],
+  ['Y', 'Toggle styling panel'],
+  ['L', 'Toggle lasso selection'],
+  ['H', 'Toggle hover highlight'],
+  ['A', 'Toggle assistant'],
+  ['Esc', 'Exit lasso mode'],
+  ['?', 'Show this sheet'],
+];
 
 class UIManager {
   constructor(cache, debugEnabled = false) {
@@ -534,6 +546,37 @@ class UIManager {
     this.info(enable ? 'Hover highlight effect enabled' : 'Hover highlight effect disabled');
   }
 
+  // Keyboard cheat sheet, opened with "?" (and closed by it, acting as a
+  // toggle). Content is static — one row per KEYBOARD_SHORTCUTS entry.
+  toggleKeyboardSheet() {
+    if (this._keyboardSheet) {
+      this._keyboardSheet.close();
+      return;
+    }
+
+    const content = document.createElement('div');
+    content.className = 'keyboard-sheet';
+    for (const [key, action] of KEYBOARD_SHORTCUTS) {
+      const row = document.createElement('div');
+      row.className = 'keyboard-sheet-row';
+      const kbd = document.createElement('kbd');
+      kbd.textContent = key;
+      const label = document.createElement('span');
+      label.textContent = action;
+      row.append(kbd, label);
+      content.appendChild(row);
+    }
+
+    this._keyboardSheet = new Popup(content, {
+      title: 'Keyboard shortcuts',
+      width: '340px',
+      showFullscreenButton: false,
+      onClose: () => {
+        this._keyboardSheet = null;
+      },
+    });
+  }
+
   /**
    * Close every anchored popover (graph teardown hook — the popovers outlive
    * the adapter, but their outside-click document listeners must not).
@@ -723,11 +766,8 @@ class UIManager {
     }
 
     // Panel-level control bar. Sits above every section so its controls read
-    // as global, not scoped to the adjacent section:
-    //  - "Combine filters" OR/AND: how multiple active filters combine.
-    //  - "Details": reveals exact numeric inputs and per-row group / selection
-    //    actions. Compact by default so dense property sets (30-50 properties)
-    //    stay scannable.
+    // as global, not scoped to the adjacent section: the OR/AND join toggle
+    // and its "complete cases" modifier.
     const toolbar = document.createElement('div');
     toolbar.className = 'filter-toolbar';
     // OR/AND join control (left). "Complete cases only" is a modifier of AND,
@@ -740,8 +780,7 @@ class UIManager {
     const joinCluster = document.createElement('div');
     joinCluster.className = 'filter-toolbar-join';
     joinCluster.append(joinToggle, strictCheckbox);
-    // Details (view option) is pushed to the far right.
-    toolbar.append(joinCluster, this.createFilterDetailsToggle(div));
+    toolbar.append(joinCluster);
     div.appendChild(toolbar);
 
     // Each section (and sub-group) is a collapsible accordion so large
@@ -837,45 +876,6 @@ class UIManager {
 
     this.manageDynamicWidgets();
     this.cache.qm.updateQueryTextArea();
-  }
-
-  // Builds the panel-level "Details" toggle button. Adding/removing
-  // `show-details` on the filter container drives input/action visibility
-  // purely via CSS. Returned button is mounted on the first section header.
-  createFilterDetailsToggle(container) {
-    const detailsBtn = document.createElement('button');
-    detailsBtn.type = 'button';
-    detailsBtn.className = 'filter-details-toggle';
-    detailsBtn.textContent = '⚙ Details';
-
-    const apply = (on) => {
-      container.classList.toggle('show-details', on);
-      detailsBtn.classList.toggle('active', on);
-      detailsBtn.setAttribute('aria-pressed', String(on));
-      detailsBtn.title = on
-        ? 'Hide exact value inputs and per-row group / selection actions'
-        : 'Show exact value inputs and per-row group / selection actions';
-    };
-
-    detailsBtn.addEventListener('click', () => {
-      const on = !container.classList.contains('show-details');
-      try {
-        window.localStorage.setItem(FILTER_DETAILS_KEY, on ? '1' : '0');
-      } catch (err) {
-        this.debug(`Could not persist filter-details preference: ${err.message}`);
-      }
-      apply(on);
-    });
-
-    let stored = '0';
-    try {
-      stored = window.localStorage.getItem(FILTER_DETAILS_KEY) ?? '0';
-    } catch (err) {
-      this.debug(`Could not read filter-details preference: ${err.message}`);
-    }
-    apply(stored === '1');
-
-    return detailsBtn;
   }
 
   // Builds the segmented OR/AND control that sets how multiple active filters
