@@ -223,3 +223,84 @@ describe('NetworkMetrics.invalidateMetricValues tooltip blanking', () => {
     expect(cache.toolTips.get('A')).toBe(TOOLTIP_WITH_METRIC)
   })
 })
+
+// ==========================================================================
+// Switching back to an already-computed metric must repaint the panel.
+//
+// The gate that skips recompute used to skip the *render* with it, so the
+// second visit to a metric left the previous one's ranking, graph-level table
+// and 🛈 popup on screen with no way back. Going to a metric for the first
+// time worked (no cache -> full path), which is what made it look like only
+// "backwards" navigation was broken.
+// ==========================================================================
+
+describe('NetworkMetrics metric switching', () => {
+  const rankedIds = (metrics) => [...metrics.multiselect.options].map((o) => o.textContent)
+  const tableRows = (metrics) =>
+    [...metrics.table.rows].map((r) => r.cells[0].textContent)
+
+  async function select(metrics, id) {
+    metrics.selected = id
+    await metrics.updateMetricUI()
+  }
+
+  it('repaints when returning to a metric that is already cached', async () => {
+    const cache = makeCache({ visibleElementsChanged: false })
+    const metrics = makeMetrics(cache)
+
+    await select(metrics, 'centrality')
+    const degreeRanking = rankedIds(metrics)
+    const degreeTable = tableRows(metrics)
+    expect(degreeRanking.length).toBeGreaterThan(0)
+
+    await select(metrics, 'betweenness')
+    expect(rankedIds(metrics)).not.toEqual(degreeRanking)
+    expect(tableRows(metrics)).not.toEqual(degreeTable)
+
+    // The regression: this left betweenness on screen.
+    await select(metrics, 'centrality')
+    expect(rankedIds(metrics)).toEqual(degreeRanking)
+    expect(tableRows(metrics)).toEqual(degreeTable)
+  })
+
+  it('serves the return visit from cache instead of recomputing', async () => {
+    const cache = makeCache({ visibleElementsChanged: false })
+    const metrics = makeMetrics(cache)
+    const spy = vi.spyOn(metrics.m.centrality, 'calculate')
+
+    await select(metrics, 'centrality')
+    expect(spy).toHaveBeenCalledTimes(1)
+
+    await select(metrics, 'betweenness')
+    await select(metrics, 'centrality')
+
+    // Repainted, but the expensive calculation ran exactly once.
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(rankedIds(metrics).length).toBeGreaterThan(0)
+    spy.mockRestore()
+  })
+
+  it('does not repaint on an unrelated refresh of the same metric', async () => {
+    const cache = makeCache({ visibleElementsChanged: false })
+    const metrics = makeMetrics(cache)
+    await select(metrics, 'centrality')
+
+    const firstOption = metrics.multiselect.options[0]
+    // decideToRenderOrDraw calls updateMetricUI on every render; with nothing
+    // changed it must touch neither the algorithms nor the DOM.
+    await metrics.updateMetricUI()
+    expect(metrics.multiselect.options[0]).toBe(firstOption)
+  })
+
+  it('recomputes and repaints when the visible subgraph changed', async () => {
+    const cache = makeCache({ visibleElementsChanged: false })
+    const metrics = makeMetrics(cache)
+    await select(metrics, 'centrality')
+
+    const spy = vi.spyOn(metrics.m.centrality, 'calculate')
+    cache.visibleElementsChanged = true
+    await metrics.updateMetricUI()
+    expect(spy).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
+  })
+})

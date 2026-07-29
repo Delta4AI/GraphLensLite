@@ -736,8 +736,10 @@ body {
 #innerGraphContainer .gll-minimap {
     position: absolute;
     /* Lifts clear of the workbench, which overlays the bottom of the stage.
-       workbench.js publishes --workbench-height (0px while it is closed). */
-    bottom: calc(10px + var(--workbench-height, 0px));
+       workbench.js publishes --workbench-height (0px while it is closed).
+       Capped so a full-height workbench cannot push it up past the stage and
+       out over the rail — at that point it is fully covered anyway. */
+    bottom: min(calc(10px + var(--workbench-height, 0px)), calc(100% - 132px));
     right: 10px;
     transition: bottom 0.05s linear;
     z-index: 500;

@@ -57,6 +57,9 @@ class NetworkMetrics {
     this.collapsed = true;
     this.cache = cache;
     this.metricValueCache = new Map();
+    // Which metric the panel is currently showing. Distinct from `selected`
+    // (what the dropdown says) so a repaint can be skipped when they agree.
+    this.renderedMetric = null;
     // Tracks whether any node tooltip currently carries metric text, so
     // invalidation can blank stale values without parsing every tooltip when
     // metrics were never shown.
@@ -94,11 +97,17 @@ class NetworkMetrics {
     // filter drag when nobody is looking at metrics.
     if (this.collapsed) return;
 
-    // Recompute when visibility changed OR the selected metric was never
-    // computed. Under sigma a fresh load produces no visibility diff (elements
-    // start visible), so gating on the flag alone would block metrics forever.
+    // Nothing changed and we already have this metric: skip the algorithms,
+    // but still paint if what is on screen belongs to a different metric.
+    // Conflating "don't recompute" with "don't render" is what used to strand
+    // the panel on the previously selected metric — switching to a fresh one
+    // worked (no cache entry, so the full path ran) while switching *back*
+    // never did.
     const cached = this.metricValueCache.get(this.selected);
-    if (!this.cache.visibleElementsChanged && cached?.values?.size) return;
+    if (!this.cache.visibleElementsChanged && cached?.values?.size) {
+      if (this.renderedMetric !== this.selected) this.#renderMetric(this.selected, cached);
+      return;
+    }
 
     const metricName = this.m[this.selected].label;
     await this.cache.ui.showLoading("Calculating", `Network Metric: ${metricName}`);
@@ -107,59 +116,84 @@ class NetworkMetrics {
     // try/finally so a failing calculation (e.g. non-converging eigenvector)
     // never leaves the loading overlay stuck on screen.
     try {
-      this.resetNodeToolTipMetricTexts();
-      this.metricTooltipsActive = false;
-
       const metricResult = await this.m[this.selected]?.calculate(this.cache);
       this.storeMetricValues(this.selected, metricResult);
-
-      /* multiselect */
-      const selectedValues = Array.from(this.multiselect.selectedOptions, opt => opt.value);
-
-      this.multiselect.innerHTML = '';
-      for (const ns of metricResult.scores) {
-        const opt = document.createElement('option');
-        opt.value = ns.id;
-        opt.textContent = `${ns.id} | ${ns.text}`;
-        opt.selected = selectedValues.includes(ns.id);
-        this.updateNodeToolTipMetricText(ns.id, metricName, ns.text);
-        this.multiselect.appendChild(opt);
-      }
-      this.metricTooltipsActive = metricResult.scores.length > 0;
-
-      /* graph-level table */
-      this.table.innerHTML = '';
-      Object.entries(metricResult.graphLevelMetrics).forEach(([label, value]) => {
-        const row = document.createElement('tr');
-        const labelCell = document.createElement('td');
-        labelCell.textContent = label;
-        const valueCell = document.createElement('td');
-        valueCell.textContent = `${value}`;
-        row.append(labelCell, valueCell);
-        this.table.appendChild(row);
-      });
-
-      /* tooltip */
-      document.getElementById("metricInfoBtn").onclick = () => {
-        this.cache.popup = new Popup(metricResult.popupContent, {title: metricResult.popupTitle, width: '400px'});
-      };
+      this.#renderMetric(this.selected, this.metricValueCache.get(this.selected));
     } finally {
       await this.cache.ui.hideLoading();
       await new Promise(resolve => requestAnimationFrame(resolve));
     }
   }
 
+  /**
+   * Paint one cached metric into the panel: ranked node list, graph-level
+   * table, 🛈 popup and the per-node tooltip values. Pure rendering — every
+   * number it needs is already in the cache entry, so a return visit to a
+   * metric costs a repaint and not a recomputation.
+   */
+  #renderMetric(metricId, entry) {
+    if (!entry) return;
+
+    this.resetNodeToolTipMetricTexts();
+    this.metricTooltipsActive = false;
+
+    /* multiselect — preserve whatever the user had highlighted */
+    const selectedValues = Array.from(this.multiselect.selectedOptions, opt => opt.value);
+    this.multiselect.innerHTML = '';
+    for (const ns of entry.scores) {
+      const opt = document.createElement('option');
+      opt.value = ns.id;
+      opt.textContent = `${ns.id} | ${ns.text}`;
+      opt.selected = selectedValues.includes(ns.id);
+      this.updateNodeToolTipMetricText(ns.id, entry.label, ns.text);
+      this.multiselect.appendChild(opt);
+    }
+    this.metricTooltipsActive = entry.scores.length > 0;
+
+    /* graph-level table */
+    this.table.innerHTML = '';
+    Object.entries(entry.graphLevelMetrics).forEach(([label, value]) => {
+      const row = document.createElement('tr');
+      const labelCell = document.createElement('td');
+      labelCell.textContent = label;
+      const valueCell = document.createElement('td');
+      valueCell.textContent = `${value}`;
+      row.append(labelCell, valueCell);
+      this.table.appendChild(row);
+    });
+
+    /* 🛈 explanation for the metric now on screen */
+    const infoBtn = document.getElementById("metricInfoBtn");
+    if (infoBtn) {
+      infoBtn.onclick = () => {
+        this.cache.popup = new Popup(entry.popupContent, {title: entry.popupTitle, width: '400px'});
+      };
+    }
+
+    this.renderedMetric = metricId;
+  }
+
+  // The cache holds everything the panel needs to redraw, not just the node
+  // values — otherwise a cache hit could satisfy the scale pickers but not a
+  // repaint. Scale-picker consumers read label/valueLabel/values only.
   storeMetricValues(metricId, metricResult) {
     if (!metricResult?.nodeValues) return;
     this.metricValueCache.set(metricId, {
       label: this.m[metricId]?.label || metricId,
       valueLabel: METRIC_VALUE_LABELS[metricId] || "Value",
       values: metricResult.nodeValues,
+      scores: metricResult.scores || [],
+      graphLevelMetrics: metricResult.graphLevelMetrics || {},
+      popupContent: metricResult.popupContent,
+      popupTitle: metricResult.popupTitle,
     });
   }
 
   invalidateMetricValues() {
     this.metricValueCache.clear();
+    // Nothing on screen is backed by the cache any more, so the next update
+    // must repaint even if it lands on the same metric.
+    this.renderedMetric = null;
     // Blank per-node tooltip metric text so a value computed for the previous
     // subgraph is never shown after filtering. Cheap string work, and skipped
     // entirely when no tooltip carries metric text (the common closed-panel

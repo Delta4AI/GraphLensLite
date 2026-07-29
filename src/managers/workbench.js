@@ -13,7 +13,11 @@
 const HEIGHT_KEY = 'gll.workbench.heights';
 const MIN_HEIGHT_PX = 120;
 const DEFAULT_HEIGHT_FRACTION = 0.35;
-const EXPANDED_HEIGHT_FRACTION = 0.92;
+// ⤢ takes the whole stage. The mockup argued for leaving a sliver of canvas
+// showing, but a ~76px strip of a dense graph reads as a rendering artefact
+// rather than reassurance — and the rail and inspector still frame the app,
+// so nobody is lost. The drag handle remains the way to get a partial view.
+const EXPANDED_HEIGHT_FRACTION = 1;
 
 /**
  * Static per-tab wiring. `pane` and `toolbar` are shown/hidden together; the
