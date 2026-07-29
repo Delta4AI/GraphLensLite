@@ -1893,6 +1893,14 @@ h5 {
     cursor: default;
 }
 
+/* The dark theme lightens --accent-text to #e0635b, and white on that is only
+   3.43:1. Flip the fill's foreground dark, as the Concept C mockups do for
+   every brand-filled pill in dark mode. */
+[data-theme="dark"] .filter-join-segment.active,
+[data-theme="dark"] .insp-pill.active {
+    color: #15131c;
+}
+
 /* Boolean filter rows (§6.1): the Any/True/False segment reuses the join
    toggle's pill styling. */
 .filter-bool-toggle {

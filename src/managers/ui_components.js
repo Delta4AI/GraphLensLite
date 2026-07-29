@@ -548,6 +548,11 @@ class InvertibleRangeSlider {
   }
 
   createDivInnerHTML() {
+    // Both thumbs are bare range inputs; without a name a screen reader
+    // announces two anonymous sliders and no way to tell them apart.
+    const prop = StaticUtilities.escapeHtml(
+      StaticUtilities.decodePropHashId(this.propID).slice(-1)[0]
+    );
     return `
       <div slider id="${this.sliderId}">
         <div>
@@ -564,10 +569,10 @@ class InvertibleRangeSlider {
             <span id="${this.labelEndId}">${StaticUtilities.formatNumber(this.currentMax, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION)}</span>
           </div>
         </div>
-        <input type="range" tabindex="0" value="${this.currentMin}" max="${this.sliderMax}" min="${this.sliderMin}" 
-          step="${this.stepSize}" id="${this.sliderIdStart}" />
-        <input type="range" tabindex="0" value="${this.currentMax}" max="${this.sliderMax}" min="${this.sliderMin}" 
-          step="${this.stepSize}" id="${this.sliderIdEnd}" />
+        <input type="range" tabindex="0" value="${this.currentMin}" max="${this.sliderMax}" min="${this.sliderMin}"
+          step="${this.stepSize}" id="${this.sliderIdStart}" aria-label="${prop} — lower threshold" />
+        <input type="range" tabindex="0" value="${this.currentMax}" max="${this.sliderMax}" min="${this.sliderMin}"
+          step="${this.stepSize}" id="${this.sliderIdEnd}" aria-label="${prop} — upper threshold" />
       </div>
     `;
   }
