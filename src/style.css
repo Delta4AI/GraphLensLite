@@ -814,6 +814,27 @@ body {
     color: #fff;
 }
 
+.insp-pills-spacer {
+    flex: 1;
+}
+
+/* ⤢ — the only control in the pill row that is not a context. */
+.insp-pill-icon {
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-muted);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 2px 6px;
+    cursor: pointer;
+}
+
+.insp-pill-icon:hover {
+    color: var(--accent-text);
+    border-color: var(--border-soft);
+}
+
 #inspectorBody {
     flex: 1;
     overflow-y: auto;
@@ -979,8 +1000,130 @@ body.presentation #outerGraphContainer {
 
 body.presentation #rail,
 body.presentation #inspector,
-body.presentation #workbench {
+body.presentation #workbench,
+body.presentation #filterSurface {
     display: none;
+}
+
+/*************************
+ The expanded filter surface (Concept C phase 6, spec §6.4). Overlays the stage
+ the same way the workbench does, but stops at the workbench's top edge so the
+ two can be used together.
+ **************************/
+#filterSurface {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: var(--workbench-height, 0px);
+    z-index: 620;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    background-color: var(--surface);
+    border-left: 1px solid var(--brand-border);
+    box-shadow: -6px 0 18px rgba(64, 60, 83, 0.18);
+}
+
+#filterSurface[hidden] {
+    display: none;
+}
+
+.fsurf-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.fsurf-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.fsurf-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.fsurf-search {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 0 1 240px;
+    height: 24px;
+    padding: 0 8px;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--surface-3);
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.fsurf-search:focus-within {
+    border-color: var(--accent-text);
+}
+
+.fsurf-search input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: none;
+    font: inherit;
+    color: var(--text-strong);
+}
+
+.fsurf-spacer {
+    flex: 1;
+}
+
+.fsurf-scope {
+    flex: none;
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--surface-3);
+    font-size: 11.5px;
+    line-height: 1.45;
+    /* --text-faint is only 2.78:1 on --surface-3; the banner is body copy the
+       user is meant to read, so it needs the AA-passing muted tone. */
+    color: var(--text-muted);
+}
+
+.fsurf-scope strong {
+    color: var(--text-strong);
+}
+
+.fsurf-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 12px 14px;
+}
+
+/* The reflow: sub-groups become the column items. break-inside on the SECTION
+   instead would pin all ~25 node properties into one column and defeat the
+   whole surface, so sections span and their bodies fragment. */
+.fsurf-body .filter-section-body {
+    column-width: 320px;
+    column-gap: 18px;
+}
+
+.fsurf-body .filter-subgroup {
+    break-inside: avoid;
+}
+
+.fsurf-body .header-card {
+    break-after: avoid;
 }
 
 /* Louvain community-detection configurator (anchored to the 🧩 button) */
@@ -1559,6 +1702,12 @@ h5 {
     display: contents;
 }
 
+/* [hidden] must beat display:contents — same specificity as the rule above, so
+   the UA sheet loses and a searched-out row would keep all three grid cells. */
+.filter-row[hidden] {
+    display: none;
+}
+
 .filter-row-col1 {
     /* Label column: shared auto width across the sub-group. Nudged down to sit
        level with the control's first line (slider / dropdown). */
@@ -1578,19 +1727,19 @@ h5 {
 /* Always-visible min/max threshold inputs under the range slider, styled as a
    single paired control (lower – upper) instead of two bare full-width boxes. */
 .filter-input-row {
-    position: relative;
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 6px;
     margin-top: 2px;
 }
 
+/* An in-flow flex item ordered between the two boxes, NOT an absolutely
+   positioned pseudo: inside the expanded surface's multi-column layout an
+   abspos pseudo paints a stray glyph adrift from its row. */
 .filter-input-row::before {
     content: "–";
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
+    order: 0;
+    flex: none;
     color: var(--text-muted);
     font-size: 11px;
     pointer-events: none;
@@ -1610,10 +1759,12 @@ h5 {
 }
 
 .filter-input-row input:first-child {
+    order: -1;
     text-align: left;
 }
 
 .filter-input-row input:last-child {
+    order: 1;
     text-align: right;
 }
 

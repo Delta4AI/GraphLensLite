@@ -248,6 +248,30 @@
         </div>
       </div>
     </section>
+    <section id="filterSurface" aria-label="Filter properties" hidden>
+      <div class="fsurf-head">
+        <h4 class="fsurf-title">Filter properties</h4>
+        <span id="filterSurfaceCount" class="fsurf-count"></span>
+        <label class="fsurf-search">
+          <span aria-hidden="true">⌕</span>
+          <input id="filterSurfaceSearch" type="search" placeholder="Search properties…"
+                 aria-label="Search filter properties">
+        </label>
+        <span class="fsurf-spacer"></span>
+        <button class="insp-btn" title="Open the query editor to write the same predicate as a query"
+                onclick="cache.ui.toggleQueryEditor()">📝 Edit as query</button>
+        <button id="filterSurfaceCollapseBtn" class="insp-btn"
+                title="Collapse back into the inspector (Escape)"
+                onclick="cache.filterSurface.close()">⤡ Collapse</button>
+      </div>
+      <p class="fsurf-scope">
+        <span aria-hidden="true">🌐</span>
+        <span><strong>Filters hide elements across the whole workspace.</strong> They are never scoped to
+          your selection — selected elements stay selected even when a filter hides them. To turn a
+          filter into a selection instead, use <strong>⊕</strong> on any row.</span>
+      </p>
+      <div id="filterSurfaceMount" class="fsurf-body"></div>
+    </section>
   </div>
   <aside id="inspector">
     <div class="inspector-resize-handle"></div>
@@ -258,6 +282,11 @@
       <button id="inspectorPillSelection" class="insp-pill" role="tab" aria-selected="false"
               aria-controls="inspectorSelection" tabindex="-1"
               title="Everything that acts on the current selection: actions, arrange, appearance">Selection</button>
+      <span class="insp-pills-spacer"></span>
+      <button id="inspectorExpandBtn" class="insp-pill-icon" aria-pressed="false"
+              aria-label="Expand the filter properties over the stage — every property in columns, with search"
+              title="Expand the filter properties over the stage — every property in columns, with search"
+              onclick="cache.filterSurface.toggle()">⤢</button>
     </div>
     <div id="inspectorBody">
       <section id="inspectorWorkspace" class="insp-panel" role="tabpanel" tabindex="0"
@@ -265,7 +294,10 @@
         <h4 class="insp-section-title">Filters</h4>
         <p class="insp-note">Filters set what is <strong>visible</strong> across the whole workspace —
           they are never scoped to your selection.</p>
-        <div id="filterContainer"></div>
+        <p id="filterExpandedNote" class="insp-note" hidden>Open on the
+          <button type="button" class="insp-link" onclick="cache.filterSurface.close()">expanded surface</button>
+          over the stage.</p>
+        <div id="filterHome"><div id="filterContainer"></div></div>
 
         <h4 class="insp-section-title">Groups</h4>
         <div class="insp-groups">

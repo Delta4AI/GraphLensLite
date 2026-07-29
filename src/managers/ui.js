@@ -565,6 +565,10 @@ class UIManager {
 
       const row = document.createElement('div');
       row.className = 'filter-row';
+      // Identity on the row, so the expanded surface can search and sort by
+      // data instead of scraping rendered label text.
+      row.dataset.propId = propID;
+      row.dataset.search = `${section} ${subSection} ${prop}`.toLowerCase();
       const col1 = document.createElement('div');
       col1.className = 'filter-row-col1';
       col1.appendChild(this.cache.uiComponents.createCheckbox(propID, prop));
@@ -617,6 +621,9 @@ class UIManager {
     }
 
     this.cache.qm.updateQueryTextArea();
+    // The rows above are brand new; if the expanded surface is up it is now
+    // showing an unsorted, unsearched list behind a populated search box.
+    this.cache.filterSurface?.refresh();
   }
 
   // Builds the segmented OR/AND control that sets how multiple active filters
