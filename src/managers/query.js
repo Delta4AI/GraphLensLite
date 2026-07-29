@@ -1,6 +1,32 @@
 import { Popup } from '../utilities/popup.js';
 import { StaticUtilities } from '../utilities/static.js';
 
+// A filter is "narrowed" when it deviates from its default (loaded) state:
+// a categorical with fewer than all values selected, or a slider whose bounds
+// moved or was inverted. This is what decides whether a filter constrains an
+// AND join — one definition, shared with the panel's constraint census
+// (ui.js updateFilterConstraintHints) so the query and the hint can never
+// disagree about which filters are doing work. Without a recorded default
+// (e.g. in tests) a filter is treated as narrowed.
+function isFilterNarrowed(fo, def) {
+  if (!def) return true;
+  if (fo.isCategory) {
+    const cur = fo.categories;
+    const base = def.categories;
+    if (!cur || !base) return true;
+    if (cur.size !== base.size) return true;
+    for (const c of base) {
+      if (!cur.has(c)) return true;
+    }
+    return false;
+  }
+  return (
+    !!fo.isInverted !== !!def.isInverted ||
+    fo.lowerThreshold !== def.lowerThreshold ||
+    fo.upperThreshold !== def.upperThreshold
+  );
+}
+
 class QueryAST {
   constructor(instructions) {
     this.instructions = instructions;
@@ -457,28 +483,8 @@ class QueryManager {
     return asciiStr;
   }
 
-  // A filter is "narrowed" when it deviates from its default (loaded) state:
-  // a categorical with fewer than all values selected, or a slider whose bounds
-  // moved or was inverted. Used to decide which filters constrain an AND join.
-  // Without a recorded default (e.g. in tests) a filter is treated as narrowed.
   #isFilterNarrowed(propID, fo) {
-    const def = this.cache.data.filterDefaults?.get(propID);
-    if (!def) return true;
-    if (fo.isCategory) {
-      const cur = fo.categories;
-      const base = def.categories;
-      if (!cur || !base) return true;
-      if (cur.size !== base.size) return true;
-      for (const c of base) {
-        if (!cur.has(c)) return true;
-      }
-      return false;
-    }
-    return (
-      !!fo.isInverted !== !!def.isInverted ||
-      fo.lowerThreshold !== def.lowerThreshold ||
-      fo.upperThreshold !== def.upperThreshold
-    );
+    return isFilterNarrowed(fo, this.cache.data.filterDefaults?.get(propID));
   }
 
   updateQueryTextArea() {
@@ -549,6 +555,10 @@ class QueryManager {
 
     this.cache.query.text.textContent = queryStr;
     this.cache.query.overlay.innerHTML = this.encodeQuery(queryStr);
+    // Every filter change funnels through here (resetQuery -> this), so it is
+    // also where the panel's "which filters actually constrain" hint is kept
+    // honest: the hint and the query are then derived in the same pass.
+    this.cache.ui?.updateFilterConstraintHints?.();
   }
 
   clearQuery() {
@@ -1111,4 +1121,4 @@ class QueryManager {
   }
 }
 
-export { QueryManager, QueryAST };
+export { QueryManager, QueryAST, isFilterNarrowed };

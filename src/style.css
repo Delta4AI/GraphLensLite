@@ -1808,9 +1808,35 @@ h5 {
    clear the join control is global, not scoped to the adjacent section. */
 .filter-toolbar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     margin-bottom: 6px;
+}
+
+/* The AND join's constraint census — its own full-width line so the join
+   segments never shift when the sentence changes length. */
+.filter-constraint-count {
+    flex-basis: 100%;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.filter-constraint-count[hidden] {
+    display: none;
+}
+
+/* An active filter still at its loaded default adds no constraint under AND,
+   so its name is muted: without this the checkbox looks load-bearing when
+   toggling it does nothing. Only the label is marked, never the whole row —
+   `opacity` on the cells also dims the slider's value bubbles, whose white-on-
+   brand text has no contrast margin to give away (4.08:1 → 2.18:1), and a
+   descendant cannot opt out of an ancestor's opacity. Muting the one element
+   that names the filter says the same thing and keeps the widgets readable,
+   which matters because narrowing them is exactly what un-inerts the row. */
+.filter-row-inert .checkboxLabel {
+    color: var(--text-muted);
+    font-style: italic;
 }
 
 .filter-toolbar-join {

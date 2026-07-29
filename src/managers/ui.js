@@ -4,6 +4,7 @@ import { createStyleDiv } from './ui_style_div.js';
 import { Popup } from '../utilities/popup.js';
 import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
 import { refreshNeo4jSessionUI } from '../utilities/neo4j_loader.js';
+import { isFilterNarrowed } from './query.js';
 
 // Persisted preference: how multiple active filters combine — "OR" (match any)
 // or "AND" (match every, non-strict: a property an element lacks does not
@@ -499,7 +500,7 @@ class UIManager {
     const joinCluster = document.createElement('div');
     joinCluster.className = 'filter-toolbar-join';
     joinCluster.append(joinToggle, strictCheckbox);
-    toolbar.append(joinCluster);
+    toolbar.append(joinCluster, this.createFilterConstraintCount());
     div.appendChild(toolbar);
 
     // Each section (and sub-group) is a collapsible accordion so large
@@ -624,6 +625,65 @@ class UIManager {
     // The rows above are brand new; if the expanded surface is up it is now
     // showing an unsorted, unsearched list behind a populated search box.
     this.cache.filterSurface?.refresh();
+  }
+
+  // Explanation of the AND join's least obvious rule, in the panel rather than
+  // only in the code: under AND a filter constrains the graph only once it is
+  // narrowed away from the range or values it loaded with. Until then it means
+  // "don't care", so ticking its checkbox on or off changes nothing and the
+  // derived query can legitimately be empty. Nothing on a filter row shows
+  // that difference, which reads as a broken panel.
+  createFilterConstraintCount() {
+    const el = document.createElement('span');
+    el.id = 'filterConstraintCount';
+    el.className = 'filter-constraint-count';
+    el.hidden = true;
+    el.title =
+      'Under AND, a filter only constrains the graph once you narrow it from ' +
+      'the range or values it loaded with.\n' +
+      'Filters still at their defaults mean "don\'t care" — they are shown ' +
+      'dimmed, and switching them on or off changes nothing.';
+    return el;
+  }
+
+  // Keeps that explanation in step with the filters. Called from
+  // updateQueryTextArea, which every filter change funnels through, so the
+  // census and the query are always derived from the same state.
+  updateFilterConstraintHints() {
+    const container = document.getElementById('filterContainer');
+    const layout = this.cache.data?.layouts?.[this.cache.data?.selectedLayout];
+    if (!container || !layout?.filters) return;
+
+    const andMode = layout.filterJoinMode === 'AND';
+    const defaults = this.cache.data.filterDefaults;
+    let constraining = 0;
+    let total = 0;
+
+    for (const row of container.querySelectorAll('.filter-row')) {
+      const fo = layout.filters.get(row.dataset.propId);
+      if (!fo || fo.unusable) continue;
+      total += 1;
+      // Under OR every active filter contributes a disjunct; under AND it has
+      // to be narrowed as well. Same rule the query derivation applies.
+      const counts =
+        !!fo.active && (!andMode || isFilterNarrowed(fo, defaults?.get(row.dataset.propId)));
+      if (counts) constraining += 1;
+      row.classList.toggle('filter-row-inert', andMode && !!fo.active && !counts);
+    }
+
+    this.renderFilterConstraintCount(andMode, constraining, total);
+  }
+
+  renderFilterConstraintCount(andMode, constraining, total) {
+    const el = document.getElementById('filterConstraintCount');
+    if (!el) return;
+    // Only shown under AND: under OR the row checkbox already says everything,
+    // because active and constraining are the same thing there.
+    el.hidden = !andMode || !total;
+    if (el.hidden) return;
+    el.textContent = constraining
+      ? `${constraining} of ${total} filters constrain the graph`
+      : 'No filter constrains the graph — every filter is still at its loaded range';
   }
 
   // Builds the segmented OR/AND control that sets how multiple active filters
