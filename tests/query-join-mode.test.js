@@ -64,12 +64,13 @@ const AND_QUERY =
   ' AND ' +
   '((Edge filters::g::weight BETWEEN 0 AND 1) OR (Edge filters::g::weight IS MISSING))';
 
-// Strict AND (complete cases): type-grouped — AND within each element type,
-// OR between the node group and the edge group.
+// Strict AND (complete cases): same shape as the non-strict query with the
+// narrower "IS FOREIGN" filler — only the other element type excuses a
+// conjunct, so a same-type absent value still excludes.
 const STRICT_AND_QUERY =
-  '((Node filters::g::score BETWEEN 0 AND 10))' +
-  ' OR ' +
-  '((Edge filters::g::weight BETWEEN 0 AND 1))';
+  '((Node filters::g::score BETWEEN 0 AND 10) OR (Node filters::g::score IS FOREIGN))' +
+  ' AND ' +
+  '((Edge filters::g::weight BETWEEN 0 AND 1) OR (Edge filters::g::weight IS FOREIGN))';
 
 describe('join mode: non-strict AND round-trip', () => {
   let qm;
@@ -187,7 +188,66 @@ describe('join mode: strict AND round-trip', () => {
     expect(ast.testNode(makeNode({ g: {} }))).toBe(false);
     // node has and matches its property → shown (edge conjunct is foreign→neutral)
     expect(ast.testNode(makeNode({ g: { score: 5 } }))).toBe(true);
+    // node has it but out of range → excluded
+    expect(ast.testNode(makeNode({ g: { score: 99 } }))).toBe(false);
     // edge has and matches its property → shown
     expect(ast.testEdge(makeEdge({ g: { weight: 0.5 } }))).toBe(true);
+    // edge lacks its own property → excluded under strict
+    expect(ast.testEdge(makeEdge({ g: {} }))).toBe(false);
+  });
+});
+
+// A "complete cases" run where the user narrowed filters of ONE element type
+// only. The type with nothing narrowed carries no constraint, so it must stay
+// fully visible: judging it against the other type's conditions — which it can
+// never satisfy — used to wipe it off the canvas entirely.
+describe('join mode: strict AND with only one element type narrowed', () => {
+  const defaults = () =>
+    new Map([
+      ['Node filters::g::type', { isCategory: true, categories: new Set(['a', 'b']) }],
+      ['Edge filters::g::kind', { isCategory: true, categories: new Set(['x', 'y']) }],
+    ]);
+
+  const filters = (nodeCats, edgeCats) =>
+    new Map([
+      ['Node filters::g::type', { active: true, isCategory: true, categories: new Set(nodeCats) }],
+      ['Edge filters::g::kind', { active: true, isCategory: true, categories: new Set(edgeCats) }],
+    ]);
+
+  function astFor(nodeCats, edgeCats) {
+    const qm = makeDerivingQM(filters(nodeCats, edgeCats), defaults(), 'AND', true);
+    qm.cache.uniquePropHierarchy = {
+      'Node filters': { g: new Set(['type']) },
+      'Edge filters': { g: new Set(['kind']) },
+    };
+    qm.updateQueryTextArea();
+    qm.cache.query.overlay.innerHTML = qm.encodeQuery(qm.cache.query.text.textContent);
+    expect(qm.cache.query.valid).toBe(true);
+    return new QueryAST(qm.decodeQuery());
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('leaves every edge visible when only a node filter is narrowed', () => {
+    const ast = astFor(['a'], ['x', 'y']);
+    expect(ast.testNode(makeNode({ g: { type: 'a' } }))).toBe(true);
+    expect(ast.testNode(makeNode({ g: { type: 'b' } }))).toBe(false);
+    expect(ast.testEdge(makeEdge({ g: { kind: 'x' } }))).toBe(true);
+    expect(ast.testEdge(makeEdge({ g: { kind: 'y' } }))).toBe(true);
+  });
+
+  it('leaves every node visible when only an edge filter is narrowed', () => {
+    const ast = astFor(['a', 'b'], ['x']);
+    expect(ast.testNode(makeNode({ g: { type: 'a' } }))).toBe(true);
+    expect(ast.testNode(makeNode({ g: { type: 'b' } }))).toBe(true);
+    expect(ast.testEdge(makeEdge({ g: { kind: 'x' } }))).toBe(true);
+    expect(ast.testEdge(makeEdge({ g: { kind: 'y' } }))).toBe(false);
+  });
+
+  it('still excludes a same-type element whose value is absent', () => {
+    const ast = astFor(['a'], ['x', 'y']);
+    expect(ast.testNode(makeNode({ g: {} }))).toBe(false);
   });
 });

@@ -100,6 +100,16 @@ class QueryAST {
       );
     }
 
+    // --- IS FOREIGN: type-scope filler used by the strict AND join. ------
+    // True only when the property belongs to the other element type. Wrapping
+    // each conjunct as "(cond) OR (prop IS FOREIGN)" judges a node on node
+    // filters alone and an edge on edge filters alone, WITHOUT the
+    // absent-value escape hatch that IS MISSING also grants — that one
+    // difference is exactly what "complete cases" means.
+    if (opTok?.value === 'IS FOREIGN') {
+      return propTok.main !== requestedMainGroup;
+    }
+
     const value = this.#readValue(element, propTok);
 
     if (value === undefined || value === null) return false;
@@ -202,7 +212,7 @@ class QueryManager {
     /* 4. Encode Property names (main group::sub group::property)                */
     /* ------------------------------------------------------------------ */
     asciiStr = asciiStr.replace(
-      /(Node filters|Edge filters)::([^:]+)::([^:]+)(?=\s(?:IN|BETWEEN|LOWER\sTHAN|IS\sMISSING|IS\sTRUE|IS\sFALSE|\)))/g,
+      /(Node filters|Edge filters)::([^:]+)::([^:]+)(?=\s(?:IN|BETWEEN|LOWER\sTHAN|IS\sMISSING|IS\sFOREIGN|IS\sTRUE|IS\sFALSE|\)))/g,
       (match, mainGroup, subGroup, prop) => {
         const mgok = mainGroup in this.cache.uniquePropHierarchy;
         const sgok = mgok && subGroup in this.cache.uniquePropHierarchy[mainGroup];
@@ -276,6 +286,12 @@ class QueryManager {
       // Single span with a literal inner space (not a nested q-space span,
       // which would break the non-greedy encoded-chunk splitter in step 10).
       () => `<span class='q-kw-ismissing' data-encoded>IS MISSING</span>`
+    );
+
+    /* 5-4b Type-scope predicate (strict AND filler): "IS FOREIGN" ------- */
+    asciiStr = asciiStr.replace(
+      /\bIS\s+FOREIGN\b/gi,
+      () => `<span class='q-kw-isforeign' data-encoded>IS FOREIGN</span>`
     );
 
     /* 5-5 Boolean predicates (§6.1): "IS TRUE" / "IS FALSE" ------------- */
@@ -506,24 +522,23 @@ class QueryManager {
           const andEntries = queryEntries.filter((e) => e.narrowed);
           if (!andEntries.length) {
             queryStr = ''; // nothing narrowed → no constraint → full graph
-          } else if (layout.filterStrict === true) {
-            // Strict (complete cases): AND within each element type, OR between
-            // the two type groups, so a node is judged only on node filters (an
-            // edge only on edge filters) while a same-type absent value excludes.
-            const groups = [];
-            for (const main of ['Node filters', 'Edge filters']) {
-              const conds = andEntries
-                .filter((e) => e.propID.startsWith(`${main}::`))
-                .map((e) => `(${e.cond})`);
-              if (conds.length) groups.push(`(${conds.join(' AND ')})`);
-            }
-            queryStr = groups.join(' OR ');
           } else {
-            // Non-strict AND: each conjunct is OR-ed with an "IS MISSING" escape
-            // hatch, so a property an element lacks (or that belongs to the
-            // other element type) never disqualifies it.
+            // Each conjunct is OR-ed with an escape hatch, and the join's two
+            // modes differ only in which one:
+            //   non-strict  IS MISSING  — foreign OR absent value excuses it,
+            //                             so an element is judged only on the
+            //                             filters it actually carries.
+            //   strict      IS FOREIGN  — only the other element type excuses
+            //                             it, so a same-type absent value
+            //                             does exclude ("complete cases") but
+            //                             a type with no narrowed filter of
+            //                             its own stays unconstrained.
+            // The type-scope hatch is what keeps strict from wiping out a whole
+            // element type: without it, narrowing one node filter leaves edges
+            // judged against a node condition they can never satisfy.
+            const filler = layout.filterStrict === true ? 'IS FOREIGN' : 'IS MISSING';
             queryStr = andEntries
-              .map(({ propID, cond }) => `((${cond}) OR (${propID} IS MISSING))`)
+              .map(({ propID, cond }) => `((${cond}) OR (${propID} ${filler}))`)
               .join(' AND ');
           }
         } else {
@@ -753,6 +768,7 @@ class QueryManager {
       'q-or-greater-than': () => ({ type: 'KW', value: 'OR GREATER THAN' }),
       'q-in-cat-bracket-open': () => ({ type: 'KW', value: 'IN [' }),
       'q-kw-ismissing': () => ({ type: 'KW', value: 'IS MISSING' }),
+      'q-kw-isforeign': () => ({ type: 'KW', value: 'IS FOREIGN' }),
       'q-kw-istrue': () => ({ type: 'KW', value: 'IS TRUE' }),
       'q-kw-isfalse': () => ({ type: 'KW', value: 'IS FALSE' }),
 
@@ -1008,6 +1024,7 @@ class QueryManager {
   <li><span class="q-lower-than">LOWER THAN</span>&nbsp;<span class="q-number">0.2</span>&nbsp;<span class="q-or-greater-than">OR GREATER THAN</span>&nbsp;<span class="q-number">0.8</span> - Keep numerical values ≤ 0.2 or ≥ 0.8</li>
   <li><span class="q-in-cat-bracket-open">IN&nbsp;[</span><span class="q-string">foo</span><span class="q-comma">,</span>&nbsp;<span class="q-string">bar</span><span class="q-cat-bracket-close">]</span> - Keep specific categorical values</li>
   <li><span class="q-kw-ismissing">IS MISSING</span> - True when the property is absent/empty or belongs to the other element type. Auto-added by the filter panel's AND join so a property an element lacks doesn't exclude it; rarely hand-written.</li>
+  <li><span class="q-kw-isforeign">IS FOREIGN</span> - True only when the property belongs to the other element type (a node property tested against an edge). Auto-added by the AND join's "complete cases only" mode, where an absent value must exclude but a foreign one must not; rarely hand-written.</li>
   <li><span class="q-kw-istrue">IS TRUE</span> / <span class="q-kw-isfalse">IS FALSE</span> - Boolean test; matches every encoding (true/TRUE/1 vs false/FALSE/0)</li>
 </ul>
 

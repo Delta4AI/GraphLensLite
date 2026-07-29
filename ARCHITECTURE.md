@@ -61,7 +61,8 @@ Business logic and UI:
 - `inspector.js` — the single right-hand panel's context router (Workspace ↔ Selection)
 - `workbench.js` — the bottom surface over the stage; four non-destructive tabs
   (Data, Query, Metrics, Assistant) with a remembered height each
-- `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, comparisons)
+- `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, IS FOREIGN,
+  comparisons)
 - `ui_components.js` — filter UI (dropdown checklists, invertible range sliders), tooltips
 - `ui_style_div.js` — builds every config card (node/edge styles, badges, edge flow,
   bubble sets, density heatmap, select/act/arrange); `ui.js` `CARD_MOUNTS` then
