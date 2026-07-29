@@ -49,7 +49,7 @@ The rendering and graph-operation core. Key modules:
   `visible_graph.js`, `lasso_geometry.js`, `communities.js`, `export_svg.js`,
   `webgl_support.js`
 
-### Functional managers (`src/managers/`, 9 files + `assistant/`)
+### Functional managers (`src/managers/`, 10 files + `assistant/`)
 
 Business logic and UI:
 
@@ -59,15 +59,18 @@ Business logic and UI:
 - `rail.js` — the 52 px top rail and its dropdown menus (app, workspace, layout,
   select, overlays, export)
 - `inspector.js` — the single right-hand panel's context router (Workspace ↔ Selection)
+- `workbench.js` — the bottom surface over the stage; four non-destructive tabs
+  (Data, Query, Metrics, Assistant) with a remembered height each
 - `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, comparisons)
 - `ui_components.js` — filter UI (dropdown checklists, invertible range sliders), tooltips
 - `ui_style_div.js` — builds every config card (node/edge styles, badges, edge flow,
   bubble sets, density heatmap, select/act/arrange); `ui.js` `CARD_MOUNTS` then
   re-parents each card to its single home in the rail or the inspector
-- `metrics.js` — `NetworkMetrics`: degree/betweenness/closeness/eigenvector centrality, PageRank
+- `metrics.js` — `NetworkMetrics`: degree/betweenness/closeness/eigenvector centrality, PageRank.
+  Computed lazily — only while its workbench tab is visible (`setWorkbenchVisible`)
 - `api_client.js` — client for the standalone ingest service
 - `assistant/` — the natural-language Graph Assistant (intent parsing, query
-  generation, settings, budget UI)
+  generation, settings, budget UI); rendered as a workbench tab, not a dock
 
 ### Utilities (`src/utilities/`, 14 files)
 

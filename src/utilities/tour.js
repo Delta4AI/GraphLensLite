@@ -355,7 +355,7 @@ const TOUR_STEPS = [
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">⤓ Export</span> — export the data table and styling properties as Excel
            <hr style="margin:6px 0;border-color:#dddbe2;">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the header for usage details.`,
-    targets: [{ selector: '#bottomBar' }, { selector: '#dataToggleBtn' }],
+    targets: [{ selector: '#workbench' }, { selector: '#dataToggleBtn' }],
     position: 'above-lower-left',
     action: 'openDataEditor',
   },
@@ -390,7 +390,7 @@ const TOUR_STEPS = [
            When the query editor is open, a <span class="add-to-query-button show tt">📝</span> button appears next to each filter checkbox in the filtering panel. Click it to <strong>append</strong> that filter's current range or category selection as a query fragment — a quick way to build complex queries from existing filters.
            <hr style="margin:6px 0;border-color:#dddbe2;">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the query editor header for a full syntax reference.`,
-    targets: [{ selector: '#bottomBar' }, { selector: '#queryToggleBtn' }],
+    targets: [{ selector: '#workbench' }, { selector: '#queryToggleBtn' }],
     position: 'above-center-left',
     action: 'openQueryEditor',
   },
@@ -401,10 +401,10 @@ const TOUR_STEPS = [
            <br>• <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">📝 Open in query editor</span> drops it into the editor for review
            <hr style="margin:6px 0;border-color:#dddbe2;">
            <strong>Setup &amp; privacy</strong>
-           <br>The assistant talks to an <strong>Ollama</strong> server you control, local by default. Every message ships a snapshot of the current graph state, so use a local endpoint for sensitive data. Click <strong>⚙</strong> in the panel header to configure the endpoint and pick a model. Results vary by model. Tested with <code>qwen3.5:9b</code>.
+           <br>The assistant talks to an <strong>Ollama</strong> server you control, local by default. Every message ships a snapshot of the current graph state, so use a local endpoint for sensitive data. Click <strong>⚙ Settings</strong> in the workbench toolbar to configure the endpoint and pick a model. Results vary by model. Tested with <code>qwen3.5:9b</code>.
            <hr style="margin:6px 0;border-color:#dddbe2;">
            The <strong>budget pill</strong> at the bottom shows how much of the model's context window the next request will consume. Click it for a per-section breakdown.`,
-    targets: [{ selector: '#assistantSidebar' }, { selector: '#assistantToggleBtn' }],
+    targets: [{ selector: '#workbench' }, { selector: '#assistantToggleBtn' }],
     position: 'left',
     action: 'openAssistantPanel',
   },
@@ -704,71 +704,28 @@ class GuidedTour {
 
   async executeAction(action) {
     switch (action) {
+      // Workbench tabs never close each other, so every "open X" step is one
+      // call — the old close-the-other-editor dances are gone with the
+      // exclusive bottom-bar slot.
       case 'openMetricsPanel': {
-        const metricsPanel = document.getElementById('networkMetricsContainer');
-        if (metricsPanel && !metricsPanel.classList.contains('open')) {
-          this.cache.metrics.toggleUI();
-        }
+        this.cache.workbench?.show('metrics');
         await this.sleep(350);
         break;
       }
       case 'openQueryEditor': {
-        // close metrics panel if open
-        const metricsPanel2 = document.getElementById('networkMetricsContainer');
-        if (metricsPanel2 && metricsPanel2.classList.contains('open')) {
-          this.cache.metrics.toggleUI();
-          await this.sleep(350);
-        }
-        // close data editor first if open
-        const dataBtn = document.getElementById('dataToggleBtn');
-        if (dataBtn && dataBtn.classList.contains('highlight')) {
-          await this.cache.ui.toggleDataEditor();
-          await this.sleep(350);
-        }
-        const queryBtn = document.getElementById('queryToggleBtn');
-        if (queryBtn && !queryBtn.classList.contains('highlight')) {
-          this.cache.ui.toggleQueryEditor();
-        }
+        this.cache.workbench?.show('query');
         await this.sleep(350);
         break;
       }
       case 'openDataEditor': {
-        // close metrics panel if open
-        const metricsPanel3 = document.getElementById('networkMetricsContainer');
-        if (metricsPanel3 && metricsPanel3.classList.contains('open')) {
-          this.cache.metrics.toggleUI();
-          await this.sleep(350);
-        }
-        // close query editor first if open
-        const queryBtn = document.getElementById('queryToggleBtn');
-        if (queryBtn && queryBtn.classList.contains('highlight')) {
-          this.cache.ui.toggleQueryEditor();
-          await this.sleep(350);
-        }
-        const dataBtn = document.getElementById('dataToggleBtn');
-        if (dataBtn && !dataBtn.classList.contains('highlight')) {
-          await this.cache.ui.toggleDataEditor();
-        }
+        this.cache.workbench?.show('data');
         await this.sleep(350);
         break;
       }
       case 'openAssistantPanel': {
-        // Bottom-bar editors compete visually with the right sidebar, so
-        // close them first to give the assistant panel a clean stage.
-        const queryBtn = document.getElementById('queryToggleBtn');
-        if (queryBtn && queryBtn.classList.contains('highlight')) {
-          this.cache.ui.toggleQueryEditor();
-          await this.sleep(350);
-        }
-        const dataBtn = document.getElementById('dataToggleBtn');
-        if (dataBtn && dataBtn.classList.contains('highlight')) {
-          await this.cache.ui.toggleDataEditor();
-          await this.sleep(350);
-        }
-        const panel = document.getElementById('assistantSidebar');
-        if (panel && !panel.classList.contains('active')) {
-          // suppressSetup avoids firing the first-run modal mid-tour — users
-          // who skipped setup still get to see the panel UI here.
+        // suppressSetup avoids firing the first-run modal mid-tour — users who
+        // skipped setup still get to see the tab.
+        if (!this.cache.workbench?.isTabOpen('assistant')) {
           this.cache.assistant.togglePanel({ suppressSetup: true });
         }
         await this.sleep(350);
@@ -780,18 +737,9 @@ class GuidedTour {
         break;
       }
       case 'showAppearance': {
-        // The assistant docks over the same edge as the inspector — close it
-        // so the appearance controls are actually on screen for this step.
-        const assistantBtn = document.getElementById('assistantToggleBtn');
-        if (assistantBtn && assistantBtn.classList.contains('highlight')) {
-          this.cache.assistant.togglePanel({ suppressSetup: true });
-          await this.sleep(350);
-        }
-        const dataBtn = document.getElementById('dataToggleBtn');
-        if (dataBtn && dataBtn.classList.contains('highlight')) {
-          await this.cache.ui.toggleDataEditor();
-          await this.sleep(350);
-        }
+        // The workbench covers the lower stage, not the inspector, so it can
+        // stay open — but a tall one crowds the step's popup.
+        this.cache.workbench?.close();
         this.cache.inspector?.showAppearance();
         await this.sleep(350);
         break;
@@ -830,24 +778,9 @@ class GuidedTour {
   finish() {
     this.cleanup();
 
-    // close any open panels
-    const metricsPanel = document.getElementById('networkMetricsContainer');
-    if (metricsPanel && metricsPanel.classList.contains('open')) {
-      this.cache.metrics.toggleUI();
-    }
-    const dataBtn = document.getElementById('dataToggleBtn');
-    if (dataBtn && dataBtn.classList.contains('highlight')) {
-      this.cache.ui.toggleDataEditor();
-    }
-    const queryBtn = document.getElementById('queryToggleBtn');
-    if (queryBtn && queryBtn.classList.contains('highlight')) {
-      this.cache.ui.toggleQueryEditor();
-    }
+    // Put the shell back the way a fresh load leaves it.
+    this.cache.workbench?.close();
     this.cache.inspector?.setContext('workspace');
-    const assistantBtn = document.getElementById('assistantToggleBtn');
-    if (assistantBtn && assistantBtn.classList.contains('highlight')) {
-      this.cache.assistant.togglePanel({ suppressSetup: true });
-    }
   }
 }
 

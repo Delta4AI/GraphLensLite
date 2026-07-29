@@ -82,6 +82,7 @@ class AssistantManager {
     this._history = []
     this._streaming = false
     this._panelOpen = false
+    this._suppressSetupOnce = false
     // Holds the last successful query-generation output so a follow-up turn
     // ("make it stricter", "same but swap X for Y") can reference it. Only
     // fully-valid entries are kept; errored ones are useless to the model.
@@ -227,31 +228,30 @@ class AssistantManager {
   // focus from the tour overlay, so the tour wants to *show* the panel UI
   // without forcing configuration mid-walkthrough.
   togglePanel({suppressSetup = false} = {}) {
-    const panel = document.getElementById('assistantSidebar')
-    const btn = document.getElementById('assistantToggleBtn')
-    this._panelOpen = !this._panelOpen
-    if (this._panelOpen) {
-      panel.classList.add('active')
-      btn.classList.add('highlight')
-    } else {
-      panel.classList.remove('active')
-      btn.classList.remove('highlight')
-      // Intentionally NOT aborting an in-flight stream: closing the panel is
-      // a "hide" gesture, not a "cancel" one. The stream keeps writing to its
-      // detached bubble and will be visible again when the panel reopens.
-    }
-    setTimeout(() => { if (this.cache.graph) this.cache.graph.resize() }, 300)
-    if (this._panelOpen) {
-      this._refreshBudgetMeter()
-      this._startBudgetAutoRefresh()
-      // First-run: walk the user through endpoint + model selection before
-      // they can send anything. Opening the panel is the earliest natural
-      // moment to prompt for this — doing it later (on Send) would mean the
-      // user types a full question first and then gets interrupted.
-      if (!suppressSetup && !this._isConfigured()) this._openSetup()
-    } else {
+    this._suppressSetupOnce = suppressSetup
+    this.cache.workbench?.toggle('assistant')
+    this._suppressSetupOnce = false
+  }
+
+  /**
+   * Called by the workbench when the Assistant tab becomes visible or hidden.
+   * Hiding intentionally does NOT abort an in-flight stream: leaving the tab
+   * is a "hide" gesture, not a "cancel" one. The stream keeps writing to its
+   * bubble and is there again when the tab comes back.
+   */
+  setWorkbenchVisible(visible) {
+    this._panelOpen = visible
+    if (!visible) {
       this._stopBudgetAutoRefresh()
+      return
     }
+    this._refreshBudgetMeter()
+    this._startBudgetAutoRefresh()
+    // First-run: walk the user through endpoint + model selection before they
+    // can send anything. Opening the tab is the earliest natural moment to
+    // prompt for this — doing it later (on Send) would mean the user types a
+    // full question first and then gets interrupted.
+    if (!this._suppressSetupOnce && !this._isConfigured()) this._openSetup()
   }
 
   // Live-update the budget pill while the user works in the app (selects

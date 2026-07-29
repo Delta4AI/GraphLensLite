@@ -51,9 +51,9 @@ class NetworkMetrics {
     this.multiselect = null;
     this.table = null;
     this.m = metrics;
-    // Panel starts visually closed (CSS .nw-root is max-height:0). Metrics are
-    // computed lazily — only while the panel is open — so this gate must start
-    // true to match the DOM and avoid an eager compute on first load.
+    // The Metrics workbench tab starts closed. Metrics are computed lazily —
+    // only while the tab is visible — so this gate must start true to match
+    // the DOM and avoid an eager compute on first load.
     this.collapsed = true;
     this.cache = cache;
     this.metricValueCache = new Map();
@@ -69,41 +69,21 @@ class NetworkMetrics {
   }
 
   toggleUI() {
-    // Metrics live in the inspector's Workspace context — opening them from
-    // the rail while the Selection context is up would otherwise do nothing
-    // visible.
-    this.cache.inspector?.setContext('workspace');
-    const panel = document.getElementById('networkMetricsContainer');
-    const willOpen = panel.classList.toggle('open');
-    const fullHeight = panel.scrollHeight + 'px';
-    panel.style.maxHeight = fullHeight;
+    this.cache.workbench?.toggle('metrics');
+  }
 
-    const btn = document.getElementById('metricsToggleBtn');
-
-    requestAnimationFrame(() => {
-      panel.style.maxHeight = willOpen ? fullHeight : '0';
-    });
-
-    if (willOpen) {
-      panel.addEventListener(
-        'transitionend',
-        () => (panel.style.maxHeight = 'none'),
-        {once: true}
-      );
-      btn.classList.add("highlight");
-    } else {
-      btn.classList.remove("highlight");
-    }
-
-    this.collapsed = !willOpen;
-
-    // Compute on open: the panel and tooltips are only refreshed while visible,
-    // so opening is the trigger that fills (or refreshes) the selected metric.
-    if (willOpen) {
-      this.updateMetricUI().catch(err =>
-        this.cache.ui.error(`Failed to update metrics: ${err.message}`)
-      );
-    }
+  /**
+   * Called by the workbench when the Metrics tab becomes visible or hidden.
+   * Drives the lazy-compute gate: the panel and the node tooltips are only
+   * refreshed while visible, so becoming visible is the trigger that fills
+   * (or refreshes) the selected metric.
+   */
+  setWorkbenchVisible(visible) {
+    this.collapsed = !visible;
+    if (!visible) return;
+    this.updateMetricUI().catch((err) =>
+      this.cache.ui.error(`Failed to update metrics: ${err.message}`)
+    );
   }
 
   async updateMetricUI() {

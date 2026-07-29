@@ -838,7 +838,7 @@ class GraphCoreManager {
   }
 
   registerGlobalEventListeners() {
-    // All targets (document, queryTextArea, innerGraphContainer, bottomBar)
+    // All targets (document, queryTextArea, innerGraphContainer, workbench)
     // are static DOM that survives file loads — same stacking hazard as hotkeys.
     if (globalEventsRegistered) return;
 
@@ -853,7 +853,6 @@ class GraphCoreManager {
       }
     });
 
-    this.cache.ui.makeBottomBarResizable();
     this.registerTooltipWheelHandler();
     this.registerTooltipExpandToggle();
     globalEventsRegistered = true;

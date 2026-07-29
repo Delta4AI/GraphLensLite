@@ -38,7 +38,6 @@ class UIManager {
   constructor(cache, debugEnabled = false) {
     this.cache = cache;
     this.debugEnabled = debugEnabled;
-    this.bottomBarHeight = null;
     // While > 0, hideLoading() is a no-op so a long multi-step orchestration
     // (workspace create/switch) keeps the overlay up across its nested
     // render→#postRefresh→hideLoading calls. See holdLoading/releaseLoading.
@@ -278,56 +277,13 @@ class UIManager {
   }
 
   toggleQueryEditor() {
-    const queryBtn = document.getElementById('queryToggleBtn');
-    const dataBtn = document.getElementById('dataToggleBtn');
-    const shouldEnable = !queryBtn.classList.contains('highlight');
-
-    if (shouldEnable) {
-      this.showEditor('query');
-      queryBtn.classList.add('highlight');
-      dataBtn.classList.remove('highlight');
-    } else {
-      this.hideBottomBar();
-      queryBtn.classList.remove('highlight');
-    }
-  }
-
-  async closeBottomBar() {
-    const queryBtn = document.getElementById('queryToggleBtn');
-    const dataBtn = document.getElementById('dataToggleBtn');
-
-    if (dataBtn.classList.contains('highlight')) {
-      await this.toggleDataEditor();
-      return;
-    }
-
-    if (queryBtn.classList.contains('highlight')) {
-      this.toggleQueryEditor();
-      return;
-    }
-
-    const bottomBar = document.getElementById('bottomBar');
-    if (bottomBar.classList.contains('active')) {
-      this.hideBottomBar();
-    }
+    this.cache.workbench?.toggle('query');
   }
 
   async toggleDataEditor() {
-    const queryBtn = document.getElementById('queryToggleBtn');
-    const dataBtn = document.getElementById('dataToggleBtn');
-    const shouldEnable = !dataBtn.classList.contains('highlight');
-
-    if (shouldEnable) {
-      await this.showLoading('Data Editor', 'Loading Data Editor ..');
-      this.showEditor('data');
-      dataBtn.classList.add('highlight');
-      queryBtn.classList.remove('highlight');
-    } else {
-      await this.showLoading('Data Editor', 'Closing Data Editor ..');
-      this.hideBottomBar();
-      dataBtn.classList.remove('highlight');
-    }
-
+    const opening = !this.cache.workbench?.isTabOpen('data');
+    await this.showLoading('Data Editor', `${opening ? 'Loading' : 'Closing'} Data Editor ..`);
+    this.cache.workbench?.toggle('data');
     await this.hideLoading();
   }
 
@@ -338,130 +294,6 @@ class UIManager {
     if (confirmed) {
       location.reload();
     }
-  }
-
-  showEditor(editorType) {
-    const bottomBar = document.getElementById('bottomBar');
-    const queryEditor = document.getElementById('queryEditor');
-    const dataEditor = document.getElementById('dataEditor');
-    const queryButtons = document.querySelector('.query-buttons');
-    const dataButtons = document.querySelector('.data-buttons');
-    const queryToggleButtons = document.querySelectorAll('.add-to-query-button');
-    const headerText = document.getElementById('bottomBarHeaderText');
-    const helpBtn = document.getElementById('bottomBarHelpBtn');
-
-    // #mainContent flexes to fill whatever the bottom bar leaves free.
-    bottomBar.style.height = this.bottomBarHeight ? this.bottomBarHeight + 'px' : '35%';
-    bottomBar.classList.add('active');
-
-    if (editorType === 'query') {
-      queryEditor.style.display = 'block';
-      dataEditor.style.display = 'none';
-      queryButtons.style.display = 'flex';
-      dataButtons.style.display = 'none';
-      queryToggleButtons.forEach((btn) => btn.classList.add('show'));
-      headerText.textContent = 'Query Editor';
-      helpBtn.onclick = () => this.cache.qm.showQueryHelp();
-      helpBtn.title = 'Display query editor help';
-    } else if (editorType === 'data') {
-      queryEditor.style.display = 'none';
-      dataEditor.style.display = 'block';
-      queryButtons.style.display = 'none';
-      dataButtons.style.display = 'flex';
-      queryToggleButtons.forEach((btn) => btn.classList.remove('show'));
-      headerText.textContent = 'Data Editor';
-      helpBtn.onclick = () => this.cache.dataTable.help();
-      helpBtn.title = 'Display data editor help';
-    }
-  }
-
-  hideBottomBar() {
-    const bottomBar = document.getElementById('bottomBar');
-    const queryToggleButtons = document.querySelectorAll('.add-to-query-button');
-
-    bottomBar.style.height = '0';
-    bottomBar.classList.remove('active');
-    queryToggleButtons.forEach((btn) => btn.classList.remove('show'));
-  }
-
-  makeBottomBarResizable() {
-    const bottomBar = document.getElementById('bottomBar');
-    const resizeHandle = bottomBar.querySelector('.resize-handle');
-    let isResizing = false;
-    let startY = 0;
-    let startHeight = 0;
-    let shadowBar = null;
-
-    function createShadowBar() {
-      if (shadowBar) return shadowBar;
-
-      shadowBar = document.createElement('div');
-      shadowBar.classList.add('resize-shadow-bar');
-      document.body.appendChild(shadowBar);
-      return shadowBar;
-    }
-
-    resizeHandle.addEventListener('mousedown', (e) => {
-      if (!bottomBar.classList.contains('active')) return;
-
-      isResizing = true;
-      startY = e.clientY;
-      startHeight = parseInt(document.defaultView.getComputedStyle(bottomBar).height, 10);
-
-      createShadowBar();
-      shadowBar.style.display = 'block';
-      shadowBar.style.bottom = startHeight + 'px';
-      shadowBar.style.height = startHeight + 'px';
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      e.preventDefault();
-
-      document.body.style.userSelect = 'none';
-      document.body.style.cursor = 'ns-resize';
-    });
-
-    function handleMouseMove(e) {
-      if (!isResizing || !bottomBar.classList.contains('active')) return;
-
-      const dy = startY - e.clientY;
-      const newHeight = startHeight + dy;
-      const minHeight = 50;
-      const maxHeight = window.innerHeight * 0.5;
-      const clampedHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
-
-      shadowBar.style.bottom = '0px';
-      shadowBar.style.height = clampedHeight + 'px';
-    }
-
-    const handleMouseUp = (e) => {
-      if (!isResizing) return;
-
-      isResizing = false;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-
-      const dy = startY - e.clientY;
-      const newHeight = startHeight + dy;
-      const minHeight = 50;
-      const maxHeight = window.innerHeight * 0.5;
-      const finalHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
-
-      if (finalHeight !== startHeight) {
-        bottomBar.style.height = finalHeight + 'px';
-        this.bottomBarHeight = finalHeight;
-      }
-
-      shadowBar.style.display = 'none';
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-    };
-
-    window.addEventListener('beforeunload', () => {
-      if (shadowBar && shadowBar.parentNode) {
-        shadowBar.parentNode.removeChild(shadowBar);
-      }
-    });
   }
 
   /**

@@ -161,6 +161,93 @@
 <div id="mainContent">
   <div id="outerGraphContainer">
     <div id="innerGraphContainer"></div>
+    <section id="workbench" aria-label="Workbench" hidden>
+      <div class="resize-handle"></div>
+      <div class="panel-header panel-header-full-width">
+        <span id="workbenchTitle" class="panel-header-text">Query Editor</span>
+        <div class="panel-header-center-buttons">
+          <div class="query-buttons">
+            <button id="queryUpdateBtn" class="purple disabled" onclick="cache.qm.handleQueryUpdateEvent()"
+                    title="Apply the query to filter the graph">🔍 Filter</button>
+            <button id="querySelectBtn" class="blue disabled" onclick="cache.qm.handleQuerySelectEvent()"
+                    title="Apply the query to select nodes in the graph without filtering">🎯 Select</button>
+            <button id="queryResetBtn" class="pink" onclick="cache.qm.resetQuery();" title="Reset query to match UI filters">⟳ Sync</button>
+            <button id="queryClearBtn" class="red" onclick="cache.qm.clearQuery();" title="Clear query">✗ Clear</button>
+          </div>
+          <div class="data-buttons" style="display: none;">
+            <button id="updateDataTableBtn" class="blue" onclick="cache.dataTable.update()"
+                    title="Update the graph after modifying the data table">✔ Apply</button>
+            <button id="resetDataTableBtn" onclick="cache.dataTable.reset()" class="pink"
+                    title="Reset the data table to current graph state">⟳ Reset</button>
+            <button onclick="cache.dataTable.addNode()" class="blue" title="Add a node"><strong>+</strong>&nbsp;Node</button>
+            <button onclick="cache.dataTable.addEdge()" class="blue" title="Add an edge"><strong>+</strong>&nbsp;Edge</button>
+            <button onclick="cache.dataTable.addColumn()" class="blue" title="Add a new property column"><strong>+</strong>&nbsp;Column</button>
+            <button id="importDataTableBtn" onclick="cache.dataTable.importExcel()" class="green"
+                    title="Merge an Excel file into the current graph — preview changes and choose to add new nodes/edges or only extend existing ones">⤒ Import</button>
+            <button id="exportDataTableBtn" onclick="cache.dataTable.exportToExcel()" class="green"
+                    title="Export the data table and styling properties as Excel">⤓ Export</button>
+          </div>
+          <div class="assistant-buttons" style="display: none;">
+            <button id="assistantSettingsBtn" class="green" title="Configure the endpoint and model"
+                    onclick="cache.assistant.openSettings()">⚙ Settings</button>
+            <button id="assistantClearBtn" class="red" title="Clear the conversation"
+                    onclick="cache.assistant.clearHistory()">🗑 Clear</button>
+          </div>
+        </div>
+        <div class="panel-header-buttons">
+          <button id="workbenchHelpBtn" class="panel-header-btn info-btn" title="Display query editor help" onclick="cache.qm.showQueryHelp();">🛈</button>
+          <button id="workbenchExpandBtn" class="panel-header-btn" title="Expand to full height"
+                  aria-pressed="false" onclick="cache.workbench.toggleExpanded()">⤢</button>
+          <button id="workbenchCloseBtn" class="panel-header-btn" title="Close the workbench"
+                  onclick="cache.workbench.close()">×</button>
+        </div>
+      </div>
+      <div class="wb-content">
+        <div id="queryEditor" class="editor-panel wb-pane">
+          <div id="queryOverlay" aria-hidden="true"></div>
+          <div id="queryTextArea" contenteditable="true" spellcheck="false" oninput="cache.qm.handleQueryValidationEvent();"></div>
+          <div id="queryCaret" class="custom-caret"></div>
+        </div>
+        <div id="dataEditor" class="editor-panel wb-pane" hidden>
+          <div id="dataTableContainer">
+            <table id="dataTable" class="data-table">
+              <thead id="dataTableHead"></thead>
+              <tbody id="dataTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="metricsContainer" class="wb-pane" hidden></div>
+        <div id="assistantPane" class="wb-pane" hidden>
+          <div id="assistantMessages"></div>
+          <div id="assistantEmptyState">
+            <div class="assistant-empty-state-title">Graph Assistant</div>
+            <div class="assistant-empty-state-body">Ask about navigating, filtering, querying, styling, or analysing your graph. I can see the current workspace state when you send a message.</div>
+            <div class="assistant-chips" role="list">
+              <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">How can I visually group and style elements?</button>
+              <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">How does the query editor work?</button>
+              <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">Figure out a strategy to select elements of high importance.</button>
+              <button type="button" class="assistant-chip" data-when="selection" onclick="cache.assistant.sendFromChip(this)">Tell me something about the selected elements.</button>
+              <button type="button" class="assistant-chip" data-when="selection" onclick="cache.assistant.sendFromChip(this)">Which of my selected nodes have the highest degree centrality?</button>
+              <button type="button" class="assistant-chip" data-when="no-selection" onclick="cache.assistant.sendFromChip(this)">How do I select nodes?</button>
+            </div>
+          </div>
+          <div id="assistantInputRow">
+            <textarea id="assistantInput" rows="3" placeholder="Ask about your graph..."></textarea>
+            <div id="assistantInputSide">
+              <button id="assistantStatusBadge" type="button" class="assistant-status-badge" onclick="cache.assistant.openSettings()" aria-label="Assistant status — click to open settings">
+                <span class="assistant-status-badge-dot" aria-hidden="true"></span>
+                <span class="assistant-status-badge-text">…</span>
+              </button>
+              <button id="assistantBudget" type="button" class="assistant-budget" onclick="cache.assistant.openBudgetDetails()" aria-label="Context budget — click for breakdown">
+                <span class="assistant-budget-dot" aria-hidden="true"></span>
+                <span class="assistant-budget-text" role="status" aria-live="polite">— / —</span>
+              </button>
+              <button id="assistantSendBtn" onclick="cache.assistant.sendOrStop()">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
   <aside id="inspector">
     <div class="inspector-resize-handle"></div>
@@ -196,10 +283,6 @@
 
         <h4 class="insp-section-title">Find</h4>
         <div id="inspectorFocusMount"></div>
-
-        <!-- Metrics carries its own "Network Metrics" header and collapses to
-             nothing when closed, so it gets no section title of its own. -->
-        <div id="metricsContainer"></div>
       </section>
 
       <section id="inspectorSelection" class="insp-panel" role="tabpanel" tabindex="0"
@@ -233,94 +316,6 @@
     </div>
     <div id="sidebarStatusContainer"></div>
   </aside>
-  <div id="assistantSidebar">
-    <div class="assistant-resize-handle"></div>
-    <div class="panel-header panel-header-full-width">
-      <span class="panel-header-text">Graph Assistant</span>
-      <div class="panel-header-buttons">
-        <button class="panel-header-btn" title="Settings" onclick="cache.assistant.openSettings()">⚙</button>
-        <button class="panel-header-btn" title="Clear conversation" onclick="cache.assistant.clearHistory()">🗑</button>
-        <button class="panel-header-btn" title="Close" onclick="cache.assistant.togglePanel()">×</button>
-      </div>
-    </div>
-    <div id="assistantMessages"></div>
-    <div id="assistantEmptyState">
-      <div class="assistant-empty-state-title">Graph Assistant</div>
-      <div class="assistant-empty-state-body">Ask about navigating, filtering, querying, styling, or analysing your graph. I can see the current workspace state when you send a message.</div>
-      <div class="assistant-chips" role="list">
-        <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">How can I visually group and style elements?</button>
-        <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">How does the query editor work?</button>
-        <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">Figure out a strategy to select elements of high importance.</button>
-        <button type="button" class="assistant-chip" data-when="selection" onclick="cache.assistant.sendFromChip(this)">Tell me something about the selected elements.</button>
-        <button type="button" class="assistant-chip" data-when="selection" onclick="cache.assistant.sendFromChip(this)">Which of my selected nodes have the highest degree centrality?</button>
-        <button type="button" class="assistant-chip" data-when="no-selection" onclick="cache.assistant.sendFromChip(this)">How do I select nodes?</button>
-      </div>
-    </div>
-    <div id="assistantInputRow">
-      <textarea id="assistantInput" rows="3" placeholder="Ask about your graph..."></textarea>
-      <div id="assistantInputSide">
-        <button id="assistantStatusBadge" type="button" class="assistant-status-badge" onclick="cache.assistant.openSettings()" aria-label="Assistant status — click to open settings">
-          <span class="assistant-status-badge-dot" aria-hidden="true"></span>
-          <span class="assistant-status-badge-text">…</span>
-        </button>
-        <button id="assistantBudget" type="button" class="assistant-budget" onclick="cache.assistant.openBudgetDetails()" aria-label="Context budget — click for breakdown">
-          <span class="assistant-budget-dot" aria-hidden="true"></span>
-          <span class="assistant-budget-text" role="status" aria-live="polite">— / —</span>
-        </button>
-        <button id="assistantSendBtn" onclick="cache.assistant.sendOrStop()">Send</button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="bottomBar">
-  <div class="resize-handle"></div>
-  <div class="panel-header panel-header-full-width">
-    <span id="bottomBarHeaderText" class="panel-header-text">Query Editor</span>
-    <div class="panel-header-center-buttons">
-      <div class="query-buttons">
-        <button id="queryUpdateBtn" class="purple disabled" onclick="cache.qm.handleQueryUpdateEvent()"
-                title="Apply the query to filter the graph">🔍 Filter</button>
-        <button id="querySelectBtn" class="blue disabled" onclick="cache.qm.handleQuerySelectEvent()"
-                title="Apply the query to select nodes in the graph without filtering">🎯 Select</button>
-        <button id="queryResetBtn" class="pink" onclick="cache.qm.resetQuery();" title="Reset query to match UI filters">⟳ Sync</button>
-        <button id="queryClearBtn" class="red" onclick="cache.qm.clearQuery();" title="Clear query">✗ Clear</button>
-      </div>
-      <div class="data-buttons" style="display: none;">
-        <button id="updateDataTableBtn" class="blue" onclick="cache.dataTable.update()"
-                title="Update the graph after modifying the data table">✔ Apply</button>
-        <button id="resetDataTableBtn" onclick="cache.dataTable.reset()" class="pink"
-                title="Reset the data table to current graph state">⟳ Reset</button>
-        <button onclick="cache.dataTable.addNode()" class="blue" title="Add a node"><strong>+</strong>&nbsp;Node</button>
-        <button onclick="cache.dataTable.addEdge()" class="blue" title="Add an edge"><strong>+</strong>&nbsp;Edge</button>
-        <button onclick="cache.dataTable.addColumn()" class="blue" title="Add a new property column"><strong>+</strong>&nbsp;Column</button>
-        <button id="importDataTableBtn" onclick="cache.dataTable.importExcel()" class="green"
-                title="Merge an Excel file into the current graph — preview changes and choose to add new nodes/edges or only extend existing ones">⤒ Import</button>
-        <button id="exportDataTableBtn" onclick="cache.dataTable.exportToExcel()" class="green"
-                title="Export the data table and styling properties as Excel">⤓ Export</button>
-      </div>
-    </div>
-    <div class="panel-header-buttons">
-      <button id="bottomBarHelpBtn" class="panel-header-btn info-btn" title="Display query editor help" onclick="cache.qm.showQueryHelp();">🛈</button>
-      <button id="bottomBarCloseBtn" class="panel-header-btn" title="Close bottom panel"
-              onclick="cache.ui.closeBottomBar()">×</button>
-    </div>
-  </div>
-  <div class="bottom-bar-content">
-    <div id="queryEditor" class="editor-panel">
-      <div id="queryOverlay" aria-hidden="true"></div>
-      <div id="queryTextArea" contenteditable="true" spellcheck="false" oninput="cache.qm.handleQueryValidationEvent();"></div>
-      <div id="queryCaret" class="custom-caret"></div>
-    </div>
-    <div id="dataEditor" class="editor-panel" style="display: none;">
-      <div id="dataTableContainer">
-        <table id="dataTable" class="data-table">
-          <thead id="dataTableHead"></thead>
-          <tbody id="dataTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
 </div>
 </body>
 </html>

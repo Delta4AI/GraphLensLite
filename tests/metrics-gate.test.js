@@ -136,33 +136,47 @@ describe('NetworkMetrics lazy panel gate', () => {
     expect(metrics.multiselect.options.length).toBe(0)
   })
 
-  it('triggers a compute and flips collapsed when the panel is opened', () => {
+  // Visibility is the workbench's call now; the gate follows it through
+  // setWorkbenchVisible. toggleUI is a one-line delegation, covered below.
+  it('triggers a compute and flips collapsed when the tab becomes visible', () => {
     // Arrange
     const cache = makeCache()
     const metrics = makeMetrics(cache, { open: false })
     const spy = vi.spyOn(metrics, 'updateMetricUI').mockResolvedValue(undefined)
 
     // Act
-    metrics.toggleUI()
+    metrics.setWorkbenchVisible(true)
 
     // Assert
     expect(metrics.collapsed).toBe(false)
     expect(spy).toHaveBeenCalledTimes(1)
   })
 
-  it('does not compute when the panel is collapsed via toggleUI', () => {
-    // Arrange: start open so the first toggle closes it
+  it('does not compute when the tab is hidden', () => {
+    // Arrange: start visible so the call under test is the hide
     const cache = makeCache()
     const metrics = makeMetrics(cache, { open: true })
-    document.getElementById('networkMetricsContainer').classList.add('open')
     const spy = vi.spyOn(metrics, 'updateMetricUI').mockResolvedValue(undefined)
 
-    // Act: toggle → closes
-    metrics.toggleUI()
+    // Act
+    metrics.setWorkbenchVisible(false)
 
     // Assert
     expect(metrics.collapsed).toBe(true)
     expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('toggleUI defers to the workbench rather than driving the DOM itself', () => {
+    // Arrange
+    const cache = makeCache()
+    cache.workbench = { toggle: vi.fn() }
+    const metrics = makeMetrics(cache, { open: false })
+
+    // Act
+    metrics.toggleUI()
+
+    // Assert
+    expect(cache.workbench.toggle).toHaveBeenCalledWith('metrics')
   })
 })
 

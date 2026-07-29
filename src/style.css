@@ -503,24 +503,26 @@ body {
     word-wrap: break-word;
 }
 
-#bottomBar {
-    height: 0;
-    width: 100%;
-    display: none;
-    overflow: hidden;
+/* The workbench overlays the bottom of the stage — it covers the canvas and
+   never the inspector (Concept C §2). Height is driven by workbench.js. */
+#workbench {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 600;
     box-sizing: border-box;
-    flex: none;
-}
-
-#bottomBar.active {
-    background-color: var(--surface);
-    border-top: 1px solid var(--brand-border);
     display: flex;
     flex-direction: column;
-    min-height: 50px;
-    max-height: 50vh;
-    height: auto;
-    position: relative;
+    min-height: 120px;
+    overflow: hidden;
+    background-color: var(--surface);
+    border-top: 1px solid var(--brand-border);
+    box-shadow: 0 -6px 18px rgba(64, 60, 83, 0.18);
+}
+
+#workbench[hidden] {
+    display: none;
 }
 
 /* Panel headers */
@@ -545,12 +547,6 @@ body {
     margin: 0;
 }
 
-/* Bottom bar header gets extra visual borders */
-#bottomBar .panel-header {
-    border-left: 1px solid var(--brand-border);
-    border-right: 1px solid var(--brand-border);
-    border-top: 1px solid var(--brand-border);
-}
 
 .panel-header-text {
     flex: 0 0 auto;
@@ -608,13 +604,37 @@ body {
     color: white;
 }
 
-/* Bottom bar content area */
-.bottom-bar-content {
+/* Workbench content area — one pane visible at a time, the rest [hidden]. */
+.wb-content {
     display: flex;
     flex: 1;
     min-height: 0;
     padding: 2px;
     gap: 2px;
+}
+
+.wb-pane[hidden] {
+    display: none;
+}
+
+/* Metrics and the assistant were column-shaped panels; in the workbench they
+   own the full width, so they scroll as one block. */
+#metricsContainer.wb-pane {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 10px;
+}
+
+#assistantPane {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+}
+
+#assistantPane:not([hidden]) {
+    display: flex;
 }
 
 .resize-shadow-bar {
@@ -938,7 +958,7 @@ body {
 /* Presentation mode (⇧F): stage only, for screenshots and demos. */
 body.presentation #rail,
 body.presentation #inspector,
-body.presentation #bottomBar {
+body.presentation #workbench {
     display: none;
 }
 
@@ -3336,18 +3356,7 @@ input:checked + .slider:before {
  network metrics
  **************************/
 .nw-root {
-    margin-right: 10px;
-    max-width: 350px;
-    overflow: hidden;
-    max-height: 0;
-    opacity: 0;
-    transition: max-height 0.3s ease-in-out,
-    opacity 0.3s ease-in-out;
-}
-
-.nw-root.open {
-    max-height: 999px;
-    opacity: 1;
+    max-width: 640px;
 }
 
 .nw-header {
@@ -4699,45 +4708,17 @@ input:checked + .slider:before {
     display: none;
 }
 
-/* ── AI Assistant sidebar ─────────────────────────────────────── */
+/* ── AI Assistant (workbench tab) ─────────────────────────────── */
 
-#assistantSidebar {
-    min-width: 0;
-    width: 0;
-    background-color: var(--surface);
-    overflow: hidden;
-    transition: width 0.3s ease-in-out, min-width 0.3s ease-in-out;
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    border-left: 0 solid var(--border);
-    position: relative;
-}
-
-#assistantSidebar.active {
-    min-width: var(--assistant-width, 380px);
-    width: var(--assistant-width, 380px);
-    border-left: 1px solid var(--border);
-}
-
-.assistant-resize-handle {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 4px;
-    background: transparent;
-    cursor: ew-resize;
-    z-index: 1000;
-}
-
-.assistant-resize-handle:hover {
-    background: #403C53;
-}
-
-#assistantSidebar .panel-header {
-    background-color: #403C53;
-    color: white;
+/* Chat is a narrow-column medium even in a wide surface — centre the reading
+   column rather than letting lines run the whole workbench width. */
+#assistantMessages,
+#assistantEmptyState,
+#assistantInputRow {
+    width: min(720px, 100%);
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
 }
 
 #assistantMessages {
@@ -4748,12 +4729,6 @@ input:checked + .slider:before {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
-
-#assistantSidebar.active #assistantMessages {
-    opacity: 1;
 }
 
 .assistant-bubble {
@@ -5389,19 +5364,31 @@ input:checked + .slider:before {
 #assistantEmptyState {
     display: none;
     flex: 1;
+    /* The workbench is short and wide where the old dock was tall and narrow:
+       without min-height/overflow these centred chips grow the pane and push
+       the input row out of sight. `safe center` keeps the top reachable once
+       the content is taller than the space. */
+    min-height: 0;
+    overflow-y: auto;
     flex-direction: column;
-    justify-content: center;
+    justify-content: safe center;
     align-items: center;
     text-align: center;
-    padding: 24px 20px;
+    padding: 16px 20px;
     color: var(--text-faint);
     gap: 8px;
 }
 
 /* The empty-state is shown when there are no message bubbles. Using :has()
-   keeps this purely CSS-driven — no JS tracking of "did we already greet". */
-#assistantSidebar:has(#assistantMessages:empty) #assistantEmptyState {
+   keeps this purely CSS-driven — no JS tracking of "did we already greet".
+   The (empty) message list is hidden with it so the two don't split the
+   available height between them. */
+#assistantPane:has(#assistantMessages:empty) #assistantEmptyState {
     display: flex;
+}
+
+#assistantPane:has(#assistantMessages:empty) #assistantMessages {
+    display: none;
 }
 
 .assistant-empty-state-title {
@@ -5482,13 +5469,7 @@ input:checked + .slider:before {
     padding: 8px 10px;
     border-top: 1px solid var(--border);
     background-color: var(--surface);
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
     flex-shrink: 0;
-}
-
-#assistantSidebar.active #assistantInputRow {
-    opacity: 1;
 }
 
 #assistantInput {
