@@ -660,6 +660,35 @@ function createStyleDiv(cache) {
     parent.appendChild(focusButton);
   }
 
+  // Two cards, split by what they need to already have: "Select Elements"
+  // *creates* a selection out of the visible graph (rail ◈ menu), while
+  // "Act on Selection" *grows or walks* one you already have, so it lives in
+  // the inspector's selection context next to the thing it operates on.
+  function createActOnSelectionCard() {
+    const actDiv = createCard("Act on Selection");
+
+    const rowTwo = createNewRow(actDiv);
+    appendButton(rowTwo, "Expand Edges",
+      "Add all edges connected to the currently selected nodes to the selection",
+      async () => await cache.sm.toggleSelectionByNeighbors("expand-edges"));
+    appendButton(rowTwo, "Reduce Edges",
+      "Remove edges that do not connect two selected nodes",
+      async () => await cache.sm.toggleSelectionByNeighbors("reduce-edges"));
+
+    const rowThree = createNewRow(actDiv);
+    appendButton(rowThree, "Expand Neighbors",
+      "Add all directly connected neighbor nodes (and their edges) to the current selection",
+      async () => await cache.sm.toggleSelectionByNeighbors("expand-neighbors"));
+    appendButton(rowThree, "Reduce Neighbors",
+      "Remove the outermost layer of selected neighbor nodes (and their edges) from the ",
+      async () => await cache.sm.toggleSelectionByNeighbors("reduce-neighbors"));
+
+    const rowShortestPath = createNewRow(actDiv);
+    appendButton(rowShortestPath, "Shortest Path",
+      "Add the shortest path connecting the two selected nodes — its nodes and the edges between them — to the selection.\nComputed on the visible graph, so it honours active filters.\nRequires exactly two selected nodes.",
+      async () => await cache.sm.selectShortestPathBetweenSelected());
+  }
+
   function createSelectCard() {
     const selDiv = createCard("Select Elements");
 
@@ -673,27 +702,6 @@ function createStyleDiv(cache) {
       async () => await cache.sm.toggleSelectionForAllEdges(true));
     appendButton(rowOne, "No Edges", "Deselect all visible edges",
       async () => await cache.sm.toggleSelectionForAllEdges(false));
-
-    const rowTwo = createNewRow(selDiv);
-    appendButton(rowTwo, "Expand Edges",
-      "Add all edges connected to the currently selected nodes to the selection",
-      async () => await cache.sm.toggleSelectionByNeighbors("expand-edges"));
-    appendButton(rowTwo, "Reduce Edges",
-      "Remove edges that do not connect two selected nodes",
-      async () => await cache.sm.toggleSelectionByNeighbors("reduce-edges"));
-
-    const rowThree = createNewRow(selDiv);
-    appendButton(rowThree, "Expand Neighbors",
-      "Add all directly connected neighbor nodes (and their edges) to the current selection",
-      async () => await cache.sm.toggleSelectionByNeighbors("expand-neighbors"));
-    appendButton(rowThree, "Reduce Neighbors",
-      "Remove the outermost layer of selected neighbor nodes (and their edges) from the ",
-      async () => await cache.sm.toggleSelectionByNeighbors("reduce-neighbors"));
-
-    const rowShortestPath = createNewRow(selDiv);
-    appendButton(rowShortestPath, "Shortest Path",
-      "Add the shortest path connecting the two selected nodes — its nodes and the edges between them — to the selection.\nComputed on the visible graph, so it honours active filters.\nRequires exactly two selected nodes.",
-      async () => await cache.sm.selectShortestPathBetweenSelected());
 
     appendHorizontalRule(selDiv);
 
@@ -836,12 +844,14 @@ function createStyleDiv(cache) {
   function createArrangeNodesCard() {
     const arrDiv = createCard("Arrange Selection");
 
+    // Six equally-weighted actions — a 3x2 grid of labelled cells reads as a
+    // palette, where one wrapping row read as an overflow accident.
     const rowOne = createNewRow(arrDiv);
+    rowOne.classList.add("card-row-grid");
     appendButton(rowOne, "Shrink", "Move nodes closer together, halving their distance to the center.",
       async () => await cache.lm.layoutSelectedNodes("shrink"));
     appendButton(rowOne, "Expand", "Move nodes farther apart, doubling their distance to the center.",
       async () => await cache.lm.layoutSelectedNodes("expand"));
-    appendVerticalRule(rowOne);
     appendButton(rowOne, "Circle", "Arrange nodes evenly in a circular layout around the center.",
       async () => await cache.lm.layoutSelectedNodes("circle"));
     appendButton(rowOne, "Force", "Apply a force-directed layout to the selected nodes.",
@@ -1430,14 +1440,9 @@ function createStyleDiv(cache) {
       parent.appendChild(container);
     }
 
+    // On/off lives on the rail's ◐ Overlays menu (Concept C §4 row J) — this
+    // card holds only the parameters, so there is one switch, not two.
     const rowSwitches = createNewRow(card);
-    appendLabel(rowSwitches, "Enable",
-      "Render a density field under the graph showing where nodes crowd together.");
-    const enableSwitch = createSwitch(() => {
-      layer()?.setHeatmapEnabled(enableSwitch.isChecked());
-    }, "heatmapEnabledSwitch", layer()?.heatmapEnabled ?? D.ENABLED);
-    rowSwitches.appendChild(enableSwitch);
-    appendVerticalRule(rowSwitches);
     appendLabel(rowSwitches, "Dim graph",
       "De-emphasize nodes and edges while the heatmap is on, so the density field reads through.");
     const dimSwitch = createSwitch(() => {
@@ -1493,6 +1498,7 @@ function createStyleDiv(cache) {
 
   createFocusCard();
   createSelectCard();
+  createActOnSelectionCard();
   createArrangeNodesCard();
   createNodeConfigCard();
   createEdgeConfigCard();

@@ -104,6 +104,14 @@
   <button id="hoverToggleBtn" class="rail-vb green highlight" title="Disable hover highlight effect (H)" onclick="cache.ui.toggleHoverEffect(this)">
     <span class="rail-vb-g">✨</span><span class="rail-vb-t">Hover</span>
   </button>
+  <button id="selectMenuBtn" class="rail-vb rail-vb-wide"
+          title="Select — all/no nodes and edges, or select by ID or label">
+    <span class="rail-vb-g">◈</span><span class="rail-vb-t">Select ⌄</span>
+  </button>
+  <button id="overlaysMenuBtn" class="rail-vb rail-vb-wide"
+          title="Overlays — density heatmap, minimap, presentation mode">
+    <span class="rail-vb-g">◐</span><span class="rail-vb-t">Overlays ⌄</span>
+  </button>
   <div class="rail-div"></div>
   <div id="selectionChip" class="rail-selchip">
     <span class="rail-selchip-empty">Nothing selected</span>
@@ -151,77 +159,80 @@
   <button id="keyboardSheetBtn" class="rail-mini" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onclick="cache.ui.toggleKeyboardSheet()">?</button>
 </header>
 <div id="mainContent">
-  <div id="sidebar">
-    <div class="sidebar-resize-handle"></div>
-    <div id="sidebarContentContainer">
-      <div id="metricsContainer"></div>
-      <div id="filterContainer"></div>
-    </div>
-    <div id="sidebarStatusContainer"></div>
-  </div>
   <div id="outerGraphContainer">
-    <div id="selectedElementsContainer" class="sel-hud-tr expanded">
-      <div class="sel-hud-header" title="Drag to move — releases to the nearest corner">
-        <span class="sel-hud-title">Selection</span>
-        <span class="sel-hud-header-tools">
-          <button class="sel-hud-tools-toggle" id="selectionEditorToggleBtn"
-                  title="Hide selection tools"
-                  aria-expanded="true" onclick="cache.ui.toggleSelectionEditor()">Tools ▴</button>
-          <button class="sel-hud-hide-btn" id="selHudHideBtn" title="Hide the selection panel (e.g. for a screenshot)" aria-label="Hide selection panel">✕</button>
-        </span>
-      </div>
+    <div id="innerGraphContainer"></div>
+  </div>
+  <aside id="inspector">
+    <div class="inspector-resize-handle"></div>
+    <div class="insp-pills" role="tablist" aria-label="Inspector context">
+      <button id="inspectorPillWorkspace" class="insp-pill active" role="tab" aria-selected="true"
+              aria-controls="inspectorWorkspace" tabindex="0"
+              title="Workspace-level controls: filters, groups, overlays, find and metrics">Workspace</button>
+      <button id="inspectorPillSelection" class="insp-pill" role="tab" aria-selected="false"
+              aria-controls="inspectorSelection" tabindex="-1"
+              title="Everything that acts on the current selection: actions, arrange, appearance">Selection</button>
+    </div>
+    <div id="inspectorBody">
+      <section id="inspectorWorkspace" class="insp-panel" role="tabpanel" tabindex="0"
+               aria-labelledby="inspectorPillWorkspace">
+        <h4 class="insp-section-title">Filters</h4>
+        <p class="insp-note">Filters set what is <strong>visible</strong> across the whole workspace —
+          they are never scoped to your selection.</p>
+        <div id="filterContainer"></div>
 
-      <div class="sel-hud-toolbar">
-        <button id="styleToggleBtn" class="sel-hud-btn" title="Open styling panel (Y)" onclick="cache.ui.toggleStylingPanel()">🎨 Style</button>
-      </div>
+        <h4 class="insp-section-title">Groups</h4>
+        <div class="insp-groups">
+          <button id="detectCommunitiesBtn" class="insp-btn" title="Auto-group by community (Louvain): pick edge weighting & resolution, then assign the largest communities to bubble groups"
+                  onclick="cache.bs.toggleCommunityDetectionPopover()">🧩 Auto-detect</button>
+          <span id="manualGroupSeparator" class="button-separator" style="display: none;"></span>
+          <span id="manualBubbleGroupStatus" class="manual-group-status" style="display: none;"></span>
+          <button id="clearManualGroupsBtn" class="insp-btn red" title="Clear all manual bubble groups"
+                  onclick="cache.bs.clearAllManualGroups()" style="display: none;">Clear all</button>
+        </div>
+        <div id="inspectorGroupsMount"></div>
 
-      <div class="sel-hud-empty">
-        <div class="sel-hud-empty-title">Nothing selected</div>
-        <div class="sel-hud-empty-hint">Click an element, drag a <button type="button" class="sel-hud-link" onclick="cache.ui.toggleLassoSelection()">lasso</button> (L), or use <button type="button" class="sel-hud-link" onclick="cache.ui.toggleSelectionEditor()">Tools</button> to select by name or neighbours. The <button type="button" class="sel-hud-link" onclick="cache.ui.toggleQueryEditor()">query editor</button> allows selection by properties.</div>
-      </div>
+        <h4 class="insp-section-title">Overlays</h4>
+        <div id="inspectorOverlaysMount"></div>
 
-      <div class="sel-hud-active">
-        <div class="sel-hud-actions">
+        <h4 class="insp-section-title">Find</h4>
+        <div id="inspectorFocusMount"></div>
+
+        <!-- Metrics carries its own "Network Metrics" header and collapses to
+             nothing when closed, so it gets no section title of its own. -->
+        <div id="metricsContainer"></div>
+      </section>
+
+      <section id="inspectorSelection" class="insp-panel" role="tabpanel" tabindex="0"
+               aria-labelledby="inspectorPillSelection" hidden>
+        <div class="insp-empty">
+          <div class="insp-empty-title">Nothing selected</div>
+          <div class="insp-empty-hint">Click an element, drag a
+            <button type="button" class="insp-link" onclick="cache.ui.toggleLassoSelection()">lasso</button> (L),
+            or use the rail's <strong>◈ Select</strong> menu to select by name or ID. The
+            <button type="button" class="insp-link" onclick="cache.ui.toggleQueryEditor()">query editor</button>
+            allows selection by properties.</div>
+        </div>
+
+        <div class="insp-act-row">
           <span class="sel-group-control">
             <span class="sel-group-label">Add to group:</span>
             <span id="manualBubbleGroupButtonContainer" class="manual-group-container"></span>
           </span>
-          <button class="sel-hud-btn disabled" title="Reset the style of selected elements to defaults" id="resetSelectedElementsStyleBtn"
+          <button class="insp-btn disabled" title="Reset the style of selected elements to defaults" id="resetSelectedElementsStyleBtn"
                   onclick="cache.style.resetStyleForSelectedElements()">⟳ Reset style</button>
-          <button class="sel-hud-btn disabled" style="display: none;" id="neo4jExpandBtn"
+          <button class="insp-btn disabled" style="display: none;" id="neo4jExpandBtn"
                   title="Fetch the neighbors of the selected nodes from Neo4j and merge them into the graph"
                   onclick="expandNeo4jSelection()">🛢️ Expand</button>
         </div>
-      </div>
+        <div id="inspectorActMount"></div>
+        <div id="inspectorArrangeMount"></div>
 
-      <div class="sel-hud-groups">
-        <span class="sel-group-label">Groups:</span>
-        <button id="detectCommunitiesBtn" class="sel-hud-btn" title="Auto-group by community (Louvain): pick edge weighting & resolution, then assign the largest communities to bubble groups"
-                onclick="cache.bs.toggleCommunityDetectionPopover()">🧩 Auto</button>
-        <span id="manualGroupSeparator" class="button-separator" style="display: none;"></span>
-        <span id="manualBubbleGroupStatus" class="manual-group-status" style="display: none;"></span>
-        <button id="clearManualGroupsBtn" class="sel-hud-btn red" title="Clear all manual bubble groups"
-                onclick="cache.bs.clearAllManualGroups()" style="display: none;">Clear all</button>
-      </div>
-
-      <div id="selectionEditorPanel" class="selection-editor-panel"></div>
+        <h4 class="insp-section-title" id="inspectorAppearanceTitle">Appearance</h4>
+        <div id="inspectorAppearanceMount"></div>
+      </section>
     </div>
-    <button id="selHudRestoreBtn" class="sel-hud-restore sel-hud-tr" title="Show the selection panel" aria-label="Show selection panel">▸ Selection</button>
-    <div id="innerGraphContainer"></div>
-  </div>
-  <div id="rightSidebar">
-    <div class="panel-header panel-header-full-width">
-      <span class="panel-header-text">Styling Panel</span>
-      <button id="rightSidebarCloseBtn" class="panel-header-btn" title="Close styling panel"
-              onclick="cache.ui.toggleStylingPanel()">×</button>
-    </div>
-    <div id="rightSidebarContentContainer">
-      <div id="stylingSelectionStatus" class="styling-status empty">Nothing selected — select nodes or edges to style them. Bubble-group styling below works without a selection.</div>
-      <div id="stylingPanelContent">
-        <!-- Styling controls will be populated here -->
-      </div>
-    </div>
-  </div>
+    <div id="sidebarStatusContainer"></div>
+  </aside>
   <div id="assistantSidebar">
     <div class="assistant-resize-handle"></div>
     <div class="panel-header panel-header-full-width">

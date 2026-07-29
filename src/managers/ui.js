@@ -25,11 +25,12 @@ const KEYBOARD_SHORTCUTS = [
   ['D', 'Toggle data table'],
   ['Q', 'Toggle query editor'],
   ['M', 'Toggle metrics panel'],
-  ['Y', 'Toggle styling panel'],
+  ['Y', 'Jump to the inspector’s appearance controls'],
   ['L', 'Toggle lasso selection'],
   ['H', 'Toggle hover highlight'],
   ['A', 'Toggle assistant'],
-  ['Esc', 'Exit lasso mode'],
+  ['⇧F', 'Presentation mode (hide the rail and inspector)'],
+  ['Esc', 'Exit lasso or presentation mode'],
   ['?', 'Show this sheet'],
 ];
 
@@ -463,35 +464,24 @@ class UIManager {
     });
   }
 
-  toggleStylingPanel() {
-    const rightSidebar = document.getElementById('rightSidebar');
-    const styleBtn = document.getElementById('styleToggleBtn');
-    const outerGraphContainer = document.getElementById('outerGraphContainer');
-    const isActive = rightSidebar.classList.contains('active');
-
-    if (isActive) {
-      rightSidebar.classList.remove('active');
-      styleBtn.classList.remove('highlight');
-      outerGraphContainer.classList.remove('styling-panel-active');
-    } else {
-      rightSidebar.classList.add('active');
-      styleBtn.classList.add('highlight');
-      outerGraphContainer.classList.add('styling-panel-active');
+  /**
+   * Presentation mode (⇧F): strip the shell down to the stage for a screenshot
+   * or a demo. Replaces the old selection-HUD "✕ hide" — it hides all the
+   * chrome rather than one widget, and Escape always brings it back.
+   */
+  togglePresentationMode() {
+    const on = document.body.classList.toggle('presentation');
+    if (on) {
+      this._presentationEscape = (e) => {
+        if (e.key === 'Escape') this.togglePresentationMode();
+      };
+      document.addEventListener('keydown', this._presentationEscape, true);
+      this.info('Presentation mode — press Escape or ⇧F to bring the interface back');
+    } else if (this._presentationEscape) {
+      document.removeEventListener('keydown', this._presentationEscape, true);
+      this._presentationEscape = null;
     }
-  }
-
-  toggleSelectionEditor() {
-    const container = document.getElementById('selectedElementsContainer');
-    const panel = document.getElementById('selectionEditorPanel');
-    const toggleBtn = document.getElementById('selectionEditorToggleBtn');
-    if (!container || !panel || !toggleBtn) return;
-
-    const isExpanded = container.classList.toggle('expanded');
-    toggleBtn.textContent = isExpanded ? 'Tools ▴' : 'Tools ▾';
-    toggleBtn.title = isExpanded
-      ? 'Hide selection tools'
-      : 'Show selection tools: select by name, neighbours, or arrange the selection';
-    toggleBtn.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+    this.cache.graph?.resize();
   }
 
   async toggleLassoSelection() {
@@ -1078,30 +1068,38 @@ class UIManager {
     }
   }
 
+  // Every config card is built by one call to createStyleDiv and then
+  // re-parented to its home in the shell. There is exactly one copy of each
+  // card; the mount ids below are the whole of the "which panel owns what"
+  // mapping (Concept C §4).
+  static CARD_MOUNTS = {
+    'Focus Elements': 'inspectorFocusMount',
+    'Select Elements': 'selectMenuMount',
+    'Act on Selection': 'inspectorActMount',
+    'Arrange Selection': 'inspectorArrangeMount',
+    'Node Configuration': 'inspectorAppearanceMount',
+    'Edge Configuration': 'inspectorAppearanceMount',
+    'Bubble Sets': 'inspectorGroupsMount',
+    'Density Heatmap': 'inspectorOverlaysMount',
+  };
+
   buildStylingPanelUI() {
-    const content = document.getElementById('stylingPanelContent');
-    content.innerHTML = '';
-    content.appendChild(createStyleDiv(this.cache));
-    this.mountSelectionEditorCards();
-  }
-
-  mountSelectionEditorCards() {
-    const selectionPanel = document.getElementById('selectionEditorPanel');
-    if (!selectionPanel) return;
-
-    selectionPanel.innerHTML = '';
-    ['Focus Elements', 'Select Elements', 'Arrange Selection'].forEach((cardId) => {
-      const card = document.getElementById(cardId);
-      if (card) selectionPanel.appendChild(card);
-    });
+    const built = createStyleDiv(this.cache);
+    for (const mountId of new Set(Object.values(UIManager.CARD_MOUNTS))) {
+      const mount = document.getElementById(mountId);
+      if (mount) mount.innerHTML = '';
+    }
+    for (const [label, mountId] of Object.entries(UIManager.CARD_MOUNTS)) {
+      const card = built.querySelector(`[data-label="${label}"]`);
+      if (card) document.getElementById(mountId)?.appendChild(card);
+    }
   }
 
   // Additively open a collapsible styling card by its label (never closes one).
   // Driven by the current selection so the relevant card is already open when
   // the user reaches for it, without fighting cards they toggled themselves.
   expandStylingCard(label) {
-    const content = document.getElementById('stylingPanelContent');
-    const card = content?.querySelector(`[data-label="${label}"]`);
+    const card = document.querySelector(`[data-label="${label}"]`);
     if (!card || !card.classList.contains('collapsed')) return;
     card.classList.remove('collapsed');
     const header = card.querySelector('.card-collapse-header');

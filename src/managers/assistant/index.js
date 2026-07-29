@@ -206,7 +206,7 @@ class AssistantManager {
       'query-editor': () => c.ui?.toggleQueryEditor?.(),
       'lasso': () => c.ui?.toggleLassoSelection?.(),
       'metrics': () => c.metrics?.toggleUI?.(),
-      'style': () => c.ui?.toggleStylingPanel?.(),
+      'style': () => c.inspector?.showAppearance?.(),
       'data-editor': () => c.ui?.toggleDataEditor?.(),
       'undo': () => c.sm?.undoSelection?.(),
       'redo': () => c.sm?.redoSelection?.(),

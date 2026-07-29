@@ -41,7 +41,7 @@ The rendering and graph-operation core. Key modules:
 - `bubble_sets.js` / `bubble_layer.js` / `bubble_geometry.js` — bubble-set grouping
   drawn on an owned canvas layer beneath the nodes
 - `heatmap_layer.js` / `heatmap_geometry.js` — node-density heatmap overlay (off by
-  default; toggled from the workspace toolbar)
+  default; toggled from the rail's ◐ Overlays menu, parameters in the inspector)
 - `edge_programs.js` / `edge_flow_programs.js` / `edge_flow_glsl.js` /
   `flow_animator.js` — custom WebGL edge programs and the animated source→target
   flow overlay (dash/pulse/comet/chevron)
@@ -49,22 +49,27 @@ The rendering and graph-operation core. Key modules:
   `visible_graph.js`, `lasso_geometry.js`, `communities.js`, `export_svg.js`,
   `webgl_support.js`
 
-### Functional managers (`src/managers/`, 7 files + `assistant/`)
+### Functional managers (`src/managers/`, 9 files + `assistant/`)
 
 Business logic and UI:
 
 - `io.js` — `IOManager`: Excel/JSON loading, export (JSON / PNG / SVG), data
   preprocessing, Excel template generation
-- `ui.js` — loading overlays, UI enable/disable, notifications
+- `ui.js` — loading overlays, UI enable/disable, notifications, presentation mode
+- `rail.js` — the 52 px top rail and its dropdown menus (app, workspace, layout,
+  select, overlays, export)
+- `inspector.js` — the single right-hand panel's context router (Workspace ↔ Selection)
 - `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, comparisons)
 - `ui_components.js` — filter UI (dropdown checklists, invertible range sliders), tooltips
-- `ui_style_div.js` — the styling panel (node/edge styles, badges, edge flow, density heatmap)
+- `ui_style_div.js` — builds every config card (node/edge styles, badges, edge flow,
+  bubble sets, density heatmap, select/act/arrange); `ui.js` `CARD_MOUNTS` then
+  re-parents each card to its single home in the rail or the inspector
 - `metrics.js` — `NetworkMetrics`: degree/betweenness/closeness/eigenvector centrality, PageRank
 - `api_client.js` — client for the standalone ingest service
 - `assistant/` — the natural-language Graph Assistant (intent parsing, query
   generation, settings, budget UI)
 
-### Utilities (`src/utilities/`, 13 files)
+### Utilities (`src/utilities/`, 14 files)
 
 - `static.js` — validation, colour math, deep-merge helpers
 - `popup.js` / `popover_position.js` — modal and popover positioning
@@ -74,7 +79,7 @@ Business logic and UI:
 - `neo4j_session.js` — Neo4j session extensions: expand selected nodes, merge additional queries
 - `tour.js` — guided tour with a sample dataset
 - `color_scale_picker.js` / `numeric_scale_picker.js` / `pie_chart_picker.js` — styling pickers
-- `selection_hud.js`, `theme.js`, `export_scale.js`
+- `excel_merge.js`, `theme.js`, `export_scale.js`
 
 ### Key files
 

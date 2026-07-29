@@ -69,6 +69,10 @@ class NetworkMetrics {
   }
 
   toggleUI() {
+    // Metrics live in the inspector's Workspace context — opening them from
+    // the rail while the Selection context is up would otherwise do nothing
+    // visible.
+    this.cache.inspector?.setContext('workspace');
     const panel = document.getElementById('networkMetricsContainer');
     const willOpen = panel.classList.toggle('open');
     const fullHeight = panel.scrollHeight + 'px';

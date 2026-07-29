@@ -812,7 +812,10 @@ class GraphCoreManager {
           this.cache.metrics.toggleUI();
           break;
         case 'y':
-          this.cache.ui.toggleStylingPanel();
+          this.cache.inspector?.showAppearance();
+          break;
+        case 'F':
+          this.cache.ui.togglePresentationMode();
           break;
         case 'l':
           await this.cache.ui.toggleLassoSelection();

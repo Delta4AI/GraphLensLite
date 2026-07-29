@@ -28,7 +28,7 @@ import {generateTourData, GuidedTour} from "./utilities/tour.js";
 import {initApiClient} from "./managers/api_client.js";
 import {initRail} from "./managers/rail.js";
 import {initTheme} from "./utilities/theme.js";
-import {initSelectionHud} from "./utilities/selection_hud.js";
+import {initInspector} from "./managers/inspector.js";
 
 
 // Stores all reference objects
@@ -463,22 +463,13 @@ window.startTour = startTour;
 window.cache = cache;
 
 
-window.addEventListener('resize', () => {
-  if (window.graph !== undefined && window.graph !== null && window.cache.initialized) {
-    const sidebar = document.getElementById("sidebar");
-    const status = document.getElementById("sidebarStatusContainer");
-
-    status.style.maxWidth = `${sidebar.offsetWidth}px`;
-  }
-})
-
 window.addEventListener("DOMContentLoaded", () => {
   // Stored preference wins; prefers-color-scheme is only the first-run default.
   initTheme(document, window);
   cache.reset();
   cache.rail = initRail(cache);
+  cache.inspector = initInspector();
   cache.ui.updateDarkModeButton();
-  initSelectionHud();
   // cache.initialize();
 
   // Display version info
@@ -491,23 +482,24 @@ window.addEventListener("DOMContentLoaded", () => {
     landingVersion.textContent = `v${VERSION}`;
   }
 
-  // Setup sidebar resize functionality
-  const sidebar = document.getElementById('sidebar');
-  const resizeHandle = document.querySelector('.sidebar-resize-handle');
+  // Inspector resize — drags from its left edge (right-docked panel), same
+  // shadow-bar gesture the assistant panel below uses.
+  const inspector = document.getElementById('inspector');
+  const resizeHandle = document.querySelector('.inspector-resize-handle');
+  const INSPECTOR_MIN_WIDTH = 300;
+  const INSPECTOR_MAX_WIDTH = 900;
   let isResizing = false;
-  let startX = 0;
-  let startWidth = 0;
   let shadowBar = null;
 
-  resizeHandle.addEventListener('mousedown', (e) => {
-    isResizing = true;
-    startX = e.clientX;
-    startWidth = sidebar.offsetWidth;
+  const clampInspectorWidth = (w) =>
+    Math.max(INSPECTOR_MIN_WIDTH, Math.min(INSPECTOR_MAX_WIDTH, w));
 
-    // Create shadow bar
+  resizeHandle?.addEventListener('mousedown', (e) => {
+    isResizing = true;
+
     shadowBar = document.createElement('div');
     shadowBar.className = 'sidebar-resize-shadow';
-    shadowBar.style.left = `${startWidth}px`;
+    shadowBar.style.left = `${window.innerWidth - inspector.offsetWidth}px`;
     shadowBar.style.width = '4px';
     shadowBar.style.display = 'block';
     document.body.appendChild(shadowBar);
@@ -519,38 +511,25 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   document.addEventListener('mousemove', (e) => {
-    if (!isResizing) return;
-
-    const deltaX = e.clientX - startX;
-    const newWidth = Math.max(200, startWidth + deltaX);
-
-    if (shadowBar) {
-      shadowBar.style.left = `${newWidth}px`;
-    }
+    if (!isResizing || !shadowBar) return;
+    shadowBar.style.left = `${window.innerWidth - clampInspectorWidth(window.innerWidth - e.clientX)}px`;
   });
 
-  document.addEventListener('mouseup', (e) => {
+  document.addEventListener('mouseup', () => {
     if (!isResizing) return;
 
-    const deltaX = e.clientX - startX;
-    const newWidth = Math.max(200, startWidth + deltaX);
-
-    sidebar.style.width = `${newWidth}px`;
-
-    // Update status container max-width to match the new sidebar width
-    const status = document.getElementById("sidebarStatusContainer");
-    if (status) {
-      status.style.maxWidth = `${newWidth}px`;
+    if (shadowBar) {
+      const rect = shadowBar.getBoundingClientRect();
+      inspector.style.width = `${clampInspectorWidth(window.innerWidth - rect.left)}px`;
+      shadowBar.remove();
+      shadowBar = null;
     }
 
     isResizing = false;
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
 
-    if (shadowBar) {
-      shadowBar.remove();
-      shadowBar = null;
-    }
+    if (cache.graph) cache.graph.resize();
   });
 
   // Setup assistant sidebar resize functionality (mirrors the left sidebar but

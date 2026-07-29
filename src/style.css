@@ -473,34 +473,6 @@ body {
     display: inline;
 }
 
-#sidebar {
-    min-width: 200px;
-    width: 360px;
-    background-color: var(--surface);
-    padding-left: 10px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    position: relative;
-}
-
-.sidebar-resize-handle {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 4px;
-    background: transparent;
-    cursor: ew-resize;
-    z-index: 1000;
-}
-
-.sidebar-resize-handle:hover {
-    background: #403C53;
-}
-
 .sidebar-resize-shadow {
     position: fixed;
     top: 0;
@@ -513,50 +485,6 @@ body {
     backdrop-filter: blur(1px);
 }
 
-#rightSidebar {
-    min-width: 0;
-    width: 0;
-    background-color: var(--surface);
-    padding-right: 0;
-    overflow: hidden;
-    transition: width 0.3s ease-in-out, min-width 0.3s ease-in-out, padding-right 0.3s ease-in-out;
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    border-left: 0 solid var(--border);
-    position: relative;
-}
-
-#rightSidebar.active {
-    min-width: 420px;
-    width: 420px;
-    border-left: 1px solid var(--border);
-}
-
-#rightSidebarContentContainer {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-    padding: 0 10px;
-}
-
-#rightSidebar.active #rightSidebarContentContainer {
-    opacity: 1;
-}
-
-#closeStylingPanelBtn {
-    margin-left: auto;
-}
-
-#sidebarContentContainer {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    border-bottom: 1px solid var(--border-strong);
-}
-
 #sidebarStatusContainer {
     display: flex;
     align-items: flex-start;
@@ -567,7 +495,6 @@ body {
     transition: height 0.3s ease-in-out;
 
     width: 100%;
-    max-width: 360px;
     overflow-y: auto;
     /* overflow-x: hidden; */
     border-top: 1px solid var(--border);
@@ -681,16 +608,6 @@ body {
     color: white;
 }
 
-/* Right sidebar header visibility */
-#rightSidebar .panel-header {
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
-
-#rightSidebar.active .panel-header {
-    opacity: 1;
-}
-
 /* Bottom bar content area */
 .bottom-bar-content {
     display: flex;
@@ -797,176 +714,103 @@ body {
 }
 
 /*************************
- Selection HUD (on-graph)
+ The inspector (Concept C phase 4) — one context-driven column that replaced
+ the left filter sidebar, the right styling sidebar and the floating
+ selection HUD.
  **************************/
-#selectedElementsContainer {
-    position: absolute !important;
-    width: 256px;
+#inspector {
+    flex: none;
+    width: 356px;
+    min-width: 300px;
     box-sizing: border-box;
-    border: 1px solid var(--brand-border);
-    border-radius: 8px;
-    background-color: var(--surface-translucent);
-    backdrop-filter: blur(6px);
-    box-shadow: 0 4px 14px rgba(64, 60, 83, 0.14);
-    transition: width 0.2s ease-in-out, box-shadow 0.2s ease-in-out, opacity 0.1s ease-in-out;
-    text-align: left;
-    padding: 8px 10px;
-    font-size: 13px;
-    z-index: 1000;
-    max-width: calc(100% - 20px);
-}
-
-#selectedElementsContainer.hidden {
-    display: none;
-    pointer-events: none;
-    width: 0;
-    height: 0;
-}
-
-#selectedElementsContainer.expanded {
-    width: 360px;
-    box-shadow: 0 8px 20px rgba(64, 60, 83, 0.22);
-}
-
-/* --- Grid snapping: drag the header, release to one of the 3×3 grid slots.
-   The bottom-right corner is reserved for the minimap (200×120 @ bottom/right
-   10px), so that region offers two slots flanking it instead: "abm" above and
-   "blm" left of the minimap. Generic classes — shared by the panel, the
-   restore pill, and the drag preview. --- */
-.sel-hud-tl  { top: 10px;    left: 10px; }
-.sel-hud-tc  { top: 10px;    left: 50%;  transform: translateX(-50%); }
-.sel-hud-tr  { top: 10px;    right: 10px; }
-.sel-hud-ml  { top: 50%;     left: 10px; transform: translateY(-50%); }
-.sel-hud-mc  { top: 50%;     left: 50%;  transform: translate(-50%, -50%); }
-.sel-hud-mr  { top: 50%;     right: 10px; transform: translateY(-50%); }
-.sel-hud-bl  { bottom: 10px; left: 10px; }
-.sel-hud-bc  { bottom: 10px; left: 50%;  transform: translateX(-50%); }
-.sel-hud-abm { bottom: 140px; right: 10px; }
-.sel-hud-blm { bottom: 10px;  right: 220px; }
-
-#selectedElementsContainer.sel-hud-dragging {
-    transition: none;
-    box-shadow: 0 12px 28px rgba(64, 60, 83, 0.30);
-    opacity: 0.96;
-    user-select: none;
-}
-
-/* Dashed skeleton showing where the panel will snap on release. */
-.sel-hud-snap-preview {
-    position: absolute;
-    display: none;
-    box-sizing: border-box;
-    border: 2px dashed var(--accent-text);
-    border-radius: 8px;
-    background: rgba(64, 60, 83, 0.08);
-    pointer-events: none;
-    z-index: 999;
-}
-
-.sel-hud-snap-preview.visible {
-    display: block;
-}
-
-/* --- HUD header: title + tools toggle (doubles as the drag handle) --- */
-.sel-hud-header {
+    background-color: var(--surface);
+    border-left: 1px solid var(--border);
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    cursor: grab;
-    touch-action: none;
+    flex-direction: column;
+    position: relative;
 }
 
-.sel-hud-dragging .sel-hud-header {
-    cursor: grabbing;
-}
-
-.sel-hud-header-tools {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.sel-hud-hide-btn {
-    font: inherit;
-    font-size: 12px;
-    line-height: 1;
-    color: var(--text-faint);
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 2px 6px;
-    cursor: pointer;
-    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-
-.sel-hud-hide-btn:hover {
-    color: #fff;
-    background: var(--accent-text);
-    border-color: var(--accent-text);
-}
-
-/* --- Floating restore pill, shown only while the HUD is hidden --- */
-.sel-hud-restore {
+.inspector-resize-handle {
     position: absolute;
-    display: none;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--text-strong);
-    background: var(--surface-translucent);
-    backdrop-filter: blur(6px);
-    border: 1px solid var(--brand-border);
-    border-radius: 8px;
-    padding: 4px 10px;
-    cursor: pointer;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 4px;
+    background: transparent;
+    cursor: ew-resize;
     z-index: 1000;
-    box-shadow: 0 4px 14px rgba(64, 60, 83, 0.14);
-    transition: border-color 0.15s ease, color 0.15s ease;
 }
 
-.sel-hud-restore.visible {
-    display: inline-flex;
+.inspector-resize-handle:hover {
+    background: var(--brand-border);
 }
 
-.sel-hud-restore:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
+/* --- context pills: the only navigation the panel has --- */
+.insp-pills {
+    flex: none;
+    display: flex;
+    gap: 4px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
 }
 
-
-.sel-hud-title {
-    font-weight: 700;
-    color: var(--brand-text);
-    letter-spacing: 0.02em;
-}
-
-.sel-hud-tools-toggle {
+.insp-pill {
     font: inherit;
     font-size: 12px;
-    color: var(--text-strong);
+    font-weight: 600;
+    color: var(--text-muted);
     background: var(--surface-3);
     border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    padding: 2px 8px;
+    border-radius: 12px;
+    padding: 3px 12px;
     cursor: pointer;
-    white-space: nowrap;
     transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.sel-hud-tools-toggle:hover {
+.insp-pill:hover {
     border-color: var(--accent-text);
     color: var(--accent-text);
 }
 
-#selectedElementsContainer.expanded .sel-hud-tools-toggle {
+.insp-pill.active {
     background: var(--accent-text);
-    color: #fff;
     border-color: var(--accent-text);
+    color: #fff;
 }
 
-/* --- shared HUD buttons --- */
-.sel-hud-btn {
+#inspectorBody {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 10px;
+}
+
+.insp-panel[hidden] {
+    display: none;
+}
+
+.insp-section-title {
+    margin: 14px 0 6px 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.insp-note {
+    margin: 0 0 8px 0;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--text-faint);
+}
+
+.insp-note strong {
+    color: var(--text-strong);
+}
+
+/* --- shared inspector buttons --- */
+.insp-btn {
     font: inherit;
     font-size: 12px;
     color: var(--text-strong);
@@ -982,18 +826,36 @@ body {
     transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.sel-hud-btn:hover {
+.insp-btn:hover {
     border-color: var(--accent-text);
     color: var(--accent-text);
 }
 
-/* --- toolbar row: the Style shortcut (always visible) --- */
-.sel-hud-toolbar {
-    display: flex;
+.insp-btn.red:hover {
+    border-color: var(--danger-text);
+    color: var(--danger-text);
+}
+
+.insp-groups,
+.insp-act-row {
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-    margin-top: 8px;
+}
+
+.insp-groups {
+    display: flex;
+}
+
+.sel-group-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.sel-group-label {
+    font-size: 12px;
+    color: var(--text-muted);
 }
 
 /* Inline lasso glyph reused by the guided tour (empty span + --size/--color). */
@@ -1008,34 +870,45 @@ body {
     line-height: 1;
 }
 
-/* --- empty state (no selection) --- */
-.sel-hud-empty {
-    margin-top: 8px;
+/* --- Selection context: empty state vs live state --- */
+.insp-empty {
+    margin-top: 14px;
 }
 
-#selectedElementsContainer.has-selection .sel-hud-empty {
+#inspectorSelection.has-selection .insp-empty {
     display: none;
 }
 
-.sel-hud-empty-title {
+/* The act row is meaningless with nothing selected; everything below it
+   (arrange, appearance) stays rendered and self-disables, per invariant 4 —
+   a control that exists for this context is shown, not hidden. */
+.insp-act-row {
+    display: none;
+}
+
+#inspectorSelection.has-selection .insp-act-row {
+    display: flex;
+}
+
+.insp-empty-title {
     font-weight: 600;
     color: var(--text-muted);
     margin-bottom: 3px;
 }
 
-.sel-hud-empty-hint {
+.insp-empty-hint {
     font-size: 12px;
     line-height: 1.45;
     color: var(--text-faint);
 }
 
-.sel-hud-empty-hint strong {
+.insp-empty-hint strong {
     color: var(--text-strong);
 }
 
 /* Inline actionable words in the empty-state hint: clicking jumps straight to
-   the named tool (lasso mode / Tools drawer / query editor). */
-.sel-hud-link {
+   the named tool (lasso mode / query editor). */
+.insp-link {
     font: inherit;
     font-weight: 600;
     color: var(--accent-text);
@@ -1047,74 +920,26 @@ body {
     text-underline-offset: 2px;
 }
 
-.sel-hud-link:hover,
-.sel-hud-link:focus-visible {
+.insp-link:hover,
+.insp-link:focus-visible {
     color: var(--text-strong);
     text-decoration: none;
 }
 
-/* --- active state (has selection) --- */
-.sel-hud-active {
-    display: none;
-    margin-top: 8px;
-}
-
-#selectedElementsContainer.has-selection .sel-hud-active {
-    display: block;
-}
-
-.sel-hud-actions {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.sel-group-control {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.sel-group-label {
-    font-size: 12px;
-    color: var(--text-muted);
-}
-
-.sel-hud-groups {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 5px;
-    margin-top: 6px;
-    min-height: 0;
-}
-
-/* --- expandable tools panel (Focus / Select / Arrange cards) --- */
-.selection-editor-panel {
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    margin-top: 0;
-    transition: max-height 0.25s ease-in-out, opacity 0.2s ease-in-out, margin-top 0.25s ease-in-out;
-}
-
-#selectedElementsContainer.expanded .selection-editor-panel {
-    max-height: 420px;
-    opacity: 1;
-    margin-top: 8px;
-    overflow-y: auto;
-    border-top: 1px solid var(--border-soft);
-    padding-top: 8px;
-}
-
-#selectedElementsContainer .selection-editor-panel .card-labeled {
+#inspector .card-labeled {
     width: 100%;
     box-sizing: border-box;
 }
 
-#selectedElementsContainer .selection-editor-panel .card-row {
+#inspector .card-row {
     flex-wrap: wrap;
+}
+
+/* Presentation mode (⇧F): stage only, for screenshots and demos. */
+body.presentation #rail,
+body.presentation #inspector,
+body.presentation #bottomBar {
+    display: none;
 }
 
 /* Louvain community-detection configurator (anchored to the 🧩 button) */
@@ -1464,27 +1289,6 @@ h5 {
     justify-content: center;
     gap: 2px;
     margin-top: 4px;
-}
-
-/* Styling-panel selection status: replaces silently-greyed cards with a
-   plain-language line about what is (or isn't) being styled. */
-.styling-status {
-    font-size: 12px;
-    line-height: 1.4;
-    padding: 8px 10px;
-    /* Match the 8px card rhythm on all sides so the status sits evenly within
-       the config stack instead of hugging the top and floating far above it. */
-    margin-top: 8px;
-    margin-bottom: 8px;
-    border-radius: 6px;
-    background: var(--surface-3);
-    color: var(--text-strong);
-    border-left: 3px solid var(--accent-text);
-}
-
-.styling-status.empty {
-    color: var(--text-muted);
-    border-left-color: var(--border-soft);
 }
 
 /* Collapsible config sections (Node / Edge / Bubble) so the panel reads as
@@ -3273,12 +3077,7 @@ input:checked + .slider:before {
 }
 
 /* Red text-button variant (e.g. "Clear all"). */
-.sel-hud-btn.red {
-    color: var(--danger-text);
-}
-
-.sel-hud-btn.red:hover {
-    border-color: var(--danger-text);
+.insp-btn.red {
     color: var(--danger-text);
 }
 

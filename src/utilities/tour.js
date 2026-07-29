@@ -223,9 +223,9 @@ const TOUR_STEPS = [
            <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;vertical-align:middle;background:#E4E3EA;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
            <strong>Selection button</strong> — <strong>+</strong> add or <strong>−</strong> remove all nodes matching that filter property to/from the current selection.
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;font-size:11px;font-weight:600;color:#403C53;background:#E4E3EA;border:1px solid #dddbe2;border-radius:12px;vertical-align:middle;">⚙ Details</span> — the panel stays compact by default. Toggle it to reveal each numeric property's <strong>exact min/max input boxes</strong> (shown under the slider above) together with the per-row <strong>bubble group</strong> and <strong>selection</strong> buttons. The mock-up above is in Details mode. Your preference is remembered between sessions.`,
+           Every numeric property also carries <strong>exact min/max input boxes</strong> under its slider, so you can type a threshold instead of dragging for it. Nothing here is hidden behind a toggle; fold a whole section away with the <strong>▾</strong> chevron on its header when the list gets long.`,
     target: '#filterContainer',
-    position: 'right',
+    position: 'left',
   },
   {
     title: 'Graph Canvas',
@@ -238,66 +238,53 @@ const TOUR_STEPS = [
            <br>• <strong>Click + drag a node</strong> — moves that node
            <br>• <strong>Click + drag selected nodes</strong> — moves the entire selection
            <br><br>
-           The <strong>minimap</strong> (bottom-right corner) shows an overview of the entire graph. Click or drag inside it to quickly navigate to different parts of the network.`,
+           The <strong>minimap</strong> (bottom-right corner) shows an overview of the entire graph. Click or drag inside it to quickly navigate to different parts of the network — the rail's <strong>◐ Overlays</strong> menu hides it, along with the density heatmap, and offers <strong>presentation mode</strong> (⇧F) for a chrome-free screenshot.`,
     targets: [{ selector: '#innerGraphContainer' }, { selector: '.gll-minimap' }],
     position: 'left',
-    action: 'collapseSelectionPanel',
   },
   {
-    title: 'Selection Panel',
-    text: `Selections live in two places. The rail's <strong>selection chip</strong> (top) always shows the live
+    title: 'Making a Selection',
+    text: `The rail's <strong>selection chip</strong> always shows the live
            <strong>node</strong> and <strong>edge</strong> counts, with <strong>🔍</strong> (zoom to the selection),
            <strong class="tour-red">×</strong> (clear it) and <strong>↶</strong> / <strong>↷</strong>
-           (undo / redo selection changes, up to 25 states). The rail's <strong>➰ Lasso</strong> toggles a freeform
-           selection area; while active, <strong>Shift+click</strong> adds individual nodes/edges.
+           (undo / redo selection changes, up to 25 states). It also warns when active filters are hiding
+           part of what you have selected.
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           This floating <strong>Selection panel</strong> gathers the actions — drag its header to move it and it
-           snaps to the nearest corner:
+           Three ways to build one:
+           <br>• <strong>Click</strong> an element on the canvas, <strong>Shift+click</strong> to add more
+           <br>• <strong>➰ Lasso</strong> (L) — drag a freeform area around what you want
+           <br>• <strong>◈ Select ⌄</strong> — all/no nodes, all/no edges, or select by
+           <strong>Node/Edge IDs</strong> or <strong>Labels</strong> with an include/exclude switch
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Header</strong>
-           <br>• <strong>Tools ▾</strong> — expand the advanced selection tools (next step)
-           <br>• <strong>✕</strong> — tuck the panel away; a <strong>▸ Selection</strong> tab brings it back
+           The <strong>query editor</strong> can also turn any predicate into a selection with 🎯 Select.`,
+    targets: [{ selector: '#selectionChip' }, { selector: '#selectMenuBtn' }],
+    position: 'below',
+  },
+  {
+    title: 'Inspector — Selection',
+    text: `The <strong>inspector</strong> on the right is the app's single panel. Its
+           <strong>Workspace</strong> / <strong>Selection</strong> pills switch what it shows; selecting
+           anything brings the Selection context forward automatically.
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>🎨 Style</strong> — open the styling panel to restyle the selection
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Add to group</strong> — the quadrant button
+           <strong>Act on selection</strong>
+           <br>• <strong>Add to group</strong> — the quadrant button
            <span style="display:inline-block;width:14px;height:14px;border-radius:50%;overflow:hidden;position:relative;vertical-align:middle;background:#E4E3EA;border:1px solid black;box-sizing:border-box;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
-           assigns or removes the selected nodes to/from one of four colored <strong>bubble set</strong> groups (visual overlays on the canvas). <strong>⟳ Reset style</strong> reverts the selection's styles to defaults.
+           assigns the selected nodes to one of four colored <strong>bubble set</strong> groups
+           <br>• <strong>⟳ Reset style</strong> — revert the selection's styles to defaults
+           <br>• <strong>Expand/Reduce Edges</strong> and <strong>Expand/Reduce Neighbors</strong> — grow or shrink the selection by one hop
+           <br>• <strong>Shortest Path</strong> — with exactly two nodes selected, add the path between them
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Groups</strong> — manage every manual group at once:
-           <br>• <strong>🧩 Auto</strong> — auto-detect communities with <strong>Louvain</strong> clustering and assign the largest to groups; choose the edge weighting and resolution (higher = more, smaller clusters)
-           <br>• a size readout (e.g. <span style="color:var(--groupOne-color);font-weight:bold;">●3</span> <span style="color:var(--groupTwo-color);font-weight:bold;">●2</span>) and <strong class="tour-red">Clear all</strong> to remove them`,
-    target: '#selectedElementsContainer',
-    position: 'below',
+           <strong>Arrange Selection</strong> — <strong>Shrink/Expand</strong> pull nodes together or apart;
+           <strong>Circle/Force/Grid/Random</strong> apply a sub-layout to the selection only.`,
+    targets: [{ selector: '#inspectorSelection' }, { selector: '#inspectorPillSelection' }],
+    position: 'left',
+    action: 'openSelectionContext',
   },
   {
-    title: 'Selection Panel — Advanced Tools',
-    text: `Expand the selection panel with <strong>Tools ▾</strong> to reveal three tool sections:
-           <br><br>
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Focus Elements</strong> — search for a node or edge by ID/label and zoom to it.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Select Elements</strong> — bulk selection controls:
-           <br>• Select/deselect all nodes or edges
-           <br>• <strong>Expand/Reduce Edges</strong> — add or remove edges connected to selected nodes
-           <br>• <strong>Expand/Reduce Neighbors</strong> — grow or shrink the selection by one hop
-           <br>• Select by <strong>Node/Edge IDs</strong> or <strong>Labels</strong> with include/exclude toggle
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Arrange Selection</strong> — reposition selected nodes:
-           <br>• <strong>Shrink/Expand</strong> — pull nodes closer or push them apart
-           <br>• <strong>Circle/Force/Grid/Random</strong> — apply a sub-layout to the selection only`,
-    targets: [
-      { selector: '#selectedElementsContainer' },
-      { selector: '#selectionEditorToggleBtn' },
-    ],
-    position: 'below',
-    action: 'expandSelectionEditor',
-  },
-  {
-    title: 'Styling Panel 🎨',
-    text: `The styling panel lets you customize the visual appearance of your graph.
-           Styles are applied <strong>only to selected elements</strong> — select nodes/edges first, then adjust.
-           All styles are <strong>per-workspace</strong>.
+    title: 'Inspector — Appearance 🎨',
+    text: `Appearance lives at the bottom of the inspector's <strong>Selection</strong> context
+           (<strong>Y</strong> jumps straight to it). Styles apply <strong>only to selected elements</strong> —
+           select nodes/edges first, then adjust. All styles are <strong>per-workspace</strong>.
            <hr style="margin:6px 0;border-color:#dddbe2;">
            <strong>Node Configuration</strong>
            <br>• Shape, size, fill color, border size &amp; color
@@ -312,21 +299,20 @@ const TOUR_STEPS = [
            <br>• <strong>Halos</strong> — colored glow around edges with adjustable width
            <br>• <strong>Edge flow</strong> — animated directional motion along edges (comet or chevron), with adjustable opacity and density
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Bubble Set Configuration</strong>
-           <br>Each of the four groups has fill/stroke color &amp; opacity, plus optional labels.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Density Heatmap</strong>
-           <br>A workspace-level overlay that shades the densest regions of the graph — configure radius, intensity and color ramp.
+           <strong>Bubble Sets</strong> and the <strong>Density Heatmap</strong> are workspace-level, not
+           per-selection, so they live in the <strong>Workspace</strong> context under
+           <strong>Groups</strong> and <strong>Overlays</strong>. The heatmap's on/off switch is on the rail's
+           <strong>◐ Overlays</strong> menu, together with the minimap and presentation mode.
            <hr style="margin:6px 0;border-color:#dddbe2;">
            <strong>Scale tools</strong> — map any data property or computed network metric to a visual property:
            <br>• <span style="display:inline-block;width:20px;height:16px;border:1px solid black;border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> <strong>Numeric scale</strong> — e.g. scale node size by PageRank
            <br>• <span style="display:inline-block;width:24px;height:16px;border:1px solid black;border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> <strong>Color scale</strong> — continuous gradient or discrete colors per category
            <hr style="margin:6px 0;border-color:#dddbe2;">
            💡 Color inputs accept any hex code — type it in the text field and press <strong>Enter</strong> to apply.`,
-    targets: [{ selector: '#rightSidebar' }, { selector: '#styleToggleBtn' }],
+    targets: [{ selector: '#inspectorAppearanceMount' }],
     position: 'left',
     positionOffset: { y: 120 },
-    action: 'openStylingPanel',
+    action: 'showAppearance',
   },
   {
     title: 'Network Metrics 📊',
@@ -350,7 +336,7 @@ const TOUR_STEPS = [
            <hr style="margin:6px 0;border-color:#dddbe2;">
            Click the <strong style="color:#8CA6D9">🛈</strong> button next to the metric dropdown for a detailed explanation of the selected metric.`,
     targets: [{ selector: '#metricsContainer' }, { selector: '#metricsToggleBtn' }],
-    position: 'right',
+    position: 'left',
     action: 'openMetricsPanel',
   },
   {
@@ -467,11 +453,6 @@ class GuidedTour {
     }
 
     const step = TOUR_STEPS[this.currentStep];
-
-    // Re-expand the selection panel once we leave the step that collapsed it.
-    if (step.action !== 'collapseSelectionPanel') {
-      this.restoreSelectionPanel();
-    }
 
     // execute pre-step action
     if (step.action) {
@@ -724,13 +705,6 @@ class GuidedTour {
   async executeAction(action) {
     switch (action) {
       case 'openMetricsPanel': {
-        // Styling now precedes metrics in the tour; close its right sidebar so
-        // it doesn't linger over the panels demoed in the later steps.
-        const rightSidebar = document.getElementById('rightSidebar');
-        if (rightSidebar && rightSidebar.classList.contains('active')) {
-          this.cache.ui.toggleStylingPanel();
-          await this.sleep(350);
-        }
         const metricsPanel = document.getElementById('networkMetricsContainer');
         if (metricsPanel && !metricsPanel.classList.contains('open')) {
           this.cache.metrics.toggleUI();
@@ -800,70 +774,29 @@ class GuidedTour {
         await this.sleep(350);
         break;
       }
-      case 'expandSelectionEditor': {
-        const container = document.getElementById('selectedElementsContainer');
-        if (container && !container.classList.contains('expanded')) {
-          this.cache.ui.toggleSelectionEditor();
-        }
+      case 'openSelectionContext': {
+        this.cache.inspector?.setContext('selection');
         await this.sleep(350);
         break;
       }
-      case 'openStylingPanel': {
-        // collapse selection editor if open
-        const selContainer = document.getElementById('selectedElementsContainer');
-        if (selContainer && selContainer.classList.contains('expanded')) {
-          this.cache.ui.toggleSelectionEditor();
-          await this.sleep(350);
-        }
-        // close data editor first if open
-        const dataBtn = document.getElementById('dataToggleBtn');
-        if (dataBtn && dataBtn.classList.contains('highlight')) {
-          await this.cache.ui.toggleDataEditor();
-          await this.sleep(350);
-        }
-        // close assistant panel — both panels compete for the right sidebar
-        // real estate; only one should be visible at a time.
+      case 'showAppearance': {
+        // The assistant docks over the same edge as the inspector — close it
+        // so the appearance controls are actually on screen for this step.
         const assistantBtn = document.getElementById('assistantToggleBtn');
         if (assistantBtn && assistantBtn.classList.contains('highlight')) {
           this.cache.assistant.togglePanel({ suppressSetup: true });
           await this.sleep(350);
         }
-        const styleBtn = document.getElementById('styleToggleBtn');
-        const rightSidebar = document.getElementById('rightSidebar');
-        if (rightSidebar && !rightSidebar.classList.contains('active')) {
-          this.cache.ui.toggleStylingPanel();
+        const dataBtn = document.getElementById('dataToggleBtn');
+        if (dataBtn && dataBtn.classList.contains('highlight')) {
+          await this.cache.ui.toggleDataEditor();
+          await this.sleep(350);
         }
+        this.cache.inspector?.showAppearance();
         await this.sleep(350);
         break;
       }
-      case 'collapseSelectionPanel': {
-        // Collapse the selection HUD so the canvas step reads cleanly. Toggle
-        // the class directly (not the HUD's hide()) so we don't persist the
-        // hidden preference, and remember the pre-tour state to restore it.
-        const container = document.getElementById('selectedElementsContainer');
-        const restore = document.getElementById('selHudRestoreBtn');
-        if (container) {
-          this._selPanelWasHidden = container.classList.contains('hidden');
-          this._selPanelCollapsedByTour = true;
-          container.classList.add('hidden');
-          restore?.classList.add('visible');
-        }
-        await this.sleep(250);
-        break;
-      }
     }
-  }
-
-  // Re-expand the selection panel if the tour collapsed it, honoring whatever
-  // state the user had it in before the tour started.
-  restoreSelectionPanel() {
-    if (!this._selPanelCollapsedByTour) return;
-    this._selPanelCollapsedByTour = false;
-    if (this._selPanelWasHidden) return;
-    const container = document.getElementById('selectedElementsContainer');
-    const restore = document.getElementById('selHudRestoreBtn');
-    container?.classList.remove('hidden');
-    restore?.classList.remove('visible');
   }
 
   sleep(ms) {
@@ -896,7 +829,6 @@ class GuidedTour {
 
   finish() {
     this.cleanup();
-    this.restoreSelectionPanel();
 
     // close any open panels
     const metricsPanel = document.getElementById('networkMetricsContainer');
@@ -911,14 +843,7 @@ class GuidedTour {
     if (queryBtn && queryBtn.classList.contains('highlight')) {
       this.cache.ui.toggleQueryEditor();
     }
-    const rightSidebar = document.getElementById('rightSidebar');
-    if (rightSidebar && rightSidebar.classList.contains('active')) {
-      this.cache.ui.toggleStylingPanel();
-    }
-    const selContainer = document.getElementById('selectedElementsContainer');
-    if (selContainer && selContainer.classList.contains('expanded')) {
-      this.cache.ui.toggleSelectionEditor();
-    }
+    this.cache.inspector?.setContext('workspace');
     const assistantBtn = document.getElementById('assistantToggleBtn');
     if (assistantBtn && assistantBtn.classList.contains('highlight')) {
       this.cache.assistant.togglePanel({ suppressSetup: true });

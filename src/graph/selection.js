@@ -414,31 +414,13 @@ class GraphSelectionManager {
       hiddenWarning.textContent = hiddenSelectedCount > 0 ? `${hiddenSelectedCount} hidden` : '';
     }
 
-    // Swap the HUD between its empty state (instructions) and its active
-    // state (actions). CSS keys off the `has-selection` class.
-    document
-      .getElementById('selectedElementsContainer')
-      ?.classList.toggle('has-selection', atLeastOneNodeOrEdgeSelected);
-
-    // Tell the styling panel what it is acting on, so the node/edge cards
-    // are no longer silently greyed with no explanation.
-    const stylingStatus = document.getElementById('stylingSelectionStatus');
-    if (stylingStatus) {
-      if (atLeastOneNodeOrEdgeSelected) {
-        const parts = [];
-        if (selectedNodesCount)
-          parts.push(`${selectedNodesCount} node${selectedNodesCount === 1 ? '' : 's'}`);
-        if (selectedEdgesCount)
-          parts.push(`${selectedEdgesCount} edge${selectedEdgesCount === 1 ? '' : 's'}`);
-        stylingStatus.textContent = `Styling ${parts.join(' · ')}`;
-        stylingStatus.classList.remove('empty');
-        // Open the config card(s) matching the selection (additive).
-        this.cache.ui.syncStylingCardsToSelection(atLeastOneNodeSelected, atLeastOneEdgeSelected);
-      } else {
-        stylingStatus.textContent =
-          'Nothing selected — select nodes or edges to style them. Bubble-group styling below works without a selection.';
-        stylingStatus.classList.add('empty');
-      }
+    // Swap the inspector's Selection context between its empty state
+    // (instructions) and its active state, and pull the panel over to it on
+    // the transition into a non-empty selection.
+    this.cache.inspector?.syncToSelection(atLeastOneNodeOrEdgeSelected);
+    if (atLeastOneNodeOrEdgeSelected) {
+      // Open the appearance card(s) matching the selection (additive).
+      this.cache.ui.syncStylingCardsToSelection(atLeastOneNodeSelected, atLeastOneEdgeSelected);
     }
     const moreThanOneNodeSelected = selectedNodesCount > 1;
     const exactlyTwoNodesSelected = selectedNodesCount === 2;
