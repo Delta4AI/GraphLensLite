@@ -243,25 +243,28 @@ class NetworkMetrics {
     this.cache.toolTips.set(nodeId, tempDiv.innerHTML);
   }
 
+  /**
+   * The metrics surface. Laid out for the workbench's frame — wide and short —
+   * as two columns: the ranked node list (which wants every pixel of height it
+   * can get) beside the graph-level summary. In the old narrow sidebar these
+   * were stacked, which is why the list was capped at 120px and the summary
+   * was always below the fold.
+   */
   buildMetricUI() {
     const container = document.createElement('div');
     container.className = 'nw-root';
     container.id = 'networkMetricsContainer';
 
-    const div = document.createElement('div');
-    div.className = 'nw-div';
+    /* left column: pick a metric, read the ranking, act on it ------- */
+    const ranking = document.createElement('div');
+    ranking.className = 'nw-col nw-col-ranking';
 
-    /* header ------------------------------------------------------- */
-    const header = document.createElement('h3');
-    header.textContent = 'Network Metrics';
-    div.appendChild(header);
-
-    /* metric dropdown --------------------------------------------- */
-    const dropdownContainer = document.createElement("div");
-    dropdownContainer.className = "nw-metric-select-container";
+    const pickerRow = document.createElement('div');
+    pickerRow.className = 'nw-metric-select-container';
 
     const dropdown = document.createElement('select');
     dropdown.className = 'nw-metric-select';
+    dropdown.setAttribute('aria-label', 'Network metric to rank nodes by');
     Object.values(this.m).forEach(metric => {
       const opt = document.createElement('option');
       opt.value = metric.id;
@@ -277,48 +280,49 @@ class NetworkMetrics {
         this.cache.ui.error(`Failed to update metrics: ${err.message}`);
       }
     });
-    dropdownContainer.appendChild(dropdown);
+    pickerRow.appendChild(dropdown);
 
-    const infoBtn = document.createElement("button");
-    infoBtn.className = "info-btn";
-    infoBtn.textContent = "🛈";
-    infoBtn.id = "metricInfoBtn";
-    dropdownContainer.appendChild(infoBtn);
-    div.append(dropdownContainer);
+    const infoBtn = document.createElement('button');
+    infoBtn.className = 'info-btn';
+    infoBtn.textContent = '🛈';
+    infoBtn.id = 'metricInfoBtn';
+    infoBtn.title = 'What does this metric measure?';
+    pickerRow.appendChild(infoBtn);
 
-    /* node multiselect -------------------------------------------- */
-    this.multiselect = document.createElement('select');
-    this.multiselect.className = 'nw-node-multiselect';
-    this.multiselect.multiple = true;
-    this.multiselect.id = 'metricsMultiselect';
-    div.appendChild(this.multiselect);
-
-    /* buttons ------------------------------------------------------ */
-    const buttonRow = document.createElement('div');
+    // Selection verbs sit with the list they act on, on the same row as the
+    // picker, so the list itself gets the whole remaining height.
     Object.entries(this.selectBtns).forEach(([text, cb]) => {
       const btn = document.createElement('button');
       btn.textContent = text;
       btn.className = 'nw-button';
       btn.onclick = cb;
-      buttonRow.appendChild(btn);
+      pickerRow.appendChild(btn);
     });
-    div.appendChild(buttonRow);
+    ranking.appendChild(pickerRow);
 
-    div.appendChild(document.createElement('hr'));
+    // Native <select multiple>: ctrl/shift range selection and keyboard
+    // navigation for free. A div-based list would mean reimplementing both.
+    this.multiselect = document.createElement('select');
+    this.multiselect.className = 'nw-node-multiselect';
+    this.multiselect.multiple = true;
+    this.multiselect.id = 'metricsMultiselect';
+    this.multiselect.setAttribute('aria-label', 'Nodes ranked by the selected metric');
+    ranking.appendChild(this.multiselect);
 
-    /* graph-level metrics table ------------------------------------ */
+    /* right column: whole-graph summary ----------------------------- */
+    const summary = document.createElement('div');
+    summary.className = 'nw-col nw-col-summary';
+
     const tHeader = document.createElement('p');
     tHeader.className = 'nw-subheader';
-    tHeader.textContent = 'Graph Level Metrics';
-    div.appendChild(tHeader);
+    tHeader.textContent = 'Graph level metrics';
+    summary.appendChild(tHeader);
 
     this.table = document.createElement('table');
     this.table.className = 'nw-graph-metrics-table';
-    div.appendChild(this.table);
+    summary.appendChild(this.table);
 
-    div.appendChild(document.createElement('hr'));
-
-    container.appendChild(div);
+    container.append(ranking, summary);
     return container;
   }
 

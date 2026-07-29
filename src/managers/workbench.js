@@ -136,6 +136,7 @@ class Workbench {
     if (!this.isOpen) return;
     const closing = this.tab;
     this.el.setAttribute('hidden', '');
+    this.el.parentElement?.style.setProperty('--workbench-height', '0px');
     for (const spec of Object.values(TABS)) {
       document.getElementById(spec.btn)?.classList.remove('highlight');
     }
@@ -170,7 +171,17 @@ class Workbench {
     const height = this.expanded
       ? stage * EXPANDED_HEIGHT_FRACTION
       : (this.heights[this.tab] ?? stage * DEFAULT_HEIGHT_FRACTION);
-    this.el.style.height = `${this.#clamp(height)}px`;
+    this.#setHeight(this.#clamp(height));
+  }
+
+  /**
+   * The height is also published to the stage as --workbench-height, so
+   * bottom-anchored canvas furniture (the minimap) can lift clear of the
+   * workbench instead of being buried under it.
+   */
+  #setHeight(height) {
+    this.el.style.height = `${height}px`;
+    this.el.parentElement?.style.setProperty('--workbench-height', `${height}px`);
   }
 
   #clamp(height) {
@@ -209,7 +220,12 @@ class Workbench {
 
     const onMove = (e) => {
       if (!shadow) return;
-      shadow.style.height = `${clampFromPointer(e.clientY)}px`;
+      const height = clampFromPointer(e.clientY);
+      shadow.style.height = `${height}px`;
+      // Only the custom property, not the panel: the workbench itself stays
+      // preview-only during the drag, but the minimap tracks the pointer so
+      // you can see what you are about to cover.
+      this.el.parentElement?.style.setProperty('--workbench-height', `${height}px`);
     };
 
     const onUp = (e) => {
@@ -236,9 +252,10 @@ class Workbench {
       shadow = document.createElement('div');
       shadow.className = 'resize-shadow-bar';
       shadow.style.display = 'block';
-      shadow.style.bottom = '0px';
       shadow.style.height = `${startHeight}px`;
-      document.body.appendChild(shadow);
+      // Into the stage, not the body: the preview must span what it resizes,
+      // and the stage's bounds are exactly the workbench's.
+      this.el.parentElement.appendChild(shadow);
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
       document.body.style.userSelect = 'none';

@@ -618,12 +618,19 @@ body {
 }
 
 /* Metrics and the assistant were column-shaped panels; in the workbench they
-   own the full width, so they scroll as one block. */
+   own the full width. Metrics stays a flex container all the way down so its
+   ranked list can claim the leftover height instead of sitting in a short box
+   under an expanse of empty pane. */
 #metricsContainer.wb-pane {
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
-    padding: 0 10px;
+    min-width: 0;
+    flex-direction: column;
+    padding: 0 12px;
+}
+
+#metricsContainer.wb-pane:not([hidden]) {
+    display: flex;
 }
 
 #assistantPane {
@@ -637,14 +644,18 @@ body {
     display: flex;
 }
 
+/* Drag preview for the workbench's top edge. Absolute inside the stage (not
+   fixed to the window) so it spans exactly what it is resizing — as a fixed
+   full-width bar it painted straight across the inspector. */
 .resize-shadow-bar {
-    position: fixed;
+    position: absolute;
     left: 0;
     right: 0;
+    bottom: 0;
     background: rgba(64, 60, 83, 0.3);
     border-top: 2px solid var(--brand-border);
     pointer-events: none;
-    z-index: 9999;
+    z-index: 700;
     display: none;
     backdrop-filter: blur(1px);
 }
@@ -724,8 +735,11 @@ body {
    minimap was CSS-forced to (bottom-right, despite its "bottom-left" config) */
 #innerGraphContainer .gll-minimap {
     position: absolute;
-    bottom: 10px;
+    /* Lifts clear of the workbench, which overlays the bottom of the stage.
+       workbench.js publishes --workbench-height (0px while it is closed). */
+    bottom: calc(10px + var(--workbench-height, 0px));
     right: 10px;
+    transition: bottom 0.05s linear;
     z-index: 500;
     border: 1px solid var(--brand-border);
     border-radius: 5px;
@@ -956,6 +970,11 @@ body {
 }
 
 /* Presentation mode (⇧F): stage only, for screenshots and demos. */
+/* Presentation mode hides the workbench, so nothing is covering the minimap. */
+body.presentation #outerGraphContainer {
+    --workbench-height: 0px;
+}
+
 body.presentation #rail,
 body.presentation #inspector,
 body.presentation #workbench {
@@ -3356,81 +3375,155 @@ input:checked + .slider:before {
  network metrics
  **************************/
 .nw-root {
-    max-width: 640px;
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 16px;
+    align-items: stretch;
+    padding: 10px 0 12px;
+    box-sizing: border-box;
 }
 
-.nw-header {
-    font-size: 16px;
-    margin-top: 0.8em;
-    margin-bottom: 0.8em;
-    font-weight: bold;
+.nw-col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+}
+
+.nw-col-ranking {
+    flex: 1 1 auto;
+    gap: 8px;
+}
+
+/* The summary is a fixed-width companion: it holds ~6 short rows, so giving
+   it a share of a wide frame would just stretch whitespace. */
+.nw-col-summary {
+    flex: 0 0 clamp(220px, 28%, 340px);
+    gap: 6px;
+    overflow-y: auto;
 }
 
 .nw-subheader {
-    font-size: 14px;
-    font-weight: bold;
-    margin-top: 0.8em;
-    margin-bottom: 0.8em;
-}
-
-.nw-div {
-    margin-top: 16px;
-}
-
-.nw-button {
-    margin: 1px;
-    font-size: 12px;
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
 }
 
 .nw-metric-select-container {
     display: flex;
     align-items: center;
-    gap: 5px;
-    margin-bottom: 0.5em;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 
 .nw-metric-select {
-    width: 100%;
-    height: 18px;
+    flex: 0 1 240px;
+    height: 26px;
+    padding: 0 6px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-strong);
+    background: var(--input-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
 }
 
+.nw-button {
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-strong);
+    background: var(--input-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.nw-button:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+/* Fills whatever height the workbench has — the point of the wide frame is
+   that the ranking is finally readable without scrolling a 120px box. */
 .nw-node-multiselect {
+    flex: 1 1 auto;
+    min-height: 90px;
     width: 100%;
-    min-height: 120px;
+    box-sizing: border-box;
     overflow-y: auto;
-    margin-bottom: 0.5em;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--input-bg);
+    padding: 2px;
 }
 
 .nw-node-multiselect option {
     font-size: 12px;
-    white-space: normal;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 
 .nw-graph-metrics-table {
     border-collapse: collapse;
     width: 100%;
-    font-size: 13px;
+    font-size: 12.5px;
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    overflow: hidden;
 }
 
 .nw-graph-metrics-table tr:hover {
-    background-color: var(--surface-3);
+    background-color: var(--input-bg);
 }
 
 .nw-graph-metrics-table td {
-    border-bottom: 1px solid #E4E3EA;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-soft);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
+.nw-graph-metrics-table tr:last-child td {
+    border-bottom: none;
+}
+
 .nw-graph-metrics-table td:first-child {
-    width: 80%;
+    width: 70%;
+    color: var(--text-muted);
 }
 
 .nw-graph-metrics-table td:last-child {
-    width: 20%;
+    width: 30%;
     text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-strong);
+}
+
+/* Below ~760px the two columns no longer both fit; stack them. */
+@media (max-width: 760px) {
+    .nw-root {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .nw-col-summary {
+        flex: 0 0 auto;
+    }
+
+    .nw-node-multiselect {
+        flex: 0 0 160px;
+    }
 }
 
 /*************************
@@ -4710,17 +4803,6 @@ input:checked + .slider:before {
 
 /* ── AI Assistant (workbench tab) ─────────────────────────────── */
 
-/* Chat is a narrow-column medium even in a wide surface — centre the reading
-   column rather than letting lines run the whole workbench width. */
-#assistantMessages,
-#assistantEmptyState,
-#assistantInputRow {
-    width: min(720px, 100%);
-    margin-left: auto;
-    margin-right: auto;
-    box-sizing: border-box;
-}
-
 #assistantMessages {
     flex: 1;
     overflow-y: auto;
@@ -4738,7 +4820,9 @@ input:checked + .slider:before {
     line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-word;
-    max-width: 92%;
+    /* The pane is full-width, but a prose line is unreadable past ~90ch —
+       cap the bubble, not the pane. */
+    max-width: min(92%, 82ch);
 }
 
 .assistant-bubble-user {
