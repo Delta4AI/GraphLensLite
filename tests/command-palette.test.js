@@ -37,7 +37,10 @@ function dom() {
     <aside id="inspector">
       <section id="inspectorFilters" class="insp-panel">
         <div class="insp-empty">
-          <button class="insp-link">lasso</button>
+          <div class="insp-empty-actions">
+            <button class="insp-btn">➰ Lasso <kbd>L</kbd></button>
+            <button class="insp-btn">◈ By name or ID</button>
+          </div>
         </div>
         <div id="filterHome">
           <div id="filterContainer">
@@ -199,10 +202,13 @@ describe('the index is derived from the DOM', () => {
     expect(named(collectCommands(cache), 'AND')).toBeTruthy();
   });
 
-  it('leaves per-row filter buttons and empty-state links out of the index', () => {
+  it('leaves per-row filter buttons and empty-state actions out of the index', () => {
+    // The empty state's buttons are shortcuts to rail controls the palette
+    // already indexes at their real home — indexing both would double them.
     const cmds = collectCommands(cache);
     expect(named(cmds, 'Add to selection')).toBeUndefined();
-    expect(named(cmds, 'lasso')).toBeUndefined();
+    expect(named(cmds, '➰ Lasso L')).toBeUndefined();
+    expect(named(cmds, '◈ By name or ID')).toBeUndefined();
   });
 
   it('reaches workbench toolbar buttons even while their tab is closed', () => {

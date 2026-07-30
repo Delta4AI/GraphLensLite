@@ -1090,8 +1090,31 @@ body {
     color: var(--text-strong);
 }
 
-/* Inline actionable words in the empty-state hint: clicking jumps straight to
-   the named tool (lasso mode / query editor). */
+/* Every route out of the empty state is a button. The prose version named the
+   Select menu and then left you to find it, which is the one thing an empty
+   state must not do. "All nodes" is deliberately absent — the Select menu the
+   middle button opens already holds it. */
+.insp-empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 9px;
+}
+
+/* --text-muted, not --text-faint: this is text, so it owes 4.5:1, and #888
+   on the input background is only 3.54:1. */
+.insp-empty-actions kbd {
+    font: inherit;
+    font-size: 10px;
+    color: var(--text-muted);
+    border: 1px solid var(--border-soft);
+    border-radius: 3px;
+    padding: 0 3px;
+    margin-left: 1px;
+}
+
+/* Inline actionable words in prose hints: clicking jumps straight to the
+   named tool. */
 .insp-link {
     font: inherit;
     font-weight: 600;

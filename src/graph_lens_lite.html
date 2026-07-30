@@ -336,11 +336,18 @@
                aria-labelledby="inspectorPillSelection" hidden>
         <div class="insp-empty">
           <div class="insp-empty-title">Nothing selected</div>
-          <div class="insp-empty-hint">Click an element, drag a
-            <button type="button" class="insp-link" onclick="cache.ui.toggleLassoSelection()">lasso</button> (L),
-            or use the rail's <strong>◈ Select</strong> menu to select by name or ID. The
-            <button type="button" class="insp-link" onclick="cache.ui.toggleQueryEditor()">query editor</button>
-            allows selection by properties.</div>
+          <div class="insp-empty-hint">Click an element on the canvas, or:</div>
+          <div class="insp-empty-actions">
+            <button type="button" class="insp-btn"
+                    title="Drag a freeform area around the elements you want (L)"
+                    onclick="cache.ui.toggleLassoSelection()">➰ Lasso <kbd>L</kbd></button>
+            <button type="button" class="insp-btn"
+                    title="Open the rail's Select menu: all/no nodes, all/no edges, or by ID or label"
+                    onclick="document.getElementById('selectMenuBtn').click()">◈ By name or ID</button>
+            <button type="button" class="insp-btn"
+                    title="Write a predicate over any property and turn it into a selection"
+                    onclick="cache.ui.toggleQueryEditor()">📝 Query editor</button>
+          </div>
         </div>
 
         <div class="insp-act-row">
