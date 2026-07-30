@@ -83,6 +83,11 @@ class Workbench {
     return !!this.el && !this.el.hasAttribute('hidden');
   }
 
+  /** The tab wiring, for the command palette's index of toolbar controls. */
+  get tabs() {
+    return TABS;
+  }
+
   isTabOpen(name) {
     return this.isOpen && this.tab === name;
   }

@@ -5,6 +5,7 @@ import { Popup } from '../utilities/popup.js';
 import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
 import { refreshNeo4jSessionUI } from '../utilities/neo4j_loader.js';
 import { isFilterNarrowed } from './query.js';
+import { paletteAccelerator } from './command_palette.js';
 
 // Persisted preference: how multiple active filters combine — "OR" (match any)
 // or "AND" (match every, non-strict: a property an element lacks does not
@@ -20,6 +21,7 @@ const FILTER_STRICT_KEY = 'gll.filterStrict';
 // The keyboard cheat sheet (opened with "?"). Must mirror the hotkey switch
 // in graph/core.js registerHotkeyEvents — update both when a key changes.
 const KEYBOARD_SHORTCUTS = [
+  [paletteAccelerator(), 'Find any control, node or property by name'],
   ['P', 'Export PNG image (at the remembered resolution)'],
   ['S', 'Save graph as JSON'],
   ['F', 'Fit view to visible elements'],
@@ -972,7 +974,6 @@ class UIManager {
   // card; the mount ids below are the whole of the "which panel owns what"
   // mapping (Concept C §4).
   static CARD_MOUNTS = {
-    'Focus Elements': 'inspectorFocusMount',
     'Select Elements': 'selectMenuMount',
     'Act on Selection': 'inspectorActMount',
     'Arrange Selection': 'inspectorArrangeMount',

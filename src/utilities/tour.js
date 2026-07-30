@@ -141,6 +141,9 @@ const TOUR_STEPS = [
            <br><strong>Workspace chip</strong> — which workspace you're in, plus live shown/total counts
            <br><strong>⛶ Fit · ↻ Layout · ➰ Lasso · ✨ Hover</strong> — the everyday canvas verbs
            <br><strong>Selection chip</strong> — what's selected, with focus, clear and undo/redo
+           <br><strong>⌕ Search</strong> — press <strong>Ctrl+K</strong> (⌘K on a Mac) to find any
+           control, node or property by name. Each result tells you where it lives, so you only
+           have to look it up once.
            <br><br>
            The <strong>tab strip</strong> opens the main panels:
            <br><br>

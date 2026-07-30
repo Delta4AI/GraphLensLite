@@ -31,6 +31,7 @@ import {initTheme} from "./utilities/theme.js";
 import {initInspector} from "./managers/inspector.js";
 import {initWorkbench} from "./managers/workbench.js";
 import {initFilterSurface} from "./managers/filter_surface.js";
+import {initCommandPalette} from "./managers/command_palette.js";
 
 
 // Stores all reference objects
@@ -473,6 +474,7 @@ window.addEventListener("DOMContentLoaded", () => {
   cache.inspector = initInspector();
   cache.workbench = initWorkbench(cache);
   cache.filterSurface = initFilterSurface(cache);
+  cache.palette = initCommandPalette(cache);
   cache.ui.updateDarkModeButton();
   // cache.initialize();
 

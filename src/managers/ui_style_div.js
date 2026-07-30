@@ -579,87 +579,6 @@ function createStyleDiv(cache) {
     });
   }
 
-  function createFocusCard() {
-    const focDiv = createCard("Focus Elements");
-
-    const row1 = createNewRow(focDiv);
-    appendLabel(row1, "Node", "Select the Node ID or Label to focus.", "nodeFocusLabel");
-    appendEditableDropdown(row1, true);
-
-    const row2 = createNewRow(focDiv);
-    appendLabel(row2, "Edge", "Select the Edge ID or Label to focus.", "edgeFocusLabel");
-    appendEditableDropdown(row2, false);
-  }
-
-  function appendEditableDropdown(parent, isNode, widthInPx = 220) {
-    const input = document.createElement('input');
-    const dataListID = `focusOptions${isNode ? 'Node' : 'Edge'}`;
-    input.setAttribute('list', dataListID);
-    input.placeholder = `Search ${isNode ? 'node' : 'edge'} ID or label...`;
-    input.classList.add('style-input');
-    input.style.width = `${widthInPx}px`;
-
-    const datalist = document.createElement('datalist');
-    datalist.id = dataListID;
-
-    const sourceMap = isNode
-      ? cache.nodeIDOrLabelToNodeIDs
-      : cache.edgeIDOrLabelToEdgeIDs;
-
-    const getVisibleIDs = () => {
-      const visibleIDs = isNode ? cache.nodeIDsToBeShown : cache.edgeIDsToBeShown;
-      return visibleIDs && visibleIDs.size ? visibleIDs : null;
-    };
-
-    const populateFocusOptions = () => {
-      const visibleIDs = getVisibleIDs();
-      const fragment = document.createDocumentFragment();
-      datalist.textContent = '';
-      for (const [key, ids] of sourceMap.entries()) {
-        let include = !visibleIDs;
-        if (visibleIDs) {
-          for (const id of ids) {
-            if (visibleIDs.has(id)) {
-              include = true;
-              break;
-            }
-          }
-        }
-        if (include) {
-          const option = document.createElement('option');
-          option.value = key;
-          fragment.appendChild(option);
-        }
-      }
-      datalist.appendChild(fragment);
-    };
-
-    populateFocusOptions();
-    input.addEventListener('focus', populateFocusOptions);
-
-    const focusButton = document.createElement('button');
-    focusButton.textContent = 'Focus';
-    focusButton.classList.add('style-inner-button');
-    focusButton.onclick = async () => {
-      const selectedValue = input.value;
-      if (selectedValue) {
-        const ids = sourceMap.get(selectedValue);
-        if (ids) {
-          if (ids.size !== 1) {
-            cache.ui.warning(`Ambiguous selection: ${selectedValue} matches ${ids.size} ${isNode ? 'nodes' : 'edges'} (${Array.from(ids).join(',')}).`);
-          }
-          await cache.gcm.focusElements(ids, isNode);
-        } else {
-          cache.ui.warning(`No ${isNode ? 'node' : 'edge'} found for: ${selectedValue}`);
-        }
-      }
-    };
-
-    parent.appendChild(input);
-    parent.appendChild(datalist);
-    parent.appendChild(focusButton);
-  }
-
   // Two cards, split by what they need to already have: "Select Elements"
   // *creates* a selection out of the visible graph (rail ◈ menu), while
   // "Act on Selection" *grows or walks* one you already have, so it lives in
@@ -1496,7 +1415,6 @@ function createStyleDiv(cache) {
     });
   }
 
-  createFocusCard();
   createSelectCard();
   createActOnSelectionCard();
   createArrangeNodesCard();

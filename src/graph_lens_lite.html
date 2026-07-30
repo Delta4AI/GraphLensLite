@@ -130,6 +130,10 @@
     <button id="redoSelectionBtn" class="rail-chip-btn disabled" title="Redo selection"
             aria-label="Redo selection" onclick="cache.sm.redoSelection()">↷</button>
   </div>
+  <button id="cmdkBtn" class="rail-vb rail-vb-wide" title="Search every control, node and property by name (Ctrl+K)"
+          aria-label="Search commands, nodes and properties" onclick="cache.palette.open()">
+    <span class="rail-vb-g">⌕</span><span class="rail-vb-t">Search <kbd>⌘K</kbd></span>
+  </button>
   <span class="rail-spacer"></span>
   <div class="rail-tabs">
     <button id="dataToggleBtn" class="rail-tab" title="Toggle data editor (D)" onclick="cache.ui.toggleDataEditor()">
@@ -312,9 +316,6 @@
 
         <h4 class="insp-section-title">Overlays</h4>
         <div id="inspectorOverlaysMount"></div>
-
-        <h4 class="insp-section-title">Find</h4>
-        <div id="inspectorFocusMount"></div>
       </section>
 
       <section id="inspectorSelection" class="insp-panel" role="tabpanel" tabindex="0"
@@ -349,5 +350,23 @@
     <div id="sidebarStatusContainer"></div>
   </aside>
 </div>
+<dialog id="cmdk" aria-label="Command palette">
+  <div class="cmdk-input-row">
+    <span class="cmdk-input-glyph" aria-hidden="true">⌕</span>
+    <input id="cmdkInput" type="text" autocomplete="off" spellcheck="false"
+           placeholder="Find a control, a node or a property…"
+           aria-label="Find a control, a node or a property"
+           role="combobox" aria-expanded="true" aria-controls="cmdkResults" aria-autocomplete="list">
+    <span id="cmdkCount" class="cmdk-count"></span>
+  </div>
+  <ul id="cmdkResults" class="cmdk-results" role="listbox" aria-label="Results"></ul>
+  <div class="cmdk-foot">
+    <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
+    <span><kbd>↵</kbd> run</span>
+    <span><kbd>⇥</kbd> show me where</span>
+    <span><kbd>esc</kbd> close</span>
+    <span class="cmdk-foot-note">controls, nodes, edges and properties in one list</span>
+  </div>
+</dialog>
 </body>
 </html>

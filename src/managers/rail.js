@@ -40,6 +40,17 @@ class RailMenu {
     return this.el.classList.contains('open');
   }
 
+  /**
+   * Fill the menu without showing it. The command palette indexes menu rows,
+   * and a menu that only exists while it is on screen would be a hole in that
+   * index. Cheap: the same build the next open() would run anyway.
+   */
+  ensureBuilt() {
+    if (!this.build || this.isOpen) return;
+    this.el.innerHTML = '';
+    this.build(this.el);
+  }
+
   toggle() {
     this.isOpen ? this.close() : this.open();
   }

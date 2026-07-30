@@ -790,6 +790,13 @@ class UIComponentManager {
         ? 'group: ' + '\n └─ ' + section + '\n        └─ ' + subSection
         : 'section: ' + '\n └─ ' + section
     }`;
+    // The rendered text is a bare ✔/✗ glyph, so the group has to be spelled out
+    // for screen readers — and for the command palette, which indexes controls
+    // by their accessible name.
+    btn.setAttribute(
+      'aria-label',
+      `${enable ? 'Enable' : 'Disable'} all filters: ${subSection ? `${section} › ${subSection}` : section}`
+    );
     btn.onclick = async () => {
       subSection
         ? await this.cache.ui.toggleSubSection(enable, section, subSection)
@@ -808,6 +815,10 @@ class UIComponentManager {
         ? 'group to their default values: ' + '\n └─ ' + section + '\n        └─ ' + subSection
         : 'section to their default values: ' + '\n └─ ' + section
     }`;
+    btn.setAttribute(
+      'aria-label',
+      `Reset all filters: ${subSection ? `${section} › ${subSection}` : section}`
+    );
     btn.onclick = async () => {
       await this.cache.fm.resetFilters(section, subSection);
     };

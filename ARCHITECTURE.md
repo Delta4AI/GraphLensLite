@@ -49,7 +49,7 @@ The rendering and graph-operation core. Key modules:
   `visible_graph.js`, `lasso_geometry.js`, `communities.js`, `export_svg.js`,
   `webgl_support.js`
 
-### Functional managers (`src/managers/`, 10 files + `assistant/`)
+### Functional managers (`src/managers/`, 12 files + `assistant/`)
 
 Business logic and UI:
 
@@ -61,6 +61,11 @@ Business logic and UI:
 - `inspector.js` — the single right-hand panel's context router (Workspace ↔ Selection)
 - `workbench.js` — the bottom surface over the stage; four non-destructive tabs
   (Data, Query, Metrics, Assistant) with a remembered height each
+- `filter_surface.js` — `⤢` lifts the inspector's filter list onto a multi-column
+  surface over the stage (search, active-first); re-parents the one filter DOM
+- `command_palette.js` — `⌘K` / `Ctrl+K`: one search over every control, node and
+  edge. The index is scraped from the live DOM on each open, so it cannot drift
+  from the UI; rows print the control's breadcrumb and accelerator
 - `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, IS FOREIGN,
   comparisons)
 - `ui_components.js` — filter UI (dropdown checklists, invertible range sliders), tooltips

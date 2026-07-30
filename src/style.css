@@ -6360,3 +6360,163 @@ input:checked + .slider:before {
 .merge-join-mode-text strong {
     color: var(--text);
 }
+
+/* Command palette (⌘K). A native <dialog>: Escape, the focus trap and the
+   backdrop come from the platform, so this is styling only. */
+#cmdk {
+    width: min(680px, calc(100vw - 40px));
+    max-height: min(520px, calc(100vh - 120px));
+    margin: 12vh auto auto;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+    overflow: hidden;
+}
+
+#cmdk::backdrop {
+    background: rgba(0, 0, 0, 0.32);
+}
+
+.cmdk-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.cmdk-input-glyph {
+    color: var(--text-faint);
+    font-size: 15px;
+}
+
+#cmdkInput {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: none;
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 15px;
+}
+
+.cmdk-count {
+    flex: none;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.cmdk-results {
+    max-height: 360px;
+    margin: 0;
+    padding: 6px;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.cmdk-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.cmdk-row.active,
+.cmdk-row:hover {
+    background: var(--surface-3);
+}
+
+.cmdk-row.active {
+    box-shadow: inset 0 0 0 1px var(--accent-text);
+}
+
+.cmdk-row.disabled .cmdk-name {
+    color: var(--text-muted);
+}
+
+.cmdk-glyph {
+    width: 18px;
+    flex: none;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.cmdk-name {
+    color: var(--text-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The breadcrumb is the point of the palette: it teaches where a control
+   lives instead of only firing it. */
+.cmdk-trail {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: right;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cmdk-row kbd,
+.cmdk-foot kbd,
+.rail-vb-t kbd {
+    flex: none;
+    padding: 1px 5px;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-strong);
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+}
+
+.cmdk-foot {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.cmdk-foot kbd {
+    margin-right: 3px;
+}
+
+.cmdk-foot-note {
+    margin-left: auto;
+}
+
+/* Where did it go? — a brief ring on whatever the palette just revealed. A
+   filter row is display:contents, so the ring lands on its cells instead. */
+.cmdk-flash,
+.filter-row.cmdk-flash > * {
+    animation: cmdk-flash 1.2s ease-out;
+    border-radius: 6px;
+}
+
+@keyframes cmdk-flash {
+    0%, 55% { box-shadow: 0 0 0 2px var(--accent-text); }
+    100% { box-shadow: 0 0 0 2px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cmdk-flash {
+        animation-duration: 0.01ms;
+    }
+}
