@@ -33,7 +33,6 @@ function surfaceDom() {
       <section id="filterSurface" hidden>
         <div class="fsurf-head">
           <span id="filterSurfaceCount"></span>
-          <input id="filterSurfaceSearch" type="search">
           <button id="filterSurfaceCollapseBtn"></button>
         </div>
         <div id="filterSurfaceMount" class="fsurf-body"></div>
@@ -45,7 +44,9 @@ function surfaceDom() {
       <p id="filterExpandedNote" hidden></p>
       <div id="filterHome">
         <div id="filterContainer">
-          <div class="filter-toolbar"></div>
+          <div class="filter-toolbar">
+            <label class="filter-search"><input id="filterSearch" type="search"></label>
+          </div>
           <div class="filter-section collapsed">
             <div class="header-card"><h4>Nodes</h4></div>
             <div class="filter-section-body">
@@ -81,9 +82,11 @@ const rowIds = (selector = '.filter-row') =>
   [...document.querySelectorAll(selector)].map((r) => r.dataset.propId);
 const visibleIds = () => rowIds('.filter-row:not([hidden])');
 const search = (text) => {
-  const input = document.getElementById('filterSurfaceSearch');
+  const input = document.getElementById('filterSearch');
   input.value = text;
-  input.dispatchEvent(new Event('input'));
+  // Bubbling, like a real input event: the surface listens on #filterContainer
+  // because buildFilterUI replaces the box itself on every rebuild.
+  input.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
 describe('filter surface', () => {
@@ -155,7 +158,7 @@ describe('filter surface', () => {
   it('returns focus to the toggle when closing from inside the surface', () => {
     const btn = document.getElementById('inspectorExpandBtn');
     fs.open();
-    document.getElementById('filterSurfaceSearch').focus();
+    document.getElementById('filterSearch').focus();
     fs.close();
     expect(document.activeElement).toBe(btn);
   });
@@ -289,7 +292,7 @@ describe('filter surface', () => {
     fs.open();
     search('degree');
     fs.close();
-    expect(document.getElementById('filterSurfaceSearch').value).toBe('');
+    expect(document.getElementById('filterSearch').value).toBe('');
     expect(visibleIds().length).toBe(4);
   });
 

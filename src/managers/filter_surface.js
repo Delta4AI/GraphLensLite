@@ -24,11 +24,25 @@ class FilterSurface {
     this.mount = document.getElementById('filterSurfaceMount');
     this.home = document.getElementById('filterHome');
     this.container = document.getElementById('filterContainer');
-    this.searchInput = document.getElementById('filterSurfaceSearch');
     this.countEl = document.getElementById('filterSurfaceCount');
     this.toggleBtn = document.getElementById('inspectorExpandBtn');
     this.homeNote = document.getElementById('filterExpandedNote');
-    this.searchInput?.addEventListener('input', () => this.applySearch());
+    // Delegated, because buildFilterUI empties #filterContainer on every
+    // rebuild and takes the search box with it. The container element itself
+    // survives, so one listener here outlives every rebuild — binding to the
+    // input would mean re-binding from the builder on the surface's behalf.
+    this.container?.addEventListener('input', (event) => {
+      if (event.target.id === 'filterSearch') this.applySearch();
+    });
+  }
+
+  /**
+   * Looked up per call, not cached: the search box lives inside
+   * #filterContainer (so it travels with the rows and works in the narrow
+   * panel too), and buildFilterUI replaces that subtree on every rebuild.
+   */
+  get searchInput() {
+    return document.getElementById('filterSearch');
   }
 
   get isOpen() {
@@ -46,6 +60,10 @@ class FilterSurface {
     // showing a panel nobody asked about once the surface collapses again.
     this.cache.inspector?.setContext('filters');
     this.mount.appendChild(this.container);
+    // Breadth is the point here: every section at once, so the narrow panel's
+    // node/edge scope segment steps aside. CSS reads the class; there is still
+    // exactly one filter DOM.
+    this.container.classList.add('filters-expanded');
     this.el.removeAttribute('hidden');
     if (this.homeNote) this.homeNote.hidden = false;
     this.#setToggle(true, '⤡', 'Collapse the filter properties back into the inspector');
@@ -70,6 +88,7 @@ class FilterSurface {
     // Whatever had focus is about to be hidden; hand it to the control that
     // brings the surface back rather than dropping it on <body>.
     const returnFocus = this.el.contains(document.activeElement);
+    this.container.classList.remove('filters-expanded');
     this.home.appendChild(this.container);
     this.el.setAttribute('hidden', '');
     if (this.homeNote) this.homeNote.hidden = true;
@@ -140,6 +159,10 @@ class FilterSurface {
   applySearch() {
     if (!this.container) return;
     const query = (this.searchInput?.value ?? '').trim().toLowerCase();
+    // A search spans both sections, so the narrow panel's node/edge segment
+    // steps aside while one is running — otherwise a hit in the section you are
+    // not looking at is a hit you cannot see.
+    this.container.classList.toggle('filters-searching', !!query);
     const rows = this.#rows();
     let shown = 0;
     for (const row of rows) {

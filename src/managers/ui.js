@@ -586,7 +586,7 @@ class UIManager {
     const joinCluster = document.createElement('div');
     joinCluster.className = 'filter-toolbar-join';
     joinCluster.append(joinToggle, strictCheckbox);
-    toolbar.append(joinCluster, this.createFilterConstraintCount());
+    toolbar.append(joinCluster, this.createFilterSearch(), this.createFilterConstraintCount());
     div.appendChild(toolbar);
 
     // Each section (and sub-group) is a collapsible accordion so large
@@ -602,6 +602,7 @@ class UIManager {
       if (!sectionBodies.has(section)) {
         const sectionWrap = document.createElement('div');
         sectionWrap.className = 'filter-section';
+        sectionWrap.dataset.section = section;
         const headerDiv = document.createElement('div');
         headerDiv.className = 'header-card';
         const header = document.createElement('h4');
@@ -707,10 +708,94 @@ class UIManager {
       widget.appendListeners();
     }
 
+    this.buildFilterScopeToggle(div);
+
     this.cache.qm.updateQueryTextArea();
     // The rows above are brand new; if the expanded surface is up it is now
     // showing an unsorted, unsearched list behind a populated search box.
     this.cache.filterSurface?.refresh();
+  }
+
+  /**
+   * Property search, built INTO #filterContainer rather than into the expanded
+   * surface's header. The container is re-parented between the inspector and
+   * the surface, so building it here means one search box that travels with the
+   * rows — and, more to the point, means the narrow panel gets a search at all.
+   * Rendering a second copy in the inspector would be two DOMs for one control.
+   */
+  createFilterSearch() {
+    const label = document.createElement('label');
+    label.className = 'filter-search';
+    const glyph = document.createElement('span');
+    glyph.setAttribute('aria-hidden', 'true');
+    glyph.textContent = '⌕';
+    const input = document.createElement('input');
+    input.id = 'filterSearch';
+    input.type = 'search';
+    input.placeholder = 'Search properties…';
+    input.setAttribute('aria-label', 'Search filter properties');
+    label.append(glyph, input);
+    return label;
+  }
+
+  /**
+   * Node/edge scope segment, shown above the sections in the narrow panel.
+   *
+   * The top level of the filter tree is always exactly two sections in a fixed
+   * order — `EXCEL_NODE_HEADER` and `EXCEL_EDGE_HEADER` are app constants, not
+   * data — so drawing it as two full-width accordions spent the panel's loudest
+   * token on a binary. One segment, one section body at a time, roughly half
+   * the rows on screen at once. (It is built from whatever sections exist, so a
+   * file with different top-level headers still works.)
+   *
+   * The expanded surface hides it and shows every section: breadth is the whole
+   * point of that surface, and the same #filterContainer is re-parented into it.
+   */
+  buildFilterScopeToggle(container) {
+    // Walked as elements rather than looked up by selector: section names are
+    // spreadsheet column headers, so they are user data and have no business
+    // being interpolated into a selector.
+    const wraps = [...container.querySelectorAll('.filter-section')];
+    const names = wraps.map((wrap) => wrap.dataset.section);
+    const bar = document.createElement('div');
+    bar.className = 'filter-scope';
+    bar.setAttribute('role', 'group');
+    bar.setAttribute('aria-label', 'Show filters for');
+
+    const show = (name) => {
+      for (const wrap of wraps) {
+        wrap.classList.toggle('filter-section-active', wrap.dataset.section === name);
+      }
+      for (const btn of bar.children) {
+        const active = btn.dataset.section === name;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', String(active));
+      }
+      this.filterScope = name;
+    };
+
+    for (const wrap of wraps) {
+      const name = wrap.dataset.section;
+      const count = wrap.querySelectorAll('.filter-row').length;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'filter-scope-segment';
+      btn.dataset.section = name;
+      // "Node filters" is the column header; as a segment label the noun alone
+      // reads better next to its sibling.
+      btn.append(name.replace(/\s*filters$/i, ''), Object.assign(document.createElement('span'), {
+        className: 'filter-scope-count',
+        textContent: String(count),
+      }));
+      btn.title = `Show the ${count} ${name.toLowerCase()}`;
+      btn.addEventListener('click', () => show(name));
+      bar.appendChild(btn);
+    }
+
+    if (wraps.length > 1) container.insertBefore(bar, wraps[0]);
+    // A rebuild (data reload, workspace switch) keeps whichever scope was up,
+    // as long as that section still exists.
+    show(names.includes(this.filterScope) ? this.filterScope : names[0]);
   }
 
   // Explanation of the AND join's least obvious rule, in the panel rather than

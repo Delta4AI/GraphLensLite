@@ -909,12 +909,24 @@ body {
 }
 
 /* --- context pills: the only navigation the panel has --- */
-.insp-pills {
+
+/* The row carries the chrome; the tablist inside it holds ONLY tabs. A
+   role="tablist" with a spacer and the ⤢ button among its children fails
+   aria-required-children outright (critical), which is what it did while the
+   two were siblings of the pills. */
+.insp-pills-row {
     flex: none;
     display: flex;
+    align-items: center;
     gap: 4px;
     padding: 8px 10px;
     border-bottom: 1px solid var(--border);
+}
+
+.insp-pills {
+    display: flex;
+    gap: 4px;
+    min-width: 0;
 }
 
 .insp-pill {
@@ -982,11 +994,13 @@ body {
     color: var(--text-muted);
 }
 
+/* --text-muted, not --text-faint. These are prose, so they owe 4.5:1, and #888
+   on the panel background is 3.54:1 — fine for an icon, a fail for a sentence. */
 .insp-note {
     margin: 0 0 8px 0;
     font-size: 11.5px;
     line-height: 1.45;
-    color: var(--text-faint);
+    color: var(--text-muted);
 }
 
 .insp-note strong {
@@ -1083,7 +1097,7 @@ body {
 .insp-empty-hint {
     font-size: 12px;
     line-height: 1.45;
-    color: var(--text-faint);
+    color: var(--text-muted);
 }
 
 .insp-empty-hint strong {
@@ -1574,15 +1588,187 @@ h5 {
     align-items: center;
 }
 
-.sub-header-card {
-    background-color: #403C53;
-    border: 1px solid var(--border-strong);
-    border-radius: 5px;
-    color: white;
-    padding-right: 4px;
-    margin-bottom: 2px;
+/* ---------- filter scope: node/edge segment (narrow panel only) ---------- */
+
+/* The top of the filter tree is always exactly two sections in a fixed order
+   ("Node filters" / "Edge filters" are app constants, not data), so it is a
+   binary — and drawing a binary as two full-width red accordions spent the
+   panel's loudest token on it. */
+.filter-scope {
+    display: inline-flex;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.filter-scope-segment {
     display: inline-flex;
     align-items: center;
+    gap: 5px;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 11px;
+    border: none;
+    background: var(--surface-3);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.filter-scope-segment:hover {
+    color: var(--text-strong);
+}
+
+.filter-scope-segment.active {
+    background: var(--accent-text);
+    color: #fff;
+    cursor: default;
+}
+
+/* White on the dark theme's lighter accent is 3.43:1 — same fix the inspector
+   pills and the OR/AND segments already carry. */
+[data-theme="dark"] .filter-scope-segment.active {
+    color: #15131c;
+}
+
+.filter-scope-count {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.75;
+}
+
+/* Narrow panel: one section at a time, chosen by the segment above. */
+#filterContainer:not(.filters-expanded) .filter-section:not(.filter-section-active) {
+    display: none;
+}
+
+/* ...and the section's own header loses its fill and its name, because the
+   segment now says which section this is. What stays is the triad, which has
+   no other home. Folding is disabled rather than hidden: the segment already
+   decides what is on screen, so a second mechanism for the same thing is just
+   a way to make a section vanish with no visible cause. */
+#filterContainer:not(.filters-expanded) .filter-section > .header-card {
+    background: none;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    margin: 0 0 2px;
+    display: flex;
+    justify-content: flex-end;
+    pointer-events: none;
+}
+
+#filterContainer:not(.filters-expanded) .filter-section > .header-card h4,
+#filterContainer:not(.filters-expanded) .filter-section > .header-card .filter-group-chevron {
+    display: none;
+}
+
+#filterContainer:not(.filters-expanded) .filter-section > .header-card .small-btn {
+    pointer-events: auto;
+}
+
+/* The surface shows every section, so the segment would be a lie there. */
+#filterContainer.filters-expanded .filter-scope {
+    display: none;
+}
+
+/* A running search spans both sections, so the segment steps aside and every
+   section with a match comes back. */
+#filterContainer.filters-searching:not(.filters-expanded) .filter-scope {
+    display: none;
+}
+
+#filterContainer.filters-searching:not(.filters-expanded) .filter-section:not(.filter-section-active) {
+    display: block;
+}
+
+/* ...but a section applySearch emptied must STAY hidden. The rule above is an
+   author `display`, which beats the UA sheet's [hidden] on specificity — the
+   same trap as .filter-row[hidden] and #sidebarStatusContainer[hidden]. */
+#filterContainer.filters-searching:not(.filters-expanded) .filter-section[hidden] {
+    display: none;
+}
+
+/* Property search. Lives in the toolbar inside #filterContainer, so it travels
+   with the rows between the inspector and the expanded surface. */
+.filter-search {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 1 1 120px;
+    min-width: 0;
+    padding: 2px 8px;
+    font-size: 12px;
+    color: var(--text-faint);
+    background: var(--input-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+}
+
+.filter-search:focus-within {
+    border-color: var(--accent-text);
+}
+
+.filter-search input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    color: var(--text);
+    background: none;
+    border: none;
+    outline: none;
+    padding: 2px 0;
+}
+
+/* Sub-groups used to be a second solid pill under the section's solid pill, so
+   the two levels read as two KINDS of thing rather than level 1 and level 2 —
+   and the container ended up louder than the properties it holds. A small-caps
+   label and a hairline carry the same grouping for none of the weight. */
+.sub-header-card {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 10px 0 4px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.sub-header-card::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-soft);
+}
+
+.sub-header-card h5 {
+    font: inherit;
+    letter-spacing: inherit;
+    margin: 0;
+    white-space: nowrap;
+}
+
+/* The group triads stay in the DOM and stay tabbable — they carry the
+   "Enable all filters: Nodes > Topology" accessible names. Quieting them is a
+   COLOR change, never opacity: these are non-text controls owing 3:1, and
+   --text-faint at full strength is 3.54:1 while the same token at 30% is
+   ~1.3:1 and fails outright. */
+.sub-header-card .small-btn,
+.filter-section > .header-card .small-btn {
+    border-color: var(--border-soft);
+    color: var(--text-faint);
+    background: transparent;
+}
+
+.sub-header-card .small-btn:hover,
+.sub-header-card .small-btn:focus-visible,
+.filter-section > .header-card .small-btn:hover,
+.filter-section > .header-card .small-btn:focus-visible {
+    border-color: var(--accent-text);
+    color: var(--text-strong);
 }
 
 /*#selectedNodes, #selectedEdges {*/
@@ -1876,54 +2062,81 @@ h5 {
     gap: 3px;
 }
 
-/* Always-visible min/max threshold inputs under the range slider, styled as a
-   single paired control (lower – upper) instead of two bare full-width boxes. */
-.filter-input-row {
+/* The exact-value boxes sit at the two ends of the track, on the slider's own
+   line — one row instead of slider-over-boxes, and no second copy of the same
+   two numbers in position:fixed bubbles. They are sized to the value, so the
+   track keeps most of the width. */
+.filter-range-row {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-top: 2px;
-}
-
-/* An in-flow flex item ordered between the two boxes, NOT an absolutely
-   positioned pseudo: inside the expanded surface's multi-column layout an
-   abspos pseudo paints a stray glyph adrift from its row. */
-.filter-input-row::before {
-    content: "–";
-    order: 0;
-    flex: none;
-    color: var(--text-muted);
-    font-size: 11px;
-    pointer-events: none;
-}
-
-.filter-input-row input {
-    flex: 1 1 0;
     min-width: 0;
-    height: 20px;
-    padding: 0 6px;
-    font-size: 11px;
-    border: 1px solid var(--border-soft);
-    border-radius: 4px;
-    background: var(--surface-3);
-    color: var(--text-strong);
+}
+
+/* [slider] claims only 8px for a track whose thumbs and inner div actually
+   paint ~18px, and the base rule reserves the rest as margin-bottom. On one
+   line that margin would push the row apart, so the box claims the height
+   directly instead — drop it and the thumbs overlap the row below. */
+.filter-range-row > div[slider] {
+    flex: 1 1 auto;
+    min-width: 40px;
+    height: 18px;
+    margin: 0;
+}
+
+/* Width comes from the `size` attribute writeBox() keeps in step with the
+   value, so "7630" is not clipped to "763" and a short value does not steal
+   track from the slider. The cap keeps a pathological number from eating the
+   row; the exact value is one click away regardless. */
+.filter-range-row input {
+    flex: 0 1 auto;
+    width: auto;
+    max-width: 10ch;
+    min-width: 0;
+    height: 18px;
+    padding: 0 3px;
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    border: 1px solid transparent;
+    border-bottom-color: var(--border-soft);
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-muted);
     box-sizing: border-box;
 }
 
-.filter-input-row input:first-child {
-    order: -1;
-    text-align: left;
-}
-
-.filter-input-row input:last-child {
+/* Inverted: sliderStart holds the HIGHER value, so its box belongs at the
+   right-hand end. Only the visual order swaps — each box still drives its own
+   handle. */
+.filter-range-row.flipped input:first-child {
     order: 1;
-    text-align: right;
 }
 
-.filter-input-row input:focus {
+.filter-range-row.flipped input:last-child {
+    order: -1;
+}
+
+.filter-range-row input:hover {
+    border-color: var(--border-soft);
+    background: var(--surface-3);
+}
+
+/* Focus shows the exact value, so the box needs room for it. */
+.filter-range-row input:focus {
     outline: none;
+    max-width: 16ch;
+    flex: 0 0 auto;
+    text-align: left;
+    color: var(--text-strong);
+    background: var(--input-bg);
     border-color: var(--accent-text);
     box-shadow: 0 0 0 2px rgba(195, 61, 53, 0.25);
+}
+
+.filter-range-row input.red {
+    color: var(--accent-text);
+    font-weight: 600;
 }
 
 /* Single-value fallback shown in place of a slider when a numeric property has
@@ -2185,7 +2398,7 @@ h5 {
 #filterContainer.locked .filter-row-col2,
 #filterContainer.locked .slider-container,
 #filterContainer.locked input[type="number"],
-#filterContainer.locked .filter-input-row,
+#filterContainer.locked .filter-range-row,
 #filterContainer.locked .range-slider-thumb,
 #filterContainer.locked .range-slider,
 #filterContainer.locked .header-card,
@@ -2871,7 +3084,27 @@ input:checked + .checkbox-green::after {
     border-left: 1px solid var(--brand-border);
 }
 
-.pm-group:hover {
+/* Per-row actions sit on every single filter row, so at full strength they
+   out-shout the properties. Quieted by COLOR, not opacity — they are non-text
+   controls owing 3:1, and dimming the token below --border would fail it.
+   .filter-row is display:contents and therefore has no box to hover, so the
+   transition keys off the controls themselves. */
+#filterContainer .filter-row-col3 .pm-group {
+    border-color: var(--border);
+    background: transparent;
+}
+
+#filterContainer .filter-row-col3 .plus-minus-button {
+    color: var(--text-faint);
+}
+
+#filterContainer .filter-row-col3 .pm-group:hover .plus-minus-button,
+#filterContainer .filter-row-col3 .pm-group:focus-within .plus-minus-button {
+    color: var(--text-strong);
+}
+
+.pm-group:hover,
+.pm-group:focus-within {
     border-color: #C33D35;
     transform: scale(2.5);
     z-index: 99;
@@ -3209,94 +3442,6 @@ div[slider] > input[type=range]::-ms-tooltip {
     display: none;
 }
 
-[slider] > div > [sign] {
-    opacity: 0;
-    /* Fixed so the bubble escapes the sidebar's three overflow-clipping
-       ancestors and can extend into the canvas. JS (positionSigns) sets
-       top/left in viewport coordinates on hover. */
-    position: fixed;
-    margin-left: 0;
-    z-index: 9999;
-    background-color: #C33D35;
-    border: 1px solid var(--brand-border);
-    color: #E4E3EA;
-    width: 32px;
-    height: 24px;
-    border-radius: 28px;
-    -webkit-border-radius: 28px;
-    align-items: center;
-    -webkit-justify-content: center;
-    justify-content: center;
-    text-align: center;
-    pointer-events: none;
-    transition: opacity 0.2s ease-in-out;
-}
-
-[slider] > div > [sign].left {
-    white-space: nowrap;
-}
-
-[slider] > div > [sign].right {
-    white-space: nowrap;
-}
-
-/* Flipped state for labels */
-[slider] > div > [sign].left.flipped {
-    transform: translateX(12px); /* Move closer to the slider to fill the gap */
-}
-
-[slider] > div > [sign].right.flipped {
-    transform: translateX(-12px); /* Move closer to the slider to fill the gap */
-}
-
-[slider] > div > [sign].left:after {
-    position: absolute;
-    content: '';
-    top: 50%;
-    right: -10px; /* controls horizontal position of left tooltip anchor */
-    transform: translateY(-50%);
-    border-top: 6px solid transparent;
-    border-bottom: 6px solid transparent;
-    border-left: 8px solid var(--brand-border);
-}
-
-[slider] > div > [sign].right:after {
-    position: absolute;
-    content: '';
-    top: 50%;
-    left: -10px; /* controls horizontal position of right tooltip anchor */
-    transform: translateY(-50%);
-    border-top: 6px solid transparent;
-    border-bottom: 6px solid transparent;
-    border-right: 8px solid var(--brand-border);
-}
-
-[slider] > div > [sign].left.flipped:after {
-    right: auto;
-    left: -10px; /* Reverses the arrow position */
-    border-left: none;
-    border-right: 8px solid #C33D35; /* Reverse the arrow direction */
-}
-
-[slider] > div > [sign].right.flipped:after {
-    left: auto;
-    right: -10px; /* Reverses the arrow position */
-    border-right: none;
-    border-left: 8px solid #C33D35; /* Reverse the arrow direction */
-}
-
-[slider] > div > [sign] > span {
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 14px;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-}
-
-[slider]:hover > div > [sign] {
-    opacity: 1;
-}
 
 /*************************
  toggle switch css start

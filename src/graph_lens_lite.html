@@ -263,11 +263,6 @@
       <div class="fsurf-head">
         <h4 class="fsurf-title">Filter properties</h4>
         <span id="filterSurfaceCount" class="fsurf-count"></span>
-        <label class="fsurf-search">
-          <span aria-hidden="true">⌕</span>
-          <input id="filterSurfaceSearch" type="search" placeholder="Search properties…"
-                 aria-label="Search filter properties">
-        </label>
         <span class="fsurf-spacer"></span>
         <button class="insp-btn" title="Open the query editor to write the same predicate as a query"
                 onclick="cache.ui.toggleQueryEditor()">📝 Edit as query</button>
@@ -286,7 +281,8 @@
   </div>
   <aside id="inspector">
     <div class="inspector-resize-handle"></div>
-    <div class="insp-pills" role="tablist" aria-label="Inspector context">
+    <div class="insp-pills-row">
+      <div class="insp-pills" role="tablist" aria-label="Inspector context">
       <button id="inspectorPillFilters" class="insp-pill active" role="tab" aria-selected="true"
               aria-controls="inspectorFilters" tabindex="0"
               title="What is visible: one filter per property, across the whole workspace">Filters</button>
@@ -296,6 +292,7 @@
       <button id="inspectorPillSelection" class="insp-pill" role="tab" aria-selected="false"
               aria-controls="inspectorSelection" tabindex="-1"
               title="Everything that acts on the current selection: actions, arrange, appearance">Selection</button>
+      </div>
       <span class="insp-pills-spacer"></span>
       <button id="inspectorExpandBtn" class="insp-pill-icon" aria-pressed="false"
               aria-label="Expand the filter properties over the stage — every property in columns, with search"

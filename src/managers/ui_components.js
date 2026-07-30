@@ -381,8 +381,6 @@ class InvertibleRangeSlider {
     this.rangeId = `${this.sliderId}-range`;
     this.thumbStartId = `${this.sliderId}-thumb-start`;
     this.thumbEndId = `${this.sliderId}-thumb-end`;
-    this.labelStartId = `${this.sliderIdStart}-label`;
-    this.labelEndId = `${this.sliderIdEnd}-label`;
   }
 
   readCurrentFilterSettings() {
@@ -426,38 +424,43 @@ class InvertibleRangeSlider {
     this.range = document.getElementById(this.rangeId);
     this.thumbStart = document.getElementById(this.thumbStartId);
     this.thumbEnd = document.getElementById(this.thumbEndId);
-    this.labelStart = document.getElementById(this.labelStartId);
-    this.labelEnd = document.getElementById(this.labelEndId);
-    // The value bubbles ([sign]) and their track parent — positioned with
-    // position:fixed (see positionSigns) so they can extend past the sidebar's
-    // clipped edges into the canvas; z-index alone cannot escape overflow.
-    this.signLeft = this.labelStart ? this.labelStart.parentElement : null;
-    this.signRight = this.labelEnd ? this.labelEnd.parentElement : null;
-    this.track = this.range ? this.range.parentElement : null;
   }
 
-  // Pins the hover value bubbles to the track ends in viewport coordinates so
-  // they render above everything and are not clipped by the sidebar's
-  // overflow. Recomputed on hover and on scroll/resize while hovered.
-  positionSigns() {
-    if (!this.track || !this.signLeft || !this.signRight) return;
-    const r = this.track.getBoundingClientRect();
-    if (r.width === 0) return; // not laid out yet
-    const midY = r.top + r.height / 2;
-    const lw = this.signLeft.offsetWidth,
-      lh = this.signLeft.offsetHeight;
-    const rw = this.signRight.offsetWidth,
-      rh = this.signRight.offsetHeight;
-    this.signLeft.style.top = `${midY - lh / 2}px`;
-    this.signLeft.style.left = `${Math.max(2, r.left - lw - 8)}px`;
-    this.signRight.style.top = `${midY - rh / 2}px`;
-    this.signRight.style.left = `${Math.min(window.innerWidth - rw - 2, r.right + 8)}px`;
+  /** Rounded for display; the raw value comes back while the box has focus. */
+  formatThreshold(value) {
+    return StaticUtilities.formatNumber(value, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION);
   }
 
-  createSliderInput(id, initialValue, relatedSliderId) {
+  /**
+   * Write a value into a threshold box and size the box to it. The boxes sit
+   * inline at the ends of the track, so a fixed width either truncates
+   * "-175.150" or steals track from every short-valued row; `size` lets each
+   * one take exactly what it needs and CSS caps the extremes.
+   */
+  writeBox(input, text) {
+    if (!input) return;
+    input.value = text;
+    // +1 because `size` counts average character widths and digits are
+    // narrower than average, so an exact count clips the last glyph.
+    input.size = Math.max(3, String(text).length + 1);
+  }
+
+  createSliderInput(id, initialValue, relatedSliderId, readExact) {
     const input = document.createElement('input');
     input.id = id;
-    input.value = initialValue;
+    this.writeBox(input, this.formatThreshold(initialValue));
+    // A column of raw floats ("-51.82279968") is what made this row need a
+    // line of its own. Rounded at rest, exact the moment you go to edit it —
+    // nothing is hidden and the true value stays reachable. The exact value
+    // comes from the widget's own state rather than the range input, which
+    // holds the same number but only as a string the browser may re-round.
+    input.addEventListener('focus', () => {
+      this.writeBox(input, readExact());
+      input.select();
+    });
+    input.addEventListener('blur', () => {
+      this.writeBox(input, this.formatThreshold(parseFloat(input.value)));
+    });
     input.addEventListener('keydown', (ev) => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
         ev.preventDefault();
@@ -505,28 +508,39 @@ class InvertibleRangeSlider {
     slider.style.width = '100%';
     slider.title = `Set the thresholds for the numeric property: ${StaticUtilities.formatPropsAsTree(this.propID)}\n---\n  - Move handles to set min/max (≥ min ∧ ≤ max).\n  - Swap handles to invert (≤ min ∨ ≥ max).\n  - Double-click to reset.`;
 
-    // Min/max number boxes are always visible directly under the slider, so
-    // exact thresholds can be typed without a hidden "edit mode". They stay in
-    // sync with the handles via handleThresholdOnInputEvent (writes their values).
-    const inputRow = document.createElement('div');
-    inputRow.className = 'filter-input-row';
+    // The exact-value boxes sit at the two ends of the track, on the slider's
+    // own line. They used to be a second row under it, while a pair of
+    // position:fixed bubbles showed the SAME two numbers on hover — one value,
+    // drawn twice, one of the copies needing hover/scroll/resize listeners to
+    // stay pinned. Merging them halves the row height (~40px to ~22px) and
+    // deletes the whole fixed-positioning apparatus.
+    const row = document.createElement('div');
+    row.className = 'filter-range-row';
     this.inputStart = this.createSliderInput(
       this.sliderIdStartInput,
       this.currentMin,
-      this.sliderIdStart
+      this.sliderIdStart,
+      () => this.currentMin
     );
     this.inputStart.title = 'Lower threshold — type an exact value and press Enter';
+    this.inputStart.setAttribute('aria-label', `${this.propLabel()} — lower threshold`);
     this.inputEnd = this.createSliderInput(
       this.sliderIdEndInput,
       this.currentMax,
-      this.sliderIdEnd
+      this.sliderIdEnd,
+      () => this.currentMax
     );
     this.inputEnd.title = 'Upper threshold — type an exact value and press Enter';
-    inputRow.appendChild(this.inputStart);
-    inputRow.appendChild(this.inputEnd);
+    this.inputEnd.setAttribute('aria-label', `${this.propLabel()} — upper threshold`);
+    row.append(this.inputStart, slider, this.inputEnd);
 
-    parent.appendChild(slider);
-    parent.appendChild(inputRow);
+    parent.appendChild(row);
+    this.rangeRow = row;
+  }
+
+  /** Bare property name, for the inputs' accessible names. */
+  propLabel() {
+    return StaticUtilities.decodePropHashId(this.propID).slice(-1)[0];
   }
 
   createSingleValueIndicator() {
@@ -562,12 +576,6 @@ class InvertibleRangeSlider {
                  right:${100 - this.calcPercentage(this.currentMax)}%;"></div>
           <span id="${this.thumbStartId}" thumb style="left:${this.calcPercentage(this.currentMin)}%;"></span>
           <span id="${this.thumbEndId}" thumb style="left:${this.calcPercentage(this.currentMax)}%;"></span>
-          <div sign class="left">
-            <span id="${this.labelStartId}">${StaticUtilities.formatNumber(this.currentMin, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION)}</span>
-          </div>
-          <div sign class="right">
-            <span id="${this.labelEndId}">${StaticUtilities.formatNumber(this.currentMax, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION)}</span>
-          </div>
         </div>
         <input type="range" tabindex="0" value="${this.currentMin}" max="${this.sliderMax}" min="${this.sliderMin}"
           step="${this.stepSize}" id="${this.sliderIdStart}" aria-label="${prop} — lower threshold" />
@@ -580,19 +588,6 @@ class InvertibleRangeSlider {
   appendListeners() {
     if (!this.isValidSlider) return;
     this.getDOMReferences();
-
-    // Position the fixed value bubbles on hover; keep them pinned while the
-    // sidebar scrolls or the window resizes during the hover.
-    const reposition = () => this.positionSigns();
-    this.slider.addEventListener('mouseenter', () => {
-      this.positionSigns();
-      window.addEventListener('scroll', reposition, true);
-      window.addEventListener('resize', reposition);
-    });
-    this.slider.addEventListener('mouseleave', () => {
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    });
 
     this.slider.addEventListener('dblclick', () => {
       this.reset();
@@ -656,29 +651,11 @@ class InvertibleRangeSlider {
       this.range.style.left = '50%';
       this.inverseLeft.style.backgroundColor = '#C33D35';
       this.inverseRight.style.backgroundColor = '#C33D35';
-      if (isLower) {
-        this.labelEnd.innerHTML = StaticUtilities.formatNumber(
-          primaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-        this.labelStart.innerHTML = StaticUtilities.formatNumber(
-          secondaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-      } else {
-        this.labelStart.innerHTML = StaticUtilities.formatNumber(
-          primaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-        this.labelEnd.innerHTML = StaticUtilities.formatNumber(
-          secondaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-      }
-
-      this.labelStart.parentElement.classList.add('flipped');
-      this.labelEnd.parentElement.classList.add('flipped');
-
+      // Inverted means sliderStart holds the HIGHER value, so its box belongs
+      // at the right-hand end of the track. Each box still drives its own
+      // handle; only the visual order swaps, which is what the retired bubbles
+      // used their own `flipped` class for.
+      this.rangeRow?.classList.add('flipped');
       this.inputStart.classList.add('red');
       this.inputEnd.classList.add('red');
     } else {
@@ -690,41 +667,22 @@ class InvertibleRangeSlider {
       this.inverseRight.style.width = rightPos + '%';
       this.inverseLeft.style.backgroundColor = 'grey';
       this.inverseRight.style.backgroundColor = 'grey';
-      if (isLower) {
-        this.labelStart.innerHTML = StaticUtilities.formatNumber(
-          primaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-        this.labelEnd.innerHTML = StaticUtilities.formatNumber(
-          secondaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-      } else {
-        this.labelStart.innerHTML = StaticUtilities.formatNumber(
-          secondaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-        this.labelEnd.innerHTML = StaticUtilities.formatNumber(
-          primaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-      }
-
-      this.labelStart.parentElement.classList.remove('flipped');
-      this.labelEnd.parentElement.classList.remove('flipped');
-
+      this.rangeRow?.classList.remove('flipped');
       this.inputStart.classList.remove('red');
       this.inputEnd.classList.remove('red');
     }
 
+    const box = isLower ? this.sliderStartInput : this.sliderEndInput;
     if (isLower) {
       this.thumbStart.style.left = this.calcPercentage(primaryValue) + '%';
-      this.sliderStartInput.value = primaryValue;
       this.currentMin = primaryValue;
     } else {
       this.thumbEnd.style.left = this.calcPercentage(primaryValue) + '%';
-      this.sliderEndInput.value = primaryValue;
       this.currentMax = primaryValue;
+    }
+    // Never overwrite the box being typed into; its own blur reformats it.
+    if (box && document.activeElement !== box) {
+      this.writeBox(box, this.formatThreshold(primaryValue));
     }
   }
 
