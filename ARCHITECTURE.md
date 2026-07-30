@@ -58,11 +58,16 @@ Business logic and UI:
 - `ui.js` — loading overlays, UI enable/disable, notifications, presentation mode
 - `rail.js` — the 52 px top rail and its dropdown menus (app, workspace, layout,
   select, overlays, export)
-- `inspector.js` — the single right-hand panel's context router (Workspace ↔ Selection)
+- `inspector.js` — the single right-hand panel's context router
+  (Filters / Overlays / Selection). `CONTEXTS` is the whole contract: the tab
+  roles, roving tabindex and arrow-key nav are generic over it, and panel and
+  pill ids are derived from the context name
 - `workbench.js` — the bottom surface over the stage; four non-destructive tabs
   (Data, Query, Metrics, Assistant) with a remembered height each
 - `filter_surface.js` — `⤢` lifts the inspector's filter list onto a multi-column
-  surface over the stage (search, active-first); re-parents the one filter DOM
+  surface over the stage (active-first); re-parents the one filter DOM. Owns the
+  search behaviour, though the box itself is built into `#filterContainer` by
+  `ui.buildFilterUI` so it travels with the rows and works in the narrow panel
 - `command_palette.js` — `⌘K` / `Ctrl+K`: one search over every control, node and
   edge. The index is scraped from the live DOM on each open, so it cannot drift
   from the UI; rows print the control's breadcrumb and accelerator
