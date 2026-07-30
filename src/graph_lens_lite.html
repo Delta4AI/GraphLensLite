@@ -287,9 +287,12 @@
   <aside id="inspector">
     <div class="inspector-resize-handle"></div>
     <div class="insp-pills" role="tablist" aria-label="Inspector context">
-      <button id="inspectorPillWorkspace" class="insp-pill active" role="tab" aria-selected="true"
-              aria-controls="inspectorWorkspace" tabindex="0"
-              title="Workspace-level controls: filters, groups, overlays, find and metrics">Workspace</button>
+      <button id="inspectorPillFilters" class="insp-pill active" role="tab" aria-selected="true"
+              aria-controls="inspectorFilters" tabindex="0"
+              title="What is visible: one filter per property, across the whole workspace">Filters</button>
+      <button id="inspectorPillOverlays" class="insp-pill" role="tab" aria-selected="false"
+              aria-controls="inspectorOverlays" tabindex="-1"
+              title="What is drawn over the graph: groups, density heatmap, minimap">Overlays</button>
       <button id="inspectorPillSelection" class="insp-pill" role="tab" aria-selected="false"
               aria-controls="inspectorSelection" tabindex="-1"
               title="Everything that acts on the current selection: actions, arrange, appearance">Selection</button>
@@ -300,17 +303,21 @@
               onclick="cache.filterSurface.toggle()">⤢</button>
     </div>
     <div id="inspectorBody">
-      <section id="inspectorWorkspace" class="insp-panel" role="tabpanel" tabindex="0"
-               aria-labelledby="inspectorPillWorkspace">
-        <h4 class="insp-section-title">Filters</h4>
+      <section id="inspectorFilters" class="insp-panel" role="tabpanel" tabindex="0"
+               aria-labelledby="inspectorPillFilters">
         <p class="insp-note">Filters set what is <strong>visible</strong> across the whole workspace —
           they are never scoped to your selection.</p>
         <p id="filterExpandedNote" class="insp-note" hidden>Open on the
           <button type="button" class="insp-link" onclick="cache.filterSurface.close()">expanded surface</button>
           over the stage.</p>
         <div id="filterHome"><div id="filterContainer"></div></div>
+      </section>
 
+      <section id="inspectorOverlays" class="insp-panel" role="tabpanel" tabindex="0"
+               aria-labelledby="inspectorPillOverlays" hidden>
         <h4 class="insp-section-title">Groups</h4>
+        <p class="insp-note">Bubble sets drawn around the nodes you assign to a group.
+          Assign the current selection from the <strong>Selection</strong> tab.</p>
         <div class="insp-groups">
           <button id="detectCommunitiesBtn" class="insp-btn" title="Auto-group by community (Louvain): pick edge weighting & resolution, then assign the largest communities to bubble groups"
                   onclick="cache.bs.toggleCommunityDetectionPopover()">🧩 Auto-detect</button>
@@ -321,7 +328,7 @@
         </div>
         <div id="inspectorGroupsMount"></div>
 
-        <h4 class="insp-section-title">Overlays</h4>
+        <h4 class="insp-section-title">Density heatmap</h4>
         <div id="inspectorOverlaysMount"></div>
       </section>
 

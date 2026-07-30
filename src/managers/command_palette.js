@@ -107,7 +107,13 @@ function sectionOf(el, panel) {
 }
 
 function breadcrumb(...parts) {
-  return parts.filter(Boolean).join(' › ');
+  // A section holding a single card of the same name ("Density heatmap" ›
+  // "Density Heatmap") would otherwise stutter. Case-insensitive, because the
+  // section title is prose and the card label is a lookup key.
+  return parts
+    .filter(Boolean)
+    .filter((part, i, all) => i === 0 || part.toLowerCase() !== all[i - 1].toLowerCase())
+    .join(' › ');
 }
 
 function collectRail(cache, out) {
@@ -127,11 +133,17 @@ function collectRail(cache, out) {
   }
 }
 
+// Breadcrumb label → panel id, and the reverse lookup `reveal` needs to switch
+// the inspector back to whichever context holds the hit. One table, so a fourth
+// context cannot be indexed without also being revealable.
+const INSPECTOR_PANELS = [
+  ['Filters', 'inspectorFilters'],
+  ['Overlays', 'inspectorOverlays'],
+  ['Selection', 'inspectorSelection'],
+];
+
 function collectInspector(out) {
-  for (const [context, panelId] of [
-    ['Workspace', 'inspectorWorkspace'],
-    ['Selection', 'inspectorSelection'],
-  ]) {
+  for (const [context, panelId] of INSPECTOR_PANELS) {
     const panel = document.getElementById(panelId);
     if (!panel) continue;
     const trailFor = (el) =>
@@ -293,7 +305,8 @@ export function reveal(cache, cmd) {
   if (cmd.tab) cache.workbench?.show(cmd.tab);
   const panel = el.closest?.('.insp-panel');
   if (panel) {
-    cache.inspector?.setContext(panel.id === 'inspectorSelection' ? 'selection' : 'workspace');
+    const entry = INSPECTOR_PANELS.find(([, id]) => id === panel.id);
+    if (entry) cache.inspector?.setContext(entry[0].toLowerCase());
   }
   for (let node = el.parentElement; node; node = node.parentElement) {
     if (!node.classList?.contains('collapsed')) continue;

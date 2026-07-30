@@ -794,7 +794,7 @@ class GuidedTour {
     // Put the shell back the way a fresh load leaves it.
     this.cache.workbench?.close();
     this.cache.filterSurface?.close();
-    this.cache.inspector?.setContext('workspace');
+    this.cache.inspector?.setContext('filters');
   }
 }
 

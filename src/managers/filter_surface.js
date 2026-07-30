@@ -42,9 +42,9 @@ class FilterSurface {
 
   open() {
     if (!this.el || this.isOpen) return;
-    // Filters are a workspace concern; expanding them from the Selection
-    // context would leave the inspector showing a panel nobody asked about.
-    this.cache.inspector?.setContext('workspace');
+    // Expanding the filters from another context would leave the inspector
+    // showing a panel nobody asked about once the surface collapses again.
+    this.cache.inspector?.setContext('filters');
     this.mount.appendChild(this.container);
     this.el.removeAttribute('hidden');
     if (this.homeNote) this.homeNote.hidden = false;

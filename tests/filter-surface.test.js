@@ -168,9 +168,9 @@ describe('filter surface', () => {
     expect(document.activeElement).toBe(outside);
   });
 
-  it('pulls the inspector to the workspace context — filters are not a selection concern', () => {
+  it('pulls the inspector to the filters context — filters are not a selection concern', () => {
     fs.open();
-    expect(cache.inspector.setContext).toHaveBeenCalledWith('workspace');
+    expect(cache.inspector.setContext).toHaveBeenCalledWith('filters');
   });
 
   it('shows the inspector placeholder only while expanded', () => {

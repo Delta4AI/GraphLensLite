@@ -35,8 +35,7 @@ function dom() {
       </button>
     </header>
     <aside id="inspector">
-      <section id="inspectorWorkspace" class="insp-panel">
-        <h4 class="insp-section-title">Filters</h4>
+      <section id="inspectorFilters" class="insp-panel">
         <div class="insp-empty">
           <button class="insp-link">lasso</button>
         </div>
@@ -74,7 +73,9 @@ function dom() {
             </div>
           </div>
         </div>
-        <h4 class="insp-section-title">Overlays</h4>
+      </section>
+      <section id="inspectorOverlays" class="insp-panel" hidden>
+        <h4 class="insp-section-title">Density heatmap</h4>
         <div id="inspectorOverlaysMount">
           <div class="card-labeled collapsed" data-label="Density Heatmap">
             <div class="card-row">
@@ -168,8 +169,14 @@ describe('the index is derived from the DOM', () => {
   it('gives inspector controls a breadcrumb of context, section and card', () => {
     const cmds = collectCommands(cache);
     expect(named(cmds, 'Reset')).toMatchObject({
-      trail: 'Inspector › Workspace › Overlays › Density Heatmap',
+      trail: 'Inspector › Overlays › Density heatmap',
     });
+  });
+
+  it('collapses a stuttering breadcrumb when a section holds a card of its own name', () => {
+    // The section title is "Density heatmap" and the card's data-label is
+    // "Density Heatmap" — one step, not two.
+    expect(named(collectCommands(cache), 'Reset').trail).not.toMatch(/Density heatmap › Density/i);
   });
 
   it('indexes a row of inputs once, by its label, as a destination', () => {

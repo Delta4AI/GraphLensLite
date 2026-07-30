@@ -19,21 +19,22 @@ function inspectorDom() {
   document.body.innerHTML = `
     <aside id="inspector">
       <div class="insp-pills">
-        <button id="inspectorPillWorkspace" class="insp-pill active" aria-selected="true"></button>
+        <button id="inspectorPillFilters" class="insp-pill active" aria-selected="true"></button>
+        <button id="inspectorPillOverlays" class="insp-pill" aria-selected="false"></button>
         <button id="inspectorPillSelection" class="insp-pill" aria-selected="false"></button>
       </div>
       <div id="inspectorBody">
-        <section id="inspectorWorkspace" class="insp-panel"></section>
+        <section id="inspectorFilters" class="insp-panel"></section>
+        <section id="inspectorOverlays" class="insp-panel" hidden></section>
         <section id="inspectorSelection" class="insp-panel" hidden></section>
       </div>
     </aside>
   `;
 }
 
-const panel = (name) =>
-  document.getElementById(name === 'workspace' ? 'inspectorWorkspace' : 'inspectorSelection');
-const pill = (name) =>
-  document.getElementById(name === 'workspace' ? 'inspectorPillWorkspace' : 'inspectorPillSelection');
+const capitalize = (name) => `${name[0].toUpperCase()}${name.slice(1)}`;
+const panel = (name) => document.getElementById(`inspector${capitalize(name)}`);
+const pill = (name) => document.getElementById(`inspectorPill${capitalize(name)}`);
 const isShowing = (name) => !panel(name).hasAttribute('hidden');
 
 describe('inspector context router', () => {
@@ -49,33 +50,33 @@ describe('inspector context router', () => {
     expect(initInspector()).toBeNull();
   });
 
-  it('starts on the workspace context', () => {
-    expect(inspector.context).toBe('workspace');
-    expect(isShowing('workspace')).toBe(true);
+  it('starts on the filters context', () => {
+    expect(inspector.context).toBe('filters');
+    expect(isShowing('filters')).toBe(true);
     expect(isShowing('selection')).toBe(false);
   });
 
   it('setContext swaps the visible panel and the pill state', () => {
     inspector.setContext('selection');
     expect(isShowing('selection')).toBe(true);
-    expect(isShowing('workspace')).toBe(false);
+    expect(isShowing('filters')).toBe(false);
     expect(pill('selection').classList.contains('active')).toBe(true);
     expect(pill('selection').getAttribute('aria-selected')).toBe('true');
-    expect(pill('workspace').classList.contains('active')).toBe(false);
-    expect(pill('workspace').getAttribute('aria-selected')).toBe('false');
+    expect(pill('filters').classList.contains('active')).toBe(false);
+    expect(pill('filters').getAttribute('aria-selected')).toBe('false');
   });
 
   it('ignores an unknown context instead of blanking the panel', () => {
     inspector.setContext('nope');
-    expect(inspector.context).toBe('workspace');
-    expect(isShowing('workspace')).toBe(true);
+    expect(inspector.context).toBe('filters');
+    expect(isShowing('filters')).toBe(true);
   });
 
   it('clicking a pill switches context', () => {
     pill('selection').click();
     expect(inspector.context).toBe('selection');
-    pill('workspace').click();
-    expect(inspector.context).toBe('workspace');
+    pill('filters').click();
+    expect(inspector.context).toBe('filters');
   });
 });
 
@@ -101,16 +102,26 @@ describe('inspector selection sync', () => {
     expect(panel('selection').classList.contains('has-selection')).toBe(false);
   });
 
-  it('leaves the workspace context alone while nothing is selected', () => {
+  it('leaves the filters context alone while nothing is selected', () => {
     inspector.syncToSelection(false);
-    expect(inspector.context).toBe('workspace');
+    expect(inspector.context).toBe('filters');
   });
 
-  it('respects a manual switch back to workspace until the next new selection', () => {
+  it('respects a manual switch back to filters until the next new selection', () => {
     inspector.syncToSelection(true);
-    inspector.setContext('workspace');
+    inspector.setContext('filters');
     inspector.syncToSelection(true); // still selected — no yank
-    expect(inspector.context).toBe('workspace');
+    expect(inspector.context).toBe('filters');
+  });
+
+  it('never yanks the Overlays context away — grouping is a selection-driven loop', () => {
+    // Assigning nodes to a bubble set, or judging the heatmap fade against a
+    // selection, means selecting things WHILE this panel is up. Only Filters
+    // gets pulled over.
+    inspector.setContext('overlays');
+    inspector.syncToSelection(true);
+    expect(inspector.context).toBe('overlays');
+    expect(panel('selection').classList.contains('has-selection')).toBe(true);
   });
 
   it('showAppearance forces the selection context', () => {
@@ -242,18 +253,20 @@ describe('inspector pills honour the role=tab keyboard contract', () => {
     );
 
   it('roving tabindex keeps only the selected pill in the tab order', () => {
-    expect(pill('workspace').getAttribute('tabindex')).toBe('0');
+    expect(pill('filters').getAttribute('tabindex')).toBe('0');
     expect(pill('selection').getAttribute('tabindex')).toBe('-1');
     inspector.setContext('selection');
-    expect(pill('workspace').getAttribute('tabindex')).toBe('-1');
+    expect(pill('filters').getAttribute('tabindex')).toBe('-1');
     expect(pill('selection').getAttribute('tabindex')).toBe('0');
   });
 
   it('arrow keys move between contexts and wrap', () => {
     key('ArrowRight');
+    expect(inspector.context).toBe('overlays');
+    key('ArrowRight');
     expect(inspector.context).toBe('selection');
     key('ArrowRight');
-    expect(inspector.context).toBe('workspace');
+    expect(inspector.context).toBe('filters');
     key('ArrowLeft');
     expect(inspector.context).toBe('selection');
   });
@@ -262,11 +275,11 @@ describe('inspector pills honour the role=tab keyboard contract', () => {
     key('End');
     expect(inspector.context).toBe('selection');
     key('Home');
-    expect(inspector.context).toBe('workspace');
+    expect(inspector.context).toBe('filters');
   });
 
   it('ignores keys outside the contract', () => {
     key('a');
-    expect(inspector.context).toBe('workspace');
+    expect(inspector.context).toBe('filters');
   });
 });
