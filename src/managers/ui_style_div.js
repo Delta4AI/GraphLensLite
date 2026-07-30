@@ -1409,6 +1409,11 @@ function createStyleDiv(cache) {
       layer()?.resetSettings();
       syncControls();
     });
+
+    // Parameters are inert until the overlay is switched on (rail ◐ menu),
+    // so the card starts greyed like an empty bubble-set card; the live
+    // toggle is in heatmap_layer.setHeatmapEnabled.
+    card.classList.toggle("disabled", !layer()?.heatmapEnabled);
   }
 
   createSelectCard();

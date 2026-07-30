@@ -157,3 +157,23 @@ describe("HeatmapLayer.resetSettings", () => {
     });
   });
 });
+
+describe("HeatmapLayer.setHeatmapEnabled", () => {
+  it("greys/ungreys the inspector's Density Heatmap card via toggleDisabledElements", () => {
+    const layer = stubLayer({ heatmapEnabled: false });
+    const toggleDisabledElements = vi.fn();
+    layer.adapter.cache = { ui: { toggleDisabledElements } };
+
+    HeatmapLayer.prototype.setHeatmapEnabled.call(layer, true);
+    expect(toggleDisabledElements).toHaveBeenCalledWith(["Density Heatmap"], true);
+
+    HeatmapLayer.prototype.setHeatmapEnabled.call(layer, false);
+    expect(toggleDisabledElements).toHaveBeenCalledWith(["Density Heatmap"], false);
+  });
+
+  it("tolerates bare adapters without a cache/ui (unit-test seam)", () => {
+    const layer = stubLayer({ heatmapEnabled: false });
+    expect(() => HeatmapLayer.prototype.setHeatmapEnabled.call(layer, true)).not.toThrow();
+    expect(layer.heatmapEnabled).toBe(true);
+  });
+});

@@ -105,6 +105,10 @@ class HeatmapLayer {
   setHeatmapEnabled(enabled) {
     if (this.heatmapEnabled === !!enabled) return;
     this.heatmapEnabled = !!enabled;
+    // The inspector's parameter card is inert while the overlay is off —
+    // grey it like the bubble-set cards (createHeatmapConfigCard sets the
+    // initial state; optional chaining covers unit tests' bare adapters).
+    this.adapter.cache?.ui?.toggleDisabledElements?.(['Density Heatmap'], this.heatmapEnabled);
     this.lastPaintSignature = null;
     // The reducers consult heatmapEnabled for the graph fade; a refresh
     // re-runs them and its afterRender drives our repaint too.
