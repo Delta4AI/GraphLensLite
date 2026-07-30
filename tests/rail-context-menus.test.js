@@ -21,9 +21,10 @@ function makeCache({ heatmapEnabled = false, withGraph = true } = {}) {
             }),
           },
           minimap: { canvas: minimapCanvas },
+          annotationLayer: {},
         }
       : null,
-    ui: { togglePresentationMode: vi.fn() },
+    ui: { togglePresentationMode: vi.fn(), startTextAnnotation: vi.fn() },
   };
 }
 
@@ -106,8 +107,17 @@ describe('rail ◐ Overlays menu', () => {
     const menu = menuFor(rail, 'overlaysMenuBtn');
     expect(labelled(menu, 'Density heatmap').getAttribute('aria-disabled')).toBe('true');
     expect(labelled(menu, 'Minimap').getAttribute('aria-disabled')).toBe('true');
+    expect(labelled(menu, 'Add text note').getAttribute('aria-disabled')).toBe('true');
     // Presentation mode is pure chrome — it works with or without data.
     expect(labelled(menu, 'Presentation mode').getAttribute('aria-disabled')).toBeNull();
+  });
+
+  it('routes the text-note row to the placement tool', () => {
+    const cache = makeCache();
+    const rail = initRail(cache);
+    document.getElementById('overlaysMenuBtn').click();
+    labelled(menuFor(rail, 'overlaysMenuBtn'), 'Add text note').click();
+    expect(cache.ui.startTextAnnotation).toHaveBeenCalled();
   });
 
   it('routes presentation mode to the UI manager and reflects its state', () => {

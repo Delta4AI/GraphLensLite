@@ -400,6 +400,16 @@ class Rail {
           minimapCanvas.style.display = minimapCanvas.style.display === 'none' ? '' : 'none';
         }),
       }),
+      menuItem({
+        icon: '✎',
+        label: 'Add text note…',
+        disabled: !this.cache.graph?.annotationLayer,
+        title: this.cache.graph?.annotationLayer
+          ? 'Place a text note on the canvas: click to place, drag to move, ' +
+            'double-click to edit, click once for styling'
+          : 'Load a graph first',
+        onClick: this.#closeAnd(() => this.cache.ui.startTextAnnotation()),
+      }),
       menuSeparator(),
       menuItem({
         icon: '⛶',
