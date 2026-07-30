@@ -600,16 +600,87 @@ function hoverStateFor(id, hoverIds) {
 }
 
 /**
- * Heatmap dim-graph companion: while the density heatmap is on with its
- * "dim graph" setting, every element without an explicit/hover state dims so
- * the field reads through (the heatmap canvas sits BELOW nodes and edges —
- * no ramp tuning can fix occlusion; de-emphasizing the occluders can).
- * Selection, highlight and hover all keep their normal treatment. Read live
- * off the cache each reducer call: the layer toggles trigger sigma.refresh.
+ * Heatmap fade companion: while the density heatmap is on, every element
+ * without an explicit/hover state fades so the field reads through (the
+ * heatmap canvas sits BELOW nodes and edges — no ramp tuning can fix
+ * occlusion; de-emphasizing the occluders can). Selection, highlight and hover
+ * all keep their normal treatment. Read live off the cache each reducer call:
+ * the layer's setters trigger sigma.refresh.
+ *
+ * This replaced a boolean that swapped `color` for an opaque grey, which did
+ * not fade anything — an opaque grey node occludes the field exactly as much
+ * as an opaque red one did.
+ *
+ * @returns {number} fade strength in [0, 1]; 0 means "leave the graph alone"
  */
-function heatmapDimActive(cache) {
+function heatmapFade(cache) {
   const layer = cache.graph?.heatmapLayer;
-  return !!(layer?.heatmapEnabled && layer.settings?.dimGraph);
+  if (!layer?.heatmapEnabled) return 0;
+  const fade = layer.settings?.fadeGraph;
+  return Number.isFinite(fade) ? Math.min(Math.max(fade, 0), 1) : 0;
+}
+
+/**
+ * Past this much fade the two big occluders — labels and edges — cut out
+ * rather than fading further. Both are cutoffs for their own reason:
+ *
+ * Labels, because the color contract makes fading them unsafe. label_renderers
+ * treats the baked "#000000" as "no explicit choice" so dark mode can flip it,
+ * so writing an alpha'd black here would pin labels black on a dark ground. A
+ * cutoff also takes the label background with it, which an alpha on the text
+ * alone would leave sitting there opaque.
+ *
+ * Edges, because sigma blends with gl.blendFunc(ONE, ONE_MINUS_SRC_ALPHA) —
+ * premultiplied — while neither its shaders nor ours emit premultiplied color.
+ * The result at low alpha is `src.rgb + dst * (1 - a)`, i.e. ADDITIVE: a faded
+ * edge brightens whatever is under it instead of disappearing, which paints
+ * white hairballs across the density field. Verified live. Premultiplying the
+ * shaders would fix it properly, but the default edge color is already
+ * #403C5390, so that restyles every edge in the app and is its own change.
+ * Nodes are unaffected — they fade through a baked texture, not the shader.
+ */
+const OCCLUDER_CUTOFF = 0.4;
+
+/** Remaining opacity for a fade strength, quantized — see applyNodeFade. */
+function fadeOpacity(fade) {
+  return Math.max(0, Math.round((1 - fade) * FADE_STEPS) / FADE_STEPS);
+}
+
+// Texture keys include the fill and stroke colors, so a continuous slider
+// would mint a new bake per alpha value per color and thrash the (full-clear)
+// texture cache. 20 steps is finer than the eye reads and bounds the keyspace.
+const FADE_STEPS = 20;
+
+/**
+ * Fade a node toward transparent. Mirrors applyNodeState's branching, because
+ * the same three node shapes need the same three treatments.
+ *
+ * Textured shapes cannot fade through `color` — it is TRANSPARENT and the
+ * pixels come from a baked SVG — so the alpha goes into the bake instead.
+ * That needs no new bake axis: shapeTextureURI's fill already accepts a hex
+ * carrying alpha, and its cache key already covers fill and stroke.
+ */
+function applyNodeFade(data, opacity) {
+  // Pie nodes have no flat fill to fade, same limitation as the dim state.
+  if (opacity >= 1 || data.type === "pie") return data;
+
+  if (data.type !== "shape") {
+    const res = { ...data, color: applyHexOpacity(data.color, opacity) };
+    if (data.borderColor) res.borderColor = applyHexOpacity(data.borderColor, opacity);
+    return res;
+  }
+  const stroke = data.borderColor ?? null;
+  return {
+    ...data,
+    color: TRANSPARENT,
+    image: shapeTextureURI({
+      shape: data.shape ?? "circle",
+      fill: applyHexOpacity(data.fillColor ?? data.color, opacity),
+      stroke: stroke && applyHexOpacity(stroke, opacity),
+      lineWidth: data.borderSize ?? 0,
+      size: data.size ?? DEFAULTS.NODE.SIZE / 2,
+    }),
+  };
 }
 
 /**
@@ -635,8 +706,10 @@ function makeNodeReducer(cache, elementStates, hoverIds = new Set()) {
       return applyNodeState(data, "highlight");
     }
     if (states.includes("dim") || hoverState === "dim") return applyNodeState(data, "dim");
-    if (heatmapDimActive(cache)) return applyNodeState(data, "dim");
-    return data;
+    const fade = heatmapFade(cache);
+    if (!fade) return data;
+    const faded = applyNodeFade(data, fadeOpacity(fade));
+    return fade >= OCCLUDER_CUTOFF ? { ...faded, label: "" } : faded;
   };
 }
 
@@ -668,7 +741,11 @@ function makeEdgeReducer(cache, elementStates, hoverIds = new Set()) {
     const states = elementStates.get(edge) ?? [];
     const hoverState = hoverStateFor(edge, hoverIds);
     if (states.length === 0 && hoverState === null) {
-      return heatmapDimActive(cache) ? { ...data, color: STATE_DIM_COLOR } : data;
+      const fade = heatmapFade(cache);
+      if (!fade) return data;
+      // Cut, never fade — see OCCLUDER_CUTOFF. A partially faded edge blends
+      // additively and paints white over the field.
+      return fade >= OCCLUDER_CUTOFF ? { ...data, hidden: true, label: "" } : data;
     }
     const res = { ...data };
     if (states.includes("selected")) {

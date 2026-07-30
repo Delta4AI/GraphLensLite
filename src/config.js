@@ -69,16 +69,19 @@ const DEFAULTS = {
   },
   // Atmospheric canvas layer (heatmap_layer.js): node-density heatmap below
   // the bubble-set canvas. Off by default; toggled from the workspace toolbar.
-  // OPACITY/INTENSITY/GAMMA/BANDWIDTH_SCALE/DIM_GRAPH are the runtime knobs
+  // OPACITY/INTENSITY/GAMMA/BANDWIDTH_SCALE/FADE_GRAPH are the runtime knobs
   // exposed in the toolbar settings popover — these are the initial values.
   HEATMAP: {
     ENABLED: false,
     MAX_RESOLUTION: 1024,  // offscreen splat canvas long-side px cap
     BANDWIDTH: 0,          // splat radius in graph units; 0 → auto (heatBandwidth)
     BANDWIDTH_SCALE: 1,    // multiplier on the (auto or explicit) bandwidth
-    OPACITY: 0.55,         // layer alpha — keeps the field atmospheric
-    INTENSITY: 0.18,       // per-splat center alpha; densities saturate at ~1/INTENSITY overlaps
-    GAMMA: 0.7,            // density exponent before the ramp; < 1 boosts low-density haze
+    // Tuned against the airport template with FADE_GRAPH on: the previous
+    // 0.55/0.18/0.7 read as a smudge rather than a density gradient once the
+    // graph stopped occluding it.
+    OPACITY: 0.7,          // layer alpha — keeps the field atmospheric
+    INTENSITY: 0.25,       // per-splat center alpha; densities saturate at ~1/INTENSITY overlaps
+    GAMMA: 0.85,           // density exponent before the ramp; < 1 boosts low-density haze
     // Density floor: pixels below this density clear entirely, the rest
     // renormalizes over the ramp. A lone node peaks at exactly INTENSITY, so
     // a value just above it shows only overlapping nodes (clusters).
@@ -161,9 +164,12 @@ const DEFAULTS = {
         ],
       },
     },
-    // Dim every non-emphasized node/edge while the heatmap is on, so the
+    // Fade every non-emphasized node/edge while the heatmap is on, so the
     // density field reads through the graph (the layer sits below everything).
-    DIM_GRAPH: false,
+    // 0 leaves the graph alone, 1 fades it out entirely; labels cut out past
+    // 0.4 because they are the largest occluder. Off by default so switching
+    // the heatmap on never silently restyles the graph.
+    FADE_GRAPH: 0,
   },
   LAYOUT: "force",
   // Keys define the layout template vocabulary (workspace-creation dropdown).

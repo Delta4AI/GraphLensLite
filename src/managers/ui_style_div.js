@@ -1309,7 +1309,7 @@ function createStyleDiv(cache) {
         threshold: D.THRESHOLD,
         bandwidthScale: D.BANDWIDTH_SCALE,
         ramp: D.RAMP,
-        dimGraph: D.DIM_GRAPH,
+        fadeGraph: D.FADE_GRAPH,
       };
     const syncFns = [];
     const syncControls = () => syncFns.forEach((fn) => fn());
@@ -1361,19 +1361,15 @@ function createStyleDiv(cache) {
 
     // On/off lives on the rail's ◐ Overlays menu (Concept C §4 row J) — this
     // card holds only the parameters, so there is one switch, not two.
-    const rowSwitches = createNewRow(card);
-    appendLabel(rowSwitches, "Dim graph",
-      "De-emphasize nodes and edges while the heatmap is on, so the density field reads through.");
-    const dimSwitch = createSwitch(() => {
-      layer()?.updateSettings({ dimGraph: dimSwitch.isChecked() });
-    }, "heatmapDimGraphSwitch", settings().dimGraph);
-    rowSwitches.appendChild(dimSwitch);
-    syncFns.push(() => dimSwitch.setChecked(settings().dimGraph));
-
+    //
     // min/max are UI guardrails, not physical limits: intensity beyond 0.5
     // saturates with 2 overlaps, contrast beyond 2 crushes everything but
     // peaks, and a threshold above 0.5 hides all but the densest cores.
     const sliders = [
+      ["Fade graph", "fadeGraph", { min: 0, max: 1, step: 0.05 },
+        "Fade nodes toward transparent so the density field reads through. Past 40% the two "
+        + "big occluders — labels and edges — drop out entirely, leaving the field and the node "
+        + "positions. Selected and hovered elements keep their normal treatment."],
       ["Intensity", "intensity", { min: 0.05, max: 0.5, step: 0.01 },
         "Per-node splat strength — how quickly overlapping nodes climb the color ramp."],
       ["Opacity", "opacity", { min: 0.1, max: 1, step: 0.05 },
