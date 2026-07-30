@@ -2064,8 +2064,8 @@ h5 {
 
 /* The exact-value boxes sit at the two ends of the track, on the slider's own
    line — one row instead of slider-over-boxes, and no second copy of the same
-   two numbers in position:fixed bubbles. They are sized to the value, so the
-   track keeps most of the width. */
+   two numbers in position:fixed bubbles. They are sized to the column's
+   endpoints, so the track keeps most of the width. */
 .filter-range-row {
     display: flex;
     align-items: center;
@@ -2084,10 +2084,11 @@ h5 {
     margin: 0;
 }
 
-/* Width comes from the `size` attribute writeBox() keeps in step with the
-   value, so "7630" is not clipped to "763" and a short value does not steal
-   track from the slider. The cap keeps a pathological number from eating the
-   row; the exact value is one click away regardless. */
+/* Width comes from the `size` attribute, fixed per slider to the widest value
+   its column can show — resizing to the CURRENT value made the track (a flex
+   sibling) shift mid-drag and the thumb jump under the cursor. The cap keeps a
+   pathological column from eating the row; the exact value is one click away
+   regardless. */
 .filter-range-row input {
     flex: 0 1 auto;
     width: auto;
@@ -2932,8 +2933,16 @@ hr {
     flex-grow: 1;
     font-size: 12px;
     /* Long property names wrap (breaking mid-word if unavoidable) so the
-       control column never drops below its readable minimum. */
+       control column never drops below its readable minimum — but clamp at two
+       lines with an ellipsis; the full name lives in the title tooltip. Two
+       lines, not one: sibling properties often differ only in a long suffix,
+       and a one-line clamp would render them identically. */
     overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
 }
 
 .checkbox {

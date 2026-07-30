@@ -91,6 +91,46 @@ describe('numeric filter row', () => {
     expect(low.value).toBe('-51.823');
   });
 
+  it('keeps the boxes a fixed width while the handles move', () => {
+    // Sizing the box to the CURRENT value made the track (a flex sibling)
+    // shift mid-drag and the thumb jump under the cursor. The width is now
+    // fixed per slider to the widest endpoint ("7630" plus glyph slack).
+    const { parent, slider } = mount();
+    const [low, high] = boxes(parent);
+    expect(low.size).toBe(5);
+    expect(high.size).toBe(5);
+
+    slider.sliderStart.value = '0';
+    slider.handleThresholdOnInputEvent(true);
+
+    expect(low.value).toBe('0');
+    expect(low.size).toBe(5);
+  });
+
+  it('pads integer-valued numbers on float columns to the fixed precision', () => {
+    // "0" next to "1.500" was the width jump; both boxes now read alike.
+    const { parent } = mount({ lower: 0, upper: 1.5, hasFloatValues: true, listeners: false });
+    const [low, high] = boxes(parent);
+
+    expect(low.value).toBe('0.000');
+    expect(high.value).toBe('1.500');
+    expect(low.size).toBe(high.size);
+  });
+
+  it('restores the resting width after focus grows the box for the exact value', () => {
+    const { parent } = mount({
+      lower: -51.82279968, upper: 68.36260223, hasFloatValues: true, listeners: false,
+    });
+    const [low] = boxes(parent);
+    const resting = low.size;
+
+    low.dispatchEvent(new Event('focus'));
+    expect(low.size).toBe('-51.82279968'.length + 1);
+
+    low.dispatchEvent(new Event('blur'));
+    expect(low.size).toBe(resting);
+  });
+
   it('still accepts an exact threshold typed in and pressed Enter', () => {
     const { parent, slider } = mount();
     const [low] = boxes(parent);

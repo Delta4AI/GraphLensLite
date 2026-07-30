@@ -354,7 +354,7 @@ class InvertibleRangeSlider {
     this.readCurrentFilterSettings();
     this.sliderMin = defaultFilterData.lowerThreshold;
     this.sliderMax = defaultFilterData.upperThreshold;
-    const allInteger =
+    this.allInteger =
       StaticUtilities.isInteger(this.sliderMin) &&
       StaticUtilities.isInteger(this.sliderMax) &&
       !defaultFilterData.hasFloatValues;
@@ -363,7 +363,20 @@ class InvertibleRangeSlider {
     // any high-decimal value) stays exactly selectable via both the slider and
     // the number box, at any column magnitude. A fixed absolute step floored
     // the reachable max below the true max and broke selection of the top node.
-    this.stepSize = allInteger ? this.cache.CFG.FILTER_STEP_SIZE_INTEGER : 'any';
+    this.stepSize = this.allInteger ? this.cache.CFG.FILTER_STEP_SIZE_INTEGER : 'any';
+    // One fixed box width per slider, sized to the widest value it can show.
+    // Sizing the box to the CURRENT value made the track (a flex sibling)
+    // shrink and grow mid-drag, so the thumb jumped under the cursor — worst
+    // near 0 on float columns, where "0" ↔ "0.050" oscillated every frame.
+    // The endpoints bound every in-range value's formatted length: the sign
+    // comes from min, integer digits from the larger magnitude, and decimals
+    // are fixed-width. +1 because `size` counts average character widths and
+    // digits are narrower than average, so an exact count clips the last glyph.
+    this.boxSize = Math.max(
+      3,
+      String(this.formatThreshold(this.sliderMin)).length + 1,
+      String(this.formatThreshold(this.sliderMax)).length + 1
+    );
     this.initializeIds();
     this.inputStart = null;
     this.inputEnd = null;
@@ -426,40 +439,39 @@ class InvertibleRangeSlider {
     this.thumbEnd = document.getElementById(this.thumbEndId);
   }
 
-  /** Rounded for display; the raw value comes back while the box has focus. */
-  formatThreshold(value) {
-    return StaticUtilities.formatNumber(value, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION);
-  }
-
   /**
-   * Write a value into a threshold box and size the box to it. The boxes sit
-   * inline at the ends of the track, so a fixed width either truncates
-   * "-175.150" or steals track from every short-valued row; `size` lets each
-   * one take exactly what it needs and CSS caps the extremes.
+   * Rounded for display; the raw value comes back while the box has focus.
+   * Float columns pad integer-valued numbers to the same fixed precision
+   * ("0" → "0.000") so a slider's two boxes always read — and measure — alike.
    */
-  writeBox(input, text) {
-    if (!input) return;
-    input.value = text;
-    // +1 because `size` counts average character widths and digits are
-    // narrower than average, so an exact count clips the last glyph.
-    input.size = Math.max(3, String(text).length + 1);
+  formatThreshold(value) {
+    const precision = this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION;
+    return this.allInteger
+      ? StaticUtilities.formatNumber(value, precision)
+      : parseFloat(value).toFixed(precision);
   }
 
   createSliderInput(id, initialValue, relatedSliderId, readExact) {
     const input = document.createElement('input');
     input.id = id;
-    this.writeBox(input, this.formatThreshold(initialValue));
+    input.size = this.boxSize;
+    input.value = this.formatThreshold(initialValue);
     // A column of raw floats ("-51.82279968") is what made this row need a
     // line of its own. Rounded at rest, exact the moment you go to edit it —
     // nothing is hidden and the true value stays reachable. The exact value
     // comes from the widget's own state rather than the range input, which
     // holds the same number but only as a string the browser may re-round.
+    // Growing for the exact value is safe here: focus never coincides with a
+    // thumb drag, so the track can't shift under the cursor.
     input.addEventListener('focus', () => {
-      this.writeBox(input, readExact());
+      const exact = String(readExact());
+      input.value = exact;
+      input.size = Math.max(this.boxSize, exact.length + 1);
       input.select();
     });
     input.addEventListener('blur', () => {
-      this.writeBox(input, this.formatThreshold(parseFloat(input.value)));
+      input.value = this.formatThreshold(parseFloat(input.value));
+      input.size = this.boxSize;
     });
     input.addEventListener('keydown', (ev) => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
@@ -682,7 +694,7 @@ class InvertibleRangeSlider {
     }
     // Never overwrite the box being typed into; its own blur reformats it.
     if (box && document.activeElement !== box) {
-      this.writeBox(box, this.formatThreshold(primaryValue));
+      box.value = this.formatThreshold(primaryValue);
     }
   }
 
@@ -1055,6 +1067,9 @@ class UIComponentManager {
     const displayField = document.createElement('span');
     displayField.className = 'checkboxLabel';
     displayField.textContent = prop;
+    // The label clamps at two lines with an ellipsis; the tooltip is the only
+    // place the clamped-away tail of a long property name survives.
+    displayField.title = prop;
 
     const updateCheckbox = () => {
       customCheckbox.textContent = input.checked ? '✔' : '';
