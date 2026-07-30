@@ -239,6 +239,7 @@ class GraphLayoutManager {
         nodeStyles: nodeStyles,
         edgeStyles: edgeStyles,
         bubbleSetStyle: structuredClone(currentLayout.bubbleSetStyle),
+        annotations: structuredClone(currentLayout.annotations ?? []),
       };
 
       // Copy query if it exists
@@ -753,6 +754,7 @@ class GraphLayoutManager {
       nodeStyles: new Map(),
       edgeStyles: new Map(),
       bubbleSetStyle: structuredClone(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE),
+      annotations: [],
     };
 
     if (overridePositionsFromExcel) {

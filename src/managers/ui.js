@@ -418,6 +418,17 @@ class UIManager {
     this.info(enableLasso ? 'Switched to lasso selection mode' : 'Switched to click and drag mode');
   }
 
+  /** Arm the one-shot text-note tool: the next canvas click places a note. */
+  startTextAnnotation() {
+    const layer = this.cache.graph?.annotationLayer;
+    if (!layer) {
+      this.error('Load a graph first.');
+      return;
+    }
+    layer.armPlacement();
+    this.info('Click the canvas to place a text note — Escape to cancel');
+  }
+
   async toggleHoverEffect(btn) {
     const enable = this.cache.CFG.DISABLE_HOVER_EFFECT;
     this.cache.CFG.DISABLE_HOVER_EFFECT = !enable;

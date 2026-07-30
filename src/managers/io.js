@@ -1,5 +1,6 @@
 /* global ExcelJS */ // loaded as a global via vendored src/lib/exceljs.min.js script tag
 import { DEFAULTS, CFG, VERSION } from '../config.js';
+import { sanitizeAnnotations } from '../graph/annotation_geometry.js';
 import { StaticUtilities } from '../utilities/static.js';
 import { buildDataTable } from '../utilities/data_editor.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
@@ -1840,6 +1841,10 @@ class IOManager {
           }
           return merged;
         })(),
+        // Trust boundary for loaded text notes: malformed records are dropped,
+        // fields are clamped/defaulted (annotation_geometry.js). Pre-note
+        // files simply get [].
+        annotations: sanitizeAnnotations(layout.annotations),
       };
 
       for (let group of this.cache.bs.traverseBubbleSets()) {

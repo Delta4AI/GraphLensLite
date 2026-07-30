@@ -15,7 +15,9 @@
  *    the app's SVG texture quads ("shape") and @sigma/node-piechart slices;
  *  - labels/badges: label_renderers.js, including the baked-#000000 theme
  *    fallback and the upright-rotation normalization;
- *  - bubble groups: bubble_layer.js #drawGroup/#drawLabel.
+ *  - bubble groups: bubble_layer.js #drawGroup/#drawLabel;
+ *  - text notes: annotation_layer.js drawExport (shared annotationLayout
+ *    metrics keep the DOM, PNG and SVG boxes identical).
  *
  * Split into collectSvgScene (sigma → flat primitive list) and
  * primitivesToSvg (pure serializer) so vitest can assert geometry and markup
@@ -29,6 +31,11 @@
  * several SVG viewers (and all pre-CSS4 ones) reject hex alpha.
  */
 import { DEFAULTS } from "../config.js";
+import {
+  ANNOTATION_FONT_FAMILY,
+  ANNOTATION_SHADOW,
+  annotationLayout,
+} from "./annotation_geometry.js";
 import { outlineLabelAnchor } from "./bubble_geometry.js";
 import { smoothClosedPath } from "./bubble_smoothing.js";
 import { placementVector, BAKED_DEFAULT_LABEL_COLOR } from "./label_renderers.js";
@@ -36,8 +43,10 @@ import { placementVector, BAKED_DEFAULT_LABEL_COLOR } from "./label_renderers.js
 // Conservative paint-value allowlist (shape_textures.js SAFE_PAINT_RE):
 // hex/rgb()/hsl()/named colors pass; anything that could break out of an
 // attribute (quotes, angle brackets, ampersands, colons) is rejected.
-// url(#localref) passes intentionally (harmless: the document carries no
-// <defs>); the missing ":" blocks url(javascript:…) and url(data:…).
+// url(#localref) passes intentionally (harmless: the only <defs> ever
+// emitted is the note-shadow filter, which is not a paint server — see
+// NOTE_SHADOW_FILTER_DEF); the missing ":" blocks url(javascript:…) and
+// url(data:…).
 const SAFE_PAINT_RE = /^[#a-zA-Z0-9(),.%\s-]+$/;
 const FALLBACK_COLOR = "#999999";
 
@@ -670,6 +679,100 @@ function bubbleLabelPrimitives({ points, opts = {}, defaults = {} }, measureText
   ];
 }
 
+// --- text annotations -----------------------------------------------------------
+
+// Fixed drop-shadow filter for note cards (mirrors the live box-shadow;
+// stdDeviation = CSS blur-radius / 2). Emitted into <defs> only when some
+// note actually uses it. NOTE for SAFE_PAINT_RE above: a user color of
+// url(#gllNoteShadow) would reference a filter as paint — invalid paint,
+// viewers fall back — so the defs stays harmless to that policy.
+const NOTE_SHADOW_FILTER_ID = "gllNoteShadow";
+const NOTE_SHADOW_FILTER_DEF =
+  `<filter id="${NOTE_SHADOW_FILTER_ID}" x="-50%" y="-50%" width="200%" height="200%">` +
+  `<feDropShadow dx="0" dy="${ANNOTATION_SHADOW.offsetY}" stdDeviation="${ANNOTATION_SHADOW.blur / 2}"` +
+  ` flood-color="${ANNOTATION_SHADOW.color}"/></filter>`;
+
+/** Whether any primitive (recursively) references the note shadow filter. */
+function usesNoteShadow(primitives) {
+  return primitives.some(
+    (p) => p.filter === NOTE_SHADOW_FILTER_ID || (p.kind === "group" && usesNoteShadow(p.children))
+  );
+}
+
+/**
+ * One text note as SVG primitives: a group carrying the note's viewport
+ * anchor + zoom scale, containing the border rect and one left-anchored text
+ * line per row. Geometry comes from annotationLayout so the SVG box matches
+ * the live DOM note and the PNG repaint (annotation_layer.js drawExport).
+ *
+ * @param {{ann: object, x: number, y: number, k: number}} placement
+ * @param {(text: string, font: string) => number} measureText
+ * @returns {Array<object>}
+ */
+function annotationPrimitives({ ann, x, y, k }, measureText) {
+  const layout = annotationLayout(ann, measureText);
+  const radius = Number.isFinite(ann.borderRadius) ? Math.max(0, ann.borderRadius) : 0;
+  const children = [];
+  if (ann.bgColor) {
+    children.push({
+      kind: "rect",
+      x: 0,
+      y: 0,
+      width: layout.boxW,
+      height: layout.boxH,
+      rx: radius,
+      fill: safeColor(ann.bgColor),
+      // The filter id is authored here, never user data; the group is scaled
+      // by k, so the filter's user-space offsets zoom with the note like the
+      // DOM box-shadow does.
+      ...(ann.shadow ? { filter: NOTE_SHADOW_FILTER_ID } : {}),
+    });
+  }
+  if (ann.borderWidth > 0) {
+    children.push({
+      kind: "rect",
+      x: ann.borderWidth / 2,
+      y: ann.borderWidth / 2,
+      width: layout.boxW - ann.borderWidth,
+      height: layout.boxH - ann.borderWidth,
+      // Centered stroke: shrink the corner radius with the inset so the
+      // OUTER curve matches the CSS border-radius.
+      rx: Math.max(0, radius - ann.borderWidth / 2),
+      fill: "none",
+      stroke: safeColor(ann.borderColor),
+      strokeWidth: ann.borderWidth,
+    });
+  }
+  const originX = ann.borderWidth + layout.pad;
+  const originY = ann.borderWidth + layout.pad;
+  layout.lines.forEach((line, i) => {
+    if (line === "") return; // an empty row still advances the line stack
+    children.push({
+      ...textPrimitive(
+        originX,
+        // canvas paints with textBaseline "middle" at the line center; the
+        // 0.35 em drop is the same alphabetic-baseline approximation the
+        // bubble labels use.
+        originY + (i + 0.5) * layout.lineHeight + ann.fontSize * 0.35,
+        line,
+        safeColor(ann.fontColor),
+        ann.fontSize,
+        ANNOTATION_FONT_FAMILY,
+        "normal",
+      ),
+      textAnchor: "start",
+    });
+  });
+  if (children.length === 0) return [];
+  return [
+    {
+      kind: "group",
+      transform: `translate(${fmt(x)} ${fmt(y)}) scale(${fmt(k)})`,
+      children,
+    },
+  ];
+}
+
 // --- scene collection ----------------------------------------------------------
 
 /**
@@ -682,7 +785,7 @@ function bubbleLabelPrimitives({ points, opts = {}, defaults = {} }, measureText
  * @returns {Array<object>} primitives ({kind: "rect"|"circle"|"path"|
  *   "polygon"|"line"|"image"|"text"|"group", ...})
  */
-function collectSvgScene({ sigma, graph, bubbleGroups = [], measureText }) {
+function collectSvgScene({ sigma, graph, bubbleGroups = [], annotations = [], measureText }) {
   const env = labelEnvironment(sigma, measureText);
   const nodes = collectNodes(sigma, graph);
   const edges = sortByZIndex(collectEdges(sigma, graph, nodes));
@@ -705,6 +808,8 @@ function collectSvgScene({ sigma, graph, bubbleGroups = [], measureText }) {
     }
   }
   for (const group of bubbleGroups) prims.push(...bubbleLabelPrimitives(group, measureText));
+  // Text notes render topmost, matching the live DOM overlay above every canvas.
+  for (const placement of annotations) prims.push(...annotationPrimitives(placement, measureText));
   return prims;
 }
 
@@ -725,7 +830,9 @@ function paintAttrs(p) {
 function serializePrimitive(p) {
   if (p.kind === "rect") {
     const rx = p.rx !== undefined ? ` rx="${fmt(p.rx)}"` : "";
-    return `<rect x="${fmt(p.x)}" y="${fmt(p.y)}" width="${fmt(p.width)}" height="${fmt(p.height)}"${rx}${paintAttrs(p)}/>`;
+    // p.filter is always an internally-authored id (never user data).
+    const filter = p.filter !== undefined ? ` filter="url(#${escapeXml(p.filter)})"` : "";
+    return `<rect x="${fmt(p.x)}" y="${fmt(p.y)}" width="${fmt(p.width)}" height="${fmt(p.height)}"${rx}${filter}${paintAttrs(p)}/>`;
   }
   if (p.kind === "circle") {
     return `<circle cx="${fmt(p.cx)}" cy="${fmt(p.cy)}" r="${fmt(p.r)}"${paintAttrs(p)}/>`;
@@ -747,7 +854,7 @@ function serializePrimitive(p) {
     return (
       `<text x="${fmt(p.x)}" y="${fmt(p.y)}" fill="${escapeXml(p.fill)}"` +
       ` font-size="${fmt(p.fontSize)}" font-family="${escapeXml(p.fontFamily)}"` +
-      ` font-weight="${escapeXml(p.fontWeight)}" text-anchor="middle">${escapeXml(p.text)}</text>`
+      ` font-weight="${escapeXml(p.fontWeight)}" text-anchor="${escapeXml(p.textAnchor ?? "middle")}">${escapeXml(p.text)}</text>`
     );
   }
   if (p.kind === "group") {
@@ -769,8 +876,9 @@ function primitivesToSvg(primitives, dims, background) {
   const h = fmt(dims.height);
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`,
-    `<rect x="0" y="0" width="${w}" height="${h}" fill="${escapeXml(safeColor(background))}"/>`,
   ];
+  if (usesNoteShadow(primitives)) parts.push(`<defs>${NOTE_SHADOW_FILTER_DEF}</defs>`);
+  parts.push(`<rect x="0" y="0" width="${w}" height="${h}" fill="${escapeXml(safeColor(background))}"/>`);
   for (const p of primitives) parts.push(serializePrimitive(p));
   parts.push("</svg>");
   return parts.join("\n");
@@ -787,6 +895,7 @@ function primitivesToSvg(primitives, dims, background) {
  * @param {{width: number, height: number}} args.dims  CSS px
  * @param {string} args.background  CSS color for the page rect
  * @param {Array<{group: string, points: Array<{x: number, y: number}>, opts: object, defaults: object}>} args.bubbleGroups
+ * @param {Array<{ann: object, x: number, y: number, k: number}>} [args.annotations]
  * @param {(text: string, font: string) => number} args.measureText
  * @returns {string} standalone SVG document
  */
@@ -814,4 +923,4 @@ function buildGraphSvg(args) {
   return primitivesToSvg(collectSvgScene(args), dims, args.background);
 }
 
-export { buildGraphSvg, collectSvgScene, primitivesToSvg };
+export { buildGraphSvg, collectSvgScene, primitivesToSvg, annotationPrimitives };

@@ -46,6 +46,7 @@ import { drawNodeLabel, drawEdgeLabel, BAKED_DEFAULT_LABEL_COLOR } from './label
 import { InteractionManager } from './interactions.js';
 import { BubbleSetLayer } from './bubble_layer.js';
 import { HeatmapLayer } from './heatmap_layer.js';
+import { AnnotationLayer } from './annotation_layer.js';
 import { Minimap } from './minimap.js';
 import { watchDevicePixelRatio } from './dpr_watch.js';
 
@@ -394,6 +395,7 @@ class SigmaAdapter {
     // atmospheric field under the bubble bodies.
     this.heatmapLayer = new HeatmapLayer(this);
     this.bubbleLayer = new BubbleSetLayer(this, cache);
+    this.annotationLayer = new AnnotationLayer(this, cache, containerEl);
     this.minimap = new Minimap(this, containerEl);
     this.flowAnimator = new FlowAnimator(this);
     this.#syncLabelVisibility();
@@ -471,6 +473,7 @@ class SigmaAdapter {
     this.flowAnimator.destroy();
     this.heatmapLayer.destroy();
     this.bubbleLayer.destroy();
+    this.annotationLayer.destroy();
     this.minimap.destroy();
     this.interactions.destroy();
     this.sigma.kill();
@@ -970,6 +973,8 @@ class SigmaAdapter {
       // Group labels sit above sigma's node labels on screen (their own canvas
       // at afterLayer "labels"); composite them last to keep that z-order.
       this.bubbleLayer.drawExportLabels(ctx, bubbleGroups, dpr * appliedScale);
+      // Text notes live in the DOM above every canvas — repaint them topmost.
+      this.annotationLayer.drawExport(ctx, dpr * appliedScale);
       return { url: out.toDataURL('image/png'), requestedScale: scale, appliedScale };
     } catch (error) {
       throw new Error(`Graph image export failed: ${error?.message ?? error}`);
@@ -1027,6 +1032,7 @@ class SigmaAdapter {
       dims,
       background: this.#stageBackgroundColor(),
       bubbleGroups: this.bubbleLayer.exportOutlines(),
+      annotations: this.annotationLayer.exportPlacements(),
       measureText,
     });
     return { svg, width: dims.width, height: dims.height };

@@ -6824,3 +6824,106 @@ input:checked + .slider:before {
         animation-duration: 0.01ms;
     }
 }
+
+/* --- Text annotations (notes) — annotation_layer.js ----------------------- */
+
+/* Full-stage host; individual notes re-enable pointer events themselves. */
+.annotation-layer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* Anchored at its graph-space top-left and scaled by 1/zoom via transform;
+   font/color/border/padding are inline (per-note style). content-box keeps
+   the border additive to the padded text box — the same arithmetic the
+   PNG/SVG export painters use (annotation_geometry.js). */
+.annotation-note {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    box-sizing: content-box;
+    pointer-events: auto;
+    cursor: grab;
+    white-space: pre;
+    user-select: none;
+}
+
+.annotation-note:focus-visible {
+    outline: 2px solid var(--accent-text, #4d90fe);
+    outline-offset: 2px;
+}
+
+.annotation-note.editing {
+    cursor: text;
+    user-select: text;
+    outline: none;
+}
+
+/* One-shot placement catcher: swallows the next click at crosshair, sits
+   above the lasso overlay (900) and below the toolbar (1000). */
+.annotation-placement-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 950;
+    cursor: crosshair;
+    touch-action: none;
+}
+
+.annotation-popover {
+    position: fixed;
+    z-index: 1100;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 190px;
+    padding: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    color: var(--text);
+    font-size: 12.5px;
+}
+
+.annotation-popover-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.annotation-popover-row input[type='number'] {
+    width: 64px;
+}
+
+.annotation-popover-row input[type='color'] {
+    width: 64px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+}
+
+.annotation-popover-delete {
+    margin-top: 4px;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: #c33d35;
+    cursor: pointer;
+}
+
+.annotation-popover-delete:hover {
+    border-color: #c33d35;
+}
+
+.annotation-popover-pair {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
