@@ -334,6 +334,7 @@ class GraphBubbleSetManager {
 
     // Force bubble set redraw to fix positioning
     await this.redrawBubbleSets();
+    this.cache.history?.commit(`Bubble group membership (${group})`);
   }
 
   /**
@@ -407,6 +408,7 @@ class GraphBubbleSetManager {
     await this.updateBubbleSetIfChanged();
     await this.cache.graph.draw();
     await this.redrawBubbleSets();
+    this.cache.history?.commit('Auto-group');
 
     const assignedText = result.communityCount <= groups.length
       ? `all ${result.communityCount}`
@@ -658,6 +660,7 @@ class GraphBubbleSetManager {
     this.cache.bubbleSetChanged = true;
     await this.updateBubbleSetIfChanged();
     await this.cache.graph.draw();
+    this.cache.history?.commit(`Clear bubble group (${group})`);
   }
 
   cleanupManualGroupMembers() {
@@ -705,6 +708,7 @@ class GraphBubbleSetManager {
     await this.redrawBubbleSets();
 
     this.cache.ui.info('Cleared all bubble groups');
+    this.cache.history?.commit('Clear all bubble groups');
   }
 }
 

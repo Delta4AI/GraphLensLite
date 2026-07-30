@@ -61,6 +61,9 @@ class GraphFilterManager {
         this.cache.EVENT_LOCKS.QUERY_UPDATE_EVENT = false;
       }
     }
+    // The funnel for every filter change: single rows, section toggles, resets
+    // and an applied query all end here, and `header` already names which.
+    this.cache.history?.commit(header);
   }
 
   resetFeatureIsWithinThresholdMaps() {

@@ -239,6 +239,9 @@ class GraphCoreManager {
       }
 
       await this.applyHideDisconnectedState();
+
+      // The graph is now settled: this is the state undo winds back to.
+      this.cache.history?.reset();
     } catch (errorMsg) {
       this.cache.ui.error(`Error in initial AFTER_RENDER: ${errorMsg}`);
       this.cache.ui.error('Graph setup failed. Please check your input data.');
@@ -508,6 +511,7 @@ class GraphCoreManager {
     }
 
     await this.cache.style.handleStyleChangeLoadingEvent('Style', 'Updating Edge Styles');
+    if (this.cache.selectedEdges.length) this.cache.history?.commit('Edge style change');
   }
 
   async updateNodes(overrides = {}, commands = []) {
@@ -620,6 +624,7 @@ class GraphCoreManager {
     }
 
     await this.cache.style.handleStyleChangeLoadingEvent('Style', `Updating Node Styles`);
+    if (this.cache.selectedNodes.length) this.cache.history?.commit('Node style change');
   }
 
   getTargetNodes(propID) {
@@ -767,6 +772,8 @@ class GraphCoreManager {
     // syncPositionsDebounced.cancel?.();
 
     this.cache.ui?.clearLog?.();
+    // The snapshots describe a graph that no longer exists.
+    this.cache.history?.reset();
   }
 
   registerHotkeyEvents() {
@@ -787,6 +794,15 @@ class GraphCoreManager {
         activeElement.tagName === 'SELECT' ||
         activeElement.isContentEditable
       ) {
+        return;
+      }
+
+      // Undo/redo are the only modified hotkeys — handled before the switch,
+      // which matches on the bare key and would otherwise fire on Ctrl+Z too.
+      if ((event.ctrlKey || event.metaKey) && 'zZyY'.includes(event.key)) {
+        event.preventDefault();
+        const redo = event.shiftKey || event.key.toLowerCase() === 'y';
+        await (redo ? this.cache.history?.redo() : this.cache.history?.undo());
         return;
       }
 

@@ -90,6 +90,12 @@
   <select name="selectView" id="selectView" hidden onchange="cache.lm.changeLayout()" aria-hidden="true" tabindex="-1"></select>
   <input type="file" id="fileInput" name="fileInput" hidden onchange="cache.io.loadFileWrapper(event);"
          accept=".json, .xls, .xlsx"/>
+  <div class="rail-hist">
+    <button id="historyUndoBtn" class="rail-mini disabled" aria-label="Undo"
+            title="Nothing to undo" onclick="cache.history.undo()">↶</button>
+    <button id="historyRedoBtn" class="rail-mini disabled" aria-label="Redo"
+            title="Nothing to redo" onclick="cache.history.redo()">↷</button>
+  </div>
   <div class="rail-div"></div>
   <button class="rail-vb" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">
     <span class="rail-vb-g">⛶</span><span class="rail-vb-t">Fit</span>

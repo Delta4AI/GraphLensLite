@@ -32,6 +32,7 @@ import {initInspector} from "./managers/inspector.js";
 import {initWorkbench} from "./managers/workbench.js";
 import {initFilterSurface} from "./managers/filter_surface.js";
 import {initCommandPalette} from "./managers/command_palette.js";
+import {initHistory} from "./managers/history.js";
 
 
 // Stores all reference objects
@@ -101,6 +102,7 @@ class Cache {
     this.dataTable = new DataTable(this);
     this.metrics = new NetworkMetrics(this);
     this.assistant = new AssistantManager(this);
+    this.history = initHistory(this);
     this.buildDataTable = buildDataTable;
   }
 

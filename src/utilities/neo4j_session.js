@@ -295,6 +295,8 @@ async function mergeAndApply(cache, newNodes, newRels, deps = {}) {
       await settle(cache.graphData, newIds);
       await cache.lm.persistNodePositions();
     }
+    // A merge is structural: earlier snapshots describe a smaller graph.
+    cache.history?.reset();
   }
   return rendered;
 }

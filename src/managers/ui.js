@@ -5,7 +5,7 @@ import { Popup } from '../utilities/popup.js';
 import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
 import { refreshNeo4jSessionUI } from '../utilities/neo4j_loader.js';
 import { isFilterNarrowed } from './query.js';
-import { paletteAccelerator } from './command_palette.js';
+import { hotkeyLabel, paletteAccelerator } from './command_palette.js';
 
 // Persisted preference: how multiple active filters combine — "OR" (match any)
 // or "AND" (match every, non-strict: a property an element lacks does not
@@ -22,6 +22,8 @@ const FILTER_STRICT_KEY = 'gll.filterStrict';
 // in graph/core.js registerHotkeyEvents — update both when a key changes.
 const KEYBOARD_SHORTCUTS = [
   [paletteAccelerator(), 'Find any control, node or property by name'],
+  [hotkeyLabel('Z'), 'Undo the last change to this workspace'],
+  [hotkeyLabel('Y'), 'Redo it (⇧ with undo works too)'],
   ['P', 'Export PNG image (at the remembered resolution)'],
   ['S', 'Save graph as JSON'],
   ['F', 'Fit view to visible elements'],

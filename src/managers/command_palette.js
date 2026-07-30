@@ -458,12 +458,16 @@ class CommandPalette {
 
 /**
  * "⌘K" everywhere would be a lie on Linux and Windows, where the palette
- * answers to Ctrl+K. One source for the rail pill, the tooltip and the
- * keyboard sheet.
+ * answers to Ctrl+K. One source for every rail pill, tooltip and keyboard-sheet
+ * row that names a modified key.
  */
-export function paletteAccelerator() {
+export function hotkeyLabel(key) {
   const platform = globalThis.navigator?.platform ?? '';
-  return /Mac|iPhone|iPad/.test(platform) ? '⌘K' : 'Ctrl K';
+  return /Mac|iPhone|iPad/.test(platform) ? `⌘${key}` : `Ctrl ${key}`;
+}
+
+export function paletteAccelerator() {
+  return hotkeyLabel('K');
 }
 
 /** Safe in DOMs without the palette markup (unit tests): returns null. */

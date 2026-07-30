@@ -13,7 +13,12 @@ class GraphLayoutManager {
     this.cache.ui.debug(`Graph updated after layout event with message ${header} ${text}`);
   }
 
-  async changeLayout() {
+  /**
+   * Apply the selected workspace's stored state to the screen. `message`
+   * overrides the closing status line — undo/redo re-use this path and say what
+   * they restored rather than claiming a workspace switch.
+   */
+  async changeLayout(message = null) {
     this.cache.data.selectedLayout = document.getElementById('selectView').value;
     await this.cache.ui.showLoading('Switching Workspace', this.cache.data.selectedLayout);
     // Pin the overlay up across the whole switch so the inner render's
@@ -85,7 +90,10 @@ class GraphLayoutManager {
         await this.cache.graph.runLayoutTransition(currentLayout.positions);
       }
 
-      this.cache.ui.info(`Switched to workspace: ${this.cache.data.selectedLayout}`);
+      this.cache.ui.info(message ?? `Switched to workspace: ${this.cache.data.selectedLayout}`);
+      // Snapshots describe one workspace's state; a real switch invalidates
+      // them. A restore drives this same path and re-baselines itself.
+      if (!message) this.cache.history?.reset();
     } finally {
       // Defensive: if a step above threw before the release, drop the hold and
       // the overlay here so a failed switch never strands a blocked UI.
@@ -568,6 +576,7 @@ class GraphLayoutManager {
 
     await this.persistNodePositions();
     await this.handleLayoutChangeLoadingEvent(action, eventLabels[action]);
+    this.cache.history?.commit(`Arrange selection (${action})`);
   }
 
   /**
@@ -590,6 +599,7 @@ class GraphLayoutManager {
       'Remove overlaps',
       'Spread overlapping nodes apart minimally'
     );
+    this.cache.history?.commit('Remove overlaps');
   }
 
   /**
@@ -687,6 +697,7 @@ class GraphLayoutManager {
       }
 
       this.cache.ui.info(`Re-layouted workspace: ${currentName} (${layoutType})`);
+      this.cache.history?.commit(`Re-layout (${layoutType})`);
     } finally {
       // Defensive: release the hold + drop the overlay on any failure so a
       // half-applied re-layout never strands a blocked UI; clear the tween flag.

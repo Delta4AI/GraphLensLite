@@ -49,7 +49,7 @@ The rendering and graph-operation core. Key modules:
   `visible_graph.js`, `lasso_geometry.js`, `communities.js`, `export_svg.js`,
   `webgl_support.js`
 
-### Functional managers (`src/managers/`, 12 files + `assistant/`)
+### Functional managers (`src/managers/`, 13 files + `assistant/`)
 
 Business logic and UI:
 
@@ -66,6 +66,9 @@ Business logic and UI:
 - `command_palette.js` — `⌘K` / `Ctrl+K`: one search over every control, node and
   edge. The index is scraped from the live DOM on each open, so it cannot drift
   from the UI; rows print the control's breadcrumb and accelerator
+- `history.js` — global undo/redo (`Ctrl+Z` / `Ctrl+Y`). Snapshots the current
+  workspace's whole view state and restores it through `lm.changeLayout()`, so a
+  feature that stores something new on the layout is undoable for free
 - `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, IS FOREIGN,
   comparisons)
 - `ui_components.js` — filter UI (dropdown checklists, invertible range sliders), tooltips

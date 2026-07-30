@@ -165,6 +165,14 @@ body {
     white-space: nowrap;
 }
 
+/* Global undo/redo, next to the workspace chip they act on. Distinct from the
+   selection chip's ↶↷, which walk the selection stack only. */
+.rail-hist {
+    display: flex;
+    gap: 2px;
+    flex: none;
+}
+
 .rail-div {
     width: 1px;
     height: 26px;
