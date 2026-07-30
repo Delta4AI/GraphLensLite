@@ -766,9 +766,7 @@ class GraphCoreManager {
     // isPositionsDirty = false;
     // syncPositionsDebounced.cancel?.();
 
-    const status = document.getElementById('sidebarStatusContainer');
-    status.innerHTML = '';
-    status.style.height = '0';
+    this.cache.ui?.clearLog?.();
   }
 
   registerHotkeyEvents() {

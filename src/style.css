@@ -485,22 +485,141 @@ body {
     backdrop-filter: blur(1px);
 }
 
+/* The activity log at the foot of the inspector. Collapsed by default — the
+   toast carries the newest message; this is the scrollback (and the assistant's
+   readRecentActions source, so it must stay in the DOM either way). */
+.insp-log {
+    flex: none;
+    border-top: 1px solid var(--border);
+}
+
+.insp-log-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 5px 10px;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.insp-log-toggle:hover {
+    color: var(--accent-text);
+}
+
+.insp-log-toggle[aria-expanded="true"] .insp-log-chevron {
+    transform: rotate(90deg);
+}
+
+.insp-log-chevron {
+    display: inline-block;
+    transition: transform 0.15s ease;
+}
+
+.insp-log-count {
+    margin-left: auto;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--text-muted);
+}
+
+/* An author `display` beats the UA sheet's [hidden] on specificity — without
+   this the collapsed strip stays on screen (same trap as .filter-row[hidden]). */
+#sidebarStatusContainer[hidden] {
+    display: none;
+}
+
 #sidebarStatusContainer {
     display: flex;
     align-items: flex-start;
     flex-direction: column;
     flex: none;
-    height: 0;
-
-    transition: height 0.3s ease-in-out;
+    max-height: 28vh;
 
     width: 100%;
+    box-sizing: border-box;
+    padding: 0 10px 6px 10px;
     overflow-y: auto;
-    /* overflow-x: hidden; */
-    border-top: 1px solid var(--border);
     font-size: 0.8rem;
     white-space: pre-wrap;
     word-wrap: break-word;
+}
+
+/* ---- toasts: the transient copy of the newest message, over the stage ---- */
+.toasts {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    /* The stack must never eat clicks meant for the canvas — only the toasts do */
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(560px, 80vw);
+    padding: 7px 8px 7px 12px;
+    font-size: 12.5px;
+    line-height: 1.35;
+    color: var(--text);
+    background: var(--surface-translucent);
+    backdrop-filter: blur(3px);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border-strong);
+    border-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+    pointer-events: auto;
+    animation: toast-in 0.18s ease-out;
+}
+
+.toast-green { border-left-color: var(--success-text); }
+.toast-dark-orange { border-left-color: #e7671f; }
+.toast-red { border-left-color: var(--accent-text); font-weight: 600; }
+
+.toast-text {
+    overflow-wrap: anywhere;
+}
+
+.toast-dismiss {
+    flex: none;
+    margin-left: auto;
+    padding: 2px 6px;
+    font: inherit;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.toast-dismiss:hover {
+    color: var(--accent-text);
+    background: var(--surface-3);
+}
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .toast { animation: none; }
+    .insp-log-chevron { transition: none; }
 }
 
 /* The workbench overlays the bottom of the stage — it covers the canvas and

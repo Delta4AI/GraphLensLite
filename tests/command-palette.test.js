@@ -91,6 +91,12 @@ function dom() {
         <button id="shortestPathBtn" aria-disabled="true"
                 title="Shortest path (needs 2 selected nodes)">Shortest path</button>
       </section>
+      <div id="inspectorLog">
+        <button id="logToggleBtn" aria-expanded="false" title="Activity log — every message this session">
+          <span>▸</span><span>Activity log</span><span id="logCount">7</span>
+        </button>
+        <div id="sidebarStatusContainer" hidden></div>
+      </div>
     </aside>
     <section id="workbench">
       <div class="query-buttons" style="display: none;">
@@ -222,6 +228,17 @@ describe('the index is derived from the DOM', () => {
     btn.textContent = 'Search';
     document.getElementById('rail').appendChild(btn);
     expect(named(collectCommands(cache), 'Search')).toBeUndefined();
+  });
+
+  it('indexes the activity log, named without its line count', () => {
+    const cmd = named(collectCommands(cache), 'Activity log');
+    expect(cmd.trail).toBe('Inspector');
+    expect(cmd.el.id).toBe('logToggleBtn');
+  });
+
+  it('leaves the activity log out while it has nothing to show', () => {
+    document.getElementById('inspectorLog').hidden = true;
+    expect(named(collectCommands(cache), 'Activity log')).toBeUndefined();
   });
 
   it('drops duplicates of the same name in the same place', () => {

@@ -981,10 +981,7 @@ class DataTable {
     await this.cache.graph?.destroy();
     this.cache.graph = null;
 
-    const status = document.getElementById('sidebarStatusContainer');
-    status.innerHTML = '';
-    status.style.height = '0';
-
+    // The log is cleared by destroyGraphAndRollBackUI below.
     await this.cache.gcm.destroyGraphAndRollBackUI();
     this.cache.gcm.resetEventLocks();
 

@@ -166,6 +166,12 @@ function collectInspector(out) {
       );
     }
   }
+  // The activity log sits below both panels, so the loop above cannot see it.
+  // Its own label carries the line count, which is state, not a name.
+  const logToggle = document.getElementById('logToggleBtn');
+  if (logToggle && !logToggle.closest('[hidden]')) {
+    out.push(command(logToggle, 'Inspector', { glyph: '⚙', name: 'Activity log' }));
+  }
 }
 
 function collectWorkbench(cache, out) {

@@ -37,6 +37,17 @@ const KEYBOARD_SHORTCUTS = [
   ['?', 'Show this sheet'],
 ];
 
+// Toasts. Every message still lands in the activity log (the assistant reads it
+// back as context, and the Neo4j connector writes its Cypher trace there) — the
+// toast is only the transient copy of the newest one. "grey" is trace severity:
+// log-only, or a multi-statement Neo4j expand would fire a stack of toasts.
+const TOAST_MS = { red: 9000, 'dark-orange': 7000 };
+const TOAST_DEFAULT_MS = 4500;
+const MAX_TOASTS = 4;
+// The log is a ring: readRecentActions only ever reads the last 20 lines, and an
+// unbounded strip grows for the whole session.
+const LOG_MAX_LINES = 200;
+
 class UIManager {
   constructor(cache, debugEnabled = false) {
     this.cache = cache;
@@ -229,7 +240,6 @@ class UIManager {
     const timestamp = StaticUtilities.getTimestamp();
 
     const container = document.getElementById('sidebarStatusContainer');
-    container.style.height = '8%';
 
     const p = document.createElement('p');
     p.style.margin = '0 0 1px 0';
@@ -253,7 +263,79 @@ class UIManager {
     p.appendChild(spanText);
 
     container.appendChild(p);
+    while (container.childElementCount > LOG_MAX_LINES) container.firstElementChild.remove();
     container.scrollTop = container.scrollHeight;
+    this.#syncLogFooter(container);
+
+    return this.showToast(text, colorClass, iconPrefix);
+  }
+
+  /**
+   * The transient copy of a message, over the stage. Returns the element so a
+   * caller can hang an action on it (the undo slice does).
+   */
+  showToast(text, colorClass = 'black', iconPrefix = '') {
+    if (colorClass === 'grey') return null;
+
+    const host = document.getElementById('toasts');
+    if (!host) return null;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${colorClass}`;
+
+    if (iconPrefix) {
+      const icon = document.createElement('span');
+      icon.className = 'toast-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = iconPrefix;
+      toast.appendChild(icon);
+    }
+
+    const body = document.createElement('span');
+    body.className = 'toast-text';
+    body.textContent = text;
+    toast.appendChild(body);
+
+    const dismiss = document.createElement('button');
+    dismiss.className = 'toast-dismiss';
+    dismiss.setAttribute('aria-label', 'Dismiss message');
+    dismiss.title = 'Dismiss (the activity log keeps it)';
+    dismiss.textContent = '✕';
+    dismiss.addEventListener('click', () => toast.remove());
+    toast.appendChild(dismiss);
+
+    host.appendChild(toast);
+    while (host.childElementCount > MAX_TOASTS) host.firstElementChild.remove();
+    setTimeout(() => toast.remove(), TOAST_MS[colorClass] ?? TOAST_DEFAULT_MS);
+
+    return toast;
+  }
+
+  /** Empty the activity log (a new graph makes every line stale). */
+  clearLog() {
+    const container = document.getElementById('sidebarStatusContainer');
+    if (!container) return;
+    container.replaceChildren();
+    this.#syncLogFooter(container);
+  }
+
+  /** Expand/collapse the log strip at the foot of the inspector. */
+  toggleLog() {
+    const container = document.getElementById('sidebarStatusContainer');
+    const btn = document.getElementById('logToggleBtn');
+    if (!container || !btn) return;
+    const open = container.hidden;
+    container.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+    if (open) container.scrollTop = container.scrollHeight;
+  }
+
+  #syncLogFooter(container) {
+    const footer = document.getElementById('inspectorLog');
+    const count = document.getElementById('logCount');
+    const lines = container.childElementCount;
+    if (footer) footer.hidden = lines === 0;
+    if (count) count.textContent = lines ? String(lines) : '';
   }
 
   info(message) {

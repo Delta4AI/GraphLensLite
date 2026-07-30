@@ -165,6 +165,7 @@
 <div id="mainContent">
   <div id="outerGraphContainer">
     <div id="innerGraphContainer"></div>
+    <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
     <section id="workbench" aria-label="Workbench" hidden>
       <div class="resize-handle"></div>
       <div class="panel-header panel-header-full-width">
@@ -347,7 +348,17 @@
         <div id="inspectorAppearanceMount"></div>
       </section>
     </div>
-    <div id="sidebarStatusContainer"></div>
+    <div id="inspectorLog" class="insp-log" hidden>
+      <button id="logToggleBtn" class="insp-log-toggle" aria-expanded="false"
+              aria-controls="sidebarStatusContainer"
+              title="Activity log — every message this session, oldest first"
+              onclick="cache.ui.toggleLog()">
+        <span class="insp-log-chevron" aria-hidden="true">▸</span>
+        <span>Activity log</span>
+        <span id="logCount" class="insp-log-count"></span>
+      </button>
+      <div id="sidebarStatusContainer" hidden></div>
+    </div>
   </aside>
 </div>
 <dialog id="cmdk" aria-label="Command palette">
