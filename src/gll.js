@@ -30,7 +30,7 @@ import {initRail} from "./managers/rail.js";
 import {initTheme} from "./utilities/theme.js";
 import {initInspector} from "./managers/inspector.js";
 import {initWorkbench} from "./managers/workbench.js";
-import {initFilterSurface} from "./managers/filter_surface.js";
+import {initFilterSearch} from "./managers/filter_search.js";
 import {initCommandPalette} from "./managers/command_palette.js";
 import {initHistory} from "./managers/history.js";
 
@@ -475,7 +475,7 @@ window.addEventListener("DOMContentLoaded", () => {
   cache.rail = initRail(cache);
   cache.inspector = initInspector();
   cache.workbench = initWorkbench(cache);
-  cache.filterSurface = initFilterSurface(cache);
+  initFilterSearch();
   cache.palette = initCommandPalette(cache);
   cache.ui.updateDarkModeButton();
   // cache.initialize();

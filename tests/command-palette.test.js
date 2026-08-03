@@ -42,8 +42,7 @@ function dom() {
             <button class="insp-btn">◈ By name or ID</button>
           </div>
         </div>
-        <div id="filterHome">
-          <div id="filterContainer">
+        <div id="filterContainer">
             <div class="filter-toolbar">
               <button id="joinAnd" title="Combine active filters with AND">AND</button>
             </div>
@@ -75,7 +74,6 @@ function dom() {
               </div>
             </div>
           </div>
-        </div>
       </section>
       <section id="inspectorOverlays" class="insp-panel" hidden>
         <h4 class="insp-section-title">Density heatmap</h4>

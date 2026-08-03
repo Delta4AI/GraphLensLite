@@ -228,10 +228,9 @@ const TOUR_STEPS = [
            <hr style="margin:6px 0;border-color:#dddbe2;">
            Every numeric property also carries <strong>exact min/max input boxes</strong> under its slider, so you can type a threshold instead of dragging for it. Nothing here is hidden behind a toggle; fold a whole section away with the <strong>▾</strong> chevron on its header when the list gets long.
            <br><br>
-           With a lot of properties, <strong>⤢</strong> at the top of the inspector spreads this whole list across the stage in columns, with a search box to jump straight to a property. <strong>Escape</strong> brings it back.`,
+           With a lot of properties, the <strong>search box</strong> at the top of the panel jumps straight to one — it matches on the section and group names too.`,
     target: '#filterContainer',
     position: 'left',
-    action: 'collapseFilterSurface',
   },
   {
     title: 'Graph Canvas',
@@ -713,13 +712,6 @@ class GuidedTour {
       // Workbench tabs never close each other, so every "open X" step is one
       // call — the old close-the-other-editor dances are gone with the
       // exclusive bottom-bar slot.
-      // This step points at #filterContainer and anchors its popup to the
-      // left, which only lands right while the filters are in the inspector.
-      case 'collapseFilterSurface': {
-        this.cache.filterSurface?.close();
-        await this.sleep(350);
-        break;
-      }
       case 'openMetricsPanel': {
         this.cache.workbench?.show('metrics');
         await this.sleep(350);
@@ -793,7 +785,6 @@ class GuidedTour {
 
     // Put the shell back the way a fresh load leaves it.
     this.cache.workbench?.close();
-    this.cache.filterSurface?.close();
     this.cache.inspector?.setContext('filters');
   }
 }
