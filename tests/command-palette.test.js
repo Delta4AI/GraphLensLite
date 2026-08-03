@@ -76,9 +76,16 @@ function dom() {
           </div>
       </section>
       <section id="inspectorOverlays" class="insp-panel" hidden>
-        <h4 class="insp-section-title">Density heatmap</h4>
-        <div id="inspectorOverlaysMount">
+        <div id="inspectorLayerCards">
           <div class="card-labeled collapsed" data-label="Density Heatmap">
+            <div class="card-collapse-bar">
+              <button id="overlaySwitchHeatmap" role="switch" aria-checked="false"
+                      aria-label="Density heatmap"></button>
+              <button class="card-collapse-header" aria-expanded="false"
+                      aria-label="Density heatmap settings">
+                <span class="card-collapse-title">Density heatmap</span>
+              </button>
+            </div>
             <div class="card-row">
               <label>Intensity</label><input id="heatIntensity" type="range">
             </div>
@@ -169,14 +176,36 @@ describe('the index is derived from the DOM', () => {
 
   it('gives inspector controls a breadcrumb of context, section and card', () => {
     const cmds = collectCommands(cache);
+    // A card with no section heading above it: context › card.
     expect(named(cmds, 'Reset')).toMatchObject({
-      trail: 'Inspector › Overlays › Density heatmap',
+      trail: 'Inspector › Overlays › Density Heatmap',
+    });
+    // And one under a heading: context › section › card.
+    expect(named(cmds, 'Shortest path')).toMatchObject({
+      trail: 'Inspector › Selection › Appearance',
     });
   });
 
+  it('indexes a layer switch and its disclosure as separate destinations', () => {
+    // The overlays used to be rail-menu rows. As layer-stack switches they must
+    // stay reachable: the switch runs, the disclosure opens the parameters, and
+    // the two carry different names so the list does not read double.
+    const cmds = collectCommands(cache);
+    expect(named(cmds, 'Density heatmap')).toMatchObject({
+      trail: 'Inspector › Overlays › Density Heatmap',
+      kind: 'run',
+    });
+    expect(named(cmds, 'Density heatmap settings')).toBeTruthy();
+  });
+
   it('collapses a stuttering breadcrumb when a section holds a card of its own name', () => {
-    // The section title is "Density heatmap" and the card's data-label is
-    // "Density Heatmap" — one step, not two.
+    // No panel in the app stutters today, but the guard is cheap and the next
+    // heading that matches a card label gets it for free.
+    const panel = document.getElementById('inspectorOverlays');
+    const heading = document.createElement('h4');
+    heading.className = 'insp-section-title';
+    heading.textContent = 'Density heatmap';
+    panel.insertBefore(heading, panel.firstChild);
     expect(named(collectCommands(cache), 'Reset').trail).not.toMatch(/Density heatmap › Density/i);
   });
 
@@ -227,7 +256,7 @@ describe('the index is derived from the DOM', () => {
       <button class="style-inner-button style-color-button"
               title="Set Node Fill Color of the selected elements to red (#f00)."></button>
       <input type="text">`;
-    document.getElementById('inspectorOverlaysMount').appendChild(row);
+    document.getElementById('inspectorLayerCards').appendChild(row);
     const cmds = collectCommands(cache);
     expect(cmds.filter((c) => c.name.startsWith('Set Node Fill Color'))).toHaveLength(0);
     expect(named(cmds, 'Fill Color')).toMatchObject({ kind: 'reveal' });

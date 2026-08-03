@@ -146,14 +146,12 @@ class GraphBubbleSetManager {
   }
 
   refreshBubbleStyleElements() {
-    let anyGroupActive = false;
     for (const group of this.traverseBubbleSets()) {
       const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
       const bubbleStyle = currentLayout.bubbleSetStyle[group];
 
       // Same union the outline renders (see getEffectiveGroupMembers).
       const hasActiveMembers = this.getEffectiveGroupMembers(group).size > 0;
-      if (hasActiveMembers) anyGroupActive = true;
       const labelConfigShouldBeEnabled = bubbleStyle.label;
 
       // toggle entire cards based on bubble group members
@@ -221,11 +219,13 @@ class GraphBubbleSetManager {
       }
     }
 
-    // Toggle the entire bubble sets card when no groups are active
-    const outerCard = document.querySelector(".bubble-set-config-card-header");
-    if (outerCard) {
-      anyGroupActive ? outerCard.classList.remove("disabled") : outerCard.classList.add("disabled");
-    }
+    // The whole card is no longer greyed when no group has members: it now
+    // holds Auto-detect, the way groups get created in the first place, so
+    // greying it would lock the user out of the only exit. The per-group
+    // panels above still grey themselves, which is the honest scope.
+
+    // Membership changed, so the layer row's "N sets" is stale.
+    this.cache.ui?.syncOverlays?.();
   }
 
   async updateBubbleSetIfChanged() {

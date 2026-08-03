@@ -140,7 +140,6 @@ class Rail {
     const relayoutBtn = document.getElementById('relayoutBtn');
     const exportMenuBtn = document.getElementById('exportMenuBtn');
     const selectMenuBtn = document.getElementById('selectMenuBtn');
-    const overlaysMenuBtn = document.getElementById('overlaysMenuBtn');
 
     if (appMenuBtn) {
       this.menus.push(new RailMenu(appMenuBtn, (el) => this.#buildAppMenu(el), {
@@ -154,9 +153,6 @@ class Rail {
       this.menus.push(new RailMenu(selectMenuBtn, (el) => this.#buildSelectMenu(el), {
         staticBuild: true,
       }));
-    }
-    if (overlaysMenuBtn) {
-      this.menus.push(new RailMenu(overlaysMenuBtn, (el) => this.#buildOverlaysMenu(el)));
     }
     if (workspaceChip) {
       this.menus.push(new RailMenu(workspaceChip, (el) => this.#buildWorkspaceMenu(el)));
@@ -373,52 +369,6 @@ class Rail {
       'Build a selection out of the visible graph. To grow or walk a selection you already ' +
       'have, use the inspector\'s "Act on selection".';
     el.appendChild(mount);
-  }
-
-  #buildOverlaysMenu(el) {
-    const layer = this.cache.graph?.heatmapLayer;
-    const minimapCanvas = this.cache.graph?.minimap?.canvas;
-
-    el.append(
-      menuItem({
-        icon: '🔥',
-        label: 'Density heatmap',
-        checked: !!layer?.heatmapEnabled,
-        disabled: !layer,
-        title: layer
-          ? 'Shade the regions where nodes crowd together. Its parameters live in the inspector under Overlays.'
-          : 'Load a graph first',
-        onClick: this.#closeAnd(() => layer.setHeatmapEnabled(!layer.heatmapEnabled)),
-      }),
-      menuItem({
-        icon: '🗺️',
-        label: 'Minimap',
-        checked: !!minimapCanvas && minimapCanvas.style.display !== 'none',
-        disabled: !minimapCanvas,
-        title: minimapCanvas ? 'Show or hide the overview thumbnail' : 'Load a graph first',
-        onClick: this.#closeAnd(() => {
-          minimapCanvas.style.display = minimapCanvas.style.display === 'none' ? '' : 'none';
-        }),
-      }),
-      menuItem({
-        icon: '✎',
-        label: 'Add text note…',
-        disabled: !this.cache.graph?.annotationLayer,
-        title: this.cache.graph?.annotationLayer
-          ? 'Place a text note on the canvas: click to place, drag to move, ' +
-            'double-click to edit, click once for styling'
-          : 'Load a graph first',
-        onClick: this.#closeAnd(() => this.cache.ui.startTextAnnotation()),
-      }),
-      menuSeparator(),
-      menuItem({
-        icon: '⛶',
-        label: 'Presentation mode',
-        checked: document.body.classList.contains('presentation'),
-        title: 'Hide the rail and the inspector for a clean screenshot (⇧F, Escape to exit)',
-        onClick: this.#closeAnd(() => this.cache.ui.togglePresentationMode()),
-      })
-    );
   }
 
   #buildExportMenu(el) {

@@ -1078,6 +1078,32 @@ function createStyleDiv(cache) {
     const bubbleDiv = createCard("Bubble Sets", undefined, "bubble-set-config-card-header");
     const optionalCSSClass = "bubbleSetOptionalLabelConfig";
 
+    // What a group IS comes before the button that makes one.
+    const note = document.createElement("p");
+    note.className = "insp-note";
+    note.innerHTML =
+      "Bubble sets drawn around the nodes you assign to a group. Assign the current selection " +
+      "from the <strong>Selection</strong> tab.";
+    bubbleDiv.appendChild(note);
+
+    // Group tools, inside the row they belong to. These ids are read by
+    // bubble_sets.js (popover anchor, manual-group status/clear), which looks
+    // them up per call, so rebuilding them with the card is safe.
+    const tools = document.createElement("div");
+    tools.className = "insp-groups";
+    tools.innerHTML =
+      '<button id="detectCommunitiesBtn" class="insp-btn" title="Auto-group by community' +
+      ' (Louvain): pick edge weighting &amp; resolution, then assign the largest communities to' +
+      ' bubble groups">🧩 Auto-detect</button>' +
+      '<span id="manualGroupSeparator" class="button-separator" style="display: none;"></span>' +
+      '<span id="manualBubbleGroupStatus" class="manual-group-status" style="display: none;"></span>' +
+      '<button id="clearManualGroupsBtn" class="insp-btn red" title="Clear all manual bubble' +
+      ' groups" style="display: none;">Clear all</button>';
+    tools.querySelector("#detectCommunitiesBtn").onclick = () =>
+      cache.bs.toggleCommunityDetectionPopover();
+    tools.querySelector("#clearManualGroupsBtn").onclick = () => cache.bs.clearAllManualGroups();
+    bubbleDiv.appendChild(tools);
+
     // Tab bar
     const tabBar = document.createElement("div");
     tabBar.className = "bubble-set-tab-bar";
@@ -1260,32 +1286,65 @@ function createStyleDiv(cache) {
   // Turn a config card into a collapsible section: replace the floating
   // `::before` title with a real clickable header (so the panel reads as a
   // set of foldable sections instead of one tall wall of controls).
-  function makeCollapsible(label, startCollapsed = false) {
+  //
+  // `title` renames the header without touching data-label (the lookup key
+  // other modules, the palette breadcrumb and the tests all use). `overlay`
+  // names a UIManager.OVERLAYS layer and turns the header into a layer row:
+  // a switch for the layer beside the disclosure for its parameters, so the
+  // one row owns both. The disclosure gets its own accessible name ("…
+  // settings") because the switch already answers to the plain one.
+  function makeCollapsible(label, startCollapsed = false, {title = label, overlay, countId} = {}) {
     const card = root.querySelector(`[data-label="${label}"]`);
     if (!card) return;
     card.classList.add("card-collapsible");
+
+    const bar = document.createElement("div");
+    bar.className = "card-collapse-bar";
+    if (overlay) card.classList.add("layer-card");
+
+    if (overlay) {
+      const sw = document.createElement("button");
+      sw.type = "button";
+      sw.id = `overlaySwitch${overlay[0].toUpperCase()}${overlay.slice(1)}`;
+      sw.className = "layer-switch";
+      sw.setAttribute("role", "switch");
+      sw.setAttribute("aria-checked", "false");
+      sw.setAttribute("aria-label", title);
+      sw.addEventListener("click", () => cache.ui.toggleOverlay(overlay));
+      bar.appendChild(sw);
+    }
 
     const header = document.createElement("button");
     header.type = "button";
     header.className = "card-collapse-header";
     header.setAttribute("aria-expanded", startCollapsed ? "false" : "true");
+    if (overlay) header.setAttribute("aria-label", `${title} settings`);
 
-    const title = document.createElement("span");
-    title.className = "card-collapse-title";
-    title.textContent = label;
+    const titleSpan = document.createElement("span");
+    titleSpan.className = "card-collapse-title";
+    titleSpan.textContent = title;
+    header.appendChild(titleSpan);
+
+    if (countId) {
+      const count = document.createElement("span");
+      count.className = "layer-count";
+      count.id = countId;
+      header.appendChild(count);
+    }
 
     const chevron = document.createElement("span");
     chevron.className = "card-collapse-chevron";
     chevron.textContent = startCollapsed ? "▸" : "▾";
+    header.appendChild(chevron);
 
-    header.append(title, chevron);
     header.addEventListener("click", () => {
       const collapsed = card.classList.toggle("collapsed");
       chevron.textContent = collapsed ? "▸" : "▾";
       header.setAttribute("aria-expanded", collapsed ? "false" : "true");
     });
 
-    card.insertBefore(header, card.firstChild);
+    bar.appendChild(header);
+    card.insertBefore(bar, card.firstChild);
     if (startCollapsed) card.classList.add("collapsed");
   }
 
@@ -1359,8 +1418,8 @@ function createStyleDiv(cache) {
       parent.appendChild(container);
     }
 
-    // On/off lives on the rail's ◐ Overlays menu (Concept C §4 row J) — this
-    // card holds only the parameters, so there is one switch, not two.
+    // On/off is the switch in this card's own header (makeCollapsible's
+    // `overlay`), so the row owns both halves of the overlay.
     //
     // min/max are UI guardrails, not physical limits: intensity beyond 0.5
     // saturates with 2 overlaps, contrast beyond 2 crushes everything but
@@ -1409,11 +1468,9 @@ function createStyleDiv(cache) {
       layer()?.resetSettings();
       syncControls();
     });
-
-    // Parameters are inert until the overlay is switched on (rail ◐ menu),
-    // so the card starts greyed like an empty bubble-set card; the live
-    // toggle is in heatmap_layer.setHeatmapEnabled.
-    card.classList.toggle("disabled", !layer()?.heatmapEnabled);
+    // No greying while the overlay is off: the switch sits in this card's own
+    // header, so the relationship needs no explaining, and pre-tuning before
+    // switching on is legitimate.
   }
 
   createSelectCard();
@@ -1425,12 +1482,20 @@ function createStyleDiv(cache) {
   createHeatmapConfigCard();
 
   // Node stays open (most common); Edge is the largest section so it starts
-  // folded; bubble styling only matters once groups exist, so fold it too.
-  // The heatmap overlay is an occasional set-and-leave feature — folded.
+  // folded. The two overlay cards are the layer stack's settings-bearing rows:
+  // both fold, and both carry their own switch (see makeCollapsible's
+  // `overlay`), which is what keeps on/off and parameters in one place.
   makeCollapsible("Node Configuration");
   makeCollapsible("Edge Configuration", true);
-  makeCollapsible("Bubble Sets", true);
-  makeCollapsible("Density Heatmap", true);
+  makeCollapsible("Bubble Sets", true, {
+    title: "Groups",
+    overlay: "groups",
+    countId: "overlayCountGroups",
+  });
+  makeCollapsible("Density Heatmap", true, {
+    title: "Density heatmap",
+    overlay: "heatmap",
+  });
 
   return root;
 }

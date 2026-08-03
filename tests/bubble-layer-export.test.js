@@ -19,6 +19,7 @@ function makeRecordingCtx() {
   return {
     ops,
     setTransform: (...args) => ops.push(["setTransform", ...args]),
+    clearRect: (...args) => ops.push(["clearRect", ...args]),
     save: () => ops.push(["save"]),
     restore: () => ops.push(["restore"]),
     beginPath: () => {},
@@ -249,5 +250,50 @@ describe("drawExportLabels", () => {
     layer.drawExportLabels(ctx, layer.exportOutlines(), 2);
 
     expect(ctx.ops.filter(([op]) => op === "fillText")).toHaveLength(0);
+  });
+});
+
+// The layer's visibility switch (the inspector's Overlays stack) has to reach
+// the export paths too — bubbles that vanish from the canvas but come back in
+// the PNG would be the obvious failure.
+describe("visibility", () => {
+  it("drops every outline from the export surface while hidden", () => {
+    const { layer } = makeLayer({ camera: CAMERA, dims: DIMS, nodes: TWO_NODES });
+    layer.getGroupHandle("groupOne").update({ members: ["a", "b"] });
+    expect(layer.exportOutlines()).toHaveLength(1);
+
+    layer.setVisible(false);
+    expect(layer.exportOutlines()).toHaveLength(0);
+
+    layer.setVisible(true);
+    expect(layer.exportOutlines()).toHaveLength(1);
+  });
+
+  it("paints an empty frame rather than skipping the paint", () => {
+    // A skip would leave the last outlines on a canvas sigma never clears for
+    // us, so the hulls would stay on screen after the switch went off.
+    const { layer, ctx } = makeLayer({ camera: CAMERA, dims: DIMS, nodes: TWO_NODES });
+    // This file's raf stub never fires. Run the frame inline instead, resetting
+    // the handle each time so the next scheduleRedraw is not swallowed.
+    globalThis.requestAnimationFrame = (cb) => {
+      cb();
+      return null;
+    };
+    const frame = () => {
+      layer.rafHandle = null;
+      layer.scheduleRedraw();
+    };
+
+    layer.getGroupHandle("groupOne").update({ members: ["a", "b"] });
+    frame();
+    expect(ctx.ops.filter(([op]) => op === "fill").length).toBeGreaterThan(0);
+
+    ctx.ops.length = 0;
+    layer.setVisible(false);
+    frame();
+
+    expect(ctx.ops.filter(([op]) => op === "fill")).toHaveLength(0);
+    // …but the canvas WAS cleared, which is what removes the old hulls.
+    expect(ctx.ops.some(([op]) => op === "clearRect")).toBe(true);
   });
 });

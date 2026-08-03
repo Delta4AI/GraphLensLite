@@ -425,8 +425,75 @@ class UIManager {
       this.error('Load a graph first.');
       return;
     }
+    // Placing a note into a hidden layer would look like a no-op, so the tool
+    // brings its own layer back rather than failing quietly.
+    if (!layer.visible) this.setOverlayVisible('notes', true);
     layer.armPlacement();
     this.info('Click the canvas to place a text note — Escape to cancel');
+  }
+
+  // ------------------------------------------------------- the overlay stack
+
+  /**
+   * The inspector's Overlays context is a layer stack: one row per thing drawn
+   * over the graph, each row owning both its switch and its parameters. Every
+   * layer answers the same two-member contract (`visible` / `setVisible`), so
+   * a row needs no per-layer code — see the rows in graph_lens_lite.html and
+   * the two switch-bearing cards in ui_style_div.js.
+   *
+   * This table is the whole of "what is an overlay". It replaced the rail's ◐
+   * menu, which held the on/off switches while the parameters lived here — a
+   * split down a mechanism seam that left the parameter card greyed with no
+   * affordance pointing at its switch.
+   */
+  static OVERLAYS = {
+    groups: { switchId: 'overlaySwitchGroups', layer: (c) => c.graph?.bubbleLayer },
+    heatmap: { switchId: 'overlaySwitchHeatmap', layer: (c) => c.graph?.heatmapLayer },
+    notes: { switchId: 'overlaySwitchNotes', layer: (c) => c.graph?.annotationLayer },
+    minimap: { switchId: 'overlaySwitchMinimap', layer: (c) => c.graph?.minimap },
+  };
+
+  /** @param {'groups'|'heatmap'|'notes'|'minimap'} name */
+  toggleOverlay(name) {
+    const layer = UIManager.OVERLAYS[name]?.layer(this.cache);
+    if (!layer) {
+      this.error('Load a graph first.');
+      return;
+    }
+    this.setOverlayVisible(name, !layer.visible);
+  }
+
+  setOverlayVisible(name, visible) {
+    UIManager.OVERLAYS[name]?.layer(this.cache)?.setVisible(visible);
+    this.syncOverlays();
+  }
+
+  /**
+   * Re-read every layer and mirror it onto its row: switch state and whether the
+   * row can act at all. Called after any toggle, on graph (re)build, and from
+   * the two places that flip a layer without going through a row — a JSON load's
+   * heatmap flag and a bubble-group membership change.
+   */
+  syncOverlays() {
+    for (const { switchId, layer: layerOf } of Object.values(UIManager.OVERLAYS)) {
+      const layer = layerOf(this.cache);
+      const btn = document.getElementById(switchId);
+      if (!btn) continue;
+      btn.setAttribute('aria-checked', String(!!layer?.visible));
+      btn.disabled = !layer;
+    }
+
+    // "3 sets" beside the Groups row — only groups with members count.
+    const count = document.getElementById('overlayCountGroups');
+    const bs = this.cache.bs;
+    if (!count) return;
+    let sets = 0;
+    if (bs && this.cache.data?.layouts?.[this.cache.data.selectedLayout]) {
+      for (const group of bs.traverseBubbleSets()) {
+        if (bs.getEffectiveGroupMembers(group).size > 0) sets++;
+      }
+    }
+    count.textContent = sets ? `${sets} ${sets === 1 ? 'set' : 'sets'}` : '';
   }
 
   async toggleHoverEffect(btn) {
@@ -664,8 +731,8 @@ class UIManager {
 
       const row = document.createElement('div');
       row.className = 'filter-row';
-      // Identity on the row, so the expanded surface can search and sort by
-      // data instead of scraping rendered label text.
+      // Identity on the row, so the search matches on data instead of scraping
+      // rendered label text.
       row.dataset.propId = propID;
       row.dataset.search = `${section} ${subSection} ${prop}`.toLowerCase();
       const col1 = document.createElement('div');
@@ -722,17 +789,12 @@ class UIManager {
     this.buildFilterScopeToggle(div);
 
     this.cache.qm.updateQueryTextArea();
-    // The rows above are brand new; if the expanded surface is up it is now
-    // showing an unsorted, unsearched list behind a populated search box.
-    this.cache.filterSurface?.refresh();
   }
 
   /**
-   * Property search, built INTO #filterContainer rather than into the expanded
-   * surface's header. The container is re-parented between the inspector and
-   * the surface, so building it here means one search box that travels with the
-   * rows — and, more to the point, means the narrow panel gets a search at all.
-   * Rendering a second copy in the inspector would be two DOMs for one control.
+   * Property search, built INTO #filterContainer with the rows it filters — the
+   * rebuild that replaces the rows replaces the box too, so a stale query can
+   * never survive over a fresh list. `filter_search.js` listens for it.
    */
   createFilterSearch() {
     const label = document.createElement('label');
@@ -760,8 +822,8 @@ class UIManager {
    * the rows on screen at once. (It is built from whatever sections exist, so a
    * file with different top-level headers still works.)
    *
-   * The expanded surface hides it and shows every section: breadth is the whole
-   * point of that surface, and the same #filterContainer is re-parented into it.
+   * A running search hides it and shows every section: a hit in the section you
+   * are not looking at is a hit you cannot see.
    */
   buildFilterScopeToggle(container) {
     // Walked as elements rather than looked up by selector: section names are
@@ -1166,8 +1228,10 @@ class UIManager {
     'Arrange Selection': 'inspectorArrangeMount',
     'Node Configuration': 'inspectorAppearanceMount',
     'Edge Configuration': 'inspectorAppearanceMount',
-    'Bubble Sets': 'inspectorGroupsMount',
-    'Density Heatmap': 'inspectorOverlaysMount',
+    // Both overlay cards land in the layer stack, in this order — the two
+    // switch-less rows (Notes, Minimap) follow them in the markup.
+    'Bubble Sets': 'inspectorLayerCards',
+    'Density Heatmap': 'inspectorLayerCards',
   };
 
   buildStylingPanelUI() {
@@ -1180,6 +1244,8 @@ class UIManager {
       const card = built.querySelector(`[data-label="${label}"]`);
       if (card) document.getElementById(mountId)?.appendChild(card);
     }
+    // The two card switches were just rebuilt, so they start unset.
+    this.syncOverlays();
   }
 
   // Additively open a collapsible styling card by its label (never closes one).

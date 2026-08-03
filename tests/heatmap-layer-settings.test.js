@@ -159,16 +159,36 @@ describe("HeatmapLayer.resetSettings", () => {
 });
 
 describe("HeatmapLayer.setHeatmapEnabled", () => {
-  it("greys/ungreys the inspector's Density Heatmap card via toggleDisabledElements", () => {
+  // The card is no longer greyed while the overlay is off — its switch now sits
+  // in its own header, so the relationship needs no explaining. What the setter
+  // owes the UI instead is a re-read, because a JSON load flips the flag
+  // without going through that switch.
+  it("re-reads the overlay row after a change, and only on a change", () => {
     const layer = stubLayer({ heatmapEnabled: false });
-    const toggleDisabledElements = vi.fn();
-    layer.adapter.cache = { ui: { toggleDisabledElements } };
+    const syncOverlays = vi.fn();
+    layer.adapter.cache = { ui: { syncOverlays } };
 
     HeatmapLayer.prototype.setHeatmapEnabled.call(layer, true);
-    expect(toggleDisabledElements).toHaveBeenCalledWith(["Density Heatmap"], true);
+    expect(syncOverlays).toHaveBeenCalledTimes(1);
+
+    HeatmapLayer.prototype.setHeatmapEnabled.call(layer, true);
+    expect(syncOverlays).toHaveBeenCalledTimes(1);
 
     HeatmapLayer.prototype.setHeatmapEnabled.call(layer, false);
-    expect(toggleDisabledElements).toHaveBeenCalledWith(["Density Heatmap"], false);
+    expect(syncOverlays).toHaveBeenCalledTimes(2);
+  });
+
+  // `visible`/`setVisible` is the layer-stack contract (UIManager.OVERLAYS);
+  // heatmapEnabled keeps its own name because it is the persisted JSON field.
+  it("answers the layer-stack contract with the persisted flag", () => {
+    const layer = Object.assign(
+      Object.create(HeatmapLayer.prototype),
+      stubLayer({ heatmapEnabled: false })
+    );
+    expect(layer.visible).toBe(false);
+    layer.setVisible(true);
+    expect(layer.heatmapEnabled).toBe(true);
+    expect(layer.visible).toBe(true);
   });
 
   it("tolerates bare adapters without a cache/ui (unit-test seam)", () => {

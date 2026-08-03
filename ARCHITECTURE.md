@@ -41,7 +41,8 @@ The rendering and graph-operation core. Key modules:
 - `bubble_sets.js` / `bubble_layer.js` / `bubble_geometry.js` — bubble-set grouping
   drawn on an owned canvas layer beneath the nodes
 - `heatmap_layer.js` / `heatmap_geometry.js` — node-density heatmap overlay (off by
-  default; toggled from the rail's ◐ Overlays menu, parameters in the inspector)
+  default; one row of the inspector's Overlays layer stack, which owns both its
+  switch and its parameters — see `UIManager.OVERLAYS`)
 - `edge_programs.js` / `edge_flow_programs.js` / `edge_flow_glsl.js` /
   `flow_animator.js` — custom WebGL edge programs and the animated source→target
   flow overlay (dash/pulse/comet/chevron)
@@ -55,9 +56,11 @@ Business logic and UI:
 
 - `io.js` — `IOManager`: Excel/JSON loading, export (JSON / PNG / SVG), data
   preprocessing, Excel template generation
-- `ui.js` — loading overlays, UI enable/disable, notifications, presentation mode
+- `ui.js` — loading overlays, UI enable/disable, notifications, presentation mode,
+  and the inspector's overlay layer stack (`OVERLAYS`: one table row per thing
+  drawn over the graph, each layer answering `visible`/`setVisible`)
 - `rail.js` — the 52 px top rail and its dropdown menus (app, workspace, layout,
-  select, overlays, export)
+  select, export)
 - `inspector.js` — the single right-hand panel's context router
   (Filters / Overlays / Selection). `CONTEXTS` is the whole contract: the tab
   roles, roving tabindex and arrow-key nav are generic over it, and panel and

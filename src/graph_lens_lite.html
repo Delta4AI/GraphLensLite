@@ -98,7 +98,7 @@
   </div>
   <div class="rail-div"></div>
   <button class="rail-vb" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">
-    <span class="rail-vb-g">⛶</span><span class="rail-vb-t">Fit</span>
+    <span class="rail-vb-g">⊡</span><span class="rail-vb-t">Fit</span>
   </button>
   <button id="relayoutBtn" class="rail-vb rail-vb-wide"
           title="Layout — re-layout the workspace, remove overlaps, hide disconnected elements">
@@ -114,9 +114,9 @@
           title="Select — all/no nodes and edges, or select by ID or label">
     <span class="rail-vb-g">◈</span><span class="rail-vb-t">Select ⌄</span>
   </button>
-  <button id="overlaysMenuBtn" class="rail-vb rail-vb-wide"
-          title="Overlays — density heatmap, minimap, text notes, presentation mode">
-    <span class="rail-vb-g">◐</span><span class="rail-vb-t">Overlays ⌄</span>
+  <button id="noteToggleBtn" class="rail-vb" title="Place a text note: click the canvas to place, drag to move, double-click to edit"
+          onclick="cache.ui.startTextAnnotation()">
+    <span class="rail-vb-g">✎</span><span class="rail-vb-t">Note</span>
   </button>
   <div class="rail-div"></div>
   <div id="selectionChip" class="rail-selchip">
@@ -165,6 +165,15 @@
           title="Export — PNG, SVG, JSON model, Excel data (P: PNG, S: JSON)">
     <span class="rail-vb-g">⤓</span><span class="rail-vb-t">Export</span>
   </button>
+  <!-- Presentation mode is app chrome, not an overlay: it hides the shell
+       rather than drawing anything over the graph, so it sits with the other
+       chrome toggles. No state glyph — the rail is gone while it is on.
+       ⛶ is this codebase's fullscreen mark everywhere else (popup.js,
+       interactions.js, core.js, ui_components.js), so it belongs on the button
+       with no text label. Fit, which is labelled "Fit", took ⊡ in exchange. -->
+  <button id="presentationToggleBtn" class="rail-mini" aria-label="Presentation mode"
+          title="Presentation mode — hide the rail and the inspector for a clean screenshot (⇧F, Escape to exit)"
+          onclick="cache.ui.togglePresentationMode()">⛶</button>
   <button id="darkModeToggleBtn" class="rail-mini" aria-label="Switch to dark mode" title="Switch to dark mode" onclick="cache.ui.toggleDarkMode()">🌙</button>
   <button id="keyboardSheetBtn" class="rail-mini" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onclick="cache.ui.toggleKeyboardSheet()">?</button>
 </header>
@@ -259,25 +268,6 @@
         </div>
       </div>
     </section>
-    <section id="filterSurface" aria-label="Filter properties" hidden>
-      <div class="fsurf-head">
-        <h4 class="fsurf-title">Filter properties</h4>
-        <span id="filterSurfaceCount" class="fsurf-count"></span>
-        <span class="fsurf-spacer"></span>
-        <button class="insp-btn" title="Open the query editor to write the same predicate as a query"
-                onclick="cache.ui.toggleQueryEditor()">📝 Edit as query</button>
-        <button id="filterSurfaceCollapseBtn" class="insp-btn"
-                title="Collapse back into the inspector (Escape)"
-                onclick="cache.filterSurface.close()">⤡ Collapse</button>
-      </div>
-      <p class="fsurf-scope">
-        <span aria-hidden="true">🌐</span>
-        <span><strong>Filters hide elements across the whole workspace.</strong> They are never scoped to
-          your selection — selected elements stay selected even when a filter hides them. To turn a
-          filter into a selection instead, use <strong>⊕</strong> on any row.</span>
-      </p>
-      <div id="filterSurfaceMount" class="fsurf-body"></div>
-    </section>
   </div>
   <aside id="inspector">
     <div class="inspector-resize-handle"></div>
@@ -288,43 +278,42 @@
               title="What is visible: one filter per property, across the whole workspace">Filters</button>
       <button id="inspectorPillOverlays" class="insp-pill" role="tab" aria-selected="false"
               aria-controls="inspectorOverlays" tabindex="-1"
-              title="What is drawn over the graph: groups, density heatmap, minimap">Overlays</button>
+              title="What is drawn over the graph: groups, density heatmap, notes, minimap">Overlays</button>
       <button id="inspectorPillSelection" class="insp-pill" role="tab" aria-selected="false"
               aria-controls="inspectorSelection" tabindex="-1"
               title="Everything that acts on the current selection: actions, arrange, appearance">Selection</button>
       </div>
-      <span class="insp-pills-spacer"></span>
-      <button id="inspectorExpandBtn" class="insp-pill-icon" aria-pressed="false"
-              aria-label="Expand the filter properties over the stage — every property in columns, with search"
-              title="Expand the filter properties over the stage — every property in columns, with search"
-              onclick="cache.filterSurface.toggle()">⤢</button>
     </div>
     <div id="inspectorBody">
       <section id="inspectorFilters" class="insp-panel" role="tabpanel" tabindex="0"
                aria-labelledby="inspectorPillFilters">
-        <p id="filterExpandedNote" class="insp-note" hidden>Open on the
-          <button type="button" class="insp-link" onclick="cache.filterSurface.close()">expanded surface</button>
-          over the stage.</p>
-        <div id="filterHome"><div id="filterContainer"></div></div>
+        <div id="filterContainer"></div>
       </section>
 
+      <!-- The layer stack: one row per thing drawn over the graph, each owning
+           both its switch and its settings. Groups and the heatmap are the two
+           rows with settings, so they are styling cards mounted into
+           #inspectorLayerCards (UIManager.CARD_MOUNTS); Notes and the minimap
+           have none and are plain rows. UIManager.OVERLAYS is the contract. -->
       <section id="inspectorOverlays" class="insp-panel" role="tabpanel" tabindex="0"
                aria-labelledby="inspectorPillOverlays" hidden>
-        <h4 class="insp-section-title">Groups</h4>
-        <p class="insp-note">Bubble sets drawn around the nodes you assign to a group.
-          Assign the current selection from the <strong>Selection</strong> tab.</p>
-        <div class="insp-groups">
-          <button id="detectCommunitiesBtn" class="insp-btn" title="Auto-group by community (Louvain): pick edge weighting & resolution, then assign the largest communities to bubble groups"
-                  onclick="cache.bs.toggleCommunityDetectionPopover()">🧩 Auto-detect</button>
-          <span id="manualGroupSeparator" class="button-separator" style="display: none;"></span>
-          <span id="manualBubbleGroupStatus" class="manual-group-status" style="display: none;"></span>
-          <button id="clearManualGroupsBtn" class="insp-btn red" title="Clear all manual bubble groups"
-                  onclick="cache.bs.clearAllManualGroups()" style="display: none;">Clear all</button>
+        <p class="insp-note">Everything drawn <strong>over</strong> the graph. Each row carries its
+          own switch; open a row for its settings.</p>
+        <div id="inspectorLayerCards"></div>
+        <div class="layer-row">
+          <button type="button" id="overlaySwitchNotes" class="layer-switch" role="switch"
+                  aria-checked="false" disabled aria-label="Notes"
+                  title="Show or hide every text note (place a new one with ✎ Note on the rail)"
+                  onclick="cache.ui.toggleOverlay('notes')"></button>
+          <span class="layer-title">Notes</span>
         </div>
-        <div id="inspectorGroupsMount"></div>
-
-        <h4 class="insp-section-title">Density heatmap</h4>
-        <div id="inspectorOverlaysMount"></div>
+        <div class="layer-row">
+          <button type="button" id="overlaySwitchMinimap" class="layer-switch" role="switch"
+                  aria-checked="false" disabled aria-label="Minimap"
+                  title="Show or hide the overview thumbnail in the bottom-right corner"
+                  onclick="cache.ui.toggleOverlay('minimap')"></button>
+          <span class="layer-title">Minimap</span>
+        </div>
       </section>
 
       <section id="inspectorSelection" class="insp-panel" role="tabpanel" tabindex="0"
@@ -345,11 +334,22 @@
           </div>
         </div>
 
+        <!-- Group membership gets its own framed section: it is the one action
+             here that changes what the graph DRAWS, and at its old size (a 14px
+             dot wedged into the act row) it read as a decoration. The h4 stays a
+             direct child of the panel so the palette's sectionOf() finds it. -->
+        <h4 class="insp-section-title sel-group-title">Group membership</h4>
+        <div class="sel-group-panel">
+          <span id="manualBubbleGroupButtonContainer" class="manual-group-container"></span>
+          <div class="sel-group-copy">
+            <div class="sel-group-label">Toggle the selection in a bubble group</div>
+            <div class="sel-group-hint">Click a quadrant to add the selected nodes, again to remove
+              them. A filled quadrant means the whole selection is already in that group; the
+              colours match the bubbles and the tabs under <strong>Overlays › Groups</strong>.</div>
+          </div>
+        </div>
+
         <div class="insp-act-row">
-          <span class="sel-group-control">
-            <span class="sel-group-label">Add to group:</span>
-            <span id="manualBubbleGroupButtonContainer" class="manual-group-container"></span>
-          </span>
           <button class="insp-btn disabled" title="Reset the style of selected elements to defaults" id="resetSelectedElementsStyleBtn"
                   onclick="cache.style.resetStyleForSelectedElements()">⟳ Reset style</button>
           <button class="insp-btn disabled" style="display: none;" id="neo4jExpandBtn"

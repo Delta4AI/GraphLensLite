@@ -51,6 +51,9 @@ class BubbleSetLayer {
     this.adapter = adapter;
     this.cache = cache;
     this.killed = false;
+    // Layer visibility, driven by the inspector's Overlays stack. Runtime
+    // state like heatmapEnabled — never persisted, resets with the adapter.
+    this.visible = true;
 
     /** @type {Map<string, {members: Map<string, true>, avoidMembers: string[], opts: object}>} */
     this.groups = new Map();
@@ -118,6 +121,13 @@ class BubbleSetLayer {
     this.labelCanvas?.remove();
   }
 
+  /** Show or hide every bubble, on screen and in both export paths. */
+  setVisible(visible) {
+    if (this.visible === visible) return;
+    this.visible = visible;
+    this.scheduleRedraw();
+  }
+
   scheduleRedraw() {
     if (this.killed || this.rafHandle !== null) return;
     this.rafHandle = requestAnimationFrame(() => {
@@ -179,17 +189,21 @@ class BubbleSetLayer {
       if (this.outlines.get(group)?.graphPoints.length) active.push([group, state]);
     }
 
+    // Hiding paints an empty frame rather than skipping the paint: a skip
+    // would leave the last outlines on a canvas sigma never clears for us.
+    const shown = this.visible ? active : [];
+
     // Skip repainting when neither the outlines nor the view changed (sigma
     // re-renders on hover etc. without clearing custom layers).
     const signature =
       `${width}x${height}x${dpr}|${camera.x},${camera.y},${camera.ratio},${camera.angle}` +
-      `|${active.map(([g]) => g).join(',')}`;
+      `|${shown.map(([g]) => g).join(',')}`;
     if (!outlinesChanged && signature === this.lastPaintSignature) return;
     this.lastPaintSignature = signature;
 
     this.#prepareCanvas(this.canvas, this.ctx, width, height, dpr);
     this.#prepareCanvas(this.labelCanvas, this.labelCtx, width, height, dpr);
-    this.#drawOutlines(active, sigma);
+    this.#drawOutlines(shown, sigma);
   }
 
   /** Reproject each cached graph-space outline to viewport px and paint it. */
@@ -221,6 +235,7 @@ class BubbleSetLayer {
    *   opts: object, defaults: object}>}
    */
   exportOutlines() {
+    if (!this.visible) return [];
     const graph = this.adapter.graph;
     const sigma = this.adapter.sigma;
     const out = [];

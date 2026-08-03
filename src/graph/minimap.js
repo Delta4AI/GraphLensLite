@@ -48,6 +48,16 @@ class Minimap {
     this.scheduleRedraw();
   }
 
+  /** Show or hide the overview thumbnail (inspector's Overlays stack). */
+  setVisible(visible) {
+    this.canvas.hidden = !visible;
+    if (visible) this.scheduleRedraw();
+  }
+
+  get visible() {
+    return !this.canvas.hidden;
+  }
+
   destroy() {
     if (this.killed) return;
     this.killed = true;

@@ -628,6 +628,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
     .toast { animation: none; }
     .insp-log-chevron { transition: none; }
+    /* The layer switch's knob slides — the state must still land, just not travel. */
+    .layer-switch,
+    .layer-switch::after { transition: none; }
 }
 
 /* The workbench overlays the bottom of the stage — it covers the canvas and
@@ -953,27 +956,6 @@ body {
     color: #fff;
 }
 
-.insp-pills-spacer {
-    flex: 1;
-}
-
-/* ⤢ — the only control in the pill row that is not a context. */
-.insp-pill-icon {
-    font: inherit;
-    font-size: 12px;
-    color: var(--text-muted);
-    background: none;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 2px 6px;
-    cursor: pointer;
-}
-
-.insp-pill-icon:hover {
-    color: var(--accent-text);
-    border-color: var(--border-soft);
-}
-
 #inspectorBody {
     flex: 1;
     overflow-y: auto;
@@ -1043,17 +1025,111 @@ body {
 
 .insp-groups {
     display: flex;
+    /* Matches .insp-note's, so the prose above and the tab bar below sit on one
+       rhythm instead of the tools touching the tabs. */
+    margin-bottom: 8px;
 }
 
-.sel-group-control {
-    display: inline-flex;
+/* --- group membership (Selection context) ------------------------------- */
+
+/* Meaningless with nothing selected, so it follows .insp-act-row's rule rather
+   than invariant 4's "show and self-disable" — same reason, same treatment. */
+.sel-group-title,
+.sel-group-panel {
+    display: none;
+}
+
+#inspectorSelection.has-selection .sel-group-title {
+    display: block;
+}
+
+#inspectorSelection.has-selection .sel-group-panel {
+    display: flex;
+}
+
+.sel-group-panel {
     align-items: center;
-    gap: 5px;
+    gap: 12px;
+    padding: 10px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--surface-2);
+}
+
+.sel-group-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
 }
 
 .sel-group-label {
     font-size: 12px;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.sel-group-hint {
+    font-size: 11px;
+    line-height: 1.4;
     color: var(--text-muted);
+}
+
+.sel-group-hint strong {
+    color: var(--text-strong);
+}
+
+/* In its own section the button IS the feature, so it is sized to be aimed at:
+   56px gives each quadrant a 28px target, clearing WCAG 2.5.8's 24px minimum
+   without the hover-zoom the compact variant needs — a zoom that touch users
+   never trigger and keyboard users never see. */
+.sel-group-panel .circle-button-compact {
+    flex: 0 0 auto;
+    width: 56px;
+    height: 56px;
+}
+
+.sel-group-panel .circle-button-compact:hover {
+    transform: none;
+}
+
+.sel-group-panel .quadrant.compact {
+    border-width: 2px;
+}
+
+/* At 14px the coloured BORDER was most of the wedge, so the compact button read
+   as a pie. Enlarged, the same rules read as a ring around a grey disc — the
+   fill is --surface-3. Scoped tints put the colour back in the wedge: faint for
+   "available", solid for "the selection is in this group". Scoped to this panel
+   so the 18px circle buttons in the filter list are untouched.
+   The .active selector needs three classes to outrank `.top-left.active`. */
+.sel-group-panel .quadrant {
+    background-color: color-mix(in srgb, var(--quadrant-color) 22%, transparent);
+}
+
+.sel-group-panel .quadrant.active {
+    background-color: var(--quadrant-color);
+}
+
+.sel-group-panel .quadrant:hover {
+    background-color: color-mix(in srgb, var(--quadrant-color) 45%, transparent);
+}
+
+.sel-group-panel .quadrant.active:hover {
+    background-color: color-mix(in srgb, var(--quadrant-color) 80%, white);
+}
+
+/* clip-path clips an outline, so focus shows as a ring on the CIRCLE (where the
+   focus is) plus a brightened wedge (which one) — neither survives alone. */
+.circle-button-compact:has(.quadrant:focus-visible) {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+.quadrant:focus-visible {
+    filter: brightness(1.35);
 }
 
 /* Inline lasso glyph reused by the guided tour (empty span + --size/--color). */
@@ -1127,26 +1203,6 @@ body {
     margin-left: 1px;
 }
 
-/* Inline actionable words in prose hints: clicking jumps straight to the
-   named tool. */
-.insp-link {
-    font: inherit;
-    font-weight: 600;
-    color: var(--accent-text);
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
-
-.insp-link:hover,
-.insp-link:focus-visible {
-    color: var(--text-strong);
-    text-decoration: none;
-}
-
 #inspector .card-labeled {
     width: 100%;
     box-sizing: border-box;
@@ -1164,130 +1220,8 @@ body.presentation #outerGraphContainer {
 
 body.presentation #rail,
 body.presentation #inspector,
-body.presentation #workbench,
-body.presentation #filterSurface {
+body.presentation #workbench {
     display: none;
-}
-
-/*************************
- The expanded filter surface (Concept C phase 6, spec §6.4). Overlays the stage
- the same way the workbench does, but stops at the workbench's top edge so the
- two can be used together.
- **************************/
-#filterSurface {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    bottom: var(--workbench-height, 0px);
-    z-index: 620;
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-    background-color: var(--surface);
-    border-left: 1px solid var(--brand-border);
-    box-shadow: -6px 0 18px rgba(64, 60, 83, 0.18);
-}
-
-#filterSurface[hidden] {
-    display: none;
-}
-
-.fsurf-head {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 9px 14px;
-    border-bottom: 1px solid var(--border);
-}
-
-.fsurf-title {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-strong);
-}
-
-.fsurf-count {
-    font-size: 11px;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-}
-
-.fsurf-search {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    flex: 0 1 240px;
-    height: 24px;
-    padding: 0 8px;
-    border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    background: var(--surface-3);
-    color: var(--text-muted);
-    font-size: 12px;
-}
-
-.fsurf-search:focus-within {
-    border-color: var(--accent-text);
-}
-
-.fsurf-search input {
-    flex: 1;
-    min-width: 0;
-    border: none;
-    outline: none;
-    background: none;
-    font: inherit;
-    color: var(--text-strong);
-}
-
-.fsurf-spacer {
-    flex: 1;
-}
-
-.fsurf-scope {
-    flex: none;
-    display: flex;
-    gap: 8px;
-    margin: 0;
-    padding: 8px 14px;
-    border-bottom: 1px solid var(--border-soft);
-    background: var(--surface-3);
-    font-size: 11.5px;
-    line-height: 1.45;
-    /* --text-faint is only 2.78:1 on --surface-3; the banner is body copy the
-       user is meant to read, so it needs the AA-passing muted tone. */
-    color: var(--text-muted);
-}
-
-.fsurf-scope strong {
-    color: var(--text-strong);
-}
-
-.fsurf-body {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 12px 14px;
-}
-
-/* The reflow: sub-groups become the column items. break-inside on the SECTION
-   instead would pin all ~25 node properties into one column and defeat the
-   whole surface, so sections span and their bodies fragment. */
-.fsurf-body .filter-section-body {
-    column-width: 320px;
-    column-gap: 18px;
-}
-
-.fsurf-body .filter-subgroup {
-    break-inside: avoid;
-}
-
-.fsurf-body .header-card {
-    break-after: avoid;
 }
 
 /* Louvain community-detection configurator (anchored to the 🧩 button) */
@@ -1638,7 +1572,7 @@ h5 {
 }
 
 /* Narrow panel: one section at a time, chosen by the segment above. */
-#filterContainer:not(.filters-expanded) .filter-section:not(.filter-section-active) {
+#filterContainer .filter-section:not(.filter-section-active) {
     display: none;
 }
 
@@ -1647,7 +1581,7 @@ h5 {
    no other home. Folding is disabled rather than hidden: the segment already
    decides what is on screen, so a second mechanism for the same thing is just
    a way to make a section vanish with no visible cause. */
-#filterContainer:not(.filters-expanded) .filter-section > .header-card {
+#filterContainer .filter-section > .header-card {
     background: none;
     border: none;
     border-radius: 0;
@@ -1658,45 +1592,40 @@ h5 {
     pointer-events: none;
 }
 
-#filterContainer:not(.filters-expanded) .filter-section > .header-card h4,
-#filterContainer:not(.filters-expanded) .filter-section > .header-card .filter-group-chevron {
+#filterContainer .filter-section > .header-card h4,
+#filterContainer .filter-section > .header-card .filter-group-chevron {
     display: none;
 }
 
-#filterContainer:not(.filters-expanded) .filter-section > .header-card .small-btn,
-#filterContainer:not(.filters-expanded) .filter-section > .header-card .filter-scope-segment {
+#filterContainer .filter-section > .header-card .small-btn,
+#filterContainer .filter-section > .header-card .filter-scope-segment {
     pointer-events: auto;
 }
 
 /* The segment shares that row: it hugs the left, the triad keeps the right,
    and the panel spends one row on the pair instead of two. */
-#filterContainer:not(.filters-expanded) .filter-section > .header-card > .filter-scope {
+#filterContainer .filter-section > .header-card > .filter-scope {
     margin-right: auto;
 }
 
-#filterContainer:not(.filters-expanded) .filter-section > .header-card:has(> .filter-scope) {
+#filterContainer .filter-section > .header-card:has(> .filter-scope) {
     margin-bottom: 8px;
-}
-
-/* The surface shows every section, so the segment would be a lie there. */
-#filterContainer.filters-expanded .filter-scope {
-    display: none;
 }
 
 /* A running search spans both sections, so the segment steps aside and every
    section with a match comes back. */
-#filterContainer.filters-searching:not(.filters-expanded) .filter-scope {
+#filterContainer.filters-searching .filter-scope {
     display: none;
 }
 
-#filterContainer.filters-searching:not(.filters-expanded) .filter-section:not(.filter-section-active) {
+#filterContainer.filters-searching .filter-section:not(.filter-section-active) {
     display: block;
 }
 
 /* ...but a section applySearch emptied must STAY hidden. The rule above is an
    author `display`, which beats the UA sheet's [hidden] on specificity — the
    same trap as .filter-row[hidden] and #sidebarStatusContainer[hidden]. */
-#filterContainer.filters-searching:not(.filters-expanded) .filter-section[hidden] {
+#filterContainer.filters-searching .filter-section[hidden] {
     display: none;
 }
 
@@ -1834,25 +1763,45 @@ h5 {
     display: none;
 }
 
-.card-collapse-header {
+/* The dark bar lives on the WRAPPER, not the header button, so a layer row's
+   switch sits inside it beside the title rather than out on the panel
+   background — the switch's contrast is designed against this bar. */
+.card-collapse-bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    width: 100%;
+    gap: 7px;
     box-sizing: border-box;
+    padding: 0 8px;
     background: var(--brand-border);
     color: #fff;
-    border: none;
     border-radius: 4px;
-    padding: 4px 8px;
+}
+
+.card-collapse-header {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: none;
+    color: inherit;
+    border: none;
+    padding: 4px 0;
     cursor: pointer;
     font: inherit;
     font-weight: bold;
     font-size: 13px;
 }
 
-.card-collapse-header:hover {
+/* Hover tints the whole bar, as it did when the header WAS the bar — reaching
+   up rather than colouring a block that stops short of the switch. */
+.card-collapse-bar:has(.card-collapse-header:hover) {
     background: var(--accent-text);
+}
+
+/* Pushes the count and the chevron to the right edge of the bar. */
+.card-collapse-title {
+    flex: 1 1 auto;
+    text-align: left;
 }
 
 .card-collapse-chevron {
@@ -1860,13 +1809,130 @@ h5 {
     opacity: 0.85;
 }
 
-.card-labeled.collapsed > :not(.card-collapse-header) {
+/* --------------------------------------------------------------------------
+   The Overlays layer stack. Four rows, one per thing drawn over the graph:
+   Groups and the heatmap are collapsible cards whose header bar carries the
+   switch; Notes and the minimap have no parameters, so they are bare rows.
+   Both shapes share the bar geometry so the four read as one stack.
+   -------------------------------------------------------------------------- */
+/* A row with no parameters: the same bar as a card's, minus the disclosure. */
+.layer-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 8px 0 0;
+    padding: 4px 8px;
+    box-sizing: border-box;
+    border-radius: 4px;
+    background: var(--brand-border);
+    color: #fff;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+/* A COLLAPSED layer card is nothing but its bar, so all four rows read as one
+   stack; expanded, the card frame comes back to group the parameters under it. */
+.card-labeled.layer-card {
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+}
+
+.card-labeled.layer-card:not(.collapsed) {
+    border: 1px solid var(--brand-border);
+    background-color: #E4E3EA80;
+    padding-bottom: 6px;
+}
+
+/* The card cannot carry the inset itself: the bar is its header and has to stay
+   full-bleed, so everything BELOW the bar is inset instead. Without this the
+   prose and the tab bar sit flush against the card border. */
+.card-labeled.layer-card > :not(.card-collapse-bar) {
+    margin-left: 6px;
+    margin-right: 6px;
+}
+
+/* Breathing room under the bar, which the contents would otherwise touch. */
+.card-labeled.layer-card > .card-collapse-bar + * {
+    margin-top: 6px;
+}
+
+.layer-title {
+    flex: 1 1 auto;
+    text-align: left;
+}
+
+/* Counts are secondary to the name they follow, and sit on the same dark bar
+   as the title — a plain white at lower weight rather than a muted grey.
+   0.9, not 0.8: at 0.8 this lands on 4.22:1 over the dark theme's lighter bar,
+   and 11px prose owes 4.5. */
+.layer-count {
+    font-weight: normal;
+    font-size: 11px;
+    opacity: 0.9;
+}
+
+/* A track with a knob, sized off the 13px bar text so it never dominates the
+   row. role=switch, so aria-checked is the state and CSS follows it.
+   The KNOB POSITION is the state signal, not the fill — colour alone would
+   fail 1.4.1, and no green both contrasts 3:1 with the white knob and 3:1
+   with the bar behind it. The border carries the 3:1 component boundary
+   instead (0.7 alpha: 0.55 lands on 2.88:1 over the dark theme's bar). */
+.layer-switch {
+    flex: 0 0 auto;
+    position: relative;
+    width: 26px;
+    height: 14px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 7px;
+    background: rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.layer-switch::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s ease;
+}
+
+/* A fixed dark green in BOTH themes, not --success-text: that token flips to
+   #58c06a in dark, where the white knob would sit on it at 2.29:1. */
+.layer-switch[aria-checked="true"] {
+    background: #015C0C;
+    border-color: rgba(255, 255, 255, 0.9);
+}
+
+.layer-switch[aria-checked="true"]::after {
+    transform: translateX(12px);
+}
+
+.layer-switch:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.layer-switch:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 1px;
+}
+
+.card-labeled.collapsed > :not(.card-collapse-bar) {
     display: none;
 }
 
-/* Allow folding/unfolding a section even while its controls are disabled
-   (nothing selected), so the contents stay readable. */
-.card-labeled.card-collapsible.disabled .card-collapse-header {
+/* Allow folding/unfolding a section — and flipping a layer switch — even while
+   its controls are disabled (nothing selected), so the contents stay readable
+   and the row that owns the switch never locks the user out of it. */
+.card-labeled.card-collapsible.disabled .card-collapse-bar {
     pointer-events: auto;
 }
 

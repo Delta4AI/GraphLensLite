@@ -48,6 +48,9 @@ class AnnotationLayer {
     this.cache = cache;
     this.container = container;
     this.killed = false;
+    // Layer visibility, driven by the inspector's Overlays stack. Runtime
+    // state like heatmapEnabled — never persisted, resets with the adapter.
+    this.visible = true;
 
     /** @type {Map<string, HTMLElement>} note id → element */
     this.els = new Map();
@@ -63,6 +66,21 @@ class AnnotationLayer {
 
     this.renderHandler = () => this.scheduleSync();
     adapter.sigma.on('afterRender', this.renderHandler);
+  }
+
+  /**
+   * Show or hide every note, on screen and in both export paths. Hiding also
+   * closes the styling popover — it would otherwise float over a note that is
+   * no longer on screen.
+   */
+  setVisible(visible) {
+    if (this.visible === visible) return;
+    this.visible = visible;
+    this.root.hidden = !visible;
+    if (!visible) {
+      this.cancelPlacement();
+      this.#closePopover();
+    }
   }
 
   destroy() {
@@ -512,6 +530,7 @@ class AnnotationLayer {
    * @returns {Array<{ann: object, x: number, y: number, k: number}>}
    */
   exportPlacements() {
+    if (!this.visible) return [];
     const sigma = this.adapter.sigma;
     const k = 1 / sigma.getCamera().getState().ratio;
     return this.annotations().map((ann) => {

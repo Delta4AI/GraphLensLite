@@ -848,9 +848,14 @@ class UIComponentManager {
     circleButton.className = `circle-button-compact`;
     circleButton.id = 'manualBubbleGroupButton';
 
+    // "Bubble Set 1", not "groupOne": the number is what the styling tabs under
+    // Overlays › Groups carry, so the quadrant names the thing the user will go
+    // and restyle. And "Toggle", because a second click removes.
+    let index = 0;
     for (let [group, quadrantPosition] of Object.entries(
       DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS
     )) {
+      index++;
       const quadrant = document.createElement('button');
       quadrant.classList.add('quadrant');
       quadrant.classList.add(quadrantPosition);
@@ -865,7 +870,8 @@ class UIComponentManager {
         }
       });
 
-      quadrant.title = `Toggle selected nodes in manual ${group}`;
+      quadrant.title = `Toggle the selected nodes in Bubble Set ${index} (${quadrantPosition.replace('-', ' ')})`;
+      quadrant.setAttribute('aria-label', quadrant.title);
       circleButton.appendChild(quadrant);
     }
 

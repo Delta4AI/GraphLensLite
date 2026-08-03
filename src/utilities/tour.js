@@ -139,7 +139,7 @@ const TOUR_STEPS = [
            <br><br>
            <strong>◆ App menu</strong> — load data, download the Excel template, take this tour, or start over
            <br><strong>Workspace chip</strong> — which workspace you're in, plus live shown/total counts
-           <br><strong>⛶ Fit · ↻ Layout · ➰ Lasso · ✨ Hover</strong> — the everyday canvas verbs
+           <br><strong>⊡ Fit · ↻ Layout · ➰ Lasso · ✨ Hover</strong> — the everyday canvas verbs
            <br><strong>Selection chip</strong> — what's selected, with focus, clear and undo/redo
            <br><strong>⌕ Search</strong> — press <strong>Ctrl+K</strong> (⌘K on a Mac) to find any
            control, node or property by name. Each result tells you where it lives, so you only
@@ -243,7 +243,7 @@ const TOUR_STEPS = [
            <br>• <strong>Click + drag a node</strong> — moves that node
            <br>• <strong>Click + drag selected nodes</strong> — moves the entire selection
            <br><br>
-           The <strong>minimap</strong> (bottom-right corner) shows an overview of the entire graph. Click or drag inside it to quickly navigate to different parts of the network — the rail's <strong>◐ Overlays</strong> menu hides it, along with the density heatmap, and offers <strong>presentation mode</strong> (⇧F) for a chrome-free screenshot.`,
+           The <strong>minimap</strong> (bottom-right corner) shows an overview of the entire graph. Click or drag inside it to quickly navigate to different parts of the network — the inspector's <strong>Overlays</strong> tab hides it, along with everything else drawn over the graph. For a chrome-free screenshot, <strong>⛶ presentation mode</strong> (⇧F) hides the rail and the inspector.`,
     targets: [{ selector: '#innerGraphContainer' }, { selector: '.gll-minimap' }],
     position: 'left',
   },
@@ -304,10 +304,10 @@ const TOUR_STEPS = [
            <br>• <strong>Halos</strong> — colored glow around edges with adjustable width
            <br>• <strong>Edge flow</strong> — animated directional motion along edges (comet or chevron), with adjustable opacity and density
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Bubble Sets</strong> and the <strong>Density Heatmap</strong> are workspace-level, not
-           per-selection, so they live in the <strong>Workspace</strong> context under
-           <strong>Groups</strong> and <strong>Overlays</strong>. The heatmap's on/off switch is on the rail's
-           <strong>◐ Overlays</strong> menu, together with the minimap and presentation mode.
+           <strong>Groups</strong> (bubble sets) and the <strong>density heatmap</strong> are
+           workspace-level, not per-selection, so they live in the <strong>Overlays</strong> tab — a
+           stack of everything drawn over the graph, alongside notes and the minimap. Each row
+           carries its own switch and opens onto its own settings.
            <hr style="margin:6px 0;border-color:#dddbe2;">
            <strong>Scale tools</strong> — map any data property or computed network metric to a visual property:
            <br>• <span style="display:inline-block;width:20px;height:16px;border:1px solid black;border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> <strong>Numeric scale</strong> — e.g. scale node size by PageRank

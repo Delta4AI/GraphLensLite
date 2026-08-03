@@ -101,19 +101,31 @@ class HeatmapLayer {
     sigma.on('afterRender', this.renderHandler);
   }
 
+  /**
+   * The layer-stack contract every overlay answers to (UIManager.OVERLAYS).
+   * `heatmapEnabled` keeps its name because it is the persisted JSON field.
+   */
+  setVisible(visible) {
+    this.setHeatmapEnabled(visible);
+  }
+
+  get visible() {
+    return this.heatmapEnabled;
+  }
+
   /** @param {boolean} enabled */
   setHeatmapEnabled(enabled) {
     if (this.heatmapEnabled === !!enabled) return;
     this.heatmapEnabled = !!enabled;
-    // The inspector's parameter card is inert while the overlay is off —
-    // grey it like the bubble-set cards (createHeatmapConfigCard sets the
-    // initial state; optional chaining covers unit tests' bare adapters).
-    this.adapter.cache?.ui?.toggleDisabledElements?.(['Density Heatmap'], this.heatmapEnabled);
     this.lastPaintSignature = null;
     // The reducers consult heatmapEnabled for the graph fade; a refresh
     // re-runs them and its afterRender drives our repaint too.
     if (this.settings.fadeGraph) this.adapter.sigma.refresh();
     this.scheduleRedraw();
+    // A JSON load flips this without going through the row, so the switch is
+    // re-read here rather than set by the caller (bare adapters in unit tests
+    // have no ui — optional chaining covers them).
+    this.adapter.cache?.ui?.syncOverlays?.();
   }
 
   /**
