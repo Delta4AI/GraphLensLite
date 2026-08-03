@@ -1599,7 +1599,6 @@ h5 {
     border: 1px solid var(--border-soft);
     border-radius: 12px;
     overflow: hidden;
-    margin-bottom: 8px;
 }
 
 .filter-scope-segment {
@@ -1664,8 +1663,19 @@ h5 {
     display: none;
 }
 
-#filterContainer:not(.filters-expanded) .filter-section > .header-card .small-btn {
+#filterContainer:not(.filters-expanded) .filter-section > .header-card .small-btn,
+#filterContainer:not(.filters-expanded) .filter-section > .header-card .filter-scope-segment {
     pointer-events: auto;
+}
+
+/* The segment shares that row: it hugs the left, the triad keeps the right,
+   and the panel spends one row on the pair instead of two. */
+#filterContainer:not(.filters-expanded) .filter-section > .header-card > .filter-scope {
+    margin-right: auto;
+}
+
+#filterContainer:not(.filters-expanded) .filter-section > .header-card:has(> .filter-scope) {
+    margin-bottom: 8px;
 }
 
 /* The surface shows every section, so the segment would be a lie there. */
@@ -2175,7 +2185,7 @@ h5 {
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    margin-bottom: 6px;
+    margin: 4px 0 6px;
 }
 
 /* The AND join's constraint census — its own full-width line so the join

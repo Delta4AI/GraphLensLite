@@ -750,7 +750,8 @@ class UIManager {
   }
 
   /**
-   * Node/edge scope segment, shown above the sections in the narrow panel.
+   * Node/edge scope segment, shown in the active section's header row in the
+   * narrow panel.
    *
    * The top level of the filter tree is always exactly two sections in a fixed
    * order — `EXCEL_NODE_HEADER` and `EXCEL_EDGE_HEADER` are app constants, not
@@ -775,7 +776,14 @@ class UIManager {
 
     const show = (name) => {
       for (const wrap of wraps) {
-        wrap.classList.toggle('filter-section-active', wrap.dataset.section === name);
+        const active = wrap.dataset.section === name;
+        wrap.classList.toggle('filter-section-active', active);
+        // The segment rides in the active section's header row rather than
+        // above it: in the narrow panel that row is stripped down to the
+        // right-aligned triad, so the pair costs one row instead of two.
+        if (active && wraps.length > 1) {
+          wrap.querySelector(':scope > .header-card').prepend(bar);
+        }
       }
       for (const btn of bar.children) {
         const active = btn.dataset.section === name;
@@ -803,7 +811,6 @@ class UIManager {
       bar.appendChild(btn);
     }
 
-    if (wraps.length > 1) container.insertBefore(bar, wraps[0]);
     // A rebuild (data reload, workspace switch) keeps whichever scope was up,
     // as long as that section still exists.
     show(names.includes(this.filterScope) ? this.filterScope : names[0]);

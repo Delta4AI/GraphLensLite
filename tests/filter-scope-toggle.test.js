@@ -28,9 +28,13 @@ function containerWith(sections) {
     const wrap = document.createElement('div');
     wrap.className = 'filter-section';
     wrap.dataset.section = name;
-    wrap.innerHTML = `<div class="filter-section-body">${
-      '<div class="filter-row"></div>'.repeat(rows)
-    }</div>`;
+    // The header row carries the section's triad; in the narrow panel the
+    // segment joins it there.
+    wrap.innerHTML = `<div class="header-card"><h4>${name}</h4>` +
+      `<button class="small-btn">↺</button></div>` +
+      `<div class="filter-section-body">${
+        '<div class="filter-row"></div>'.repeat(rows)
+      }</div>`;
     div.appendChild(wrap);
   }
   document.body.innerHTML = '';
@@ -120,11 +124,22 @@ describe('filter scope segment', () => {
     expect(segments()[0].textContent).toBe('Node "filters"3');
   });
 
-  it('sits above the sections, so the choice reads as governing them', () => {
+  it('rides in the active section header, ahead of that section triad', () => {
     const div = containerWith({ 'Node filters': 8, 'Edge filters': 5 });
 
     ui.buildFilterScopeToggle(div);
 
-    expect(div.firstElementChild.classList.contains('filter-scope')).toBe(true);
+    const header = div.querySelector('.filter-section-active > .header-card');
+    expect(header.firstElementChild.classList.contains('filter-scope')).toBe(true);
+  });
+
+  it('follows the scope, so it is never left in a hidden section', () => {
+    const div = containerWith({ 'Node filters': 8, 'Edge filters': 5 });
+    ui.buildFilterScopeToggle(div);
+
+    segments()[1].click();
+
+    const host = div.querySelector('.filter-scope').closest('.filter-section');
+    expect(host.dataset.section).toBe('Edge filters');
   });
 });
