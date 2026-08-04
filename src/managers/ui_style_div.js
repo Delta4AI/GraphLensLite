@@ -1359,6 +1359,9 @@ function createStyleDiv(cache) {
       sw.setAttribute("role", "switch");
       sw.setAttribute("aria-checked", "false");
       sw.setAttribute("aria-label", title);
+      // syncOverlays swaps this out for a reason while the layer has nothing to
+      // draw, and back in when it does, so it has to exist to be restored.
+      sw.title = `Show or hide ${title.toLowerCase()} on the graph`;
       sw.addEventListener("click", () => cache.ui.toggleOverlay(overlay));
       bar.appendChild(sw);
     }

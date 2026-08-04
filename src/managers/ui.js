@@ -448,11 +448,33 @@ class UIManager {
    * affordance pointing at its switch.
    */
   static OVERLAYS = {
-    groups: { switchId: 'overlaySwitchGroups', layer: (c) => c.graph?.bubbleLayer },
+    groups: {
+      switchId: 'overlaySwitchGroups',
+      layer: (c) => c.graph?.bubbleLayer,
+      // A group with no members draws nothing, so the count IS the content.
+      empty: (c) => UIManager.#groupSetCount(c) === 0,
+      emptyHint: 'Nothing to show yet — put nodes in a group below',
+    },
     heatmap: { switchId: 'overlaySwitchHeatmap', layer: (c) => c.graph?.heatmapLayer },
-    notes: { switchId: 'overlaySwitchNotes', layer: (c) => c.graph?.annotationLayer },
+    notes: {
+      switchId: 'overlaySwitchNotes',
+      layer: (c) => c.graph?.annotationLayer,
+      empty: (c) => (c.graph?.annotationLayer?.annotations?.() ?? []).length === 0,
+      emptyHint: 'Nothing to show yet — place a note with ✎ Note on the rail',
+    },
     minimap: { switchId: 'overlaySwitchMinimap', layer: (c) => c.graph?.minimap },
   };
+
+  /** Groups that actually draw something: the "N sets" beside the Groups row. */
+  static #groupSetCount(cache) {
+    const bs = cache.bs;
+    if (!bs || !cache.data?.layouts?.[cache.data.selectedLayout]) return 0;
+    let sets = 0;
+    for (const group of bs.traverseBubbleSets()) {
+      if (bs.getEffectiveGroupMembers(group).size > 0) sets++;
+    }
+    return sets;
+  }
 
   /** @param {'groups'|'heatmap'|'notes'|'minimap'} name */
   toggleOverlay(name) {
@@ -472,28 +494,32 @@ class UIManager {
   /**
    * Re-read every layer and mirror it onto its row: switch state and whether the
    * row can act at all. Called after any toggle, on graph (re)build, and from
-   * the two places that flip a layer without going through a row — a JSON load's
-   * heatmap flag and a bubble-group membership change.
+   * the three places that flip a layer without going through a row — a JSON
+   * load's heatmap flag, a bubble-group membership change, and placing or
+   * deleting a note.
+   *
+   * A layer whose content is empty gets a disabled switch: Groups with no
+   * populated group and Notes with no note draw nothing either way, so an
+   * enabled switch promises an effect it cannot deliver. The title says why.
    */
   syncOverlays() {
-    for (const { switchId, layer: layerOf } of Object.values(UIManager.OVERLAYS)) {
+    for (const { switchId, layer: layerOf, empty, emptyHint } of Object.values(UIManager.OVERLAYS)) {
       const layer = layerOf(this.cache);
       const btn = document.getElementById(switchId);
       if (!btn) continue;
       btn.setAttribute('aria-checked', String(!!layer?.visible));
-      btn.disabled = !layer;
+      const blank = !!layer && !!empty?.(this.cache);
+      btn.disabled = !layer || blank;
+      // The enabled title is authored once (markup or makeCollapsible); stash it
+      // the first time so the hint can be swapped in and back out.
+      btn.dataset.baseTitle ??= btn.title;
+      btn.title = blank ? emptyHint : btn.dataset.baseTitle;
     }
 
     // "3 sets" beside the Groups row — only groups with members count.
     const count = document.getElementById('overlayCountGroups');
-    const bs = this.cache.bs;
     if (!count) return;
-    let sets = 0;
-    if (bs && this.cache.data?.layouts?.[this.cache.data.selectedLayout]) {
-      for (const group of bs.traverseBubbleSets()) {
-        if (bs.getEffectiveGroupMembers(group).size > 0) sets++;
-      }
-    }
+    const sets = UIManager.#groupSetCount(this.cache);
     count.textContent = sets ? `${sets} ${sets === 1 ? 'set' : 'sets'}` : '';
   }
 

@@ -27,21 +27,33 @@ function stubLayer(visible = true) {
 
 function overlayDom() {
   document.body.innerHTML = `
-    <button id="overlaySwitchGroups" role="switch" aria-checked="false" disabled></button>
+    <button id="overlaySwitchGroups" role="switch" aria-checked="false" disabled title="Show or hide groups"></button>
     <button id="overlaySwitchHeatmap" role="switch" aria-checked="false" disabled></button>
-    <button id="overlaySwitchNotes" role="switch" aria-checked="false" disabled></button>
+    <button id="overlaySwitchNotes" role="switch" aria-checked="false" disabled title="Show or hide every text note"></button>
     <button id="overlaySwitchMinimap" role="switch" aria-checked="false" disabled></button>
     <span id="overlayCountGroups"></span>
   `;
 }
 
-function makeUI({ groups = true, heatmap = false, notes = true, minimap = true } = {}) {
+/**
+ * A UI over four stub layers. `populated` gives Groups and Notes the content
+ * their switches now require — the default, since most tests are about state
+ * rather than emptiness.
+ */
+function makeUI({ groups = true, heatmap = false, notes = true, minimap = true, populated = true } = {}) {
+  const annotationLayer = stubLayer(notes);
+  annotationLayer.annotations = () => (populated ? [{ id: 'a1' }] : []);
   const cache = {
     graph: {
       bubbleLayer: stubLayer(groups),
       heatmapLayer: stubLayer(heatmap),
-      annotationLayer: stubLayer(notes),
+      annotationLayer,
       minimap: stubLayer(minimap),
+    },
+    data: { selectedLayout: 'Default', layouts: { Default: {} } },
+    bs: {
+      traverseBubbleSets: () => (populated ? ['g1'] : []),
+      getEffectiveGroupMembers: () => new Set(populated ? ['n1'] : []),
     },
   };
   return [new UIManager(cache, false), cache];
@@ -90,6 +102,46 @@ describe('UIManager overlay layer stack', () => {
     for (const name of ['Groups', 'Heatmap', 'Notes', 'Minimap']) {
       expect(sw(name).disabled).toBe(false);
     }
+  });
+
+  // ------------------------------------------ a switch over nothing to draw
+  //
+  // An enabled switch promises an effect. Groups with no populated group and
+  // Notes with no note draw nothing either way, so the switch is disabled and
+  // its title says why rather than letting the user toggle a no-op.
+
+  it('disables the Groups and Notes switches while those layers have nothing to draw', () => {
+    const [ui] = makeUI({ populated: false });
+    ui.syncOverlays();
+
+    expect(sw('Groups').disabled).toBe(true);
+    expect(sw('Notes').disabled).toBe(true);
+    // The heatmap draws off the nodes themselves and the minimap off the
+    // viewport, so neither can be empty while a graph exists.
+    expect(sw('Heatmap').disabled).toBe(false);
+    expect(sw('Minimap').disabled).toBe(false);
+  });
+
+  it('swaps the title for the reason, and back again once there is content', () => {
+    const [ui, cache] = makeUI({ populated: false });
+    ui.syncOverlays();
+    expect(sw('Notes').title).toBe(UIManager.OVERLAYS.notes.emptyHint);
+
+    cache.graph.annotationLayer.annotations = () => [{ id: 'a1' }];
+    ui.syncOverlays();
+    expect(sw('Notes').disabled).toBe(false);
+    expect(sw('Notes').title).toBe('Show or hide every text note');
+  });
+
+  it('counts a group with no members as nothing to draw, like the "N sets" label', () => {
+    // The two must not disagree: "" sets beside an enabled switch would read as
+    // a broken count rather than an empty layer.
+    const [ui, cache] = makeUI();
+    cache.bs.getEffectiveGroupMembers = () => new Set();
+    ui.syncOverlays();
+
+    expect(sw('Groups').disabled).toBe(true);
+    expect(document.getElementById('overlayCountGroups').textContent).toBe('');
   });
 
   it('reports an error instead of throwing when there is no layer to toggle', () => {
@@ -180,6 +232,22 @@ describe('AnnotationLayer.setVisible', () => {
     l.setVisible(true);
     expect(l.root.hidden).toBe(false);
     expect(l.exportPlacements()).toHaveLength(1);
+  });
+
+  it('re-reads the layer rows when a note is placed or deleted', () => {
+    // The Notes switch is disabled while there is no note, so the two calls
+    // that change how many there are have to say so. sync() cannot carry it —
+    // it runs on every render.
+    const l = layer();
+    l.cache.ui.syncOverlays = vi.fn();
+
+    l.armPlacement();
+    l.placementOverlay.dispatchEvent(new window.PointerEvent('pointerdown', { button: 0, bubbles: true }));
+    expect(l.annotations()).toHaveLength(2);
+    expect(l.cache.ui.syncOverlays).toHaveBeenCalledTimes(1);
+
+    l.removeAnnotation('a1');
+    expect(l.cache.ui.syncOverlays).toHaveBeenCalledTimes(2);
   });
 
   it('disarms the placement tool when the layer goes away under it', () => {

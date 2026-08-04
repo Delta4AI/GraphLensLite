@@ -1847,10 +1847,12 @@ h5 {
     transition: transform 0.15s ease;
 }
 
-/* A fixed dark green in BOTH themes, not --success-text: that token flips to
-   #58c06a in dark, where the white knob would sit on it at 2.29:1. */
+/* The brand accent in BOTH themes, not --accent-text: that token flips to
+   #e0635b in dark, where the white knob drops to 3.44:1. Fixed, it is 5.2:1.
+   Green would be the conventional "on" here, but the app has no green anywhere
+   else, and the knob position — not the fill — is what states the switch. */
 .layer-switch[aria-checked="true"] {
-    background: #015C0C;
+    background: #C33D35;
     border-color: rgba(255, 255, 255, 0.9);
 }
 

@@ -152,6 +152,9 @@ class AnnotationLayer {
     };
     (layout.annotations ??= []).push(ann);
     this.sync();
+    // First note: the Notes row's switch is disabled while there is nothing to
+    // show, so it has to be re-read here. Not in sync() — that runs per render.
+    this.cache.ui?.syncOverlays?.();
     const el = this.els.get(ann.id);
     if (el) this.#startEditing(ann, el, { selectAll: true });
   }
@@ -163,6 +166,7 @@ class AnnotationLayer {
     layout.annotations = layout.annotations.filter((a) => a.id !== id);
     this.#closePopover();
     this.sync();
+    this.cache.ui?.syncOverlays?.();
   }
 
   // ------------------------------------------------------------------- sync
