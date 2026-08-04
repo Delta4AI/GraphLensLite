@@ -3131,6 +3131,14 @@ input:checked + .checkbox-green::after {
     color: var(--text-strong);
 }
 
+/* Transparent at rest is what keeps these quiet; transparent at 2.5x is a
+   control with the group chip and the row behind it showing through its
+   middle. Opaque the moment it grows. */
+#filterContainer .filter-row-col3 .pm-group:hover,
+#filterContainer .filter-row-col3 .pm-group:focus-within {
+    background: var(--surface-3);
+}
+
 .pm-group:hover,
 .pm-group:focus-within {
     border-color: #C33D35;
