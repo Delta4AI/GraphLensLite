@@ -145,7 +145,7 @@ const TOUR_STEPS = [
            (<strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong>). The selection has its own pair, further along
            <br><strong>⊡ Fit · ↻ Layout · ➰ Lasso · ✨ Hover · ◈ Select · ✎ Note</strong>
            — the everyday canvas verbs
-           <br><strong>⌕ Search</strong> (<strong>Ctrl+K</strong>, ⌘K on a Mac) — find any control, node or
+           <br><strong>⌕ Search</strong> (<strong>Ctrl+K</strong>) — find any control, node or
            property by name. Each result tells you where it lives, so you only have to look it up once
            <br><strong>Selection chip</strong> — what's selected, with focus, clear and undo/redo
            <br><br>
@@ -466,7 +466,7 @@ const TOUR_STEPS = [
     text: `That covers the main features. Here are the <strong>keyboard shortcuts</strong> — the
            <strong>?</strong> button on the rail shows this list any time:
            <br><br>
-           <strong>Ctrl+K</strong> — Find any control, node or property by name (⌘K on a Mac)
+           <strong>Ctrl+K</strong> — Find any control, node or property by name
            <br><strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong> — Undo / redo the last change to the workspace
            <br><strong>P</strong> — Export as PNG
            <br><strong>S</strong> — Save as JSON
