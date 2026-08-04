@@ -3745,24 +3745,6 @@ input:checked + .slider:before {
     border-top: 1px dashed var(--border-soft);
 }
 
-.group-style-heading {
-    margin: 0 0 6px;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-strong);
-}
-
-/* A group with no members dims its settings, but the heading has to stay
-   readable — and a child cannot out-opacity its parent, so the dimming moves
-   off the container onto the rows. */
-.group-style-panel.disabled {
-    opacity: 1;
-}
-
-.group-style-panel.disabled > .card-row {
-    opacity: 0.5;
-}
-
 /* --- the shared group menu ---------------------------------------------- */
 
 .group-menu-dot {

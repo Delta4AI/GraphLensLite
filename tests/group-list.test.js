@@ -295,6 +295,7 @@ describe('refreshBubbleStyleElements — the single settings pane', () => {
         <div data-property="Bubble Set ${group} Padding">
           <input type="range"><input type="number">
         </div>
+        <label class="switch" data-property="Bubble Set ${group} Label"><input type="checkbox"></label>
         <select data-property="Bubble Set ${group} Label Placement">
           <option value="top">top</option><option value="bottom">bottom</option>
         </select>
@@ -340,6 +341,21 @@ describe('refreshBubbleStyleElements — the single settings pane', () => {
     layoutOf(cache).bubbleSetStyle.g1.label = true;
     bs.refreshBubbleStyleElements();
     expect(document.querySelector('.bubbleSetOptionalLabelConfig').classList.contains('disabled')).toBe(false);
+  });
+
+  it('syncs the Label switch — it had no data-property, so nothing could', () => {
+    const { cache, bs } = mountPane('g1', { labelText: 'K', label: true });
+    // createSwitch exposes setChecked; the harness switch needs the same shape.
+    const sw = document.querySelector('[data-property="Bubble Set g1 Label"]');
+    let checked = null;
+    sw.setChecked = (v) => { checked = v; };
+
+    bs.refreshBubbleStyleElements();
+    expect(checked).toBe(true);
+
+    layoutOf(cache).bubbleSetStyle.g1.label = false;
+    bs.refreshBubbleStyleElements();
+    expect(checked).toBe(false);
   });
 
   it('is a no-op, not a crash, when no group is selected', () => {
@@ -411,7 +427,7 @@ describe('selecting a row', () => {
 
     expect(cache.ui.buildGroupStylePanel).toHaveBeenLastCalledWith('g1');
 
-    document.querySelector('.group-row[data-group="g2"]').click();
+    document.querySelector('.group-row[data-group="g2"] .group-row-head').click();
     expect(cache.ui.buildGroupStylePanel).toHaveBeenLastCalledWith('g2');
     expect(document.querySelector('.group-row[data-group="g2"]').classList.contains('active'))
       .toBe(true);
@@ -422,7 +438,7 @@ describe('selecting a row', () => {
     const cache = makeCache({ g1: 'Kinases', g2: 'Hubs' });
     const bs = new GraphBubbleSetManager(cache);
     bs.renderGroupList();
-    document.querySelector('.group-row[data-group="g2"]').click();
+    document.querySelector('.group-row[data-group="g2"] .group-row-head').click();
     expect(bs.selectedGroup).toBe('g2');
 
     await bs.deleteGroup('g2');
@@ -437,9 +453,33 @@ describe('selecting a row', () => {
     const bs = new GraphBubbleSetManager(cache);
     bs.renderGroupList();
 
-    // The ⋯ button lives inside row g2; clicking it must not also select g2
-    // out from under the menu that is about to open.
+    // The ⋯ button lives inside row g2's head; clicking it must not also select
+    // g2 out from under the menu that is about to open.
     document.querySelector('.group-row[data-group="g2"] .group-row-more').click();
     expect(bs.selectedGroup).toBe('g1');
+  });
+
+  it('leaves clicks inside the settings pane alone', () => {
+    // A switch is a <label><span> — neither a button nor an input, so a
+    // handler on the whole ROW let the click through and the rebuild destroyed
+    // the control before its toggle completed. Selection is the head's job.
+    mount();
+    const cache = makeCache({ g1: 'Kinases', g2: 'Hubs' });
+    const bs = new GraphBubbleSetManager(cache);
+    bs.renderGroupList();
+    const openRow = document.querySelector('.group-row[data-group="g1"]');
+    const pane = openRow.querySelector('#groupStylePanel');
+    const sw = document.createElement('label');
+    sw.className = 'switch';
+    const span = document.createElement('span');
+    sw.appendChild(span);
+    pane.appendChild(sw);
+
+    const renders = vi.spyOn(bs, 'renderGroupList');
+    span.click();
+
+    expect(renders).not.toHaveBeenCalled();
+    // …and the control is still standing.
+    expect(document.querySelector('#groupStylePanel .switch span')).toBe(span);
   });
 });

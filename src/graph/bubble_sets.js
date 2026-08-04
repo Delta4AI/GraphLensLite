@@ -305,6 +305,8 @@ class GraphBubbleSetManager {
       const el = card.querySelector(`[data-property="Bubble Set ${group} ${prop}"]`);
       if (el && el.setChecked) el.setChecked(!!val);
     };
+    syncSwitch("Label", bubbleStyle.label);
+    syncSwitch("Label Background", bubbleStyle.labelBackground);
     syncSwitch("Label Close To Path", bubbleStyle.labelCloseToPath);
     syncSwitch("Label Auto Rotate", bubbleStyle.labelAutoRotate);
     // Numeric 0/1 (legacy values > 0 read as ON) → checked state.

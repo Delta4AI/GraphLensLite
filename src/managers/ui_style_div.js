@@ -1176,12 +1176,9 @@ function createStyleDiv(cache) {
     if (!bs) return;
 
     const optionalCSSClass = "bubbleSetOptionalLabelConfig";
+    // No heading: the pane sits inside the group's own row, which already
+    // carries its name, colour and count.
     const name = bs.labelText || group;
-
-    const heading = document.createElement("div");
-    heading.className = "group-style-heading";
-    heading.textContent = `Appearance — ${name}`;
-    panel.appendChild(heading);
 
     // Fill Color
     const rowFillColor = createNewRow(panel);
@@ -1241,6 +1238,8 @@ function createStyleDiv(cache) {
     const enableTextSwitch = createSwitch(async () => {
       await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label`, enableTextSwitch.isChecked());
     }, undefined, bs.label);
+    enableTextSwitch.dataset.property = `Bubble Set ${group} Label`;
+    enableTextSwitch.querySelector("input").setAttribute("aria-label", `Show the label for "${name}"`);
     rowLabel.appendChild(enableTextSwitch);
     const labelInput = createInput(120, "label text",
       "The text drawn on the bubble. This is the same name the group list shows.",
@@ -1259,6 +1258,10 @@ function createStyleDiv(cache) {
       await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Background`, enableBackgroundSwitch.isChecked());
     }, undefined, bs.labelBackground);
     enableBackgroundSwitch.classList.add(optionalCSSClass);
+    enableBackgroundSwitch.dataset.property = `Bubble Set ${group} Label Background`;
+    enableBackgroundSwitch
+      .querySelector("input")
+      .setAttribute("aria-label", `Draw a background plate behind the "${name}" label`);
     rowLabelBg.appendChild(enableBackgroundSwitch);
     createColorControls(rowLabelBg, `Bubble Set ${group} Label Background Color`,
       bs.labelBackgroundFill || bs.fill, [], false, optionalCSSClass);

@@ -134,13 +134,6 @@ function buildGroupRow(bs, group, layout) {
     row.classList.add('active');
     row.style.setProperty('--row-color', style.fill || 'transparent');
   }
-  row.addEventListener('click', (e) => {
-    // A click on the swatch, the name field or the ⋯ button is meant for that
-    // control, not for selecting the row out from under it.
-    if (e.target.closest('button, input')) return;
-    bs.selectedGroup = group;
-    renderGroupList(bs);
-  });
 
   const swatch = document.createElement('input');
   swatch.type = 'color';
@@ -204,6 +197,16 @@ function buildGroupRow(bs, group, layout) {
   const head = document.createElement('div');
   head.className = 'group-row-head';
   head.append(chevron, swatch, nameInput, countEl, toggle, more);
+  // Only the HEAD selects the row. The settings pane below is content, and a
+  // handler on the whole row swallowed clicks on its switches — a switch is a
+  // <label><span>, neither a button nor an input, so it slipped past the guard
+  // and the rebuild destroyed the control before the toggle completed.
+  head.addEventListener('click', (e) => {
+    // …and within the head, a click on a control is meant for that control.
+    if (e.target.closest('button, input')) return;
+    bs.selectedGroup = group;
+    renderGroupList(bs);
+  });
   row.appendChild(head);
 
   // The second line is the thing the old UI never admitted: a group can be fed
