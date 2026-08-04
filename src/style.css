@@ -3528,9 +3528,11 @@ input:checked + .slider:before {
     outline-offset: 2px;
 }
 
+/* A miniature of the bubble: the group's fill inside its stroke colour. */
 .group-chip.assigned {
     border-style: solid;
-    border-color: var(--chip-color);
+    border-width: 2px;
+    border-color: var(--chip-border, var(--chip-color));
     background: var(--chip-color);
 }
 

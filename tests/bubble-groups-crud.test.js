@@ -246,6 +246,37 @@ describe('toggleSelectedNodesInManualGroup', () => {
   });
 });
 
+describe('updateBubbleSetStyle', () => {
+  // Every style write funnels through here, so this is the one place that can
+  // keep the filter rows' chips in step. It did not, and a recoloured group
+  // left stale dots in the filter panel until something unrelated rebuilt it.
+  it('repaints the filter-row chips after a colour change', async () => {
+    const cache = makeCache();
+    const bs = bsFor(cache);
+    bs.refreshBubbleStyleElements = vi.fn();
+    const key = bs.createGroup();
+    cache.INSTANCES.BUBBLE_GROUPS[key] = { update: vi.fn(async () => {}) };
+    cache.gcm = { decideToRenderOrDraw: vi.fn(async () => {}) };
+
+    await bs.updateBubbleSetStyle(`Bubble Set ${key} Fill Color`, '#00ff00');
+
+    expect(cache.data.layouts.Default.bubbleSetStyle[key].fill).toBe('#00ff00');
+    expect(cache.uiComponents.refreshGroupChips).toHaveBeenCalled();
+  });
+
+  it('carries the fill onto the label plate, so they cannot drift apart', async () => {
+    const cache = makeCache();
+    const bs = bsFor(cache);
+    bs.refreshBubbleStyleElements = vi.fn();
+    const key = bs.createGroup();
+    cache.INSTANCES.BUBBLE_GROUPS[key] = { update: vi.fn(async () => {}) };
+    cache.gcm = { decideToRenderOrDraw: vi.fn(async () => {}) };
+
+    await bs.updateBubbleSetStyle(`Bubble Set ${key} Fill Color`, '#00ff00');
+    expect(cache.data.layouts.Default.bubbleSetStyle[key].labelBackgroundFill).toBe('#00ff00');
+  });
+});
+
 describe('cleanupManualGroupMembers', () => {
   it('drops members whose nodes are gone, keeping the rest', () => {
     const cache = makeCache();

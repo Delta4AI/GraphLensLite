@@ -242,9 +242,14 @@ class GraphBubbleSetManager {
       default:
         break;
     }
-    await this.cache.INSTANCES.BUBBLE_GROUPS[group].update({ ...bStyle });
+    await this.#groupInstance(group).update({ ...bStyle });
     await this.cache.gcm.decideToRenderOrDraw(true);
     this.refreshBubbleStyleElements();
+    // Every style write funnels through here, so this is the one place that
+    // can keep the filter rows' chips in step. They render a group's fill and
+    // stroke, and used to hold the old colours until the row was rebuilt for
+    // some unrelated reason.
+    this.cache.uiComponents?.refreshGroupChips?.();
   }
 
   /**

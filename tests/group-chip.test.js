@@ -15,8 +15,9 @@ import { UIComponentManager } from '../src/managers/ui_components.js';
 
 function makeCache(groups = { g1: '#403C53', g2: '#C33D35' }) {
   const bubbleSetStyle = {};
+  const STROKES = { g1: '#C33D35', g2: '#403C53' };
   Object.entries(groups).forEach(([key, fill], i) => {
-    bubbleSetStyle[key] = { fill, labelText: ['Kinases', 'Hubs'][i] ?? key };
+    bubbleSetStyle[key] = { fill, stroke: STROKES[key] ?? '#000000', labelText: ['Kinases', 'Hubs'][i] ?? key };
   });
   const layout = { filters: new Map(), bubbleSetStyle };
   for (const key of Object.keys(bubbleSetStyle)) layout[`${key}Props`] = new Set();
@@ -63,7 +64,29 @@ describe('group chip appearance', () => {
     expect(chip.classList.contains('assigned')).toBe(true);
     expect(chip.classList.contains('multi')).toBe(false);
     expect(chip.style.getPropertyValue('--chip-color')).toBe('#403C53');
+    // The stroke too: the chip is a miniature of the bubble, not half of it.
+    expect(chip.style.getPropertyValue('--chip-border')).toBe('#C33D35');
     expect(chip.getAttribute('aria-label')).toContain('currently in Kinases');
+  });
+
+  it('falls back to the fill when a group has no stroke of its own', () => {
+    const cache = makeCache();
+    delete layoutOf(cache).bubbleSetStyle.g1.stroke;
+    layoutOf(cache).g1Props.add(PROP);
+    const chip = cache.uiComponents.createGroupChip(PROP);
+    expect(chip.style.getPropertyValue('--chip-border')).toBe('#403C53');
+  });
+
+  it('clears both colours when the last group is unassigned', () => {
+    const cache = makeCache();
+    layoutOf(cache).g1Props.add(PROP);
+    const chip = cache.uiComponents.createGroupChip(PROP);
+    layoutOf(cache).g1Props.delete(PROP);
+    cache.uiComponents.paintGroupChip(chip);
+
+    expect(chip.classList.contains('assigned')).toBe(false);
+    expect(chip.style.getPropertyValue('--chip-color')).toBe('');
+    expect(chip.style.getPropertyValue('--chip-border')).toBe('');
   });
 
   it('adds the "and others" ring and names every group when in several', () => {

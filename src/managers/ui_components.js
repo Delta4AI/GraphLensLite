@@ -883,8 +883,13 @@ class UIComponentManager {
     chip.classList.toggle('assigned', inGroups.length > 0);
     chip.classList.toggle('multi', inGroups.length > 1);
     chip.style.removeProperty('--chip-color');
+    chip.style.removeProperty('--chip-border');
     if (inGroups.length > 0) {
-      chip.style.setProperty('--chip-color', styles[inGroups[0]]?.fill ?? 'currentColor');
+      // Fill AND stroke, so the chip is a miniature of the bubble it stands
+      // for rather than a flat dot that only carries half the group's look.
+      const style = styles[inGroups[0]] ?? {};
+      chip.style.setProperty('--chip-color', style.fill ?? 'currentColor');
+      chip.style.setProperty('--chip-border', style.stroke || style.fill || 'currentColor');
     }
 
     const names = inGroups.map((g) => styles[g]?.labelText || g);
