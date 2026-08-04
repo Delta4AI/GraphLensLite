@@ -155,6 +155,58 @@ describe("computeOutlinePoints", () => {
     });
   });
 
+  // Regression (the "wedge at the group label"): the POLYGON is clean but the
+  // curve the painters draw from it crossed itself, and with even-odd fill a
+  // crossing paints the empty space between two corridor arms as a solid
+  // wedge. Cause: the control offsets were capped at a fraction of the
+  // segment's CHORD, and a corridor arm is a few px wide but hundreds long —
+  // so at the sharp notch where two arms meet, the cap allowed an overshoot
+  // many times the arm's own width, straight across the ribbon. Damping the
+  // offset by how sharply the ring turns (SMOOTH_TURN_FALLOFF_POWER) fixes it.
+  describe("painted curve on thin corridors", () => {
+    // The reported workspace's group, in reference-space px: a chain of hubs
+    // plus two nodes off in a corner whose arms meet at a sharp angle.
+    const REPORTED = [
+      [179, 127], [509, 259], [749, 345], [65, 481], [182, 702], [915, 605], [814, 760],
+    ];
+    const members = REPORTED.map(([x, y]) => rectAt(x, y, 10));
+
+    // Every padding here crossed before the damping; the band the report
+    // named ("0.01 up to about 0.3") is exactly where the arms stay thin.
+    it.each([0.01, 0.1, 0.3])("does not cross itself at padding %s", (padding) => {
+      const outline = computeOutlinePoints(members, [], { padding, corridor: 0.25 });
+      // The polygon was never the problem — only what was painted from it.
+      expect(polygonSelfIntersects(outline)).toBe(false);
+      expect(polygonSelfIntersects(sampleSmoothedRing(outline))).toBe(false);
+    });
+
+    it("still rounds a gently turning ring", () => {
+      // A 24-gon turns 15° per vertex, so the damping is nearly inactive and
+      // the curve must stay clear of the inscribed polygon's flat edges.
+      const circle = Array.from({ length: 24 }, (_, i) => ({
+        x: 100 * Math.cos((i / 24) * 2 * Math.PI),
+        y: 100 * Math.sin((i / 24) * 2 * Math.PI),
+      }));
+      const painted = sampleSmoothedRing(circle);
+      const radii = painted.map((p) => Math.hypot(p.x, p.y));
+      // Polygon edge midpoints sit at 100·cos(7.5°) ≈ 99.14; a smoothed ring
+      // bulges back out past that.
+      expect(Math.min(...radii)).toBeGreaterThan(99.1);
+      expect(Math.max(...radii)).toBeLessThan(100.5);
+    });
+
+    it("takes the corner off a hairpin instead of overshooting it", () => {
+      // Two long parallel runs joined by a 180° reversal — the shape that
+      // used to overshoot across the gap. The tip control points must not
+      // travel back up the ribbon.
+      const hairpin = [
+        { x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 6 }, { x: 0, y: 6 },
+      ];
+      const tip = smoothClosedPath(hairpin).find((s) => s.x0 === 300 && s.y0 === 0);
+      expect(Math.abs(tip.c1x - 300)).toBeLessThan(1);
+    });
+  });
+
   describe("node-size-aware influence field", () => {
     // The field derives from the group's MEAN MEMBER RADIUS (the rects carry
     // the size information), so the same scene rescaled — different node
