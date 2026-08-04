@@ -137,13 +137,17 @@ const TOUR_STEPS = [
     title: 'The Rail',
     text: `Everything session-level lives on the <strong>rail</strong> at the top:
            <br><br>
-           <strong>◆ App menu</strong> — load data, download the Excel template, take this tour, or start over
+           <strong>◆ App menu</strong> — load data (Excel, JSON, or the STRING database), download the
+           Excel template, take this tour, start over, or open the project on GitHub
            <br><strong>Workspace chip</strong> — which workspace you're in, plus live shown/total counts
-           <br><strong>⊡ Fit · ↻ Layout · ➰ Lasso · ✨ Hover</strong> — the everyday canvas verbs
+           <br><strong>↶ ↷</strong> — undo / redo the last change to the workspace
+           (<strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong>). The selection has its own pair, further along
+           <br><strong>⊡ Fit · ↻ Layout · ➰ Lasso · ✨ Hover · ◈ Select · ✎ Note · ⌕ Search</strong>
+           — the everyday canvas verbs
            <br><strong>Selection chip</strong> — what's selected, with focus, clear and undo/redo
-           <br><strong>⌕ Search</strong> — press <strong>Ctrl+K</strong> (⌘K on a Mac) to find any
-           control, node or property by name. Each result tells you where it lives, so you only
-           have to look it up once.
+           <br><br>
+           <strong>⌕ Search</strong> (<strong>Ctrl+K</strong>, ⌘K on a Mac) finds any control, node or
+           property by name. Each result tells you where it lives, so you only have to look it up once.
            <br><br>
            The <strong>tab strip</strong> opens the main panels:
            <br><br>
@@ -152,9 +156,9 @@ const TOUR_STEPS = [
            <br>📊 <strong>Metrics</strong> — compute network metrics
            <br>🤖 <strong>Assist</strong> — ask natural-language questions about your graph
            <br><br>
-           On the right: <strong>⤓ Export</strong> (PNG, SVG, JSON model, Excel data), the theme
-           toggle, and the <strong>?</strong> keyboard cheat sheet. Each tab stays highlighted
-           while its panel is open.`,
+           On the right: <strong>⤓ Export</strong> (PNG, SVG, JSON model, Excel data),
+           <strong>⛶ presentation mode</strong>, the theme toggle, and the <strong>?</strong> keyboard
+           cheat sheet. Each tab stays highlighted while its panel is open.`,
     targets: [{ selector: '#rail' }],
     position: 'below',
   },
@@ -198,7 +202,7 @@ const TOUR_STEPS = [
                    <input disabled value="70" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid #aaa;border-radius:3px;background:white;color:#403C53;box-sizing:border-box;">
                  </div>
                </div>
-               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;overflow:hidden;position:relative;flex-shrink:0;background:#E4E3EA;margin-top:2px;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
+               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:2px solid #403C53;background:#403C53;flex-shrink:0;margin-top:2px;"></span>
                <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;background:#E4E3EA;flex-shrink:0;margin-top:2px;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
              </div>
              <div style="display:flex;align-items:center;gap:8px;">
@@ -207,7 +211,7 @@ const TOUR_STEPS = [
                <select disabled style="flex:1;font-size:11px;padding:1px 4px;border:1px solid #aaa;border-radius:3px;background:white;">
                  <option>Enzyme ✓, Receptor ✓, ...</option>
                </select>
-               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;overflow:hidden;position:relative;flex-shrink:0;background:#E4E3EA;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
+               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:1.5px dashed #9a97a8;background:transparent;flex-shrink:0;"></span>
                <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;background:#E4E3EA;flex-shrink:0;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
              </div>
            </div>
@@ -230,9 +234,13 @@ const TOUR_STEPS = [
            <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;vertical-align:middle;background:#E4E3EA;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
            <strong>Selection button</strong> — <strong>+</strong> add or <strong>−</strong> remove all nodes matching that filter property to/from the current selection.
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           Every numeric property also carries <strong>exact min/max input boxes</strong> under its slider, so you can type a threshold instead of dragging for it. Nothing here is hidden behind a toggle; fold a whole section away with the <strong>▾</strong> chevron on its header when the list gets long.
+           Every numeric property also carries <strong>exact min/max input boxes</strong> under its slider, so you can type a threshold instead of dragging for it. When the list gets long, fold a whole property group — <em>Classification</em>, <em>Annotation</em>, whatever your spreadsheet calls them — away with the <strong>▾</strong> chevron on its heading.
            <br><br>
-           With a lot of properties, the <strong>search box</strong> at the top of the panel jumps straight to one — it matches on the section and group names too.`,
+           <span style="display:inline-flex;align-items:stretch;border:1px solid #dddbe2;border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:#C33D35;color:#fff;">Node&nbsp;5</span><span style="padding:2px 9px;background:#E4E3EA;color:#403C53;border-left:1px solid #dddbe2;">Edge&nbsp;2</span></span>
+           The <strong>Node / Edge</strong> segment in the section header picks which half of your filters
+           the panel shows — one at a time, each labelled with how many filters it holds.
+           <br><br>
+           With a lot of properties, the <strong>search box</strong> at the top of the panel jumps straight to one — it matches on the section and group names too. While a search is running both sections are shown, so a hit in the half you are not looking at is still visible.`,
     target: '#filterContainer',
     position: 'left',
   },
@@ -309,26 +317,53 @@ const TOUR_STEPS = [
            <br>• <strong>Halos</strong> — colored glow around edges with adjustable width
            <br>• <strong>Edge flow</strong> — animated directional motion along edges (comet or chevron), with adjustable opacity and density
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Groups</strong> (bubble sets) and the <strong>density heatmap</strong> are
-           workspace-level, not per-selection, so they live in the <strong>Overlays</strong> tab — a
-           stack of everything drawn over the graph, alongside notes and the minimap. Each row
-           carries its own switch and opens onto its own settings.
-           <br><br>
-           <strong>Overlays › Groups</strong> is where bubble groups live: one row per group with its
-           colour, its name, how many nodes it holds, and a <strong>＋</strong> button that drops the
-           current selection into it. Make as many as you like — <strong>＋ New group</strong>,
-           <strong>＋ From selection</strong>, or <strong>🧩 Auto-detect</strong> to turn the graph's
-           communities into groups. Open a row for its fill, outline, padding and label settings.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
            <strong>Scale tools</strong> — map any data property or computed network metric to a visual property:
            <br>• <span style="display:inline-block;width:20px;height:16px;border:1px solid black;border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> <strong>Numeric scale</strong> — e.g. scale node size by PageRank
            <br>• <span style="display:inline-block;width:24px;height:16px;border:1px solid black;border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> <strong>Color scale</strong> — continuous gradient or discrete colors per category
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           💡 Color inputs accept any hex code — type it in the text field and press <strong>Enter</strong> to apply.`,
+           💡 Color inputs accept any hex code — type it in the text field and press <strong>Enter</strong> to apply.
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           Anything drawn over the whole graph rather than over your selection — groups, the density
+           heatmap, notes, the minimap — lives in the <strong>Overlays</strong> context instead. That is
+           the next step.`,
     targets: [{ selector: '#inspectorAppearanceMount' }],
     position: 'left',
     positionOffset: { y: 120 },
     action: 'showAppearance',
+  },
+  {
+    title: 'Inspector — Overlays',
+    text: `<strong>Overlays</strong> is the stack of everything drawn <em>over</em> the graph. Every row
+           owns its own switch, a row with nothing to draw is greyed out, and the two rows with
+           settings open onto them. These are <strong>workspace-level</strong>, not per-selection.
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Groups</strong> — one row per bubble group: its colour, its name, how many nodes it
+           holds, and a <strong>＋</strong> that drops the current selection into it
+           (<strong>－</strong> takes it back out). Build them with <strong>＋ New group</strong>,
+           <strong>＋ From selection</strong>, or <strong>🧩 Auto-detect</strong>, which turns the graph's
+           communities into groups. Click a row for its fill, outline, padding, corridor and label
+           settings; <strong>⋯</strong> renames, duplicates, clears or deletes it. Make as many as you
+           like — there is no cap.
+           <br><br>
+           A group fed from a filter row is marked <strong>⚙</strong> and follows that filter as it
+           changes. The two sources add up, so a row can read <em>⚙ Type · +8 manual</em>: eight nodes
+           you put there by hand, on top of everything the filter matches.
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Density heatmap</strong> — a continuous density field under the graph, showing where
+           nodes crowd together whatever their styling. <strong>Fade graph</strong> dims nodes, labels
+           and edges so the field reads through; <strong>Intensity</strong>, <strong>Opacity</strong>,
+           <strong>Radius</strong>, <strong>Contrast</strong> and <strong>Threshold</strong> shape it.
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Notes</strong> — free text pinned to graph coordinates, so it pans and zooms with the
+           network. Place one with <strong>✎ Note</strong> on the rail, then click the canvas. Drag to
+           move it, double-click (or <strong>Enter</strong>) to edit the text, single-click for its style
+           popover — font size and colour, border, background, shadow, and <strong>✗ Delete note</strong>.
+           Notes are per workspace and come along in PNG and SVG exports.
+           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <strong>Minimap</strong> — the overview thumbnail in the bottom-right corner.`,
+    targets: [{ selector: '#inspectorOverlays' }, { selector: '#inspectorPillOverlays' }],
+    position: 'left',
+    action: 'openOverlaysContext',
   },
   {
     title: 'Network Metrics 📊',
@@ -367,6 +402,8 @@ const TOUR_STEPS = [
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Node</span>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Edge</span>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Column</span> — add new nodes, edges, or property columns to the table
+           <br>
+           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">⤒ Import</span> — merge a second Excel file into the current graph. You get a preview of what would change first, and you choose whether new nodes and edges are added or only the existing ones extended
            <br>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">⤓ Export</span> — export the data table and styling properties as Excel
            <hr style="margin:6px 0;border-color:#dddbe2;">
@@ -426,18 +463,24 @@ const TOUR_STEPS = [
   },
   {
     title: "You're all set! 🎉",
-    text: `That covers the main features. Here are some <strong>keyboard shortcuts</strong> to remember:
+    text: `That covers the main features. Here are the <strong>keyboard shortcuts</strong> — the
+           <strong>?</strong> button on the rail shows this list any time:
            <br><br>
-           <strong>P</strong> — Export as PNG
+           <strong>Ctrl+K</strong> — Find any control, node or property by name (⌘K on a Mac)
+           <br><strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong> — Undo / redo the last change to the workspace
+           <br><strong>P</strong> — Export as PNG
            <br><strong>S</strong> — Save as JSON
-           <br><strong>M</strong> — Toggle metrics panel
+           <br><strong>F</strong> — Fit graph to screen
            <br><strong>D</strong> — Toggle data editor
            <br><strong>Q</strong> — Toggle query editor
+           <br><strong>M</strong> — Toggle metrics panel
            <br><strong>A</strong> — Toggle Graph Assistant
-           <br><strong>F</strong> — Fit graph to screen
-           <br><strong>H</strong> — Toggle hover highlight effect
+           <br><strong>Y</strong> — Jump to the inspector's appearance controls
            <br><strong>L</strong> — Toggle lasso selection
-           <br><strong>Y</strong> — Toggle styling panel
+           <br><strong>H</strong> — Toggle hover highlight effect
+           <br><strong>⇧F</strong> — Presentation mode (hide the rail and inspector)
+           <br><strong>Esc</strong> — Exit lasso or presentation mode
+           <br><strong>?</strong> — Show the shortcut sheet
            <br><br>
            Try loading your own data from an <strong>Excel file</strong> or <strong>JSON export</strong>, or fetch protein networks from the <strong>STRING database</strong>.
            <br><br>
@@ -749,6 +792,11 @@ class GuidedTour {
       }
       case 'openSelectionContext': {
         this.cache.inspector?.setContext('selection');
+        await this.sleep(350);
+        break;
+      }
+      case 'openOverlaysContext': {
+        this.cache.inspector?.setContext('overlays');
         await this.sleep(350);
         break;
       }
