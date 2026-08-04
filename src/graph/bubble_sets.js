@@ -320,7 +320,10 @@ class GraphBubbleSetManager {
 
   async updateBubbleSetIfChanged() {
     for (let group of this.traverseBubbleSets()) {
-      let lastSetMembers = this.cache.lastBubbleSetMembers.get(group);
+      // A group created at runtime has no baseline yet — the fixed four were
+      // always pre-seeded here by layout creation, which is no longer true.
+      // "Never drawn" is an empty set, so the first real membership is a change.
+      let lastSetMembers = this.cache.lastBubbleSetMembers.get(group) ?? new Set();
       let newSetMembers = this.getEffectiveGroupMembers(group);
 
       if (!StaticUtilities.setsAreEqual(lastSetMembers, newSetMembers)) {

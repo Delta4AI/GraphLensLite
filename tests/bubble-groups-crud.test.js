@@ -18,6 +18,7 @@ function makeCache(layout = { bubbleSetStyle: {}, filters: new Map() }) {
   return {
     data: { selectedLayout: 'Default', layouts: { Default: layout } },
     DEFAULTS: { BUBBLE_GROUP_STYLE_TEMPLATE: {} },
+    CFG: { AVOID_MEMBERS_IN_BUBBLE_GROUPS: true },
     INSTANCES: { BUBBLE_GROUPS: {} },
     lastBubbleSetMembers: new Map(),
     propIDsToNodeIDsToBeShown: new Map(),
@@ -124,6 +125,31 @@ describe('deleteGroup', () => {
     const cache = makeCache();
     await bsFor(cache).deleteGroup('ghost');
     expect(cache.history.commit).not.toHaveBeenCalled();
+  });
+});
+
+describe('updateBubbleSetIfChanged with a runtime-created group', () => {
+  // Found live: the fixed four were always pre-seeded into lastBubbleSetMembers
+  // by workspace creation, so the baseline was never missing. A group created
+  // at runtime has no entry, and setsAreEqual(undefined, …) threw inside
+  // afterMembershipChange — which aborted the draw AND stranded the loading
+  // overlay, so the whole app locked up the first time you filled a new group.
+  it('treats a missing baseline as empty instead of throwing', async () => {
+    const cache = makeCache();
+    const bs = bsFor(cache);
+    const key = bs.createGroup();
+    cache.data.layouts.Default[`${key}ManualMembers`] = new Set(['n1']);
+    cache.nodeRef = new Map([['n1', {}]]);
+    cache.INSTANCES.BUBBLE_GROUPS[key] = {
+      members: new Map(),
+      update: vi.fn(async () => {}),
+      drawBubbleSets: vi.fn(async () => {}),
+    };
+
+    await expect(bs.updateBubbleSetIfChanged()).resolves.toBeUndefined();
+
+    expect(cache.INSTANCES.BUBBLE_GROUPS[key].update).toHaveBeenCalled();
+    expect(cache.lastBubbleSetMembers.get(key)).toEqual(new Set(['n1']));
   });
 });
 

@@ -186,7 +186,17 @@ describe('bubble group style factory', () => {
   it('keeps generating distinct colours past the palette', () => {
     const beyond = [4, 5, 6, 7, 8].map((i) => bubbleGroupColor(i))
     expect(new Set(beyond).size).toBe(beyond.length)
-    for (const c of beyond) expect(c).toMatch(/^hsl\(/)
+  })
+
+  it('always returns #rrggbb, at any index', () => {
+    // The group row's swatch is <input type="color">, which accepts NOTHING
+    // else — an hsl() string collapsed every group past the fourth onto the
+    // swatch fallback, so they all looked identical. Found live.
+    for (const index of [0, 3, 4, 5, 12, 99]) {
+      expect(bubbleGroupColor(index)).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(bubbleGroupStyle(index).fill).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(bubbleGroupStyle(index).stroke).toMatch(/^#[0-9a-f]{6}$/i)
+    }
   })
 
   it('names groups by position but lets a caller override', () => {

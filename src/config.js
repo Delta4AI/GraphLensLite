@@ -361,17 +361,33 @@ const CFG = {
   // setup/settings modal — nothing to keep in sync here.
 }
 
+/** HSL (h 0-360, s/l 0-1) to `#rrggbb`. */
+function hslToHex(h, s, l) {
+  const a = s * Math.min(l, 1 - l);
+  const channel = (n) => {
+    const k = (n + h / 30) % 12;
+    const v = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(255 * v).toString(16).padStart(2, '0');
+  };
+  return `#${channel(0)}${channel(8)}${channel(4)}`;
+}
+
 /**
  * Fill colour for the group at `index`. The palette covers the first four, then
  * the hue circle is walked by the golden angle so any number of groups stays
  * visually separable without a hand-authored list.
+ *
+ * Always `#rrggbb`: `<input type="color">` (the group row's swatch) accepts
+ * nothing else, so an `hsl()` string here silently collapsed every group past
+ * the fourth onto the swatch's fallback colour.
+ *
  * @param {number} index zero-based creation order
- * @returns {string} CSS colour
+ * @returns {string} hex colour
  */
 function bubbleGroupColor(index) {
   const palette = DEFAULTS.BUBBLE_GROUP_PALETTE;
   if (index < palette.length) return palette[index];
-  return `hsl(${(index * 137.508) % 360} 55% 55%)`;
+  return hslToHex((index * 137.508) % 360, 0.55, 0.55);
 }
 
 /**
