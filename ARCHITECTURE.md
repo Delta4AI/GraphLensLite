@@ -89,6 +89,11 @@ Business logic and UI:
   the per-row group chip, tooltips
 - `group_menu.js` — the one group checklist, opened by both assign sites (a filter
   row assigns a property, the Selection panel assigns nodes); built on `RailMenu`
+- `group_list.js` — the Groups list under Overlays › Groups (rows, the ⋯ menu, the
+  ＋/－ selection buttons). DOM only: it is handed the bubble-set MANAGER rather
+  than reaching for it through the cache, and every state change routes back
+  through it. `bubble_sets` keeps `renderGroupList`/`syncGroupRows` delegators so
+  callers still have one entry point
 - `ui_style_div.js` — builds every config card (node/edge styles, badges, edge flow,
   bubble sets, density heatmap, select/act/arrange); `ui.js` `CARD_MOUNTS` then
   re-parents each card to its single home in the rail or the inspector. The Groups

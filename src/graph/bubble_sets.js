@@ -2,7 +2,7 @@ import {bubbleGroupStyle} from "../config.js";
 import {StaticUtilities} from "../utilities/static.js";
 import {detectCommunities as computeCommunityAssignments} from "./communities.js";
 import {clampPopoverLeft} from "../utilities/popover_position.js";
-import {RailMenu, menuItem, menuSeparator} from "../managers/rail.js";
+import {renderGroupList, syncGroupRows} from "../managers/group_list.js";
 
 class GraphBubbleSetManager {
   constructor(cache) {
@@ -706,237 +706,15 @@ class GraphBubbleSetManager {
     popover.appendChild(detectBtn);
   }
 
-  /**
-   * Mirror the live selection onto each group row's primary button. Runs from
-   * selection.updateSelectedNodesAndEdges — the ONE point where
-   * cache.selectedNodes is authoritative. An earlier hook (updateSelectedState)
-   * reads a stale selection and the labels desync; that was a real bug once.
-   */
+  // The Groups list is DOM; it lives in managers/group_list.js next to the
+  // group menu. These two delegate so every caller (selection.js, layout.js,
+  // io.js, the tests) keeps one entry point on the manager.
   syncGroupRows() {
-    for (const btn of document.querySelectorAll('.group-row-toggle')) {
-      const group = btn.dataset.group;
-      const count = this.cache.selectedNodes?.length ?? this.cache.selectedNodes?.size ?? 0;
-      const state = this.selectionMembership(group);
-      const name = this.#layout()?.bubbleSetStyle?.[group]?.labelText || group;
-
-      btn.disabled = count === 0;
-      btn.classList.toggle('remove', state === 'all');
-      if (count === 0) {
-        btn.textContent = '＋';
-        btn.title = 'Select nodes first, then add them to this group';
-      } else if (state === 'all') {
-        btn.textContent = `－ ${count}`;
-        btn.title = `Remove the ${count} selected node(s) from "${name}"`;
-      } else {
-        btn.textContent = `＋ ${count}`;
-        btn.title =
-          state === 'some'
-            ? `Add the rest of the selection to "${name}" (some are already in it)`
-            : `Add the ${count} selected node(s) to "${name}"`;
-      }
-      btn.setAttribute('aria-label', btn.title);
-    }
+    syncGroupRows(this);
   }
 
-  /**
-   * Which filters feed a group's property-derived membership, in readable form.
-   * @returns {string[]}
-   */
-  #groupFilterNames(group) {
-    const props = this.#layout()?.[`${group}Props`] ?? new Set();
-    return [...props].map((propID) =>
-      StaticUtilities.decodePropHashId(propID).filter(Boolean).join(' › ')
-    );
-  }
-
-  /**
-   * Paint the Groups list under Overlays › Groups. One row per group: colour,
-   * editable name, live count, the selection toggle, and a ⋯ menu. Rebuilt
-   * whole — the list is a handful of rows and diffing it would be more code
-   * than redrawing it.
-   */
   renderGroupList() {
-    const list = document.getElementById('groupList');
-    if (!list) return;
-    const layout = this.#layout();
-    const groups = [...this.traverseBubbleSets()];
-
-    list.replaceChildren();
-    list.classList.toggle('is-empty', groups.length === 0);
-
-    if (groups.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'group-empty';
-      empty.textContent =
-        'No groups yet. A group draws a coloured bubble around the nodes you put in it.';
-      list.appendChild(empty);
-      this.#syncGroupStylePanel(null);
-      return;
-    }
-
-    for (const group of groups) {
-      list.appendChild(this.#buildGroupRow(group, layout));
-    }
-    if (!groups.includes(this.selectedGroup)) this.selectedGroup = groups[0];
-    this.#syncGroupStylePanel(this.selectedGroup);
-    this.syncGroupRows();
-  }
-
-  #buildGroupRow(group, layout) {
-    const style = layout.bubbleSetStyle[group];
-    const name = style.labelText || group;
-    const count = this.getEffectiveGroupMembers(group).size;
-
-    const row = document.createElement('div');
-    row.className = 'group-row';
-    row.dataset.group = group;
-    if (group === this.selectedGroup) row.classList.add('active');
-    row.addEventListener('click', (e) => {
-      if (e.target.closest('button, input')) return;
-      this.selectedGroup = group;
-      this.renderGroupList();
-    });
-
-    const swatch = document.createElement('input');
-    swatch.type = 'color';
-    swatch.className = 'group-swatch';
-    swatch.value = /^#[0-9a-f]{6}$/i.test(style.fill) ? style.fill : '#403C53';
-    swatch.title = `Fill colour of "${name}"`;
-    swatch.setAttribute('aria-label', `Fill colour of "${name}"`);
-    swatch.addEventListener('change', async () => {
-      await this.updateBubbleSetStyle(`Bubble Set ${group} Fill Color`, swatch.value);
-      this.renderGroupList();
-    });
-
-    // The row name IS labelText, the string painted on the hull, so the list
-    // and the canvas cannot disagree about what a group is called.
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.className = 'group-name';
-    nameInput.value = name;
-    nameInput.title = 'Rename this group (this is the label drawn on the bubble)';
-    nameInput.setAttribute('aria-label', `Name of group "${name}"`);
-    nameInput.addEventListener('change', async () => {
-      await this.updateBubbleSetStyle(`Bubble Set ${group} Label Text`, nameInput.value.trim());
-      this.renderGroupList();
-    });
-
-    const countEl = document.createElement('span');
-    countEl.className = 'group-count';
-    countEl.textContent = `${count} node${count === 1 ? '' : 's'}`;
-
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'group-row-toggle';
-    toggle.dataset.group = group;
-    toggle.addEventListener('click', () => this.toggleSelectedNodesInManualGroup(group));
-
-    const more = document.createElement('button');
-    more.type = 'button';
-    more.className = 'group-row-more';
-    more.textContent = '⋯';
-    more.title = `More actions for "${name}"`;
-    more.setAttribute('aria-label', more.title);
-    this.#attachRowMenu(more, group);
-
-    const head = document.createElement('div');
-    head.className = 'group-row-head';
-    head.append(swatch, nameInput, countEl, toggle, more);
-    row.appendChild(head);
-
-    // The second line is the thing the old UI never admitted: a group can be
-    // fed by a live filter AND by a hand-picked node set at the same time.
-    const filters = this.#groupFilterNames(group);
-    const manualCount = layout[`${group}ManualMembers`]?.size ?? 0;
-    if (filters.length > 0) {
-      const source = document.createElement('div');
-      source.className = 'group-row-source';
-      source.textContent =
-        `⚙ ${filters.join(', ')}` + (manualCount ? ` · +${manualCount} manual` : '');
-      source.title =
-        'Filter-driven membership updates as you change those filters; ' +
-        'manually added nodes stay until you remove them.';
-      row.appendChild(source);
-    }
-
-    return row;
-  }
-
-  #attachRowMenu(anchor, group) {
-    const menu = new RailMenu(anchor, (el) => {
-      const layout = this.#layout();
-      const name = layout?.bubbleSetStyle?.[group]?.labelText || group;
-      const hasProps = (layout?.[`${group}Props`]?.size ?? 0) > 0;
-      const hasManual = (layout?.[`${group}ManualMembers`]?.size ?? 0) > 0;
-
-      el.appendChild(
-        menuItem({
-          icon: '◈',
-          label: 'Select members',
-          disabled: this.getEffectiveGroupMembers(group).size === 0,
-          title: `Select every node in "${name}"`,
-          onClick: () => {
-            menu.close();
-            this.cache.sm.selectNodes([...this.getEffectiveGroupMembers(group)]);
-          },
-        })
-      );
-      el.appendChild(
-        menuItem({
-          icon: '⧉',
-          label: 'Duplicate',
-          title: `Copy "${name}" and its membership into a new group`,
-          onClick: async () => {
-            menu.close();
-            await this.duplicateGroup(group);
-          },
-        })
-      );
-      el.appendChild(menuSeparator());
-      if (hasManual) {
-        el.appendChild(
-          menuItem({
-            icon: '−',
-            label: 'Clear manual nodes',
-            title: 'Drop the hand-picked nodes, keep the filter-driven ones',
-            onClick: async () => {
-              menu.close();
-              layout[`${group}ManualMembers`].clear();
-              await this.afterMembershipChange(`Clear manual nodes (${name})`);
-            },
-          })
-        );
-      }
-      if (hasProps) {
-        el.appendChild(
-          menuItem({
-            icon: '⚙',
-            label: 'Detach filter',
-            title: 'Drop the filter-driven members, keep the hand-picked ones',
-            onClick: async () => {
-              menu.close();
-              this.clearGroupPropAssignments(group);
-              await this.afterMembershipChange(`Detach filter (${name})`);
-            },
-          })
-        );
-      }
-      el.appendChild(
-        menuItem({
-          icon: '✕',
-          label: 'Delete group',
-          title: `Remove "${name}" entirely`,
-          onClick: async () => {
-            menu.close();
-            await this.deleteGroup(group);
-            this.renderGroupList();
-            this.refreshBubbleStyleElements();
-            this.cache.uiComponents?.refreshGroupChips?.();
-            this.cache.ui.info(`Deleted group "${name}"`);
-          },
-        })
-      );
-    });
+    renderGroupList(this);
   }
 
   /** Copy a group's style and both membership stores into a new group. */
@@ -951,11 +729,6 @@ class GraphBubbleSetManager {
     layout[`${key}ManualMembers`] = new Set(layout[`${group}ManualMembers`] ?? []);
     this.selectedGroup = key;
     await this.afterMembershipChange(`Duplicate bubble group (${group})`);
-  }
-
-  /** Ask the styling card to (re)build its panel for the selected group. */
-  #syncGroupStylePanel(group) {
-    this.cache.ui?.buildGroupStylePanel?.(group);
   }
 
   /**
