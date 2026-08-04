@@ -155,6 +155,196 @@ describe('the source line', () => {
   });
 });
 
+describe('the row ⋯ menu', () => {
+  function render(groups = { g1: 'Kinases' }) {
+    mount();
+    const cache = makeCache(groups);
+    const bs = new GraphBubbleSetManager(cache);
+    bs.refreshBubbleStyleElements = vi.fn();
+    bs.updateBubbleSetIfChanged = vi.fn(async () => {});
+    bs.redrawBubbleSets = vi.fn(async () => {});
+    bs.renderGroupList();
+    return { cache, bs };
+  }
+  const open = async (group = 'g1') => {
+    document.querySelector(`.group-row[data-group="${group}"] .group-row-more`).click();
+    await Promise.resolve();
+  };
+  const rowLabels = () =>
+    [...document.querySelectorAll('.rail-menu.open .rail-menu-label')].map((e) => e.textContent);
+  const clickRow = (label) =>
+    [...document.querySelectorAll('.rail-menu.open .rail-menu-item')]
+      .find((r) => r.querySelector('.rail-menu-label').textContent === label).click();
+
+  it('offers a source-specific clear only for the sources a group actually has', async () => {
+    const { cache } = render();
+    layoutOf(cache).g1Props = new Set(['Node::x::y']);
+    await open();
+    expect(rowLabels()).toContain('Detach filter');
+    expect(rowLabels()).not.toContain('Clear manual nodes');
+
+    // Escape, not a stray click: RailMenu closes on pointerdown, and a second
+    // click on the anchor would just toggle the open menu shut.
+    document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' }));
+    layoutOf(cache).g1ManualMembers = new Set(['n1']);
+    await open();
+    expect(rowLabels()).toContain('Clear manual nodes');
+    expect(rowLabels()).toContain('Detach filter');
+  });
+
+  it('clears one source and leaves the other standing', async () => {
+    const { cache, bs } = render();
+    layoutOf(cache).g1Props = new Set(['Node::x::y']);
+    layoutOf(cache).g1ManualMembers = new Set(['n1']);
+    cache.nodeRef = new Map([['n1', {}]]);
+    bs.renderGroupList();
+
+    await open();
+    clickRow('Clear manual nodes');
+    await Promise.resolve();
+
+    expect(layoutOf(cache).g1ManualMembers.size).toBe(0);
+    expect(layoutOf(cache).g1Props).toEqual(new Set(['Node::x::y']));
+  });
+
+  it('selects the group members', async () => {
+    const { cache, bs } = render();
+    layoutOf(cache).g1ManualMembers = new Set(['n1', 'n2']);
+    cache.nodeRef = new Map([['n1', {}], ['n2', {}]]);
+    bs.renderGroupList();
+
+    await open();
+    clickRow('Select members');
+
+    expect(cache.sm.selectNodes).toHaveBeenCalledWith(expect.arrayContaining(['n1', 'n2']));
+  });
+
+  it('disables Select members for an empty group rather than selecting nothing', async () => {
+    render();
+    await open();
+    const row = [...document.querySelectorAll('.rail-menu.open .rail-menu-item')]
+      .find((r) => r.querySelector('.rail-menu-label').textContent === 'Select members');
+    expect(row.classList.contains('disabled')).toBe(true);
+    expect(row.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('deletes the group and says so', async () => {
+    const { cache, bs } = render({ g1: 'Kinases', g2: 'Hubs' });
+    await open('g2');
+    clickRow('Delete group');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect([...bs.traverseBubbleSets()]).toEqual(['g1']);
+    expect(cache.ui.info).toHaveBeenCalledWith('Deleted group "Hubs"');
+  });
+});
+
+describe('editing a row in place', () => {
+  function render() {
+    mount();
+    const cache = makeCache();
+    const bs = new GraphBubbleSetManager(cache);
+    bs.refreshBubbleStyleElements = vi.fn();
+    bs.updateBubbleSetIfChanged = vi.fn(async () => {});
+    bs.redrawBubbleSets = vi.fn(async () => {});
+    cache.INSTANCES.BUBBLE_GROUPS.g1 = { update: vi.fn(async () => {}) };
+    cache.gcm = { decideToRenderOrDraw: vi.fn(async () => {}) };
+    bs.renderGroupList();
+    return { cache, bs };
+  }
+
+  it('writes the name straight onto labelText — the string drawn on the hull', async () => {
+    const { cache } = render();
+    const input = document.querySelector('.group-name');
+    input.value = '  Kinases  ';
+    input.dispatchEvent(new window.Event('change'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(layoutOf(cache).bubbleSetStyle.g1.labelText).toBe('Kinases');
+  });
+
+  it('writes the swatch onto the fill and the label plate together', async () => {
+    const { cache } = render();
+    const swatch = document.querySelector('.group-swatch');
+    swatch.value = '#00ff00';
+    swatch.dispatchEvent(new window.Event('change'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(layoutOf(cache).bubbleSetStyle.g1.fill).toBe('#00ff00');
+    expect(layoutOf(cache).bubbleSetStyle.g1.labelBackgroundFill).toBe('#00ff00');
+  });
+});
+
+describe('refreshBubbleStyleElements — the single settings pane', () => {
+  // Rewritten for this rework: there used to be one panel per group, all built
+  // eagerly, and this looped over every one. With an unbounded number of groups
+  // there is ONE pane, rebuilt for the selected row, so this syncs only that.
+  function mountPane(group, style) {
+    document.body.innerHTML = `
+      <div id="groupList"></div>
+      <div id="groupStylePanel">
+        <input data-property="Bubble Set ${group} Fill Color">
+        <input data-property="Bubble Set ${group} Label Text">
+        <div data-property="Bubble Set ${group} Padding">
+          <input type="range"><input type="number">
+        </div>
+        <select data-property="Bubble Set ${group} Label Placement">
+          <option value="top">top</option><option value="bottom">bottom</option>
+        </select>
+        <span class="bubbleSetOptionalLabelConfig"></span>
+      </div>`;
+    const cache = makeCache({ [group]: style.labelText });
+    Object.assign(layoutOf(cache).bubbleSetStyle[group], style);
+    const bs = new GraphBubbleSetManager(cache);
+    bs.selectedGroup = group;
+    return { cache, bs };
+  }
+
+  it('writes the selected group\'s stored values onto the pane', () => {
+    const { bs } = mountPane('g1', {
+      labelText: 'Kinases', fill: '#123456', padding: 0.42, labelPlacement: 'top', label: true,
+    });
+    bs.refreshBubbleStyleElements();
+
+    expect(document.querySelector('[data-property="Bubble Set g1 Fill Color"]').value).toBe('#123456');
+    expect(document.querySelector('[data-property="Bubble Set g1 Label Text"]').value).toBe('Kinases');
+    expect(document.querySelector('[data-property="Bubble Set g1 Padding"] input[type="range"]').value).toBe('0.42');
+    expect(document.querySelector('[data-property="Bubble Set g1 Label Placement"]').value).toBe('top');
+  });
+
+  it('greys the pane for a group with no members, and un-greys it once it has some', () => {
+    const { cache, bs } = mountPane('g1', { labelText: 'Kinases', label: true });
+    const pane = document.getElementById('groupStylePanel');
+
+    bs.refreshBubbleStyleElements();
+    expect(pane.classList.contains('disabled')).toBe(true);
+
+    layoutOf(cache).g1ManualMembers = new Set(['n1']);
+    cache.nodeRef = new Map([['n1', {}]]);
+    bs.refreshBubbleStyleElements();
+    expect(pane.classList.contains('disabled')).toBe(false);
+  });
+
+  it('disables the label sub-controls when the label is off', () => {
+    const { cache, bs } = mountPane('g1', { labelText: 'K', label: false });
+    bs.refreshBubbleStyleElements();
+    expect(document.querySelector('.bubbleSetOptionalLabelConfig').classList.contains('disabled')).toBe(true);
+
+    layoutOf(cache).bubbleSetStyle.g1.label = true;
+    bs.refreshBubbleStyleElements();
+    expect(document.querySelector('.bubbleSetOptionalLabelConfig').classList.contains('disabled')).toBe(false);
+  });
+
+  it('is a no-op, not a crash, when no group is selected', () => {
+    const { bs } = mountPane('g1', { labelText: 'K' });
+    bs.selectedGroup = 'deleted';
+    expect(() => bs.refreshBubbleStyleElements()).not.toThrow();
+  });
+});
+
 describe('selecting a row', () => {
   it('rebuilds the settings pane for that group only', () => {
     mount();

@@ -128,6 +128,139 @@ describe('deleteGroup', () => {
   });
 });
 
+describe('createGroupFromSelection', () => {
+  function wire(cache) {
+    const bs = bsFor(cache);
+    bs.renderGroupList = vi.fn();
+    bs.syncGroupRows = vi.fn();
+    bs.refreshBubbleStyleElements = vi.fn();
+    bs.updateBubbleSetIfChanged = vi.fn(async () => {});
+    bs.redrawBubbleSets = vi.fn(async () => {});
+    return bs;
+  }
+
+  it('creates a group holding exactly the selection', async () => {
+    const cache = makeCache();
+    cache.selectedNodes = ['n1', 'n2', 'n3'];
+    cache.nodeRef = new Map([['n1', {}], ['n2', {}], ['n3', {}]]);
+    const bs = wire(cache);
+
+    const key = await bs.createGroupFromSelection('Kinases');
+
+    expect(cache.data.layouts.Default[`${key}ManualMembers`]).toEqual(new Set(['n1', 'n2', 'n3']));
+    expect(cache.data.layouts.Default.bubbleSetStyle[key].labelText).toBe('Kinases');
+    // The new group becomes the one whose settings the pane shows.
+    expect(bs.selectedGroup).toBe(key);
+  });
+
+  it('warns and creates nothing when the selection is empty', async () => {
+    const cache = makeCache();
+    cache.selectedNodes = [];
+    const bs = wire(cache);
+
+    expect(await bs.createGroupFromSelection()).toBeNull();
+    expect(cache.ui.warning).toHaveBeenCalled();
+    // A stray empty group left behind would be worse than the refusal.
+    expect(Object.keys(cache.data.layouts.Default.bubbleSetStyle)).toEqual([]);
+  });
+
+  it('honours an explicit colour over the palette', () => {
+    const cache = makeCache();
+    const key = bsFor(cache).createGroup({ color: '#abcdef' });
+    const style = cache.data.layouts.Default.bubbleSetStyle[key];
+    expect(style.fill).toBe('#abcdef');
+    // The label plate follows the fill, or a recoloured group keeps an old one.
+    expect(style.labelBackgroundFill).toBe('#abcdef');
+  });
+});
+
+describe('toggleSelectedNodesInManualGroup', () => {
+  function wire(cache) {
+    const bs = bsFor(cache);
+    bs.renderGroupList = vi.fn();
+    bs.syncGroupRows = vi.fn();
+    bs.refreshBubbleStyleElements = vi.fn();
+    bs.updateBubbleSetIfChanged = vi.fn(async () => {});
+    bs.redrawBubbleSets = vi.fn(async () => {});
+    return bs;
+  }
+  const said = (cache) => cache.ui.info.mock.calls.map((c) => c[0]).join(' | ');
+
+  it('adds the selection, naming the group the user gave it', async () => {
+    const cache = makeCache();
+    const bs = wire(cache);
+    const key = bs.createGroup({ name: 'Kinases' });
+    cache.selectedNodes = ['n1', 'n2'];
+    cache.nodeRef = new Map([['n1', {}], ['n2', {}]]);
+
+    await bs.toggleSelectedNodesInManualGroup(key);
+
+    expect(cache.data.layouts.Default[`${key}ManualMembers`]).toEqual(new Set(['n1', 'n2']));
+    expect(said(cache)).toContain('Added 2 node(s) to "Kinases"');
+  });
+
+  it('removes them again on the second toggle', async () => {
+    const cache = makeCache();
+    const bs = wire(cache);
+    const key = bs.createGroup({ name: 'Kinases' });
+    cache.data.layouts.Default[`${key}ManualMembers`] = new Set(['n1', 'n2']);
+    cache.selectedNodes = ['n1', 'n2'];
+    cache.nodeRef = new Map([['n1', {}], ['n2', {}]]);
+
+    await bs.toggleSelectedNodesInManualGroup(key);
+
+    expect(cache.data.layouts.Default[`${key}ManualMembers`].size).toBe(0);
+    expect(said(cache)).toContain('Removed 2 node(s) from "Kinases"');
+    expect(said(cache)).not.toContain('still match');
+  });
+
+  it('says so when removed nodes come straight back through the filter', async () => {
+    // The one place the two-source union leaks: the node leaves ManualMembers
+    // and is immediately re-added by the property layer, so the click looks
+    // like a no-op unless it explains itself.
+    const cache = makeCache();
+    const bs = wire(cache);
+    const key = bs.createGroup({ name: 'Mixed', fromProp: 'Node::x::y' });
+    cache.data.layouts.Default[`${key}ManualMembers`] = new Set(['n1', 'n2']);
+    cache.propIDsToNodeIDsToBeShown.set('Node::x::y', ['n1']);
+    cache.selectedNodes = ['n1', 'n2'];
+    cache.nodeRef = new Map([['n1', {}], ['n2', {}]]);
+
+    await bs.toggleSelectedNodesInManualGroup(key);
+
+    expect(said(cache)).toContain('Removed 2 node(s) from "Mixed"; 1 still match its filters');
+    // And it really is still a member — the message is not a white lie.
+    expect(bs.getEffectiveGroupMembers(key)).toEqual(new Set(['n1']));
+  });
+
+  it('warns instead of acting when nothing is selected', async () => {
+    const cache = makeCache();
+    const bs = wire(cache);
+    const key = bs.createGroup();
+    cache.selectedNodes = [];
+
+    await bs.toggleSelectedNodesInManualGroup(key);
+
+    expect(cache.ui.warning).toHaveBeenCalledWith('No nodes selected');
+    expect(cache.data.layouts.Default[`${key}ManualMembers`].size).toBe(0);
+  });
+});
+
+describe('cleanupManualGroupMembers', () => {
+  it('drops members whose nodes are gone, keeping the rest', () => {
+    const cache = makeCache();
+    const bs = bsFor(cache);
+    bs.renderGroupList = vi.fn();
+    const key = bs.createGroup();
+    cache.data.layouts.Default[`${key}ManualMembers`] = new Set(['alive', 'deleted']);
+    cache.nodeRef = new Map([['alive', {}]]);
+
+    bs.cleanupManualGroupMembers();
+
+    expect(cache.data.layouts.Default[`${key}ManualMembers`]).toEqual(new Set(['alive']));
+  });
+});
+
 describe('updateBubbleSetIfChanged with a runtime-created group', () => {
   // Found live: the fixed four were always pre-seeded into lastBubbleSetMembers
   // by workspace creation, so the baseline was never missing. A group created
