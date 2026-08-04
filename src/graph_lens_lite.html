@@ -22,8 +22,11 @@
       <p class="landing-subtitle">From spreadsheet to graph visualization in seconds</p>
     </div>
 
+    <!-- Filled by gll.js only when the WebGL2 probe fails (see webgl_support.js) -->
+    <div id="landingWebglWarning" role="alert" hidden></div>
+
     <div class="landing-primary-action">
-      <button class="landing-browse-btn" onclick="document.getElementById('fileInput').click()">
+      <button class="landing-browse-btn" data-needs-webgl onclick="document.getElementById('fileInput').click()">
         <span class="landing-browse-icon">📂</span>
         <span class="landing-browse-label">Open Graph File</span>
         <span class="landing-browse-desc">Load from Excel (.xlsx, .xls) or a saved model (.json)</span>
@@ -36,17 +39,17 @@
         <span class="landing-card-title">Download Template</span>
         <span class="landing-card-desc">Get a pre-filled Excel template showing how to structure your graph data</span>
       </button>
-      <button class="landing-card" onclick="loadDemoData()">
+      <button class="landing-card" data-needs-webgl onclick="loadDemoData()">
         <span class="landing-card-icon">🔍</span>
         <span class="landing-card-title">STRING Database</span>
         <span class="landing-card-desc">Explore protein-protein interaction networks from the STRING database</span>
       </button>
-      <button class="landing-card" onclick="loadNeo4jData()">
+      <button class="landing-card" data-needs-webgl onclick="loadNeo4jData()">
         <span class="landing-card-icon">🛢️</span>
         <span class="landing-card-title">Neo4j Database</span>
         <span class="landing-card-desc">Fetch a graph from a Neo4j server with a Cypher query — or try the built-in Stack Overflow demo</span>
       </button>
-      <button class="landing-card" onclick="startTour()">
+      <button class="landing-card" data-needs-webgl onclick="startTour()">
         <span class="landing-card-icon">🗺️</span>
         <span class="landing-card-title">Take a Tour</span>
         <span class="landing-card-desc">A guided walkthrough of the app's features and interface</span>

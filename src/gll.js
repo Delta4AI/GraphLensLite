@@ -33,6 +33,11 @@ import {initWorkbench} from "./managers/workbench.js";
 import {initFilterSearch} from "./managers/filter_search.js";
 import {initCommandPalette} from "./managers/command_palette.js";
 import {initHistory} from "./managers/history.js";
+import {
+  isWebGL2Available,
+  renderWebGLUnavailableMessage,
+  WEBGL2_ERROR_MESSAGE,
+} from "./graph/webgl_support.js";
 
 
 // Stores all reference objects
@@ -488,6 +493,19 @@ window.addEventListener("DOMContentLoaded", () => {
   const landingVersion = document.getElementById('landingVersion');
   if (landingVersion) {
     landingVersion.textContent = `v${VERSION}`;
+  }
+
+  // Warn on the landing page too: without WebGL2 every load path ends in a
+  // graph-less stage, so say it before the user picks a data source — and
+  // disable the actions that would land there (template download still works).
+  const webglWarning = document.getElementById('landingWebglWarning');
+  if (webglWarning && !isWebGL2Available()) {
+    renderWebGLUnavailableMessage(webglWarning);
+    webglWarning.hidden = false;
+    document.querySelectorAll('#landingPage [data-needs-webgl]').forEach((btn) => {
+      btn.disabled = true;
+      btn.title = WEBGL2_ERROR_MESSAGE;
+    });
   }
 
   // Inspector resize — drags from its left edge (right-docked panel), same
