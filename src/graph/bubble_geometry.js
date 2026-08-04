@@ -106,6 +106,24 @@ const HOLE_GAP_RADIUS_RATIO = 0.25;
 // 4 px default — a coarser grid visibly wobbles the outline around large
 // nodes (jaggies/spline hooks at pinch points), it only ever gets finer for
 // small nodes.
+//
+// It must also be a WHOLE number of pixels, for the same reason the sample
+// stride above must be. bubblesets-js maps pixels to marching cells with
+// PotentialArea.scaleX = floor((x - originX) / pixelGroup) but maps cells
+// back with invertScaleX = round(i * pixelGroup + originX). That round trip
+// only agrees when the cell is an integer; at a fractional cell adjacent
+// contour cells can invert onto the same pixel and the traced ring
+// short-circuits across its own interior — painting the empty space between
+// two corridors as one solid wedge. No downstream repair can catch it: the
+// resulting ring is simple and does not self-intersect.
+//
+// Measured on the reported layout, sweeping the node radius 4→40 px: 15 of
+// 145 radii wedged with a fractional cell, 0 with a rounded one. Over 400
+// random layouts a fractional cell inflated the hull past 1.5× the rounded
+// one 43 times (worst 10.4×) versus 15 the other way (worst 2.2×, and those
+// are honest corridor-thickness differences, not fills). The ratio below
+// lands off a whole number for mean member radii of 3.75–15 px, which is
+// squarely where ordinary graphs sit — hence "weird at times".
 const FIELD_PIXEL_GROUP_MIN = 1;
 const FIELD_PIXEL_GROUP_MAX = 4;
 // Capsule links are gently ARCED tubes (quadratic, deterministic bulge), so
@@ -204,9 +222,10 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
   const avoidRaw = Number(opts.avoidance ?? 1);
   const avoidance = Number.isFinite(avoidRaw) && avoidRaw <= 0 ? 0 : 1;
   const unit = meanMemberRadius(memberRects);
-  const pixelGroupPx = Math.min(
-    FIELD_PIXEL_GROUP_MAX,
-    Math.max(FIELD_PIXEL_GROUP_MIN, FIELD_PIXEL_GROUP_RATIO * unit)
+  // Rounded LAST, so the whole-pixel cell the library needs is also inside
+  // the [MIN, MAX] range (both bounds are already whole numbers).
+  const pixelGroupPx = Math.round(
+    Math.min(FIELD_PIXEL_GROUP_MAX, Math.max(FIELD_PIXEL_GROUP_MIN, FIELD_PIXEL_GROUP_RATIO * unit))
   );
   // Field radii track the knobs all the way down — NO grid floor. A field
   // thinner than a marching cell simply registers nothing, and the enclosure

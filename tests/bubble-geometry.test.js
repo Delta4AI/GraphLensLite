@@ -104,6 +104,57 @@ describe("computeOutlinePoints", () => {
     expect(pointInPolygon({ x: 75, y: 50 }, outline)).toBe(true);
   });
 
+  // Regression (the "solid wedge"): bubblesets-js maps pixels to marching
+  // cells with floor((x - originX) / pixelGroup) but maps cells back with
+  // round(i * pixelGroup + originX), a round trip that only agrees when the
+  // cell is a whole number of pixels. At a fractional cell the traced ring
+  // short-circuits across its own interior and the empty space between two
+  // corridors paints as one solid wedge. No downstream repair can see it:
+  // the ring is simple and does not self-intersect.
+  //
+  // The cell size derives from the mean member radius, so whether a graph
+  // wedges depended on its node size. Every radius below reproduced it before
+  // pixelGroup was rounded; the avoid node is load-bearing (it bends the
+  // corridor past the probe point, and with no avoid rects nothing wedges).
+  describe("whole-pixel marching grid", () => {
+    // Two members side by side, a third far below, one non-member beside the
+    // long corridor — the reported layout, reduced.
+    const members = (r) => [rectAt(170, 30, r), rectAt(322, 30, r), rectAt(176, 661, r)];
+    const avoid = (r) => [rectAt(180, 497, r)];
+    // The knobs a new group actually ships with (BUBBLE_GROUP_STYLE_TEMPLATE).
+    // computeOutlinePoints' own fallback is 1/1, a far fatter hull than any
+    // group is created with, so the reported case only reproduces at these.
+    const SHIPPED = { padding: 0.1, corridor: 0.25 };
+    const BETWEEN_THE_ARMS = { x: 240, y: 200 };
+    const WEDGING_RADII = [7, 8, 9, 11, 11.5, 12.5, 13, 13.5, 14.5];
+
+    it.each(WEDGING_RADII)("leaves the space between two corridors empty at radius %s", (r) => {
+      const outline = computeOutlinePoints(members(r), avoid(r), SHIPPED);
+      expect(pointInPolygon(BETWEEN_THE_ARMS, outline)).toBe(false);
+    });
+
+    it("still encloses every member while doing so", () => {
+      const outline = computeOutlinePoints(members(12.5), avoid(12.5), SHIPPED);
+      for (const [x, y] of [[170, 30], [322, 30], [176, 661]]) {
+        expect(pointInPolygon({ x, y }, outline)).toBe(true);
+      }
+    });
+
+    it("keeps the hull to corridor scale rather than wedge scale", () => {
+      // Measured: ~7.6k px² for two thin arms, ~39k once the wedge fills —
+      // the triangle those three members span is ~48k. Catches a fill the
+      // single probe point above happens to miss.
+      const outline = computeOutlinePoints(members(12.5), avoid(12.5), SHIPPED);
+      const area = Math.abs(
+        outline.reduce((sum, p, i) => {
+          const q = outline[(i + 1) % outline.length];
+          return sum + (p.x * q.y - q.x * p.y);
+        }, 0) / 2
+      );
+      expect(area).toBeLessThan(15000);
+    });
+  });
+
   describe("node-size-aware influence field", () => {
     // The field derives from the group's MEAN MEMBER RADIUS (the rects carry
     // the size information), so the same scene rescaled — different node
