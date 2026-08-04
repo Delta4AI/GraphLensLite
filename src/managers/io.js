@@ -1,5 +1,5 @@
 /* global ExcelJS */ // loaded as a global via vendored src/lib/exceljs.min.js script tag
-import { DEFAULTS, CFG, VERSION } from '../config.js';
+import { DEFAULTS, CFG, VERSION, bubbleGroupStyle } from '../config.js';
 import { sanitizeAnnotations } from '../graph/annotation_geometry.js';
 import { StaticUtilities } from '../utilities/static.js';
 import { buildDataTable } from '../utilities/data_editor.js';
@@ -1826,18 +1826,18 @@ class IOManager {
             ? layout.edgeStyles
             : new Map(Object.entries(layout.edgeStyles || {})),
         bubbleSetStyle: (() => {
-          const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE;
           const merged = {};
-          // Iterate the SAVED group keys, never the defaults': a model is the
-          // authority on which groups it has, and the defaults are a template
-          // that does not enumerate them. Keying off the defaults would drop
-          // every group a file names that the template does not.
-          for (const group of savedLayoutGroupKeys(layout)) {
+          // Iterate the SAVED group keys, never a fixed list: a model is the
+          // authority on which groups it has. Each one gets the template (plus
+          // a palette colour by position, so a file that stored no `fill` does
+          // not collapse every group onto one colour) with its saved values on
+          // top.
+          savedLayoutGroupKeys(layout).forEach((group, index) => {
             merged[group] = {
-              ...(defaults[group] ?? {}),
+              ...bubbleGroupStyle(index, group),
               ...(layout.bubbleSetStyle?.[group] || {}),
             };
-          }
+          });
           return merged;
         })(),
         // Trust boundary for loaded text notes: malformed records are dropped,
@@ -1969,8 +1969,7 @@ class IOManager {
         // Restored ManualMembers populate the layout, but the selection-panel
         // badges (per-group deselect toggles) only refresh via these calls —
         // mirror the post-layout sync so loaded groups stay deselectable.
-        this.cache.bs.updateManualGroupStatus();
-        this.cache.bs.updateManualGroupButtonState();
+        this.cache.bs.renderGroupList();
 
         this.cache.ui.debug('Initial graph rendered.');
 

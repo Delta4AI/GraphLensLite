@@ -42,7 +42,7 @@ function makeSelectionCache({ nodes, edges, shownNodes, shownEdges }) {
       toggleStyleElementsThatRequireExactlyTwoSelectedNodes: vi.fn(),
       syncStylingCardsToSelection: vi.fn(),
     },
-    bs: { updateManualGroupButtonState: vi.fn() },
+    bs: { syncGroupRows: vi.fn() },
   };
 }
 

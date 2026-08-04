@@ -1074,213 +1074,247 @@ function createStyleDiv(cache) {
       {min: 0.5, max: 3, step: 0.25}, "Pattern spacing multiplier — higher spreads the dashes/dots further apart.", true);
   }
 
+  // The Groups overlay card. The four fixed style tabs are gone: a workspace
+  // holds any number of groups, so the card is a LIST (bubble_sets.renderGroupList
+  // paints it) over one settings pane that is rebuilt for whichever row is
+  // selected. Building a pane per group would be N x ~20 rows of DOM for a
+  // surface that only ever shows one.
   function createBubbleSetConfigCard() {
     const bubbleDiv = createCard("Bubble Sets", undefined, "bubble-set-config-card-header");
-    const optionalCSSClass = "bubbleSetOptionalLabelConfig";
 
-    // What a group IS comes before the button that makes one.
+    // What a group IS comes before the buttons that make one.
     const note = document.createElement("p");
     note.className = "insp-note";
-    note.innerHTML =
-      "Bubble sets drawn around the nodes you assign to a group. Assign the current selection " +
-      "from the <strong>Selection</strong> tab.";
+    note.textContent =
+      "Coloured bubbles drawn around nodes you group together. A group can be fed " +
+      "by a filter (it then follows that filter) or by a selection, or both.";
     bubbleDiv.appendChild(note);
 
-    // Group tools, inside the row they belong to. These ids are read by
-    // bubble_sets.js (popover anchor, manual-group status/clear), which looks
-    // them up per call, so rebuilding them with the card is safe.
+    // One row per group, plus the empty state. Filled by renderGroupList.
+    const list = document.createElement("div");
+    list.id = "groupList";
+    list.className = "group-list";
+    bubbleDiv.appendChild(list);
+
+    // Group-level tools. These ids are read by bubble_sets.js, which looks them
+    // up per call, so rebuilding them with the card is safe.
     const tools = document.createElement("div");
     tools.className = "insp-groups";
-    tools.innerHTML =
-      '<button id="detectCommunitiesBtn" class="insp-btn" title="Auto-group by community' +
-      ' (Louvain): pick edge weighting &amp; resolution, then assign the largest communities to' +
-      ' bubble groups">🧩 Auto-detect</button>' +
-      '<span id="manualGroupSeparator" class="button-separator" style="display: none;"></span>' +
-      '<span id="manualBubbleGroupStatus" class="manual-group-status" style="display: none;"></span>' +
-      '<button id="clearManualGroupsBtn" class="insp-btn red" title="Clear all manual bubble' +
-      ' groups" style="display: none;">Clear all</button>';
-    tools.querySelector("#detectCommunitiesBtn").onclick = () =>
-      cache.bs.toggleCommunityDetectionPopover();
-    tools.querySelector("#clearManualGroupsBtn").onclick = () => cache.bs.clearAllManualGroups();
+
+    const newBtn = document.createElement("button");
+    newBtn.id = "newGroupBtn";
+    newBtn.className = "insp-btn";
+    newBtn.textContent = "＋ New group";
+    newBtn.title = "Create an empty group, then add nodes to it from a selection or a filter";
+    newBtn.onclick = async () => {
+      const group = cache.bs.createGroup();
+      if (!group) return;
+      cache.bs.selectedGroup = group;
+      await cache.bs.afterMembershipChange("New bubble group");
+      cache.ui.info(`Created "${cache.bs.groupName(group)}" — add nodes to it from a selection or a filter`);
+    };
+    tools.appendChild(newBtn);
+
+    const fromSelBtn = document.createElement("button");
+    fromSelBtn.id = "newGroupFromSelectionBtn";
+    fromSelBtn.className = "insp-btn";
+    fromSelBtn.textContent = "＋ From selection";
+    fromSelBtn.title = "Create a group holding the currently selected nodes";
+    fromSelBtn.onclick = () => cache.bs.createGroupFromSelection();
+    tools.appendChild(fromSelBtn);
+
+    const detectBtn = document.createElement("button");
+    detectBtn.id = "detectCommunitiesBtn";
+    detectBtn.className = "insp-btn";
+    detectBtn.textContent = "🧩 Auto-detect";
+    detectBtn.title =
+      "Auto-group by community (Louvain): pick edge weighting, resolution and how " +
+      "many groups to create. Adds new groups; existing ones are left alone.";
+    detectBtn.onclick = () => cache.bs.toggleCommunityDetectionPopover();
+    tools.appendChild(detectBtn);
+
+    const clearBtn = document.createElement("button");
+    clearBtn.id = "clearManualGroupsBtn";
+    clearBtn.className = "insp-btn red";
+    clearBtn.textContent = "Clear all";
+    clearBtn.title = "Empty every group (the groups themselves stay)";
+    clearBtn.onclick = () => cache.bs.clearAllManualGroups();
+    tools.appendChild(clearBtn);
+
     bubbleDiv.appendChild(tools);
 
-    // Tab bar
-    const tabBar = document.createElement("div");
-    tabBar.className = "bubble-set-tab-bar";
-    bubbleDiv.appendChild(tabBar);
+    // Settings for the selected row. Rebuilt by ui.buildGroupStylePanel.
+    const panel = document.createElement("div");
+    panel.id = "groupStylePanel";
+    panel.className = "group-style-panel";
+    bubbleDiv.appendChild(panel);
+  }
 
-    const panels = [];
-    let tabIndex = 0;
+  /**
+   * Build the style controls for ONE group into `#groupStylePanel`. Called
+   * whenever the selected row changes, so the pane always describes exactly the
+   * group whose row is highlighted.
+   * @param {string|null} group  null clears the pane (no groups exist)
+   */
+  function buildGroupStylePanel(group) {
+    const panel = document.getElementById("groupStylePanel");
+    if (!panel) return;
+    panel.replaceChildren();
+    const bs = cache.data?.layouts?.[cache.data?.selectedLayout]?.bubbleSetStyle?.[group];
+    if (!bs) return;
 
-    for (const group of cache.bs.traverseBubbleSets()) {
-      tabIndex++;
-      const bs = cache.data.layouts[cache.data.selectedLayout].bubbleSetStyle[group];
+    const optionalCSSClass = "bubbleSetOptionalLabelConfig";
+    const name = bs.labelText || group;
 
-      // Create tab button with group color accent
-      const tab = document.createElement("button");
-      tab.className = `bubble-set-tab${tabIndex === 1 ? " active" : ""}`;
-      tab.textContent = `Bubble Set ${tabIndex}`;
-      tab.dataset.group = group;
-      tab.style.setProperty("--tab-color", bs.fill);
-      tab.style.setProperty("--tab-text-color", StaticUtilities.getReadableForegroundColor(bs.fill));
-      tabBar.appendChild(tab);
+    const heading = document.createElement("div");
+    heading.className = "group-style-heading";
+    heading.textContent = `Appearance — ${name}`;
+    panel.appendChild(heading);
 
-      // Create tab panel
-      const panel = document.createElement("div");
-      panel.className = `bubble-set-tab-panel${tabIndex === 1 ? " active" : ""}`;
-      panel.id = `bubbleSetStyleCard${group}`;
-      bubbleDiv.appendChild(panel);
-      panels.push(panel);
+    // Fill Color
+    const rowFillColor = createNewRow(panel);
+    appendLabel(rowFillColor, "Fill Color");
+    createColorControls(rowFillColor, `Bubble Set ${group} Fill Color`, bs.fill, [], false);
 
-      tab.onclick = () => {
-        tabBar.querySelectorAll(".bubble-set-tab").forEach(t => t.classList.remove("active"));
-        panels.forEach(p => p.classList.remove("active"));
-        tab.classList.add("active");
-        panel.classList.add("active");
-      };
+    // Fill Opacity
+    const rowFillOpacity = createNewRow(panel);
+    appendLabel(rowFillOpacity, "Fill Opacity");
+    createNumericalSlider(rowFillOpacity, `Bubble Set ${group} Fill Opacity`, bs.fillOpacity,
+      {min: 0, max: 1, step: 0.01}, `Define the fill opacity of "${name}".`, false);
 
-      // Fill Color
-      const rowFillColor = createNewRow(panel);
-      appendLabel(rowFillColor, "Fill Color");
-      createColorControls(rowFillColor, `Bubble Set ${group} Fill Color`, bs.fill, [], false);
+    // Stroke Color
+    const rowStrokeColor = createNewRow(panel);
+    appendLabel(rowStrokeColor, "Stroke Color");
+    createColorControls(rowStrokeColor, `Bubble Set ${group} Stroke Color`, bs.stroke, [], false);
 
-      // Fill Opacity
-      const rowFillOpacity = createNewRow(panel);
-      appendLabel(rowFillOpacity, "Fill Opacity");
-      createNumericalSlider(rowFillOpacity, `Bubble Set ${group} Fill Opacity`, bs.fillOpacity,
-        {min: 0, max: 1, step: 0.01}, `Define the fill opacity of bubble set ${tabIndex}.`, false);
+    // Stroke Opacity
+    const rowStrokeOpacity = createNewRow(panel);
+    appendLabel(rowStrokeOpacity, "Stroke Opacity");
+    createNumericalSlider(rowStrokeOpacity, `Bubble Set ${group} Stroke Opacity`, bs.strokeOpacity,
+      {min: 0, max: 1, step: 0.01}, `Define the stroke opacity of "${name}".`, false);
 
-      // Stroke Color
-      const rowStrokeColor = createNewRow(panel);
-      appendLabel(rowStrokeColor, "Stroke Color");
-      createColorControls(rowStrokeColor, `Bubble Set ${group} Stroke Color`, bs.stroke, [], false);
+    // Padding (node influence field multiplier)
+    const rowPadding = createNewRow(panel);
+    appendLabel(rowPadding, "Padding",
+      "How far the bubble body extends past its member nodes — lower for a tighter hug, higher for more breathing room.");
+    createNumericalSlider(rowPadding, `Bubble Set ${group} Padding`, bs.padding ?? 1,
+      {min: 0.01, max: 3, step: 0.01},
+      `How far "${name}" extends past its member nodes.`, false);
 
-      // Stroke Opacity
-      const rowStrokeOpacity = createNewRow(panel);
-      appendLabel(rowStrokeOpacity, "Stroke Opacity");
-      createNumericalSlider(rowStrokeOpacity, `Bubble Set ${group} Stroke Opacity`, bs.strokeOpacity,
-        {min: 0, max: 1, step: 0.01}, `Define the stroke opacity of bubble set ${tabIndex}.`, false);
+    // Corridor Width (virtual-edge influence field multiplier)
+    const rowCorridor = createNewRow(panel);
+    appendLabel(rowCorridor, "Corridor Width",
+      "Thickness of the connecting arms that reach outlying member nodes.");
+    createNumericalSlider(rowCorridor, `Bubble Set ${group} Corridor Width`, bs.corridor ?? 1,
+      {min: 0.01, max: 3, step: 0.01},
+      `Thickness of "${name}"'s connecting arms to outlying members.`, false);
 
-      // Padding (node influence field multiplier)
-      const rowPadding = createNewRow(panel);
-      appendLabel(rowPadding, "Padding",
-        "How far the bubble body extends past its member nodes — lower for a tighter hug, higher for more breathing room.");
-      createNumericalSlider(rowPadding, `Bubble Set ${group} Padding`, bs.padding ?? 1,
-        {min: 0.01, max: 3, step: 0.01},
-        `How far bubble set ${tabIndex} extends past its member nodes.`, false);
+    // Avoidance (non-member field on/off; persisted numeric 0/1 for
+    // JSON back-compat — legacy saved values > 0 read as ON)
+    const rowAvoidance = createNewRow(panel);
+    appendLabel(rowAvoidance, "Avoid Other Nodes",
+      "Steer the hull around nodes that are not in the group and carve holes for enclosed ones. " +
+      "Two overlapping groups with this on will each route around the other's nodes.");
+    const avoidanceSwitch = createSwitch(async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Avoidance`, avoidanceSwitch.isChecked() ? 1 : 0);
+    }, undefined, (bs.avoidance ?? 1) > 0);
+    avoidanceSwitch.dataset.property = `Bubble Set ${group} Avoidance`;
+    // The row label is a separate element, so name the checkbox directly.
+    avoidanceSwitch.querySelector("input").setAttribute("aria-label", `Avoid other nodes ("${name}")`);
+    rowAvoidance.appendChild(avoidanceSwitch);
 
-      // Corridor Width (virtual-edge influence field multiplier)
-      const rowCorridor = createNewRow(panel);
-      appendLabel(rowCorridor, "Corridor Width",
-        "Thickness of the connecting arms that reach outlying member nodes.");
-      createNumericalSlider(rowCorridor, `Bubble Set ${group} Corridor Width`, bs.corridor ?? 1,
-        {min: 0.01, max: 3, step: 0.01},
-        `Thickness of bubble set ${tabIndex}'s connecting arms to outlying members.`, false);
-
-      // Avoidance (non-member field on/off; persisted numeric 0/1 for
-      // JSON back-compat — legacy saved values > 0 read as ON)
-      const rowAvoidance = createNewRow(panel);
-      appendLabel(rowAvoidance, "Avoid Other Nodes",
-        "Steer the hull around nodes that are not in the group and carve holes for enclosed ones.");
-      const avoidanceSwitch = createSwitch(async () => {
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Avoidance`, avoidanceSwitch.isChecked() ? 1 : 0);
-      }, undefined, (bs.avoidance ?? 1) > 0);
-      avoidanceSwitch.dataset.property = `Bubble Set ${group} Avoidance`;
-      // The row label is a separate element, so name the checkbox directly.
-      avoidanceSwitch.querySelector("input").setAttribute("aria-label",
-        `Avoid other nodes (bubble set ${tabIndex})`);
-      rowAvoidance.appendChild(avoidanceSwitch);
-
-      // Label (toggle + text input)
-      const rowLabel = createNewRow(panel);
-      appendLabel(rowLabel, "Label Text");
-      const enableTextSwitch = createSwitch(async () => {
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label`, enableTextSwitch.isChecked());
-      }, undefined, bs.label);
-      rowLabel.appendChild(enableTextSwitch);
-      const labelInput = createInput(120, `${group} label text`,
-        `Enter the label text for bubble set ${tabIndex}.`, bs.labelText, async () => {
+    // Label (toggle + text input)
+    const rowLabel = createNewRow(panel);
+    appendLabel(rowLabel, "Label Text");
+    const enableTextSwitch = createSwitch(async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label`, enableTextSwitch.isChecked());
+    }, undefined, bs.label);
+    rowLabel.appendChild(enableTextSwitch);
+    const labelInput = createInput(120, "label text",
+      "The text drawn on the bubble. This is the same name the group list shows.",
+      bs.labelText, async () => {
         await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Text`, labelInput.value.trim());
+        cache.bs.renderGroupList();
       });
-      labelInput.classList.add(optionalCSSClass);
-      rowLabel.appendChild(labelInput);
+    labelInput.dataset.property = `Bubble Set ${group} Label Text`;
+    labelInput.classList.add(optionalCSSClass);
+    rowLabel.appendChild(labelInput);
 
-      // Label Background (toggle + color)
-      const rowLabelBg = createNewRow(panel);
-      appendLabel(rowLabelBg, "Label Background", undefined, undefined, optionalCSSClass);
-      const enableBackgroundSwitch = createSwitch(async () => {
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Background`, enableBackgroundSwitch.isChecked());
-      }, undefined, bs.labelBackground);
-      enableBackgroundSwitch.classList.add(optionalCSSClass);
-      rowLabelBg.appendChild(enableBackgroundSwitch);
-      createColorControls(rowLabelBg, `Bubble Set ${group} Label Background Color`,
-        bs.labelBackgroundFill || bs.fill, [], false, optionalCSSClass);
+    // Label Background (toggle + color)
+    const rowLabelBg = createNewRow(panel);
+    appendLabel(rowLabelBg, "Label Background", undefined, undefined, optionalCSSClass);
+    const enableBackgroundSwitch = createSwitch(async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Background`, enableBackgroundSwitch.isChecked());
+    }, undefined, bs.labelBackground);
+    enableBackgroundSwitch.classList.add(optionalCSSClass);
+    rowLabelBg.appendChild(enableBackgroundSwitch);
+    createColorControls(rowLabelBg, `Bubble Set ${group} Label Background Color`,
+      bs.labelBackgroundFill || bs.fill, [], false, optionalCSSClass);
 
-      // Label Fill Color
-      const rowLabelFill = createNewRow(panel);
-      appendLabel(rowLabelFill, "Label Color", undefined, undefined, optionalCSSClass);
-      createColorControls(rowLabelFill, `Bubble Set ${group} Label Fill Color`, bs.labelFill, [], false, optionalCSSClass);
+    // Label Fill Color
+    const rowLabelFill = createNewRow(panel);
+    appendLabel(rowLabelFill, "Label Color", undefined, undefined, optionalCSSClass);
+    createColorControls(rowLabelFill, `Bubble Set ${group} Label Fill Color`, bs.labelFill, [], false, optionalCSSClass);
 
-      // Label Font Size
-      const rowFontSize = createNewRow(panel);
-      appendLabel(rowFontSize, "Label Font Size", undefined, undefined, optionalCSSClass);
-      createNumericalSlider(rowFontSize, `Bubble Set ${group} Label Font Size`, bs.labelFontSize,
-        {min: 6, max: 36, step: 1}, `Define the label font size for bubble set ${tabIndex}.`, false);
-      rowFontSize.lastChild.classList.add(optionalCSSClass);
+    // Label Font Size
+    const rowFontSize = createNewRow(panel);
+    appendLabel(rowFontSize, "Label Font Size", undefined, undefined, optionalCSSClass);
+    createNumericalSlider(rowFontSize, `Bubble Set ${group} Label Font Size`, bs.labelFontSize,
+      {min: 6, max: 36, step: 1}, `Define the label font size for "${name}".`, false);
+    rowFontSize.lastChild.classList.add(optionalCSSClass);
 
-      // Label Placement
-      const rowPlacement = createNewRow(panel);
-      appendLabel(rowPlacement, "Label Placement", undefined, undefined, optionalCSSClass);
-      const placementDropdown = document.createElement("select");
-      placementDropdown.className = "style-inner-button";
-      placementDropdown.dataset.property = `Bubble Set ${group} Label Placement`;
-      placementDropdown.classList.add(optionalCSSClass);
-      ['left', 'right', 'top', 'bottom', 'center'].forEach(v => {
-        const opt = document.createElement("option");
-        opt.value = v;
-        opt.textContent = v;
-        placementDropdown.appendChild(opt);
-      });
-      placementDropdown.value = bs.labelPlacement;
-      placementDropdown.onchange = async () => {
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Placement`, placementDropdown.value);
-      };
-      rowPlacement.appendChild(placementDropdown);
+    // Label Placement
+    const rowPlacement = createNewRow(panel);
+    appendLabel(rowPlacement, "Label Placement", undefined, undefined, optionalCSSClass);
+    const placementDropdown = document.createElement("select");
+    placementDropdown.className = "style-inner-button";
+    placementDropdown.dataset.property = `Bubble Set ${group} Label Placement`;
+    placementDropdown.classList.add(optionalCSSClass);
+    ['left', 'right', 'top', 'bottom', 'center'].forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      placementDropdown.appendChild(opt);
+    });
+    placementDropdown.value = bs.labelPlacement;
+    placementDropdown.onchange = async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Placement`, placementDropdown.value);
+    };
+    rowPlacement.appendChild(placementDropdown);
 
-      // Label Close To Path
-      const rowClosePath = createNewRow(panel);
-      appendLabel(rowClosePath, "Close To Path", undefined, undefined, optionalCSSClass);
-      const closeToPathSwitch = createSwitch(async () => {
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Close To Path`, closeToPathSwitch.isChecked());
-      }, undefined, bs.labelCloseToPath);
-      closeToPathSwitch.classList.add(optionalCSSClass);
-      closeToPathSwitch.dataset.property = `Bubble Set ${group} Label Close To Path`;
-      rowClosePath.appendChild(closeToPathSwitch);
+    // Label Close To Path
+    const rowClosePath = createNewRow(panel);
+    appendLabel(rowClosePath, "Close To Path", undefined, undefined, optionalCSSClass);
+    const closeToPathSwitch = createSwitch(async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Close To Path`, closeToPathSwitch.isChecked());
+    }, undefined, bs.labelCloseToPath);
+    closeToPathSwitch.classList.add(optionalCSSClass);
+    closeToPathSwitch.dataset.property = `Bubble Set ${group} Label Close To Path`;
+    rowClosePath.appendChild(closeToPathSwitch);
 
-      // Label Auto Rotate
-      const rowAutoRotate = createNewRow(panel);
-      appendLabel(rowAutoRotate, "Auto Rotate", undefined, undefined, optionalCSSClass);
-      const autoRotateSwitch = createSwitch(async () => {
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Auto Rotate`, autoRotateSwitch.isChecked());
-      }, undefined, bs.labelAutoRotate);
-      autoRotateSwitch.classList.add(optionalCSSClass);
-      autoRotateSwitch.dataset.property = `Bubble Set ${group} Label Auto Rotate`;
-      rowAutoRotate.appendChild(autoRotateSwitch);
+    // Label Auto Rotate
+    const rowAutoRotate = createNewRow(panel);
+    appendLabel(rowAutoRotate, "Auto Rotate", undefined, undefined, optionalCSSClass);
+    const autoRotateSwitch = createSwitch(async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Auto Rotate`, autoRotateSwitch.isChecked());
+    }, undefined, bs.labelAutoRotate);
+    autoRotateSwitch.classList.add(optionalCSSClass);
+    autoRotateSwitch.dataset.property = `Bubble Set ${group} Label Auto Rotate`;
+    rowAutoRotate.appendChild(autoRotateSwitch);
 
-      // Label Offset X
-      const rowOffsetX = createNewRow(panel);
-      appendLabel(rowOffsetX, "Label Offset X", undefined, undefined, optionalCSSClass);
-      createNumericalSlider(rowOffsetX, `Bubble Set ${group} Label Offset X`, bs.labelOffsetX,
-        {min: -50, max: 50, step: 1}, `Define the label X offset for bubble set ${tabIndex}.`, false);
-      rowOffsetX.lastChild.classList.add(optionalCSSClass);
+    // Label Offset X
+    const rowOffsetX = createNewRow(panel);
+    appendLabel(rowOffsetX, "Label Offset X", undefined, undefined, optionalCSSClass);
+    createNumericalSlider(rowOffsetX, `Bubble Set ${group} Label Offset X`, bs.labelOffsetX,
+      {min: -50, max: 50, step: 1}, `Define the label X offset for "${name}".`, false);
+    rowOffsetX.lastChild.classList.add(optionalCSSClass);
 
-      // Label Offset Y
-      const rowOffsetY = createNewRow(panel);
-      appendLabel(rowOffsetY, "Label Offset Y", undefined, undefined, optionalCSSClass);
-      createNumericalSlider(rowOffsetY, `Bubble Set ${group} Label Offset Y`, bs.labelOffsetY,
-        {min: -50, max: 50, step: 1}, `Define the label Y offset for bubble set ${tabIndex}.`, false);
-      rowOffsetY.lastChild.classList.add(optionalCSSClass);
-    }
+    // Label Offset Y
+    const rowOffsetY = createNewRow(panel);
+    appendLabel(rowOffsetY, "Label Offset Y", undefined, undefined, optionalCSSClass);
+    createNumericalSlider(rowOffsetY, `Bubble Set ${group} Label Offset Y`, bs.labelOffsetY,
+      {min: -50, max: 50, step: 1}, `Define the label Y offset for "${name}".`, false);
+    rowOffsetY.lastChild.classList.add(optionalCSSClass);
   }
 
   // Turn a config card into a collapsible section: replace the floating
@@ -1496,6 +1530,11 @@ function createStyleDiv(cache) {
     title: "Density heatmap",
     overlay: "heatmap",
   });
+
+  // The group settings pane is rebuilt whenever the selected row changes, long
+  // after this builder has returned, so hand the closure to the UI manager
+  // rather than making bubble_sets reach back into this module.
+  cache.ui.buildGroupStylePanel = buildGroupStylePanel;
 
   return root;
 }

@@ -202,7 +202,6 @@ class GraphCoreManager {
       await new Promise((resolve) => requestAnimationFrame(resolve));
       this.registerHotkeyEvents();
       this.registerGlobalEventListeners();
-      await this.registerPluginStates();
 
       // to initially fill caches related to the query/filters, preRenderEvent is called without rendering afterwards
       await this.cache.ui.showLoading('Post-processing', 'Pre-render event ..');
@@ -973,15 +972,6 @@ class GraphCoreManager {
         once: true,
       });
     });
-  }
-
-  async registerPluginStates() {
-    this.cache.ui.debug('Registering bubble set plugin instances ..');
-    for (const group of this.cache.bs.traverseBubbleSets()) {
-      this.cache.INSTANCES.BUBBLE_GROUPS[group] = await this.cache.graph.getPluginInstance(
-        `bubbleSetPlugin-${group}`
-      );
-    }
   }
 }
 

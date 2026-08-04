@@ -75,8 +75,7 @@ class GraphLayoutManager {
       await this.cache.bs.updateBubbleSetIfChanged();
 
       // Update manual bubble group status after layout change
-      this.cache.bs.updateManualGroupStatus();
-      this.cache.bs.updateManualGroupButtonState();
+      this.cache.bs.renderGroupList();
       this.cache.bs.refreshBubbleStyleElements();
 
       // Everything that mutates the graph is done — drop the overlay now so the
@@ -305,7 +304,10 @@ class GraphLayoutManager {
         // Start with default styles
         nodeStyles: new Map(),
         edgeStyles: new Map(),
-        bubbleSetStyle: structuredClone(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE),
+        // A new workspace starts with NO groups. Four always-present empty
+        // groups were the main reason the feature read as decoration; the
+        // Groups panel now shows an empty state that says what a group is.
+        bubbleSetStyle: {},
       };
 
       // Initialize empty bubble group props (no groups selected). Keyed off the
@@ -408,8 +410,7 @@ class GraphLayoutManager {
 
         // Update metrics and bubble group status
         await this.cache.metrics.updateMetricUI();
-        this.cache.bs.updateManualGroupStatus();
-        this.cache.bs.updateManualGroupButtonState();
+        this.cache.bs.renderGroupList();
         this.cache.bs.refreshBubbleStyleElements();
 
         // Graph mutations done — drop the overlay so the tween animates clear.
@@ -761,7 +762,10 @@ class GraphLayoutManager {
       // Per-view styles
       nodeStyles: new Map(),
       edgeStyles: new Map(),
-      bubbleSetStyle: structuredClone(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE),
+      // A new workspace starts with NO groups. Four always-present empty
+        // groups were the main reason the feature read as decoration; the
+        // Groups panel now shows an empty state that says what a group is.
+        bubbleSetStyle: {},
       annotations: [],
     };
 

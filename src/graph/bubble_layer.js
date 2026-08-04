@@ -110,6 +110,18 @@ class BubbleSetLayer {
     };
   }
 
+  /**
+   * Forget a group entirely. Without this a deleted group keeps its state slot
+   * and its cached outline, and #drawOutlines keeps painting a hull for a group
+   * that no longer exists.
+   * @param {string} group
+   */
+  removeGroup(group) {
+    this.groups.delete(group);
+    this.outlines.delete(group);
+    this.scheduleRedraw();
+  }
+
   destroy() {
     if (this.killed) return;
     this.killed = true;
@@ -213,7 +225,7 @@ class BubbleSetLayer {
       const cached = this.outlines.get(group);
       const points = cached.graphPoints.map((p) => sigma.graphToViewport(p));
       const holes = (cached.graphHoles ?? []).map((h) => h.map((p) => sigma.graphToViewport(p)));
-      const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {};
+      const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE_TEMPLATE;
       const drawn = this.#drawGroup(this.ctx, points, state, defaults, holes);
       // Labels paint on the top canvas (afterLayer: "labels") so they read
       // over member-node labels; the body/outline stayed on the bottom one.
@@ -260,7 +272,7 @@ class BubbleSetLayer {
         points: graphPoints.map((p) => sigma.graphToViewport(p)),
         holes: graphHoles.map((h) => h.map((p) => sigma.graphToViewport(p))),
         opts: state.opts,
-        defaults: this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {},
+        defaults: this.cache.DEFAULTS.BUBBLE_GROUP_STYLE_TEMPLATE,
       });
     }
     return out;

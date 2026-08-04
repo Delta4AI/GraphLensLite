@@ -201,103 +201,36 @@ const DEFAULTS = {
   EXPENSIVE_LAYOUTS: ["dagre", "mds"],
   LAYOUT_NODE_WARNING_THRESHOLD: 2000,
   CUSTOM_LAYOUT_NAME: "custom",
-  BUBBLE_GROUP_STYLE: {
-    "groupOne": {
-      fill: '#403C53',
-      fillOpacity: 0.25,
-      stroke: '#C33D35',
-      strokeOpacity: 1,
-      virtualEdges: true,
-      padding: 0.1,
-      corridor: 0.25,
-      avoidance: 1,
-      label: true,
-      labelText: 'group one',
-      labelFill: '#fff',
-      labelFontSize: 12,
-      labelPadding: 2,
-      labelBackground: true,
-      labelBackgroundFill: '#403C53',
-      labelBackgroundRadius: 5,
-      labelCloseToPath: true,
-      labelAutoRotate: true,
-      labelOffsetX: 0,
-      labelOffsetY: 0,
-      labelPlacement: 'bottom',
-    },
-    "groupTwo": {
-      fill: '#c33d35',
-      fillOpacity: 0.25,
-      stroke: '#403c53',
-      strokeOpacity: 1,
-      virtualEdges: true,
-      padding: 0.1,
-      corridor: 0.25,
-      avoidance: 1,
-      label: true,
-      labelText: 'group two',
-      labelFill: '#fff',
-      labelFontSize: 12,
-      labelPadding: 2,
-      labelBackground: true,
-      labelBackgroundFill: '#c33d35',
-      labelBackgroundRadius: 5,
-      labelCloseToPath: true,
-      labelAutoRotate: true,
-      labelOffsetX: 0,
-      labelOffsetY: 0,
-      labelPlacement: 'bottom',
-    },
-    "groupThree": {
-      fill: '#EFB0AA',
-      fillOpacity: 0.4,
-      stroke: '#8CA6D9',
-      strokeOpacity: 1,
-      virtualEdges: true,
-      padding: 0.1,
-      corridor: 0.25,
-      avoidance: 1,
-      label: true,
-      labelText: 'group three',
-      labelFill: '#fff',
-      labelFontSize: 12,
-      labelPadding: 2,
-      labelBackground: true,
-      labelBackgroundFill: '#EFB0AA',
-      labelBackgroundRadius: 5,
-      labelCloseToPath: true,
-      labelAutoRotate: true,
-      labelOffsetX: 0,
-      labelOffsetY: 0,
-      labelPlacement: 'bottom',
-    },
-    "groupFour": {
-      fill: '#8CA6D9',
-      fillOpacity: 0.4,
-      stroke: '#EFB0AA',
-      strokeOpacity: 1,
-      virtualEdges: true,
-      padding: 0.1,
-      corridor: 0.25,
-      avoidance: 1,
-      label: true,
-      labelText: 'group four',
-      labelFill: '#fff',
-      labelFontSize: 12,
-      labelPadding: 2,
-      labelBackground: true,
-      labelBackgroundFill: '#8CA6D9',
-      labelBackgroundRadius: 5,
-      labelCloseToPath: true,
-      labelAutoRotate: true,
-      labelOffsetX: 0,
-      labelOffsetY: 0,
-      labelPlacement: 'bottom',
-    },
+  // Everything a bubble group's style holds that does NOT depend on which group
+  // it is. There is no per-group literal any more: a workspace owns its own
+  // `bubbleSetStyle` map and may hold any number of groups, so the only thing
+  // config can supply is one template plus a colour cycle
+  // (see bubbleGroupStyle). Geometry defaults 0.1 / 0.25 / avoidance-on are the
+  // values tuned in 1.16.0; changing them here changes only NEW groups, because
+  // a saved workspace stores its own resolved values.
+  BUBBLE_GROUP_STYLE_TEMPLATE: {
+    fillOpacity: 0.25,
+    strokeOpacity: 1,
+    virtualEdges: true,
+    padding: 0.1,
+    corridor: 0.25,
+    avoidance: 1,
+    label: true,
+    labelFill: '#fff',
+    labelFontSize: 12,
+    labelPadding: 2,
+    labelBackground: true,
+    labelBackgroundRadius: 5,
+    labelCloseToPath: true,
+    labelAutoRotate: true,
+    labelOffsetX: 0,
+    labelOffsetY: 0,
+    labelPlacement: 'bottom',
   },
-  BUBBLE_GROUP_QUADRANT_POSITIONS: {
-    groupOne: "top-left", groupTwo: "top-right", groupThree: "bottom-left", groupFour: "bottom-right"
-  },
+  // The brand colours the original four groups used, in their original order,
+  // so the first four groups a user creates look exactly as they always have.
+  // Past the end, bubbleGroupColor walks the hue circle by the golden angle.
+  BUBBLE_GROUP_PALETTE: ['#403C53', '#C33D35', '#EFB0AA', '#8CA6D9'],
   STYLES: {
     NODE_FORM: {"●": "circle", "◆": "diamond", "⬢": "hexagon", "■": "rect", "▲": "triangle", "★": "star"},
     NODE_COLORS: {red: "#C33D35", purple: "#403C53", blue: "#8CA6D9", pink: "#EFB0AA", grey: "#ABACBD"},
@@ -428,4 +361,36 @@ const CFG = {
   // setup/settings modal — nothing to keep in sync here.
 }
 
-export {VERSION, DEFAULTS, CFG}
+/**
+ * Fill colour for the group at `index`. The palette covers the first four, then
+ * the hue circle is walked by the golden angle so any number of groups stays
+ * visually separable without a hand-authored list.
+ * @param {number} index zero-based creation order
+ * @returns {string} CSS colour
+ */
+function bubbleGroupColor(index) {
+  const palette = DEFAULTS.BUBBLE_GROUP_PALETTE;
+  if (index < palette.length) return palette[index];
+  return `hsl(${(index * 137.508) % 360} 55% 55%)`;
+}
+
+/**
+ * A complete style object for a new bubble group: the shared template plus the
+ * three values that identify one group from another. The stroke is the NEXT
+ * palette entry, which is what the original four did (contrast, not a tint of
+ * the fill).
+ * @param {number} index zero-based creation order
+ * @param {string} [name] label text; defaults to "Group <n>"
+ */
+function bubbleGroupStyle(index, name) {
+  const fill = bubbleGroupColor(index);
+  return {
+    ...DEFAULTS.BUBBLE_GROUP_STYLE_TEMPLATE,
+    fill,
+    stroke: bubbleGroupColor(index + 1),
+    labelText: name ?? `Group ${index + 1}`,
+    labelBackgroundFill: fill,
+  };
+}
+
+export {VERSION, DEFAULTS, CFG, bubbleGroupColor, bubbleGroupStyle}

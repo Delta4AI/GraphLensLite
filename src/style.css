@@ -1058,19 +1058,6 @@ body {
     background: var(--surface-2);
 }
 
-.sel-group-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    min-width: 0;
-}
-
-.sel-group-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-strong);
-}
-
 .sel-group-hint {
     font-size: 11px;
     line-height: 1.4;
@@ -1081,55 +1068,11 @@ body {
     color: var(--text-strong);
 }
 
-/* In its own section the button IS the feature, so it is sized to be aimed at:
-   56px gives each quadrant a 28px target, clearing WCAG 2.5.8's 24px minimum
-   without the hover-zoom the compact variant needs — a zoom that touch users
-   never trigger and keyboard users never see. */
-.sel-group-panel .circle-button-compact {
-    flex: 0 0 auto;
-    width: 56px;
-    height: 56px;
-}
-
-.sel-group-panel .circle-button-compact:hover {
-    transform: none;
-}
-
-.sel-group-panel .quadrant.compact {
-    border-width: 2px;
-}
-
-/* At 14px the coloured BORDER was most of the wedge, so the compact button read
-   as a pie. Enlarged, the same rules read as a ring around a grey disc — the
-   fill is --surface-3. Scoped tints put the colour back in the wedge: faint for
-   "available", solid for "the selection is in this group". Scoped to this panel
-   so the 18px circle buttons in the filter list are untouched.
-   The .active selector needs three classes to outrank `.top-left.active`. */
-.sel-group-panel .quadrant {
-    background-color: color-mix(in srgb, var(--quadrant-color) 22%, transparent);
-}
-
-.sel-group-panel .quadrant.active {
-    background-color: var(--quadrant-color);
-}
-
-.sel-group-panel .quadrant:hover {
-    background-color: color-mix(in srgb, var(--quadrant-color) 45%, transparent);
-}
-
-.sel-group-panel .quadrant.active:hover {
-    background-color: color-mix(in srgb, var(--quadrant-color) 80%, white);
-}
-
-/* clip-path clips an outline, so focus shows as a ring on the CIRCLE (where the
-   focus is) plus a brightened wedge (which one) — neither survives alone. */
-.circle-button-compact:has(.quadrant:focus-visible) {
+/* clip-path used to clip the focus ring on the quadrant pie; a plain button
+   takes the standard one. */
+#addToGroupBtn:focus-visible {
     outline: 2px solid var(--accent-text);
     outline-offset: 2px;
-}
-
-.quadrant:focus-visible {
-    filter: brightness(1.35);
 }
 
 /* Inline lasso glyph reused by the guided tour (empty span + --size/--color). */
@@ -1940,44 +1883,6 @@ h5 {
     font-size: 12px;
 }
 
-.bubble-set-tab-bar {
-    display: flex;
-    gap: 2px;
-}
-
-.bubble-set-tab {
-    flex: 1;
-    padding: 2px 4px;
-    background: var(--surface-3);
-    border: 1px solid var(--brand-border);
-    border-bottom: 2px solid var(--tab-color, #403C53);
-    border-radius: 3px 3px 0 0;
-    cursor: pointer;
-    font-size: 11px;
-    line-height: 14px;
-    color: var(--brand-text);
-    transition: all 0.15s ease;
-    text-align: center;
-    white-space: nowrap;
-}
-
-.bubble-set-tab:hover {
-    background: var(--surface-3);
-}
-
-.bubble-set-tab.active {
-    background: var(--tab-color, #403C53);
-    color: var(--tab-text-color, #fff);
-    border-color: var(--tab-color, #403C53);
-}
-
-.bubble-set-tab-panel {
-    display: none;
-}
-
-.bubble-set-tab-panel.active {
-    display: block;
-}
 
 .alert-warning {
     background-color: #fff3cd;
@@ -2467,8 +2372,6 @@ h5 {
 /* Locked filter state - disable all interactive elements */
 #filterContainer.locked .header-card button,
 #filterContainer.locked .sub-header-card button,
-#filterContainer.locked .circle-button,
-#filterContainer.locked .circle-button .quadrant,
 #filterContainer.locked .checkbox-container,
 #filterContainer.locked .dropdown-checklist,
 #filterContainer.locked .filter-row-col1 label,
@@ -3593,205 +3496,232 @@ input:checked + .slider:before {
 }
 
 /*************************
- Round 4-way circle button
+ Bubble group controls
  **************************/
 
-.circle-button {
-    position: relative;
+/* The per-filter-row group control. 18px is what filter-row-col3 allows, so it
+   shows ONE colour plus a ring meaning "and others" — N colours are not legible
+   at this size and a conic pie would rebuild the 2x2 quadrant wedges this
+   replaced. The tooltip and the menu carry the exact membership.
+   ponytail: 18px misses WCAG 2.5.8's 24px target — the same app-wide issue the
+   rail's icon buttons have; fix globally, not here. */
+.group-chip {
     width: 18px;
     height: 18px;
+    flex: 0 0 18px;
+    padding: 0;
     border-radius: 50%;
-    overflow: hidden;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    transition: transform 0.2s ease;
-}
-
-.circle-button:hover {
-    transform: translateX(-75%) scale(2.5);
-    cursor: pointer;
-    z-index: 99;
-}
-
-.circle-button-compact {
-    position: relative;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    overflow: hidden;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    transition: transform 0.2s ease;
-    vertical-align: middle;
-    border: 1px solid var(--border-strong);
-    box-sizing: border-box;
-}
-
-.circle-button-compact:hover {
-    transform: translate(-100%, 75%) scale(4);
-    cursor: pointer;
-    z-index: 99;
-}
-
-.manual-group-container {
-    display: inline-block;
-    vertical-align: middle;
-    line-height: 0;
-    margin-left: 2px;
-}
-
-.manual-group-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
-/* One clickable badge per active manual group: ●count in the group colour,
-   with an ✕ that fades in on hover to signal it clears just that group. */
-.manual-group-badge {
-    font: inherit;
-    font-size: 12px;
-    font-weight: bold;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    padding: 2px 5px;
+    border: 1.5px dashed var(--text-faint);
     background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    vertical-align: middle;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.group-chip:hover {
+    transform: scale(1.15);
+}
+
+.group-chip:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+.group-chip.assigned {
+    border-style: solid;
+    border-color: var(--chip-color);
+    background: var(--chip-color);
+}
+
+/* In several groups: an inset ring reads as "there is more here" without
+   pretending to name the others. */
+.group-chip.multi {
+    box-shadow: inset 0 0 0 2px var(--surface-1);
+}
+
+#filterContainer.locked .group-chip {
+    pointer-events: none;
+    opacity: 0.4;
+}
+
+/* --- the Groups list (Overlays > Groups) -------------------------------- */
+
+.group-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 8px;
+}
+
+.group-empty {
+    margin: 4px 0 8px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
+.group-row {
+    padding: 5px 6px;
     border: 1px solid transparent;
     border-radius: 6px;
     cursor: pointer;
-    transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.manual-group-badge:hover,
-.manual-group-badge:focus-visible {
+.group-row:hover {
+    background: var(--surface-2);
+}
+
+.group-row.active {
+    background: var(--surface-2);
     border-color: var(--border-soft);
-    background: var(--input-bg);
 }
 
-.mg-badge-x {
-    font-size: 10px;
-    color: var(--text-muted);
-    opacity: 0;
-    transition: opacity 0.15s ease;
+.group-row-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
-.manual-group-badge:hover .mg-badge-x,
-.manual-group-badge:focus-visible .mg-badge-x {
-    opacity: 1;
-}
-
-/* Red text-button variant (e.g. "Clear all"). */
-.insp-btn.red {
-    color: var(--danger-text);
-}
-
-.quadrant {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    border: 10px solid transparent;
-    box-sizing: border-box;
-    clip-path: inset(0 0 0 0);
-    transition: background-color 0.3s ease, border-color 0.3s ease;
-    pointer-events: all;
-    cursor: pointer;
+/* A native colour input is the whole swatch: the platform picker beats any
+   palette we would hand-roll, and it is keyboard accessible for free. */
+.group-swatch {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
     padding: 0;
-    margin: 0;
-    outline: none;
-    background: transparent none;
-    font: inherit;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-}
-
-:root {
-  --groupOne-color: var(--brand-text);
-  --groupTwo-color: var(--accent-text);
-  --groupThree-color: #EFB0AA;
-  --groupFour-color: #8CA6D9;
-}
-
-.top-left {
-    --quadrant-color: var(--groupOne-color);
-    clip-path: polygon(0 0, 50% 0, 50% 50%, 0 50%);
-    border-top-left-radius: 50%;
-    border-width: 0.125rem;
-    border-left-color: var(--quadrant-color);
-    border-top-color: var(--quadrant-color);
-    background-color: var(--surface-3);
-}
-
-.top-left.active {
-    background-color: var(--quadrant-color);
-    border-left-color: var(--border-strong);
-    border-top-color: var(--border-strong);
-}
-
-.top-right {
-    --quadrant-color: var(--groupTwo-color);
-    clip-path: polygon(50% 0, 100% 0, 100% 50%, 50% 50%);
-    border-width: 0.125rem;
-    border-top-right-radius: 50%;
-    border-right-color: var(--quadrant-color);
-    border-top-color: var(--quadrant-color);
-    background-color: var(--surface-3);
-}
-
-.top-right.active {
-    background-color: var(--quadrant-color);
-    border-right-color: var(--border-strong);
-    border-top-color: var(--border-strong);
-}
-
-.bottom-left {
-    --quadrant-color: var(--groupThree-color);
-    clip-path: polygon(0 50%, 50% 50%, 50% 100%, 0 100%);
-    border-width: 0.125rem;
-    border-bottom-left-radius: 50%;
-    border-left-color: var(--quadrant-color);
-    border-bottom-color: var(--quadrant-color);
-    background-color: var(--surface-3);
-}
-
-.bottom-left.active {
-    background-color: var(--quadrant-color);
-    border-left-color: var(--border-strong);
-    border-bottom-color: var(--border-strong);
-}
-
-.bottom-right {
-    --quadrant-color: var(--groupFour-color);
-    clip-path: polygon(50% 50%, 100% 50%, 100% 100%, 50% 100%);
-    border-width: 0.125rem;
-    border-bottom-right-radius: 50%;
-    border-right-color: var(--quadrant-color);
-    border-bottom-color: var(--quadrant-color);
-    background-color: var(--surface-3);
-}
-
-.bottom-right.active {
-    background-color: var(--quadrant-color);
-    border-right-color: var(--border-strong);
-    border-bottom-color: var(--border-strong);
-}
-
-.top-left.compact, .top-right.compact, .bottom-left.compact, .bottom-right.compact {
-    border-width: 1px;
-}
-
-.top-left.compact.active, .top-right.compact.active, .bottom-left.compact.active, .bottom-right.compact.active {
-    border: none;
-}
-
-.quadrant:hover {
-    /*background-color: rgba(255, 255, 255, 0.4);*/
-    /*filter: grayscale(0%);*/
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    background: none;
     cursor: pointer;
+}
+
+.group-swatch::-webkit-color-swatch-wrapper { padding: 2px; }
+.group-swatch::-webkit-color-swatch { border: none; border-radius: 2px; }
+.group-swatch::-moz-color-swatch { border: none; border-radius: 2px; }
+
+/* Looks like text until you touch it — the name is read far more often than
+   it is edited, and a field per row would make the list read as a form. */
+.group-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 2px 4px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-strong);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.group-name:hover {
+    border-color: var(--border-soft);
+}
+
+.group-name:focus {
+    border-color: var(--accent-text);
+    background: var(--surface-1);
+    outline: none;
+}
+
+.group-count {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.group-row-toggle {
+    flex: 0 0 auto;
+    min-width: 34px;
+    height: 22px;
+    padding: 0 6px;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    background: var(--surface-1);
+    color: var(--text-strong);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.group-row-toggle:hover:not(:disabled) {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+.group-row-toggle.remove:not(:disabled) {
+    color: var(--danger-text);
+    border-color: var(--danger-text);
+}
+
+.group-row-toggle:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.group-row-more {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.group-row-more:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+/* The line the old UI never showed: a group can be fed by a live filter AND a
+   hand-picked node set at the same time. */
+.group-row-source {
+    margin: 2px 0 0 26px;
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.group-style-panel:empty {
+    display: none;
+}
+
+.group-style-heading {
+    margin: 10px 0 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-soft);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+/* --- the shared group menu ---------------------------------------------- */
+
+.group-menu-dot {
+    width: 10px;
+    height: 10px;
+    flex: 0 0 10px;
+    border-radius: 50%;
+    border: 1px solid var(--border-soft);
+}
+
+.group-menu-hint {
+    padding: 6px 10px;
+    max-width: 220px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.rail-menu-item.partial .rail-menu-check {
+    color: var(--text-muted);
 }
 
 /*************************

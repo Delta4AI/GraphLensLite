@@ -1,6 +1,7 @@
 import { StaticUtilities } from '../utilities/static.js';
 import { BooleanToggle, DropdownChecklist, InvertibleRangeSlider } from './ui_components.js';
 import { createStyleDiv } from './ui_style_div.js';
+import { attachGroupMenu } from './group_menu.js';
 import { Popup } from '../utilities/popup.js';
 import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
 import { refreshNeo4jSessionUI } from '../utilities/neo4j_loader.js';
@@ -615,10 +616,7 @@ class UIManager {
     div.innerHTML = '';
     div.appendChild(this.cache.metrics.buildMetricUI());
 
-    // Initialize manual bubble group button
-    const manualButtonContainer = document.getElementById('manualBubbleGroupButtonContainer');
-    manualButtonContainer.innerHTML = '';
-    manualButtonContainer.appendChild(this.cache.uiComponents.createManualBubbleGroupButton());
+    this.buildAddToGroupButton();
 
     this.buildFilterUI();
 
@@ -628,6 +626,24 @@ class UIManager {
 
     this.cache.query.lastGoodWidth = this.cache.query.editorDiv.offsetWidth;
     this.cache.qm.validateAlignment();
+  }
+
+  /**
+   * Wire the Selection panel's "Add to group" button to the shared group
+   * checklist — the same menu the filter rows open, so one gesture covers both
+   * ways of putting things in a group.
+   */
+  buildAddToGroupButton() {
+    const btn = document.getElementById('addToGroupBtn');
+    if (!btn) return;
+    attachGroupMenu(btn, this.cache, () => ({
+      isChecked: (group) => this.cache.bs.selectionMembership(group) === 'all',
+      isPartial: (group) => this.cache.bs.selectionMembership(group) === 'some',
+      onToggle: (group) => this.cache.bs.toggleSelectedNodesInManualGroup(group),
+      onNew: () => this.cache.bs.createGroupFromSelection(),
+      newLabel: 'New group from selection',
+      emptyHint: 'A group draws a coloured bubble around the nodes you put in it.',
+    }));
   }
 
   buildFilterUI() {
@@ -774,7 +790,7 @@ class UIManager {
       const col3 = document.createElement('div');
       col3.className = 'filter-row-col3';
       if (this.cache.nodeExclusiveProps.has(propID) || this.cache.mixedProps.has(propID)) {
-        col3.appendChild(this.cache.uiComponents.createCircleGroupButtonWithQuadrants(propID));
+        col3.appendChild(this.cache.uiComponents.createGroupChip(propID));
       } else {
         const placeHolder = document.createElement('div');
         placeHolder.style.width = '18px';

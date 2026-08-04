@@ -94,7 +94,7 @@ const GROUP_DEFAULTS = {
 function makeLayer({ camera, dims, nodes }) {
   const { sigma, ctx, labelCtx } = makeSigma(camera, dims);
   const adapter = { sigma, graph: makeGraph(nodes) };
-  const cache = { DEFAULTS: { BUBBLE_GROUP_STYLE: { groupOne: { ...GROUP_DEFAULTS } } } };
+  const cache = { DEFAULTS: { BUBBLE_GROUP_STYLE_TEMPLATE: { ...GROUP_DEFAULTS } } };
   const layer = new BubbleSetLayer(adapter, cache);
   return { layer, sigma, ctx, labelCtx, graph: adapter.graph };
 }

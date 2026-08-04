@@ -49,8 +49,8 @@ function createCache(nodeCount) {
       traverseBubbleSets: () => [],
       clearBubbleSetInstanceMembers: asyncNoop,
       updateBubbleSetIfChanged: asyncNoop,
-      updateManualGroupStatus: noop,
-      updateManualGroupButtonState: noop,
+      renderGroupList: noop,
+      syncGroupRows: noop,
       refreshBubbleStyleElements: noop,
     },
     gcm: {

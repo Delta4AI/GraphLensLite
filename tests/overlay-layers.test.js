@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UIManager } from '../src/managers/ui.js';
 import { createStyleDiv } from '../src/managers/ui_style_div.js';
-import { DEFAULTS, CFG } from '../src/config.js';
+import { DEFAULTS, CFG, bubbleGroupStyle } from '../src/config.js';
 import { AnnotationLayer } from '../src/graph/annotation_layer.js';
 import { Minimap } from '../src/graph/minimap.js';
 
@@ -216,16 +216,15 @@ describe('Minimap.setVisible', () => {
 // ==========================================================================
 
 describe('createStyleDiv layer rows', () => {
-  function build() {
+  /** @param {string[]} groups  the workspace's groups (unbounded, may be empty) */
+  function build(groups = ['g1', 'g2']) {
     const bubbleSetStyle = {};
-    for (const g of Object.keys(DEFAULTS.BUBBLE_GROUP_STYLE)) {
-      bubbleSetStyle[g] = { ...DEFAULTS.BUBBLE_GROUP_STYLE[g] };
-    }
+    groups.forEach((g, i) => { bubbleSetStyle[g] = bubbleGroupStyle(i); });
     const cache = {
       DEFAULTS,
       CFG,
       data: { selectedLayout: 'Default', layouts: { Default: { bubbleSetStyle } } },
-      bs: { traverseBubbleSets: () => Object.keys(DEFAULTS.BUBBLE_GROUP_STYLE) },
+      bs: { traverseBubbleSets: () => groups },
       ui: {},
       nodeLabels: [],
       edgeLabels: [],

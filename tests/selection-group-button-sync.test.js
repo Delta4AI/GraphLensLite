@@ -3,11 +3,14 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { GraphSelectionManager } from "../src/graph/selection.js";
 
 // --------------------------------------------------------------------------
-// Regression: the "Add to group" four-way quadrant button must reflect the
-// CURRENT selection. cache.selectedNodes is only recomputed inside
-// updateSelectedNodesAndEdges (the after-draw refresh), so the button resync
-// must happen there — not in updateSelectedState, which runs before the
-// refresh and would read a stale selection.
+// Regression: each group row's ＋/－ button must reflect the CURRENT selection
+// (it says how many nodes a click will add or remove). cache.selectedNodes is
+// only recomputed inside updateSelectedNodesAndEdges (the after-draw refresh),
+// so the resync must happen there — not in updateSelectedState, which runs
+// before the refresh and would read a stale selection.
+//
+// The control changed shape (a 2×2 quadrant pie became one button per named
+// group) but the ordering constraint is identical, so this test outlives it.
 // --------------------------------------------------------------------------
 
 function mountDom() {
@@ -32,7 +35,7 @@ function makeCache() {
     edgeIDsToBeShown: new Set(),
     selectedNodes: ["stale"], // pre-existing stale value the button must NOT see
     selectedEdges: [],
-    bs: { updateManualGroupButtonState: vi.fn() },
+    bs: { syncGroupRows: vi.fn() },
     ui: {
       syncStylingCardsToSelection: vi.fn(),
       toggleStyleElementsThatRequireAtLeastOneSelectedNode: vi.fn(),
@@ -44,7 +47,7 @@ function makeCache() {
   };
 }
 
-describe("updateSelectedNodesAndEdges — quadrant button resync", () => {
+describe("updateSelectedNodesAndEdges — group-row button resync", () => {
   let cache, sm;
 
   beforeEach(() => {
@@ -58,13 +61,13 @@ describe("updateSelectedNodesAndEdges — quadrant button resync", () => {
 
   it("resyncs the button after refreshing cache.selectedNodes", async () => {
     let selectionSeenByButton;
-    cache.bs.updateManualGroupButtonState.mockImplementation(() => {
+    cache.bs.syncGroupRows.mockImplementation(() => {
       selectionSeenByButton = [...cache.selectedNodes];
     });
 
     await sm.updateSelectedNodesAndEdges();
 
-    expect(cache.bs.updateManualGroupButtonState).toHaveBeenCalledTimes(1);
+    expect(cache.bs.syncGroupRows).toHaveBeenCalledTimes(1);
     // The button must see the fresh selection, not the stale pre-call value.
     expect(selectionSeenByButton).toEqual(["n1"]);
   });
@@ -77,6 +80,6 @@ describe("updateSelectedNodesAndEdges — quadrant button resync", () => {
 
     await sm.updateSelectedState([{ id: "n1" }], true);
 
-    expect(cache.bs.updateManualGroupButtonState).not.toHaveBeenCalled();
+    expect(cache.bs.syncGroupRows).not.toHaveBeenCalled();
   });
 });

@@ -6,7 +6,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 //   1. ONE membership computation (getEffectiveGroupMembers) feeds the
 //      rendered outline AND the status badge, so the displayed count can
 //      never diverge from what is highlighted (the "shows 4, highlights 1" bug).
-//   2. 🧩 Auto (Louvain) confirms before discarding existing manual groups.
+//   2. 🧩 Auto (Louvain) ADDS groups rather than overwriting a fixed four, so
+//      it destroys nothing and needs no confirmation.
 //   3. Clearing a group clears BOTH sources (manual + filter/prop), so the
 //      badge — which now spans both — can actually reach zero.
 // --------------------------------------------------------------------------
@@ -18,21 +19,11 @@ vi.mock("../src/graph/communities.js", () => ({
   LOUVAIN_RNG_SEED: 1,
 }));
 
-// Control the confirm dialog.
-const confirmMock = vi.fn();
-vi.mock("../src/utilities/popup.js", () => ({
-  Popup: { confirm: (...args) => confirmMock(...args) },
-}));
-
 const { GraphBubbleSetManager } = await import("../src/graph/bubble_sets.js");
 
+// A legacy four-group workspace: the group list is per-layout now, so these
+// are just the keys this fixture happens to carry.
 const GROUPS = ["groupOne", "groupTwo", "groupThree", "groupFour"];
-const QUADRANTS = {
-  groupOne: "top-left",
-  groupTwo: "top-right",
-  groupThree: "bottom-left",
-  groupFour: "bottom-right",
-};
 
 function makeLayout() {
   const layout = { filters: new Map(), bubbleSetStyle: {} };
@@ -47,10 +38,7 @@ function makeLayout() {
 function makeCache(layout = makeLayout()) {
   return {
     data: { selectedLayout: "Default", layouts: { Default: layout } },
-    DEFAULTS: {
-      BUBBLE_GROUP_STYLE: Object.fromEntries(GROUPS.map((g) => [g, {}])),
-      BUBBLE_GROUP_QUADRANT_POSITIONS: QUADRANTS,
-    },
+    DEFAULTS: { BUBBLE_GROUP_STYLE_TEMPLATE: {} },
     propIDsToNodeIDsToBeShown: new Map(),
     hiddenDanglingNodeIDs: new Set(),
     nodeRef: new Map(),
@@ -59,22 +47,23 @@ function makeCache(layout = makeLayout()) {
     bubbleSetChanged: false,
     INSTANCES: { BUBBLE_GROUPS: {} },
     graph: { draw: vi.fn(async () => {}) },
-    ui: { info: vi.fn(), warning: vi.fn(), debug: vi.fn(), buildFilterUI: vi.fn(), expandStylingCard: vi.fn() },
+    uiComponents: { refreshGroupChips: vi.fn() },
+    ui: { info: vi.fn(), warning: vi.fn(), debug: vi.fn(), buildFilterUI: vi.fn(),
+          expandStylingCard: vi.fn(), syncOverlays: vi.fn() },
   };
 }
 
-// Minimal DOM the status panel touches.
-function mountStatusDom() {
+// Minimal DOM the group list touches.
+function mountGroupListDom() {
   document.body.innerHTML = `
-    <span id="manualBubbleGroupStatus" style="display:none;"></span>
-    <button id="clearManualGroupsBtn" style="display:none;"></button>
-    <span id="manualGroupSeparator" style="display:none;"></span>
+    <div id="groupList"></div>
+    <div id="groupStylePanel"></div>
+    <button id="clearManualGroupsBtn"></button>
   `;
 }
 
 beforeEach(() => {
   detectCommunitiesMock.mockReset();
-  confirmMock.mockReset();
   document.body.innerHTML = "";
 });
 
@@ -115,9 +104,9 @@ describe("getEffectiveGroupMembers", () => {
   });
 });
 
-describe("updateManualGroupStatus — badge count matches the rendered union", () => {
+describe("renderGroupList — the row count matches the rendered union", () => {
   it("counts prop ∪ manual (not manual alone)", () => {
-    mountStatusDom();
+    mountGroupListDom();
     const layout = makeLayout();
     layout.groupOneProps = new Set(["propA"]);
     layout.groupOneManualMembers = new Set(["n3"]);
@@ -126,28 +115,46 @@ describe("updateManualGroupStatus — badge count matches the rendered union", (
     cache.nodeRef = new Map([["n1", {}], ["n2", {}], ["n3", {}]]);
 
     const bs = new GraphBubbleSetManager(cache);
-    bs.updateManualGroupStatus();
+    bs.renderGroupList();
 
-    const badges = document.querySelectorAll("#manualBubbleGroupStatus .manual-group-badge");
-    expect(badges.length).toBe(1);
-    expect(badges[0].textContent).toContain("●3");
+    const rows = document.querySelectorAll("#groupList .group-row");
+    expect(rows.length).toBe(GROUPS.length);
+    const first = document.querySelector('.group-row[data-group="groupOne"] .group-count');
+    expect(first.textContent).toBe("3 nodes");
   });
 
-  it("renders no badge when a group has neither source", () => {
-    mountStatusDom();
-    const bs = new GraphBubbleSetManager(makeCache());
-    bs.updateManualGroupStatus();
-    expect(document.querySelectorAll("#manualBubbleGroupStatus .manual-group-badge").length).toBe(0);
-    expect(document.getElementById("manualBubbleGroupStatus").style.display).toBe("none");
+  it("shows a group's two sources on its own row", () => {
+    mountGroupListDom();
+    const layout = makeLayout();
+    layout.groupOneProps = new Set(["Node::Topology::degree"]);
+    layout.groupOneManualMembers = new Set(["n3"]);
+    const cache = makeCache(layout);
+    cache.propIDsToNodeIDsToBeShown.set("Node::Topology::degree", ["n1"]);
+    cache.nodeRef = new Map([["n1", {}], ["n3", {}]]);
+
+    new GraphBubbleSetManager(cache).renderGroupList();
+
+    const source = document.querySelector('.group-row[data-group="groupOne"] .group-row-source');
+    expect(source.textContent).toBe("⚙ Node › Topology › degree · +1 manual");
+    // A group with no filter source says nothing rather than "+0 manual".
+    expect(document.querySelector('.group-row[data-group="groupTwo"] .group-row-source')).toBeNull();
+  });
+
+  it("renders the empty state when the workspace has no groups", () => {
+    mountGroupListDom();
+    const cache = makeCache({ filters: new Map(), bubbleSetStyle: {} });
+    new GraphBubbleSetManager(cache).renderGroupList();
+    expect(document.querySelectorAll("#groupList .group-row").length).toBe(0);
+    expect(document.querySelector("#groupList .group-empty").textContent).toContain("No groups yet");
   });
 });
 
-describe("detectCommunities — confirm before clobbering manual groups", () => {
+describe("detectCommunities — creates groups instead of overwriting them", () => {
   function wireDetect(cache) {
     const bs = new GraphBubbleSetManager(cache);
-    // Isolate the confirm/assignment logic from DOM-heavy choreography.
-    bs.updateManualGroupButtonState = vi.fn();
-    bs.updateManualGroupStatus = vi.fn();
+    // Isolate the assignment logic from DOM-heavy choreography.
+    bs.syncGroupRows = vi.fn();
+    bs.renderGroupList = vi.fn();
     bs.refreshBubbleStyleElements = vi.fn();
     bs.updateBubbleSetIfChanged = vi.fn(async () => {});
     bs.redrawBubbleSets = vi.fn(async () => {});
@@ -155,84 +162,91 @@ describe("detectCommunities — confirm before clobbering manual groups", () => 
     return bs;
   }
 
-  it("does not prompt when no manual groups exist, and applies assignments", async () => {
-    const cache = makeCache();
-    detectCommunitiesMock.mockReturnValue({
-      assignments: new Map([["groupOne", new Set(["a", "b"])]]),
+  /** Louvain fills whichever keys detectCommunities minted for it. */
+  function assignFirst(members) {
+    detectCommunitiesMock.mockImplementation((cache, groups) => ({
+      assignments: new Map([[groups[0], new Set(members)]]),
       communityCount: 1,
       modularity: 0.4,
-    });
-    const bs = wireDetect(cache);
+    }));
+  }
 
-    await bs.detectCommunities();
-
-    expect(confirmMock).not.toHaveBeenCalled();
-    expect(cache.data.layouts.Default.groupOneManualMembers).toEqual(new Set(["a", "b"]));
-  });
-
-  it("prompts and ABORTS when the user cancels — members untouched", async () => {
+  it("adds new groups and leaves existing ones untouched", async () => {
     const cache = makeCache();
     cache.data.layouts.Default.groupTwoManualMembers = new Set(["existing"]);
-    detectCommunitiesMock.mockReturnValue({
-      assignments: new Map([["groupOne", new Set(["a", "b"])]]),
-      communityCount: 1,
-      modularity: 0.4,
-    });
-    confirmMock.mockResolvedValue(false);
+    assignFirst(["a", "b"]);
     const bs = wireDetect(cache);
 
-    await bs.detectCommunities();
+    await bs.detectCommunities({ groupCount: 2 });
 
-    expect(confirmMock).toHaveBeenCalledTimes(1);
-    // unchanged: cancel must not assign
-    expect(cache.data.layouts.Default.groupTwoManualMembers).toEqual(new Set(["existing"]));
-    expect(cache.data.layouts.Default.groupOneManualMembers).toEqual(new Set());
+    const layout = cache.data.layouts.Default;
+    // Nothing the user built was destroyed — the whole reason the old confirm
+    // dialog existed, and why it is gone.
+    expect(layout.groupTwoManualMembers).toEqual(new Set(["existing"]));
+    // One community found → exactly one new group survives.
+    const created = Object.keys(layout.bubbleSetStyle).filter((g) => /^g\d+$/.test(g));
+    expect(created).toHaveLength(1);
+    expect(layout[`${created[0]}ManualMembers`]).toEqual(new Set(["a", "b"]));
   });
 
-  it("prompts and PROCEEDS when the user confirms", async () => {
+  it("honours the requested group count", async () => {
     const cache = makeCache();
-    cache.data.layouts.Default.groupTwoManualMembers = new Set(["existing"]);
-    detectCommunitiesMock.mockReturnValue({
-      assignments: new Map([["groupOne", new Set(["a", "b"])]]),
-      communityCount: 1,
-      modularity: 0.4,
-    });
-    confirmMock.mockResolvedValue(true);
+    detectCommunitiesMock.mockImplementation((c, groups) => ({
+      assignments: new Map(groups.map((g, i) => [g, new Set([`n${i}`])])),
+      communityCount: groups.length,
+      modularity: 0.5,
+    }));
     const bs = wireDetect(cache);
 
-    await bs.detectCommunities();
+    await bs.detectCommunities({ groupCount: 6 });
 
-    expect(confirmMock).toHaveBeenCalledTimes(1);
-    expect(cache.data.layouts.Default.groupOneManualMembers).toEqual(new Set(["a", "b"]));
-    // group two was not assigned a community → cleared by the overwrite
-    expect(cache.data.layouts.Default.groupTwoManualMembers).toEqual(new Set());
+    const created = Object.keys(cache.data.layouts.Default.bubbleSetStyle)
+      .filter((g) => /^g\d+$/.test(g));
+    expect(created).toHaveLength(6);
   });
 
-  it("warns and returns without prompting when detection yields no result", async () => {
+  it("drops the groups no community landed in", async () => {
+    const cache = makeCache();
+    assignFirst(["a"]);
+    const bs = wireDetect(cache);
+
+    await bs.detectCommunities({ groupCount: 5 });
+
+    // 5 minted, 1 filled — an empty group is clutter, not a result.
+    const layout = cache.data.layouts.Default;
+    const created = Object.keys(layout.bubbleSetStyle).filter((g) => /^g\d+$/.test(g));
+    expect(created).toHaveLength(1);
+    for (const g of created) expect(layout[`${g}ManualMembers`].size).toBeGreaterThan(0);
+  });
+
+  it("warns and leaves no debris when detection yields no result", async () => {
     const cache = makeCache();
     cache.data.layouts.Default.groupOneManualMembers = new Set(["existing"]);
     detectCommunitiesMock.mockReturnValue(null);
     const bs = wireDetect(cache);
 
-    await bs.detectCommunities();
+    await bs.detectCommunities({ groupCount: 3 });
 
     expect(cache.ui.warning).toHaveBeenCalled();
-    expect(confirmMock).not.toHaveBeenCalled();
     expect(cache.data.layouts.Default.groupOneManualMembers).toEqual(new Set(["existing"]));
+    // The keys minted to compute against must not survive a failed run.
+    expect(Object.keys(cache.data.layouts.Default.bubbleSetStyle).filter((g) => /^g\d+$/.test(g)))
+      .toHaveLength(0);
   });
 });
 
 describe("clear actions span both membership sources", () => {
   function wireClear(cache) {
     const bs = new GraphBubbleSetManager(cache);
-    bs.updateManualGroupButtonState = vi.fn();
-    bs.updateManualGroupStatus = vi.fn();
+    bs.syncGroupRows = vi.fn();
+    bs.renderGroupList = vi.fn();
+    bs.refreshBubbleStyleElements = vi.fn();
     bs.updateBubbleSetIfChanged = vi.fn(async () => {});
     bs.redrawBubbleSets = vi.fn(async () => {});
     return bs;
   }
 
-  it("clearManualGroup clears manual + prop and rebuilds the filter UI", async () => {
+  it("clearManualGroup clears manual + prop and repaints the filter chips", async () => {
     const layout = makeLayout();
     layout.groupOneProps = new Set(["propA"]);
     layout.groupOneManualMembers = new Set(["n3"]);
@@ -243,19 +257,20 @@ describe("clear actions span both membership sources", () => {
 
     expect(layout.groupOneManualMembers.size).toBe(0);
     expect(layout.groupOneProps.size).toBe(0);
-    expect(cache.ui.buildFilterUI).toHaveBeenCalledTimes(1);
+    expect(cache.uiComponents.refreshGroupChips).toHaveBeenCalledTimes(1);
   });
 
-  it("clearManualGroup skips the filter rebuild when no props were assigned", async () => {
+  it("clearManualGroup leaves the other groups' prop assignments alone", async () => {
     const layout = makeLayout();
     layout.groupOneManualMembers = new Set(["n3"]);
+    layout.groupTwoProps = new Set(["propB"]);
     const cache = makeCache(layout);
     const bs = wireClear(cache);
 
     await bs.clearManualGroup("groupOne");
 
     expect(layout.groupOneManualMembers.size).toBe(0);
-    expect(cache.ui.buildFilterUI).not.toHaveBeenCalled();
+    expect(layout.groupTwoProps).toEqual(new Set(["propB"]));
   });
 
   it("clearAllManualGroups clears prop assignments across all groups", async () => {
@@ -269,6 +284,6 @@ describe("clear actions span both membership sources", () => {
 
     expect(layout.groupOneProps.size).toBe(0);
     expect(layout.groupTwoManualMembers.size).toBe(0);
-    expect(cache.ui.buildFilterUI).toHaveBeenCalledTimes(1);
+    expect(cache.uiComponents.refreshGroupChips).toHaveBeenCalledTimes(1);
   });
 });

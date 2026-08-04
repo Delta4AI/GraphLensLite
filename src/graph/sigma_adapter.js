@@ -885,7 +885,7 @@ class SigmaAdapter {
   /**
    * Per-group bubble-set handle backed by the shared BubbleSetLayer (the
    * old G6 plugin-instance surface: `members` Map + update/drawBubbleSets).
-   * core.registerPluginStates caches one per group in INSTANCES.BUBBLE_GROUPS,
+   * bubble_sets caches one per group in INSTANCES.BUBBLE_GROUPS on first use,
    * which destroyGraphAndRollBackUI resets together with this adapter.
    *
    * @param {string} key  legacy plugin key ("bubbleSetPlugin-<group>") or

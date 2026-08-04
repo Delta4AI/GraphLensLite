@@ -93,8 +93,8 @@ function makeGraph(nodes) {
 function makeCache() {
   return {
     DEFAULTS: {
-      BUBBLE_GROUP_STYLE: {
-        groupOne: { fill: "#e74c3c", stroke: "#e74c3c", fillOpacity: 0.25, strokeOpacity: 1, label: false },
+      BUBBLE_GROUP_STYLE_TEMPLATE: {
+        fill: "#e74c3c", stroke: "#e74c3c", fillOpacity: 0.25, strokeOpacity: 1, label: false,
       },
     },
   };

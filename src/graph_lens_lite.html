@@ -338,18 +338,17 @@
         </div>
 
         <!-- Group membership gets its own framed section: it is the one action
-             here that changes what the graph DRAWS, and at its old size (a 14px
-             dot wedged into the act row) it read as a decoration. The h4 stays a
-             direct child of the panel so the palette's sectionOf() finds it. -->
+             here that changes what the graph DRAWS. The h4 stays a direct child
+             of the panel so the palette's sectionOf() finds it. One button
+             opening a named checklist replaces the 2x2 quadrant pie, which used
+             the same glyph as the filter rows for a different verb and could
+             only ever address four groups. -->
         <h4 class="insp-section-title sel-group-title">Group membership</h4>
         <div class="sel-group-panel">
-          <span id="manualBubbleGroupButtonContainer" class="manual-group-container"></span>
-          <div class="sel-group-copy">
-            <div class="sel-group-label">Toggle the selection in a bubble group</div>
-            <div class="sel-group-hint">Click a quadrant to add the selected nodes, again to remove
-              them. A filled quadrant means the whole selection is already in that group; the
-              colours match the bubbles and the tabs under <strong>Overlays › Groups</strong>.</div>
-          </div>
+          <button type="button" id="addToGroupBtn" class="insp-btn"
+                  title="Add or remove the selected nodes in a bubble group">＋ Add to group ⌄</button>
+          <div class="sel-group-hint">Groups are listed under <strong>Overlays › Groups</strong>,
+            where you can rename, recolour and restyle them.</div>
         </div>
 
         <div class="insp-act-row">

@@ -1,4 +1,4 @@
-import { DEFAULTS } from '../config.js';
+import { attachGroupMenu } from './group_menu.js';
 import { StaticUtilities } from '../utilities/static.js';
 
 class DropdownChecklist {
@@ -795,81 +795,105 @@ class UIComponentManager {
     return btn;
   }
 
-  createCircleGroupButtonWithQuadrants(propID) {
-    const circleButton = document.createElement('div');
-    circleButton.className = `circle-button`;
+  /**
+   * The per-filter-row group control. One dot that opens the shared group
+   * checklist, replacing a 2×2 quadrant pie that could only ever address four
+   * groups and never said which four.
+   *
+   * ponytail: at 18px in `filter-row-col3` the dot shows ONE colour plus a ring
+   * meaning "and others" — N colours are not legible at this size, and a conic
+   * pie would just rebuild the wedges this replaced. Exact membership is in the
+   * tooltip and the menu. Give it more room and it could show a colour stack.
+   *
+   * @param {string} propID
+   */
+  createGroupChip(propID) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'group-chip';
+    chip.dataset.prop = propID;
 
-    for (let [group, quadrantPosition] of Object.entries(
-      DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS
-    )) {
-      const quadrant = document.createElement('button');
-      quadrant.classList.add('quadrant');
-      quadrant.classList.add(quadrantPosition);
-      // `${group}Props` on the layout is the only store: it is what
-      // getEffectiveGroupMembers resolves and what the outline renders.
-      const propsInGroup = () =>
-        this.cache.data.layouts[this.cache.data.selectedLayout][`${group}Props`];
-      propsInGroup().has(propID)
-        ? quadrant.classList.add('active')
-        : quadrant.classList.remove('active');
+    attachGroupMenu(chip, this.cache, () => ({
+      isChecked: (group) => this.#propsOf(group).has(propID),
+      onToggle: async (group) => {
+        const props = this.#propsOf(group);
+        props.has(propID) ? props.delete(propID) : props.add(propID);
+        this.refreshGroupChips();
+        await this.cache.gcm.decideToRenderOrDraw();
+        this.cache.bs.afterMembershipChange(`Bubble group membership (${group})`);
+      },
+      onNew: async () => {
+        const label = this.#readableProp(propID);
+        const group = this.cache.bs.createGroup({ name: label, fromProp: propID });
+        if (!group) return;
+        this.refreshGroupChips();
+        await this.cache.gcm.decideToRenderOrDraw();
+        this.cache.bs.afterMembershipChange(`New bubble group (${label})`);
+        const count = this.cache.bs.getEffectiveGroupMembers(group).size;
+        this.cache.ui.info(
+          `Created group "${label}" (${count} node${count === 1 ? '' : 's'}) — ` +
+            `style it under Overlays › Groups`
+        );
+      },
+      newLabel: 'New group from this filter',
+      emptyHint: 'A group draws a coloured bubble around the nodes you put in it.',
+    }));
 
-      quadrant.addEventListener('click', async () => {
-        try {
-          const props = propsInGroup();
-          if (props.has(propID)) {
-            props.delete(propID);
-            quadrant.classList.remove('active');
-          } else {
-            props.add(propID);
-            quadrant.classList.add('active');
-          }
-          quadrant.title = `Highlight ${propID} and add to bubble-group (${group})`;
-          await this.cache.gcm.decideToRenderOrDraw();
-        } catch (err) {
-          this.cache.ui.error(`Failed to update bubble set group: ${err.message}`);
-        }
-      });
-
-      quadrant.title = `Highlight ${propID} and add to bubble-group (${group})`;
-      circleButton.appendChild(quadrant);
-    }
-
-    return circleButton;
+    this.paintGroupChip(chip);
+    return chip;
   }
 
-  createManualBubbleGroupButton() {
-    const circleButton = document.createElement('div');
-    circleButton.className = `circle-button-compact`;
-    circleButton.id = 'manualBubbleGroupButton';
+  /** "Node › Topology › degree" — what the user reads, not the prop hash. */
+  #readableProp(propID) {
+    const [section, subSection, prop] = StaticUtilities.decodePropHashId(propID);
+    return [section, subSection, prop].filter(Boolean).join(' › ');
+  }
 
-    // "Bubble Set 1", not "groupOne": the number is what the styling tabs under
-    // Overlays › Groups carry, so the quadrant names the thing the user will go
-    // and restyle. And "Toggle", because a second click removes.
-    let index = 0;
-    for (let [group, quadrantPosition] of Object.entries(
-      DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS
-    )) {
-      index++;
-      const quadrant = document.createElement('button');
-      quadrant.classList.add('quadrant');
-      quadrant.classList.add(quadrantPosition);
-      quadrant.classList.add('manual');
-      quadrant.classList.add('compact');
+  /** `${group}Props` for the selected workspace, the single membership store. */
+  #propsOf(group) {
+    const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
+    if (!layout[`${group}Props`]) layout[`${group}Props`] = new Set();
+    return layout[`${group}Props`];
+  }
 
-      quadrant.addEventListener('click', async () => {
-        try {
-          await this.cache.bs.toggleSelectedNodesInManualGroup(group);
-        } catch (err) {
-          this.cache.ui.error(`Failed to update manual bubble group: ${err.message}`);
-        }
-      });
-
-      quadrant.title = `Toggle the selected nodes in Bubble Set ${index} (${quadrantPosition.replace('-', ' ')})`;
-      quadrant.setAttribute('aria-label', quadrant.title);
-      circleButton.appendChild(quadrant);
+  /**
+   * Paint one chip from current membership: hairline when unassigned, the
+   * group's colour when in one, plus a ring when in several. The full list of
+   * groups goes in the accessible name, which is where it stays legible.
+   */
+  paintGroupChip(chip) {
+    const propID = chip.dataset.prop;
+    const styles =
+      this.cache.data?.layouts?.[this.cache.data?.selectedLayout]?.bubbleSetStyle ?? {};
+    const inGroups = [];
+    for (const group of this.cache.bs.traverseBubbleSets()) {
+      if (this.#propsOf(group).has(propID)) inGroups.push(group);
     }
 
-    return circleButton;
+    chip.classList.toggle('assigned', inGroups.length > 0);
+    chip.classList.toggle('multi', inGroups.length > 1);
+    chip.style.removeProperty('--chip-color');
+    if (inGroups.length > 0) {
+      chip.style.setProperty('--chip-color', styles[inGroups[0]]?.fill ?? 'currentColor');
+    }
+
+    const names = inGroups.map((g) => styles[g]?.labelText || g);
+    const readable = this.#readableProp(propID);
+    chip.title = names.length
+      ? `Assign nodes matching ${readable} to a group — currently in ${names.join(', ')}`
+      : `Assign nodes matching ${readable} to a group`;
+    chip.setAttribute('aria-label', chip.title);
+  }
+
+  /**
+   * Repaint every chip in the filter panel. Membership changes from four other
+   * places (the group list, clears, auto-detect, undo), and rebuilding the
+   * whole filter UI to reflect a colour is far more than the change deserves.
+   */
+  refreshGroupChips() {
+    for (const chip of document.querySelectorAll('#filterContainer .group-chip')) {
+      this.paintGroupChip(chip);
+    }
   }
 
   buildToolTipText(nodeOrEdgeID, isEdge) {
