@@ -823,7 +823,7 @@ class UIComponentManager {
         this.cache.bs.afterMembershipChange(`Bubble group membership (${group})`);
       },
       onNew: async () => {
-        const label = this.#readableProp(propID);
+        const label = this.#groupNameForProp(propID);
         const group = this.cache.bs.createGroup({ name: label, fromProp: propID });
         if (!group) return;
         this.refreshGroupChips();
@@ -843,10 +843,20 @@ class UIComponentManager {
     return chip;
   }
 
-  /** "Node › Topology › degree" — what the user reads, not the prop hash. */
+  /** "Node filters › Topology › degree" — the full path, for tooltips. */
   #readableProp(propID) {
     const [section, subSection, prop] = StaticUtilities.decodePropHashId(propID);
     return [section, subSection, prop].filter(Boolean).join(' › ');
+  }
+
+  /**
+   * The same path without its section. A group made from a filter is named
+   * with this: the section is always "Node filters"/"Edge filters", which is
+   * noise inside a group list where every entry would carry it.
+   */
+  #groupNameForProp(propID) {
+    const [, subSection, prop] = StaticUtilities.decodePropHashId(propID);
+    return [subSection, prop].filter(Boolean).join(' › ') || propID;
   }
 
   /** `${group}Props` for the selected workspace, the single membership store. */

@@ -1090,14 +1090,10 @@ function createStyleDiv(cache) {
       "by a filter (it then follows that filter) or by a selection, or both.";
     bubbleDiv.appendChild(note);
 
-    // One row per group, plus the empty state. Filled by renderGroupList.
-    const list = document.createElement("div");
-    list.id = "groupList";
-    list.className = "group-list";
-    bubbleDiv.appendChild(list);
-
-    // Group-level tools. These ids are read by bubble_sets.js, which looks them
-    // up per call, so rebuilding them with the card is safe.
+    // Creation verbs sit ABOVE the list: they answer "how do I get one", which
+    // is the question the empty state asks and the question a user returning to
+    // add another asks. "Clear all" is destructive and goes below, on its own —
+    // it has no business sitting in a row of ＋ buttons.
     const tools = document.createElement("div");
     tools.className = "insp-groups";
 
@@ -1133,21 +1129,37 @@ function createStyleDiv(cache) {
     detectBtn.onclick = () => cache.bs.toggleCommunityDetectionPopover();
     tools.appendChild(detectBtn);
 
+    bubbleDiv.appendChild(tools);
+
+    // One row per group, plus the empty state. Filled by renderGroupList.
+    const list = document.createElement("div");
+    list.id = "groupList";
+    list.className = "group-list";
+    bubbleDiv.appendChild(list);
+
+    const footer = document.createElement("div");
+    footer.className = "group-list-footer";
     const clearBtn = document.createElement("button");
     clearBtn.id = "clearManualGroupsBtn";
     clearBtn.className = "insp-btn red";
-    clearBtn.textContent = "Clear all";
-    clearBtn.title = "Empty every group (the groups themselves stay)";
+    clearBtn.textContent = "Empty all groups";
+    clearBtn.title =
+      "Remove every node from every group. The groups themselves stay — " +
+      "delete one from its ⋯ menu.";
     clearBtn.onclick = () => cache.bs.clearAllManualGroups();
-    tools.appendChild(clearBtn);
+    footer.appendChild(clearBtn);
+    bubbleDiv.appendChild(footer);
 
-    bubbleDiv.appendChild(tools);
-
-    // Settings for the selected row. Rebuilt by ui.buildGroupStylePanel.
+    // Settings for the open row. group_list re-parents this ONE element into
+    // whichever row is expanded; #groupStylePanelHome is where it waits when
+    // none is, so a list rebuild can never destroy it.
+    const panelHome = document.createElement("div");
+    panelHome.id = "groupStylePanelHome";
     const panel = document.createElement("div");
     panel.id = "groupStylePanel";
     panel.className = "group-style-panel";
-    bubbleDiv.appendChild(panel);
+    panelHome.appendChild(panel);
+    bubbleDiv.appendChild(panelHome);
   }
 
   /**

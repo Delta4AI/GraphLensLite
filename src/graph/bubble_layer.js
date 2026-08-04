@@ -42,6 +42,21 @@ const OUTLINE_STROKE_WIDTH = 2;
 // label drawn with labelCloseToPath: false.
 const LABEL_STANDOFF_PX = 8;
 
+// --- refit deferral (drag responsiveness) ----------------------------------
+// Fitting an outline is bubblesets' marching-squares pass over an influence
+// field; on a dense graph with avoidance on it costs far more than a frame.
+// #paint runs on every sigma afterRender, so dragging a member used to re-fit
+// 60×/second and the whole canvas crawled.
+//
+// A fit whose last run stayed inside this budget keeps re-fitting live — small
+// graphs are unaffected and the hull tracks the node exactly as before.
+const CHEAP_FIT_MS = 8;
+// Past it, MEMBERSHIP and STYLE changes still fit immediately (they are
+// discrete user actions), but POSITION changes coast on the cached hull and
+// re-fit once motion stops. The hull lags the node mid-drag and snaps true on
+// release, which is the trade the alternative cannot buy: a locked UI.
+const REFIT_SETTLE_MS = 90;
+
 class BubbleSetLayer {
   /**
    * @param {object} adapter  SigmaAdapter (owns sigma + graphology)
@@ -64,6 +79,12 @@ class BubbleSetLayer {
 
     this.rafHandle = null;
     this.lastPaintSignature = null;
+    /** Last fit duration per group, in ms — drives refit deferral. */
+    this.fitDurations = new Map();
+    this.settleHandle = null;
+    // Set while a settled refit is running so #syncGroupOutline stops
+    // deferring and actually fits.
+    this.forceRefit = false;
 
     const sigma = adapter.sigma;
     // createCanvasContext returns the Sigma instance (fluent API); the canvas
@@ -119,6 +140,7 @@ class BubbleSetLayer {
   removeGroup(group) {
     this.groups.delete(group);
     this.outlines.delete(group);
+    this.fitDurations.delete(group);
     this.scheduleRedraw();
   }
 
@@ -126,6 +148,7 @@ class BubbleSetLayer {
     if (this.killed) return;
     this.killed = true;
     if (this.rafHandle !== null) cancelAnimationFrame(this.rafHandle);
+    clearTimeout(this.settleHandle);
     this.adapter.sigma.off('afterRender', this.renderHandler);
     // sigma.kill() may or may not remove custom layer canvases; remove() on
     // an already-detached node is a no-op, so drop ours defensively.
@@ -146,6 +169,31 @@ class BubbleSetLayer {
       this.rafHandle = null;
       this.#paint();
     });
+  }
+
+  /** Did this group's last fit blow the frame budget? */
+  #fitIsExpensive(group) {
+    if (this.forceRefit) return false;
+    return (this.fitDurations.get(group) ?? 0) > CHEAP_FIT_MS;
+  }
+
+  /**
+   * Re-fit every deferred outline once the graph stops moving. Restarted on
+   * each deferred frame, so a continuous drag fits exactly once, on release.
+   */
+  #scheduleSettledRefit() {
+    if (this.killed) return;
+    clearTimeout(this.settleHandle);
+    this.settleHandle = setTimeout(() => {
+      this.settleHandle = null;
+      if (this.killed) return;
+      this.forceRefit = true;
+      try {
+        this.#paint();
+      } finally {
+        this.forceRefit = false;
+      }
+    }, REFIT_SETTLE_MS);
   }
 
   // ------------------------------------------------------------ group state
@@ -394,10 +442,15 @@ class BubbleSetLayer {
     // unhide changes visibleMembers.length, and a same-count hidden swap
     // changes the checksum. No camera/viewport term — the graph-space outline
     // is the same at every zoom.
-    const key =
-      `${state.membersKey}|${state.avoidKey}|${visibleMembers.length}` +
-      `|${styleKey(state.opts)}|${positionsChecksum(memberPositions)}` +
-      `|${positionsChecksum(avoidPositions)}`;
+    //
+    // Split in two so the two kinds of change can be treated differently:
+    // identity (what is in the group and how it is styled) always re-fits;
+    // position may be deferred while the graph is in motion.
+    const identityKey =
+      `${state.membersKey}|${state.avoidKey}|${visibleMembers.length}|${styleKey(state.opts)}`;
+    const positionKey =
+      `${positionsChecksum(memberPositions)}|${positionsChecksum(avoidPositions)}`;
+    const key = `${identityKey}|${positionKey}`;
     const cached = this.outlines.get(group);
     if (cached && cached.key === key) return false;
 
@@ -406,7 +459,17 @@ class BubbleSetLayer {
       return cached !== undefined;
     }
 
+    // Position-only change on a group whose last fit blew the frame budget:
+    // keep painting the cached hull and re-fit once motion settles. Without a
+    // cached hull there is nothing to coast on, so the first fit always runs.
+    if (cached && cached.identityKey === identityKey && this.#fitIsExpensive(group)) {
+      this.#scheduleSettledRefit();
+      return false;
+    }
+
+    const started = performance.now();
     const { outer: graphPoints, holes: graphHoles } = this.#fitGraphOutline(state, visibleMembers);
+    this.fitDurations.set(group, performance.now() - started);
     // computeOutlineGeometry repairs self-intersections, so a bad fit here is
     // a collapse to nothing or the rare unrepairable self-cross. Never let it
     // replace a good outline.
@@ -416,6 +479,7 @@ class BubbleSetLayer {
       if (cached?.graphPoints.length) {
         this.outlines.set(group, {
           key,
+          identityKey,
           graphPoints: cached.graphPoints,
           graphHoles: cached.graphHoles ?? [],
         });
@@ -424,7 +488,7 @@ class BubbleSetLayer {
       // No prior good outline yet: stay absent until a clean fit appears.
       return this.outlines.delete(group);
     }
-    this.outlines.set(group, { key, graphPoints, graphHoles });
+    this.outlines.set(group, { key, identityKey, graphPoints, graphHoles });
     return true;
   }
 

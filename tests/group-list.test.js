@@ -44,7 +44,7 @@ function makeCache(groups = { g1: 'Kinases' }) {
 function mount() {
   document.body.innerHTML = `
     <div id="groupList"></div>
-    <div id="groupStylePanel"></div>
+    <div id="groupStylePanelHome"><div id="groupStylePanel"></div></div>
   `;
 }
 
@@ -140,8 +140,10 @@ describe('the source line', () => {
 
     new GraphBubbleSetManager(cache).renderGroupList();
 
-    const source = document.querySelector('.group-row[data-group="g1"] .group-row-source');
-    expect(source.textContent).toBe('⚙ Node › Topology › degree · +1 manual');
+    const parts = [...document.querySelectorAll(
+      '.group-row[data-group="g1"] .group-row-source .group-source-part')].map((e) => e.textContent);
+    // Two parts, and no "Node ›" section prefix — every row would carry it.
+    expect(parts).toEqual(['⚙ follows Topology › degree', '＋ 1 added by hand']);
     expect(document.querySelector('.group-row[data-group="g2"] .group-row-source')).toBeNull();
   });
 
@@ -151,7 +153,9 @@ describe('the source line', () => {
     layoutOf(cache).g1Props = new Set(['Node::x::y']);
     new GraphBubbleSetManager(cache).renderGroupList();
 
-    expect(document.querySelector('.group-row-source').textContent).toBe('⚙ Node › x › y');
+    const parts = [...document.querySelectorAll('.group-row-source .group-source-part')]
+      .map((e) => e.textContent);
+    expect(parts).toEqual(['⚙ follows x › y']);
   });
 });
 
@@ -342,6 +346,59 @@ describe('refreshBubbleStyleElements — the single settings pane', () => {
     const { bs } = mountPane('g1', { labelText: 'K' });
     bs.selectedGroup = 'deleted';
     expect(() => bs.refreshBubbleStyleElements()).not.toThrow();
+  });
+});
+
+describe('the settings pane lives inside the open row', () => {
+  // A shared pane below the list made "where do I click to style this one" a
+  // guess. As a real disclosure the chevron answers it, and the settings sit
+  // next to the group they belong to.
+  function render(groups = { g1: 'Kinases', g2: 'Hubs' }) {
+    mount();
+    const cache = makeCache(groups);
+    const bs = new GraphBubbleSetManager(cache);
+    bs.renderGroupList();
+    return { cache, bs };
+  }
+  const pane = () => document.getElementById('groupStylePanel');
+  const chevron = (g) => document.querySelector(`.group-row[data-group="${g}"] .group-row-chevron`);
+
+  it('parents the pane into the open row, not the card', () => {
+    render();
+    expect(pane().closest('.group-row')?.dataset.group).toBe('g1');
+  });
+
+  it('moves the pane when another row is opened', () => {
+    const { bs } = render();
+    chevron('g2').click();
+    expect(bs.selectedGroup).toBe('g2');
+    expect(pane().closest('.group-row')?.dataset.group).toBe('g2');
+    expect(chevron('g2').getAttribute('aria-expanded')).toBe('true');
+    expect(chevron('g1').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('collapses the open row and parks the pane, without re-opening another', () => {
+    const { bs } = render();
+    chevron('g1').click();
+    expect(bs.selectedGroup).toBeNull();
+    expect(document.querySelectorAll('.group-row.active')).toHaveLength(0);
+    // Parked, not destroyed — every listener on it has to survive.
+    expect(pane().parentElement.id).toBe('groupStylePanelHome');
+  });
+
+  it('survives repeated rebuilds — the pane is one element, re-parented', () => {
+    const { bs } = render();
+    const original = pane();
+    for (let i = 0; i < 5; i++) bs.renderGroupList();
+    expect(pane()).toBe(original);
+    expect(document.querySelectorAll('#groupStylePanel')).toHaveLength(1);
+  });
+
+  it('parks the pane when the last group is deleted', async () => {
+    const { bs } = render({ g1: 'Only' });
+    await bs.deleteGroup('g1');
+    bs.renderGroupList();
+    expect(pane().parentElement.id).toBe('groupStylePanelHome');
   });
 });
 

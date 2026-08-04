@@ -134,8 +134,9 @@ describe("renderGroupList — the row count matches the rendered union", () => {
 
     new GraphBubbleSetManager(cache).renderGroupList();
 
-    const source = document.querySelector('.group-row[data-group="groupOne"] .group-row-source');
-    expect(source.textContent).toBe("⚙ Node › Topology › degree · +1 manual");
+    const parts = [...document.querySelectorAll(
+      '.group-row[data-group="groupOne"] .group-row-source .group-source-part')].map((e) => e.textContent);
+    expect(parts).toEqual(['⚙ follows Topology › degree', '＋ 1 added by hand']);
     // A group with no filter source says nothing rather than "+0 manual".
     expect(document.querySelector('.group-row[data-group="groupTwo"] .group-row-source')).toBeNull();
   });

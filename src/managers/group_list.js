@@ -54,12 +54,17 @@ export function syncGroupRows(bs) {
   }
 }
 
-/** Which filters feed a group's property-derived membership, in readable form. */
+/**
+ * Which filters feed a group's property-derived membership, named the way the
+ * filter panel names them MINUS the section — every entry would otherwise
+ * start "Node filters ›", which is noise in a 356 px column.
+ */
 function groupFilterNames(bs, group) {
   const props = layoutOf(bs)?.[`${group}Props`] ?? new Set();
-  return [...props].map((propID) =>
-    StaticUtilities.decodePropHashId(propID).filter(Boolean).join(' › ')
-  );
+  return [...props].map((propID) => {
+    const [, subSection, prop] = StaticUtilities.decodePropHashId(propID);
+    return [subSection, prop].filter(Boolean).join(' › ') || propID;
+  });
 }
 
 /**
@@ -72,6 +77,14 @@ export function renderGroupList(bs) {
   const layout = layoutOf(bs);
   const groups = [...bs.traverseBubbleSets()];
 
+  // The settings pane lives inside the open row, so detach it BEFORE the rows
+  // are replaced — replaceChildren would otherwise destroy the one element the
+  // whole styling surface hangs off. It is parked in #groupStylePanelHome
+  // whenever no row is open.
+  const pane = document.getElementById('groupStylePanel');
+  const paneHome = document.getElementById('groupStylePanelHome');
+  pane?.remove();
+
   list.replaceChildren();
   list.classList.toggle('is-empty', groups.length === 0);
 
@@ -81,12 +94,29 @@ export function renderGroupList(bs) {
     empty.textContent =
       'No groups yet. A group draws a coloured bubble around the nodes you put in it.';
     list.appendChild(empty);
+    if (pane && paneHome) paneHome.appendChild(pane);
     bs.cache.ui?.buildGroupStylePanel?.(null);
     return;
   }
 
-  for (const group of groups) list.appendChild(buildGroupRow(bs, group, layout));
-  if (!groups.includes(bs.selectedGroup)) bs.selectedGroup = groups[0];
+  // null means "the user collapsed the open row" — a real state. Only an unset
+  // or stale selection falls back to the first group.
+  if (bs.selectedGroup !== null && !groups.includes(bs.selectedGroup)) {
+    bs.selectedGroup = groups[0];
+  }
+  let openRow = null;
+  for (const group of groups) {
+    const row = buildGroupRow(bs, group, layout);
+    if (group === bs.selectedGroup) openRow = row;
+    list.appendChild(row);
+  }
+
+  // The settings pane lives INSIDE the open row, not below the list. A shared
+  // pane at the bottom made "where do I click to style this one" a guess; as a
+  // real disclosure the chevron says it, and the settings are next to the group
+  // they belong to. One element, re-parented (the CARD_MOUNTS trick), so its
+  // id, its listeners and refreshBubbleStyleElements all survive.
+  if (pane) (openRow ?? paneHome)?.appendChild(pane);
   bs.cache.ui?.buildGroupStylePanel?.(bs.selectedGroup);
   syncGroupRows(bs);
 }
@@ -96,10 +126,14 @@ function buildGroupRow(bs, group, layout) {
   const name = style.labelText || group;
   const count = bs.getEffectiveGroupMembers(group).size;
 
+  const expanded = group === bs.selectedGroup;
   const row = document.createElement('div');
   row.className = 'group-row';
   row.dataset.group = group;
-  if (group === bs.selectedGroup) row.classList.add('active');
+  if (expanded) {
+    row.classList.add('active');
+    row.style.setProperty('--row-color', style.fill || 'transparent');
+  }
   row.addEventListener('click', (e) => {
     // A click on the swatch, the name field or the ⋯ button is meant for that
     // control, not for selecting the row out from under it.
@@ -150,9 +184,26 @@ function buildGroupRow(bs, group, layout) {
   more.setAttribute('aria-label', more.title);
   attachRowMenu(bs, more, group);
 
+  // The affordance for "open this group's appearance settings". Without it the
+  // only cue was a faint row highlight, and nothing said the pane below
+  // belonged to the highlighted row.
+  const chevron = document.createElement('button');
+  chevron.type = 'button';
+  chevron.className = 'group-row-chevron';
+  chevron.textContent = expanded ? '▾' : '▸';
+  chevron.setAttribute('aria-expanded', String(expanded));
+  chevron.title = expanded ? `Hide "${name}" settings` : `Appearance settings for "${name}"`;
+  chevron.setAttribute('aria-label', chevron.title);
+  chevron.addEventListener('click', () => {
+    // Clicking the open row's chevron closes it, so a group can be collapsed
+    // back to one line.
+    bs.selectedGroup = expanded ? null : group;
+    renderGroupList(bs);
+  });
+
   const head = document.createElement('div');
   head.className = 'group-row-head';
-  head.append(swatch, nameInput, countEl, toggle, more);
+  head.append(chevron, swatch, nameInput, countEl, toggle, more);
   row.appendChild(head);
 
   // The second line is the thing the old UI never admitted: a group can be fed
@@ -162,11 +213,26 @@ function buildGroupRow(bs, group, layout) {
   if (filters.length > 0) {
     const source = document.createElement('div');
     source.className = 'group-row-source';
-    source.textContent =
-      `⚙ ${filters.join(', ')}` + (manualCount ? ` · +${manualCount} manual` : '');
-    source.title =
-      'Filter-driven membership updates as you change those filters; ' +
-      'manually added nodes stay until you remove them.';
+
+    const fromFilter = document.createElement('span');
+    fromFilter.className = 'group-source-part';
+    fromFilter.textContent = `⚙ follows ${filters.join(', ')}`;
+    fromFilter.title =
+      `This group takes whichever nodes match ${filters.join(' and ')}, and ` +
+      'follows those filters as you change them.';
+    source.appendChild(fromFilter);
+
+    // "+2 manual" read as jargon. Say what the number IS: nodes someone put
+    // there by hand, which stay put whatever the filter does.
+    if (manualCount) {
+      const byHand = document.createElement('span');
+      byHand.className = 'group-source-part';
+      byHand.textContent = `＋ ${manualCount} added by hand`;
+      byHand.title =
+        `${manualCount} node(s) added from a selection. They stay in the group ` +
+        'regardless of the filter above.';
+      source.appendChild(byHand);
+    }
     row.appendChild(source);
   }
 

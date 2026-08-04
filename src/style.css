@@ -3550,8 +3550,8 @@ input:checked + .slider:before {
 .group-list {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    margin-bottom: 8px;
+    gap: 6px;
+    margin: 10px 0;
 }
 
 .group-empty {
@@ -3561,26 +3561,56 @@ input:checked + .slider:before {
     color: var(--text-muted);
 }
 
+/* Each group is a card, not a table row: at one hairline apart, a list of five
+   read as an undifferentiated block, and the open one has a settings pane
+   inside it that has to be visibly part of THAT group. */
 .group-row {
-    padding: 5px 6px;
-    border: 1px solid transparent;
-    border-radius: 6px;
+    padding: 6px;
+    border: 1px solid var(--border-soft);
+    border-radius: 7px;
+    background: var(--surface-1, transparent);
     cursor: pointer;
 }
 
 .group-row:hover {
-    background: var(--surface-2);
+    border-color: var(--border-strong);
 }
 
+/* The open row carries its own settings, so it reads as a container rather
+   than a highlighted line. Its edge takes the GROUP's colour (set inline), not
+   the accent: a red frame beside the group's own swatch reads as an error, and
+   this ties the open panel to the bubble it belongs to. */
 .group-row.active {
     background: var(--surface-2);
-    border-color: var(--border-soft);
+    border-color: var(--border-strong);
+    border-left: 3px solid var(--row-color, var(--border-strong));
+    padding-left: 4px;
+    cursor: default;
 }
 
 .group-row-head {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+/* The disclosure. Universal "there is more under this", and the settings really
+   are under this row now. */
+.group-row-chevron {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 10px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.group-row-chevron:hover {
+    color: var(--text-strong);
 }
 
 /* A native colour input is the whole swatch: the platform picker beats any
@@ -3612,6 +3642,7 @@ input:checked + .slider:before {
     color: var(--text-strong);
     font-size: 12px;
     font-weight: 600;
+    text-overflow: ellipsis;
 }
 
 .group-name:hover {
@@ -3620,8 +3651,9 @@ input:checked + .slider:before {
 
 .group-name:focus {
     border-color: var(--accent-text);
-    background: var(--surface-1);
+    background: var(--input-bg, var(--surface-1));
     outline: none;
+    text-overflow: clip;
 }
 
 .group-count {
@@ -3680,27 +3712,39 @@ input:checked + .slider:before {
 }
 
 /* The line the old UI never showed: a group can be fed by a live filter AND a
-   hand-picked node set at the same time. */
+   hand-picked node set at the same time. Two parts, so "follows a filter" and
+   "someone put these here" do not run together into one cryptic string. */
 .group-row-source {
-    margin: 2px 0 0 26px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    margin: 3px 0 0 24px;
     font-size: 10.5px;
     line-height: 1.4;
     color: var(--text-muted);
     overflow-wrap: anywhere;
 }
 
+.group-list-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-soft);
+}
+
 .group-style-panel:empty {
     display: none;
 }
 
-/* Names which group the pane below belongs to, so it is orientation rather
-   than a control: it keeps full contrast even while the pane is dimmed for a
-   group with no members (`.disabled` halves opacity, and a muted token under
-   that lands at ~2:1). */
+/* Inside the open row, so it needs its own edge against the row's fill. */
+.group-row .group-style-panel {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border-soft);
+}
+
 .group-style-heading {
-    margin: 10px 0 6px;
-    padding-top: 8px;
-    border-top: 1px solid var(--border-soft);
+    margin: 0 0 6px;
     font-size: 11px;
     font-weight: 600;
     color: var(--text-strong);

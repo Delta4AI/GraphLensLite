@@ -140,8 +140,10 @@ describe('group chip menu', () => {
     document.querySelector('.rail-menu.open .rail-menu-item').click();
     await Promise.resolve();
 
+    // Named "Topology › degree", not "Node › Topology › degree": the section
+    // is the same on every filter and only eats the row's width.
     expect(cache.bs.createGroup).toHaveBeenCalledWith({
-      name: 'Node › Topology › degree',
+      name: 'Topology › degree',
       fromProp: PROP,
     });
   });
