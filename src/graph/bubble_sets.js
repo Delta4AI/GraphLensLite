@@ -628,8 +628,8 @@ class GraphBubbleSetManager {
 
   /**
    * Remove all filter/property-based assignments for a group from the current
-   * layout, mirroring the change into each prop's per-filter member set so the
-   * filter-panel quadrant buttons render inactive on the next build.
+   * layout. `${group}Props` is the single store, so the filter-panel buttons
+   * read the cleared state on their next build.
    * @param {string} group
    * @returns {boolean} true if any prop assignment was actually cleared
    */
@@ -638,11 +638,6 @@ class GraphBubbleSetManager {
     const propsInGroup = currentLayout[`${group}Props`];
     if (!propsInGroup || propsInGroup.size === 0) return false;
 
-    for (const propID of propsInGroup) {
-      const filter = currentLayout.filters?.get(propID);
-      const groupMembers = filter?.[`${group}Members`];
-      if (groupMembers) groupMembers.delete(propID);
-    }
     propsInGroup.clear();
     return true;
   }

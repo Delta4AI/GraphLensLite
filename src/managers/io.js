@@ -692,21 +692,11 @@ class IOManager {
             if (filterValue.categories && Array.isArray(filterValue.categories)) {
               filterValue.categories = new Set(filterValue.categories);
             }
-            // Restore bubble group member Sets
-            for (const key in filterValue) {
-              if (key.endsWith('Members') && Array.isArray(filterValue[key])) {
-                filterValue[key] = new Set(filterValue[key]);
-              }
-              if (key.endsWith('IDs') && Array.isArray(filterValue[key])) {
-                filterValue[key] = new Set(filterValue[key]);
-              }
-              if (key.endsWith('MembersHidden') && Array.isArray(filterValue[key])) {
-                filterValue[key] = new Set(filterValue[key]);
-              }
-              if (key.endsWith('IDsHidden') && Array.isArray(filterValue[key])) {
-                filterValue[key] = new Set(filterValue[key]);
-              }
-            }
+            // Per-filter `${group}Members/IDs/MembersHidden/IDsHidden` sets used to be
+            // revived here. Group membership lives on the LAYOUT
+            // (`${group}Props` / `${group}ManualMembers`, above); those four were
+            // either never read or mirrored `${group}Props`. Files that still carry
+            // them are simply ignored.
           }
 
           layout.filters = filtersMap;
@@ -1464,12 +1454,6 @@ class IOManager {
       hasFloatValues: false,
       categories: new Set(),
     };
-    for (let group of this.cache.bs.traverseBubbleSets()) {
-      obj[`${group}Members`] = new Set();
-      obj[`${group}MembersHidden`] = new Set();
-      obj[`${group}IDs`] = new Set();
-      obj[`${group}IDsHidden`] = new Set();
-    }
     return obj;
   }
 
@@ -1784,19 +1768,6 @@ class IOManager {
     await new Promise((resolve) => requestAnimationFrame(resolve));
   }
 
-  parseGroups(filterValue) {
-    const groupData = {
-      categories: new Set(filterValue?.categories || []),
-    };
-    for (let group of this.cache.bs.traverseBubbleSets()) {
-      groupData[`${group}Members`] = new Set(filterValue[`${group}Members`] || []);
-      groupData[`${group}IDs`] = new Set(filterValue[`${group}IDs`] || []);
-      groupData[`${group}MembersHidden`] = new Set(filterValue[`${group}MembersHidden`] || []);
-      groupData[`${group}IDsHidden`] = new Set(filterValue[`${group}IDsHidden`] || []);
-    }
-    return groupData;
-  }
-
   parseLayouts(jsonLayouts) {
     const parsedLayouts = {};
     Object.entries(jsonLayouts).forEach(([key, layout]) => {
@@ -1867,7 +1838,7 @@ class IOManager {
     return new Map(
       Object.entries(filtersObj || {}).map(([key, value]) => [
         key,
-        { ...value, ...this.parseGroups(value) },
+        { ...value, categories: new Set(value?.categories || []) },
       ])
     );
   }

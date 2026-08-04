@@ -805,32 +805,26 @@ class UIComponentManager {
       const quadrant = document.createElement('button');
       quadrant.classList.add('quadrant');
       quadrant.classList.add(quadrantPosition);
-      this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID)[`${group}Members`]
-        .size === 0
-        ? quadrant.classList.remove('active')
-        : quadrant.classList.add('active');
+      // `${group}Props` on the layout is the only store: it is what
+      // getEffectiveGroupMembers resolves and what the outline renders.
+      const propsInGroup = () =>
+        this.cache.data.layouts[this.cache.data.selectedLayout][`${group}Props`];
+      propsInGroup().has(propID)
+        ? quadrant.classList.add('active')
+        : quadrant.classList.remove('active');
 
       quadrant.addEventListener('click', async () => {
         try {
-          let shouldShowRemove = quadrant.classList.contains('active');
-          let members =
-            this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID)[
-              `${group}Members`
-            ];
-
-          if (shouldShowRemove) {
-            this.cache.data.layouts[this.cache.data.selectedLayout][`${group}Props`].delete(propID);
-            quadrant.title = `Remove ${propID} from ${group}.`;
-            members.delete(propID);
+          const props = propsInGroup();
+          if (props.has(propID)) {
+            props.delete(propID);
             quadrant.classList.remove('active');
-            await this.cache.gcm.decideToRenderOrDraw();
           } else {
-            this.cache.data.layouts[this.cache.data.selectedLayout][`${group}Props`].add(propID);
-            quadrant.title = `Highlight ${propID} and add to bubble-group (${group})`;
-            members.add(propID);
+            props.add(propID);
             quadrant.classList.add('active');
-            await this.cache.gcm.decideToRenderOrDraw();
           }
+          quadrant.title = `Highlight ${propID} and add to bubble-group (${group})`;
+          await this.cache.gcm.decideToRenderOrDraw();
         } catch (err) {
           this.cache.ui.error(`Failed to update bubble set group: ${err.message}`);
         }

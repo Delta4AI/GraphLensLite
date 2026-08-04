@@ -236,7 +236,6 @@ describe("clear actions span both membership sources", () => {
     const layout = makeLayout();
     layout.groupOneProps = new Set(["propA"]);
     layout.groupOneManualMembers = new Set(["n3"]);
-    layout.filters.set("propA", { groupOneMembers: new Set(["propA"]) });
     const cache = makeCache(layout);
     const bs = wireClear(cache);
 
@@ -244,7 +243,6 @@ describe("clear actions span both membership sources", () => {
 
     expect(layout.groupOneManualMembers.size).toBe(0);
     expect(layout.groupOneProps.size).toBe(0);
-    expect(layout.filters.get("propA").groupOneMembers.size).toBe(0);
     expect(cache.ui.buildFilterUI).toHaveBeenCalledTimes(1);
   });
 
@@ -264,7 +262,6 @@ describe("clear actions span both membership sources", () => {
     const layout = makeLayout();
     layout.groupOneProps = new Set(["propA"]);
     layout.groupTwoManualMembers = new Set(["x"]);
-    layout.filters.set("propA", { groupOneMembers: new Set(["propA"]) });
     const cache = makeCache(layout);
     const bs = wireClear(cache);
 
@@ -272,7 +269,6 @@ describe("clear actions span both membership sources", () => {
 
     expect(layout.groupOneProps.size).toBe(0);
     expect(layout.groupTwoManualMembers.size).toBe(0);
-    expect(layout.filters.get("propA").groupOneMembers.size).toBe(0);
     expect(cache.ui.buildFilterUI).toHaveBeenCalledTimes(1);
   });
 });
