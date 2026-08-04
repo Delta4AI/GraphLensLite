@@ -2349,9 +2349,11 @@ h5 {
 }
 
 /* Boolean filter rows (§6.1): the Any/True/False segment reuses the join
-   toggle's pill styling. */
+   toggle's pill styling. col2 is a flex column whose default cross-axis
+   stretch would pull the pill to full width — align-self, not justify-self,
+   is what opts out of that in flex. */
 .filter-bool-toggle {
-    justify-self: start;
+    align-self: flex-start;
 }
 
 /* Mixed-type rows (§6.2): visible but inert, with the reason inline. */
