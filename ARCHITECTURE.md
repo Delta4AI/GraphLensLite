@@ -39,7 +39,14 @@ The rendering and graph-operation core. Key modules:
 - `filter.js` — range-slider + dropdown filtering
 - `selection.js` — selection state with undo/redo memory
 - `bubble_sets.js` / `bubble_layer.js` / `bubble_geometry.js` — bubble-set grouping
-  drawn on an owned canvas layer beneath the nodes
+  drawn on an owned canvas layer beneath the nodes. A workspace holds ANY number
+  of groups: the list is `Object.keys(layout.bubbleSetStyle)`, not a constant, so
+  every caller reads it through `traverseBubbleSets()` — which describes the
+  SELECTED workspace, and code touching a different layout (`io.parseLayouts`,
+  `layout.createDefaultLayout`) must key off that layout's own map instead.
+  Membership has two sources unioned by `getEffectiveGroupMembers`:
+  `${group}Props` (filters, resolved live) and `${group}ManualMembers` (node IDs,
+  a snapshot)
 - `heatmap_layer.js` / `heatmap_geometry.js` — node-density heatmap overlay (off by
   default; one row of the inspector's Overlays layer stack, which owns both its
   switch and its parameters — see `UIManager.OVERLAYS`)
@@ -78,10 +85,16 @@ Business logic and UI:
   feature that stores something new on the layout is undoable for free
 - `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, IS FOREIGN,
   comparisons)
-- `ui_components.js` — filter UI (dropdown checklists, invertible range sliders), tooltips
+- `ui_components.js` — filter UI (dropdown checklists, invertible range sliders),
+  the per-row group chip, tooltips
+- `group_menu.js` — the one group checklist, opened by both assign sites (a filter
+  row assigns a property, the Selection panel assigns nodes); built on `RailMenu`
 - `ui_style_div.js` — builds every config card (node/edge styles, badges, edge flow,
   bubble sets, density heatmap, select/act/arrange); `ui.js` `CARD_MOUNTS` then
-  re-parents each card to its single home in the rail or the inspector
+  re-parents each card to its single home in the rail or the inspector. The Groups
+  card is a list (painted by `bubble_sets.renderGroupList`) over ONE settings pane
+  rebuilt for the selected row by `buildGroupStylePanel` — a pane per group would
+  be N × ~20 rows of DOM for a surface showing one group at a time
 - `metrics.js` — `NetworkMetrics`: degree/betweenness/closeness/eigenvector centrality, PageRank.
   Computed lazily — only while its workbench tab is visible (`setWorkbenchVisible`)
 - `api_client.js` — client for the standalone ingest service
@@ -125,7 +138,10 @@ mapping bidirectionally between properties and node/edge IDs.
 Maps on `cache` for O(1) lookups.
 
 **Workspaces** — each layout independently stores node positions, styles,
-filters, bubble groups, and queries.
+filters, bubble groups, and queries. A workspace's groups live in three keyed
+places — `bubbleSetStyle[group]`, `${group}Props`, `${group}ManualMembers` — and
+deleting a group must clear all three, or `io.savedLayoutGroupKeys` infers the
+group back from the orphan on the next load.
 
 ## Build & Run
 

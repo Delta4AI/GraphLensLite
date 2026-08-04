@@ -220,8 +220,12 @@ const TOUR_STEPS = [
            <span style="display:inline-flex;align-items:stretch;border:1px solid #dddbe2;border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:#E4E3EA;color:#403C53;">OR</span><span style="padding:2px 9px;background:#C33D35;color:#fff;border-left:1px solid #dddbe2;">AND</span></span>
            toggle at the top of the panel switches to requiring <em>all</em> the filters you've narrowed (AND); its <strong>Complete cases only</strong> option additionally hides elements missing any of those filters.
            <hr style="margin:6px 0;border-color:#dddbe2;">
-           <span style="display:inline-block;width:16px;height:16px;border-radius:50%;overflow:hidden;position:relative;vertical-align:middle;background:#E4E3EA;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
-           <strong>Bubble group button</strong> — click a quadrant to assign that filter's matching nodes to one of four colored <strong>bubble set</strong> groups. These are <em>filter-driven</em> and update automatically as filters change (unlike the <em>manual</em> bubble groups in the selection panel).
+           <span style="display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:middle;background:var(--brand-text);"></span>
+           <strong>Bubble group chip</strong> — click it to put that filter's matching nodes into a
+           <strong>group</strong>, or to make a new group from the filter. The dot is hollow when the
+           property is in no group, filled with the group's colour when it is in one, and ringed when
+           it is in several (hover it to read the names). Groups fed this way are <em>filter-driven</em>:
+           they update as the filter changes. Manage them all under <strong>Overlays › Groups</strong>.
            <br><br>
            <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;vertical-align:middle;background:#E4E3EA;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
            <strong>Selection button</strong> — <strong>+</strong> add or <strong>−</strong> remove all nodes matching that filter property to/from the current selection.
@@ -272,9 +276,9 @@ const TOUR_STEPS = [
            anything brings the Selection context forward automatically.
            <hr style="margin:6px 0;border-color:#dddbe2;">
            <strong>Act on selection</strong>
-           <br>• <strong>Add to group</strong> — the quadrant button
-           <span style="display:inline-block;width:14px;height:14px;border-radius:50%;overflow:hidden;position:relative;vertical-align:middle;background:#E4E3EA;border:1px solid black;box-sizing:border-box;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
-           assigns the selected nodes to one of four colored <strong>bubble set</strong> groups
+           <br>• <strong>＋ Add to group</strong> — opens a list of your bubble groups and drops the
+           selected nodes into one (or takes them out again); the same menu makes a new group from the
+           selection. Groups themselves live under <strong>Overlays › Groups</strong>
            <br>• <strong>⟳ Reset style</strong> — revert the selection's styles to defaults
            <br>• <strong>Expand/Reduce Edges</strong> and <strong>Expand/Reduce Neighbors</strong> — grow or shrink the selection by one hop
            <br>• <strong>Shortest Path</strong> — with exactly two nodes selected, add the path between them
@@ -308,6 +312,12 @@ const TOUR_STEPS = [
            workspace-level, not per-selection, so they live in the <strong>Overlays</strong> tab — a
            stack of everything drawn over the graph, alongside notes and the minimap. Each row
            carries its own switch and opens onto its own settings.
+           <br><br>
+           <strong>Overlays › Groups</strong> is where bubble groups live: one row per group with its
+           colour, its name, how many nodes it holds, and a <strong>＋</strong> button that drops the
+           current selection into it. Make as many as you like — <strong>＋ New group</strong>,
+           <strong>＋ From selection</strong>, or <strong>🧩 Auto-detect</strong> to turn the graph's
+           communities into groups. Open a row for its fill, outline, padding and label settings.
            <hr style="margin:6px 0;border-color:#dddbe2;">
            <strong>Scale tools</strong> — map any data property or computed network metric to a visual property:
            <br>• <span style="display:inline-block;width:20px;height:16px;border:1px solid black;border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> <strong>Numeric scale</strong> — e.g. scale node size by PageRank
