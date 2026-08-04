@@ -11,21 +11,27 @@
  * collapsed at ~33 px, so they never appeared without scrolling past every
  * property. Splitting them out is what makes each pill name exactly one job.
  *
- * Selecting something switches to the Selection context; clearing a selection
- * does NOT switch back, because a panel that yanks itself away on a stray
- * canvas click is the characteristic failure of context-driven inspectors
- * (spec §9). The Selection context shows its own empty state instead.
+ * NOTHING switches context on its own. A panel that swaps itself out from
+ * under the click that caused it costs the user the row they were working in
+ * — the characteristic failure of context-driven inspectors (spec §9), and
+ * just as true entering a context as leaving one. Changes elsewhere announce
+ * themselves by flashing their pill; the move stays the user's.
  */
 
 const CONTEXTS = ['filters', 'overlays', 'selection'];
+
+/** Matches the .insp-pill.flash animation; the class is what drives it. */
+const FLASH_MS = 1200;
 
 /** 'filters' → 'Filters', for the id convention both panels and pills follow. */
 const elementId = (prefix, name) => `${prefix}${name[0].toUpperCase()}${name.slice(1)}`;
 
 class Inspector {
+  #flashTimer = null;
+
   constructor() {
     this.context = 'filters';
-    this.hadSelection = false;
+    this.selectionSize = '0/0';
     this.panels = {};
     this.pills = {};
     for (const name of CONTEXTS) {
@@ -62,28 +68,41 @@ class Inspector {
       this.pills[other]?.classList.toggle('active', active);
       this.pills[other]?.setAttribute('aria-selected', String(active));
       this.pills[other]?.setAttribute('tabindex', active ? '0' : '-1');
+      // Opening a context answers whatever its flash was announcing.
+      if (active) this.pills[other]?.classList.remove('flash');
     }
+  }
+
+  /** "Something landed over here" — without taking the panel the user is in. */
+  flashPill(name) {
+    const pill = this.pills[name];
+    if (!pill || this.context === name) return;
+    clearTimeout(this.#flashTimer);
+    // Restart rather than stack: two changes in quick succession are one
+    // "look here", and a half-finished animation must not swallow the second.
+    for (const other of CONTEXTS) this.pills[other]?.classList.remove('flash');
+    void pill.offsetWidth;
+    pill.classList.add('flash');
+    this.#flashTimer = setTimeout(() => pill.classList.remove('flash'), FLASH_MS);
   }
 
   /**
    * Mirror the live selection: flip the Selection panel between its empty and
-   * active states, and pull the context over on the EDGE into a non-empty
-   * selection. Edge-triggered, not level-triggered — this runs on every
-   * selection recompute (drags, filter changes, style writes), so pulling on
-   * the level would drag a user who deliberately switched back to Filters
-   * out of it again on the next unrelated event.
+   * active states, and flash the Selection pill whenever the selection changes
+   * while the user is looking somewhere else.
    *
-   * Only Filters gets pulled away. Tuning an overlay while picking the nodes
-   * it applies to is a real loop — bubble-set membership and the heatmap fade
-   * are both judged against a selection — so yanking that panel would fight
-   * the user rather than follow them.
+   * On the change, not on the level: this runs on every selection recompute
+   * (drags, filter changes, style writes), and a pill that pulsed on all of
+   * them would be noise. On the change rather than only on the 0 → N edge,
+   * because "Add to selection" fires just as often against a selection that
+   * already exists, and that is the case the hint has to cover.
    */
-  syncToSelection(hasSelection) {
-    this.panels.selection?.classList.toggle('has-selection', hasSelection);
-    if (hasSelection && !this.hadSelection && this.context === 'filters') {
-      this.setContext('selection');
-    }
-    this.hadSelection = hasSelection;
+  syncToSelection(nodeCount, edgeCount) {
+    const size = `${nodeCount}/${edgeCount}`;
+    const changed = size !== this.selectionSize;
+    this.selectionSize = size;
+    this.panels.selection?.classList.toggle('has-selection', nodeCount + edgeCount > 0);
+    if (changed && nodeCount + edgeCount > 0) this.flashPill('selection');
   }
 
   /** "Y": bring the appearance controls into view, whatever context is up. */

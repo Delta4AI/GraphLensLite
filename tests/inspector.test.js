@@ -88,38 +88,65 @@ describe('inspector selection sync', () => {
     inspector = initInspector();
   });
 
-  it('marks the selection panel live and pulls the context over', () => {
-    inspector.syncToSelection(true);
+  const flashing = (name) => pill(name).classList.contains('flash');
+
+  it('marks the selection panel live and flashes the pill instead of switching', () => {
+    // The pull is the bug: "Add to selection" in Filters used to swap the
+    // panel out from under the row the user was still working in.
+    inspector.syncToSelection(3, 0);
     expect(panel('selection').classList.contains('has-selection')).toBe(true);
-    expect(inspector.context).toBe('selection');
+    expect(inspector.context).toBe('filters');
+    expect(flashing('selection')).toBe(true);
   });
 
-  it('does NOT switch back when the selection empties', () => {
-    // A stray canvas click must not yank the panel away mid-task (spec §9).
-    inspector.syncToSelection(true);
-    inspector.syncToSelection(false);
-    expect(inspector.context).toBe('selection');
+  it('flashes again when a selection that already exists grows', () => {
+    inspector.syncToSelection(3, 0);
+    pill('selection').classList.remove('flash');
+    inspector.syncToSelection(5, 0);
+    expect(flashing('selection')).toBe(true);
+  });
+
+  it('stays quiet when a recompute leaves the selection unchanged', () => {
+    // Drags, filter changes and style writes all land here.
+    inspector.syncToSelection(3, 1);
+    pill('selection').classList.remove('flash');
+    inspector.syncToSelection(3, 1);
+    expect(flashing('selection')).toBe(false);
+  });
+
+  it('does not flash for an emptied selection, and drops the live state', () => {
+    inspector.syncToSelection(3, 0);
+    pill('selection').classList.remove('flash');
+    inspector.syncToSelection(0, 0);
+    expect(flashing('selection')).toBe(false);
     expect(panel('selection').classList.contains('has-selection')).toBe(false);
   });
 
-  it('leaves the filters context alone while nothing is selected', () => {
-    inspector.syncToSelection(false);
-    expect(inspector.context).toBe('filters');
+  it('does not flash the context the user is already in', () => {
+    inspector.setContext('selection');
+    inspector.syncToSelection(3, 0);
+    expect(flashing('selection')).toBe(false);
   });
 
-  it('respects a manual switch back to filters until the next new selection', () => {
-    inspector.syncToSelection(true);
-    inspector.setContext('filters');
-    inspector.syncToSelection(true); // still selected — no yank
-    expect(inspector.context).toBe('filters');
+  it('clears the flash once the pill is opened', () => {
+    inspector.syncToSelection(3, 0);
+    pill('selection').click();
+    expect(flashing('selection')).toBe(false);
+  });
+
+  it('drops the flash on its own after the animation', () => {
+    vi.useFakeTimers();
+    inspector.syncToSelection(3, 0);
+    vi.advanceTimersByTime(1200);
+    expect(flashing('selection')).toBe(false);
+    vi.useRealTimers();
   });
 
   it('never yanks the Overlays context away — grouping is a selection-driven loop', () => {
     // Assigning nodes to a bubble set, or judging the heatmap fade against a
-    // selection, means selecting things WHILE this panel is up. Only Filters
-    // gets pulled over.
+    // selection, means selecting things WHILE this panel is up.
     inspector.setContext('overlays');
-    inspector.syncToSelection(true);
+    inspector.syncToSelection(4, 0);
     expect(inspector.context).toBe('overlays');
     expect(panel('selection').classList.contains('has-selection')).toBe(true);
   });

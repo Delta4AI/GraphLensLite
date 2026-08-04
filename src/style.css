@@ -21,6 +21,7 @@
     --brand-text: #403C53;
     --brand-border: #403C53;
     --accent-text: #C33D35;
+    --accent-ring: rgba(195, 61, 53, 0.35);
     --success-text: #015C0C;
     --danger-text: #8a2d2d;
     color-scheme: light;
@@ -44,6 +45,7 @@
     --brand-text: #aaa3c4;
     --brand-border: #6b6486;
     --accent-text: #e0635b;
+    --accent-ring: rgba(224, 99, 91, 0.45);
     --success-text: #58c06a;
     --danger-text: #d98a84;
     color-scheme: dark;
@@ -945,6 +947,16 @@ body {
     transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
+/* The pills are the app's primary navigation, and dark's muted grey on
+   surface-3 is 5:1 next to an active pill near 12:1 — legible on paper,
+   washed out beside its neighbour. Strong text and the full border token take
+   the inactive two to 8.5:1. Deliberately ABOVE :hover and .active, which
+   match at the same specificity and must keep winning. */
+[data-theme="dark"] .insp-pill {
+    color: var(--text-strong);
+    border-color: var(--border);
+}
+
 .insp-pill:hover {
     border-color: var(--accent-text);
     color: var(--accent-text);
@@ -954,6 +966,32 @@ body {
     background: var(--accent-text);
     border-color: var(--accent-text);
     color: #fff;
+}
+
+/* No context ever opens itself, so this is the only word the user gets that
+   something arrived in a panel they are not looking at. Two beats, because one
+   fading ring on a 12px pill has to replace a tab switch that was impossible
+   to miss — but a RING, not the active fill: a second solid pill would read as
+   two selected tabs for as long as it lasts. */
+.insp-pill.flash {
+    animation: insp-pill-flash 0.6s ease-in-out 2;
+}
+
+/* Only the ring and the border move. Leaving `color` out of the frames means
+   the label keeps the theme's resting colour throughout — the dark accent is
+   3.8:1 on the pill, which is fine for a border and not for text. */
+@keyframes insp-pill-flash {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(195, 61, 53, 0); }
+    45% { box-shadow: 0 0 0 4px var(--accent-ring); border-color: var(--accent-text); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* Same class, same 1.2 s, no pulse: hold the ring instead of beating it. */
+    .insp-pill.flash {
+        animation: none;
+        box-shadow: 0 0 0 4px var(--accent-ring);
+        border-color: var(--accent-text);
+    }
 }
 
 #inspectorBody {

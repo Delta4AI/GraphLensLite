@@ -272,8 +272,9 @@ const TOUR_STEPS = [
   {
     title: 'Inspector — Selection',
     text: `The <strong>inspector</strong> on the right is the app's single panel. Its
-           <strong>Workspace</strong> / <strong>Selection</strong> pills switch what it shows; selecting
-           anything brings the Selection context forward automatically.
+           <strong>Filters</strong> / <strong>Overlays</strong> / <strong>Selection</strong> pills switch
+           what it shows. Nothing switches on its own — when a selection changes while you are in
+           another context, the Selection pill flashes and waits for you.
            <hr style="margin:6px 0;border-color:#dddbe2;">
            <strong>Act on selection</strong>
            <br>• <strong>＋ Add to group</strong> — opens a list of your bubble groups and drops the

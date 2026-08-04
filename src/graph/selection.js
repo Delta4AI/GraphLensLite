@@ -415,9 +415,9 @@ class GraphSelectionManager {
     }
 
     // Swap the inspector's Selection context between its empty state
-    // (instructions) and its active state, and pull the panel over to it on
-    // the transition into a non-empty selection.
-    this.cache.inspector?.syncToSelection(atLeastOneNodeOrEdgeSelected);
+    // (instructions) and its active state, and flash its pill when the
+    // selection changed while another context is up.
+    this.cache.inspector?.syncToSelection(selectedNodesCount, selectedEdgesCount);
     if (atLeastOneNodeOrEdgeSelected) {
       // Open the appearance card(s) matching the selection (additive).
       this.cache.ui.syncStylingCardsToSelection(atLeastOneNodeSelected, atLeastOneEdgeSelected);
