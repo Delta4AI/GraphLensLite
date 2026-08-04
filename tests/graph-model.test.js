@@ -1385,6 +1385,20 @@ describe("hover layer (Phase 3) — hoverNeighborhood + reducer composition", ()
     expect(ids.has("d")).toBe(false);
   });
 
+  it("a filtered-out edge is not a path to its neighbor", () => {
+    const { cache } = hoverFixture();
+    cache.graphData.setEdgeAttribute("e2", "hidden", true);
+
+    expect(hoverNeighborhood(cache.graphData, "b", false)).toEqual(new Set(["a", "b", "e1"]));
+  });
+
+  it("a filtered-out neighbor is excluded even when the edge is visible", () => {
+    const { cache } = hoverFixture();
+    cache.graphData.setNodeAttribute("c", "hidden", true);
+
+    expect(hoverNeighborhood(cache.graphData, "b", false)).toEqual(new Set(["a", "b", "e1"]));
+  });
+
   it("edge neighborhood is the edge plus its two endpoints", () => {
     const { cache } = hoverFixture();
 

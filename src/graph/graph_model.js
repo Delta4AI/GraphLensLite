@@ -564,8 +564,12 @@ function applyNodeState(data, state) {
 /**
  * 1-degree hover neighborhood (G6 hover-activate parity): the element itself
  * plus, for a node, its neighbors and incident edges, or, for an edge, its
- * two endpoints. Hidden members are harmless to include — the reducers bail
- * out on hidden elements before consulting hover state.
+ * two endpoints.
+ *
+ * Traversal respects the current filter state: a hidden edge is not a path to
+ * a neighbor, and a hidden neighbor is not a member. Without that, hovering a
+ * node lit up nodes it no longer has a visible edge to — the highlight claimed
+ * a connection the filtered graph does not show.
  *
  * @param {import("../lib/graphology.bundle.mjs").Graph} graph
  * @param {string} id  node or edge key
@@ -581,8 +585,13 @@ function hoverNeighborhood(graph, id, isEdge) {
     return ids;
   }
   if (graph.hasNode(id)) {
-    for (const neighbor of graph.neighbors(id)) ids.add(neighbor);
-    for (const edge of graph.edges(id)) ids.add(edge);
+    for (const edge of graph.edges(id)) {
+      if (graph.getEdgeAttribute(edge, "hidden")) continue;
+      const neighbor = graph.opposite(id, edge);
+      if (graph.getNodeAttribute(neighbor, "hidden")) continue;
+      ids.add(edge);
+      ids.add(neighbor);
+    }
   }
   return ids;
 }
