@@ -210,6 +210,13 @@ body {
     line-height: 1;
 }
 
+/* Optical sizing: ⌕ draws 8.4px wide where the rail's other text glyphs
+   (⊡ ◈ ✎ ⤓) draw 11.7px and the emoji 17.4px at the same font-size, so at 14px
+   it reads as a smaller button. Scaled to match their ink, not their em. */
+#cmdkBtn .rail-vb-g {
+    font-size: 19px;
+}
+
 .rail-vb-t {
     font-size: 9px;
     font-weight: 600;

@@ -503,13 +503,14 @@ describe('the palette dialog', () => {
     expect(palette.countEl.textContent).toBe('60 of 70 — keep typing');
   });
 
-  it('names the accelerator for this platform on the rail pill', () => {
-    document.body.insertAdjacentHTML(
-      'beforeend',
-      '<button id="cmdkBtn" title="x"><kbd>⌘K</kbd></button>'
-    );
+  it('names the accelerator for this platform in the rail button tooltip', () => {
+    // The face stays a plain glyph + label like every other rail button; the
+    // key lives in the title, which is where the rest of the rail puts it.
+    document.body.insertAdjacentHTML('beforeend', '<button id="cmdkBtn" title="x">Search</button>');
     initCommandPalette(cache);
     // jsdom reports a non-Mac platform, so the Ctrl form is the correct one.
-    expect(document.querySelector('#cmdkBtn kbd').textContent).toBe('Ctrl K');
+    const btn = document.getElementById('cmdkBtn');
+    expect(btn.title).toContain('Ctrl K');
+    expect(btn.textContent).not.toContain('Ctrl');
   });
 });

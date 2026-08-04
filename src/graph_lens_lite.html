@@ -103,7 +103,7 @@
   <button class="rail-vb" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">
     <span class="rail-vb-g">⊡</span><span class="rail-vb-t">Fit</span>
   </button>
-  <button id="relayoutBtn" class="rail-vb rail-vb-wide"
+  <button id="relayoutBtn" class="rail-vb"
           title="Layout — re-layout the workspace, remove overlaps, hide disconnected elements">
     <span class="rail-vb-g">↻</span><span class="rail-vb-t"><span id="layoutTypeLabel">Layout</span> ⌄</span>
   </button>
@@ -113,13 +113,20 @@
   <button id="hoverToggleBtn" class="rail-vb green highlight" title="Disable hover highlight effect (H)" onclick="cache.ui.toggleHoverEffect(this)">
     <span class="rail-vb-g">✨</span><span class="rail-vb-t">Hover</span>
   </button>
-  <button id="selectMenuBtn" class="rail-vb rail-vb-wide"
+  <button id="selectMenuBtn" class="rail-vb"
           title="Select — all/no nodes and edges, or select by ID or label">
     <span class="rail-vb-g">◈</span><span class="rail-vb-t">Select ⌄</span>
   </button>
   <button id="noteToggleBtn" class="rail-vb" title="Place a text note: click the canvas to place, drag to move, double-click to edit"
           onclick="cache.ui.startTextAnnotation()">
     <span class="rail-vb-g">✎</span><span class="rail-vb-t">Note</span>
+  </button>
+  <!-- With the verbs, not after the selection chip: search acts on the whole
+       workspace like they do, and the chip's width changes with the selection,
+       which used to slide this button around under the pointer. -->
+  <button id="cmdkBtn" class="rail-vb" title="Search every control, node and property by name (Ctrl+K)"
+          aria-label="Search commands, nodes and properties" onclick="cache.palette.open()">
+    <span class="rail-vb-g">⌕</span><span class="rail-vb-t">Search</span>
   </button>
   <div class="rail-div"></div>
   <div id="selectionChip" class="rail-selchip">
@@ -139,10 +146,6 @@
     <button id="redoSelectionBtn" class="rail-chip-btn disabled" title="Redo selection"
             aria-label="Redo selection" onclick="cache.sm.redoSelection()">↷</button>
   </div>
-  <button id="cmdkBtn" class="rail-vb rail-vb-wide" title="Search every control, node and property by name (Ctrl+K)"
-          aria-label="Search commands, nodes and properties" onclick="cache.palette.open()">
-    <span class="rail-vb-g">⌕</span><span class="rail-vb-t">Search <kbd>⌘K</kbd></span>
-  </button>
   <span class="rail-spacer"></span>
   <div class="rail-tabs">
     <button id="dataToggleBtn" class="rail-tab" title="Toggle data editor (D)" onclick="cache.ui.toggleDataEditor()">

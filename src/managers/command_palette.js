@@ -490,10 +490,9 @@ export function initCommandPalette(cache) {
 
   const accel = paletteAccelerator();
   const btn = document.getElementById('cmdkBtn');
-  if (btn) {
-    btn.querySelector('kbd').textContent = accel;
-    btn.title = `Search every control, node and property by name (${accel})`;
-  }
+  // The tooltip is where every other rail button names its key; printing it on
+  // the face made this the only one advertising a keycap.
+  if (btn) btn.title = `Search every control, node and property by name (${accel})`;
   // Not part of registerHotkeyEvents: that handler deliberately ignores keys
   // typed into inputs, and ⌘K has to work from the query editor too.
   document.addEventListener('keydown', (event) => {
