@@ -3693,13 +3693,28 @@ input:checked + .slider:before {
     display: none;
 }
 
+/* Names which group the pane below belongs to, so it is orientation rather
+   than a control: it keeps full contrast even while the pane is dimmed for a
+   group with no members (`.disabled` halves opacity, and a muted token under
+   that lands at ~2:1). */
 .group-style-heading {
     margin: 10px 0 6px;
     padding-top: 8px;
     border-top: 1px solid var(--border-soft);
     font-size: 11px;
     font-weight: 600;
-    color: var(--text-muted);
+    color: var(--text-strong);
+}
+
+/* A group with no members dims its settings, but the heading has to stay
+   readable — and a child cannot out-opacity its parent, so the dimming moves
+   off the container onto the rows. */
+.group-style-panel.disabled {
+    opacity: 1;
+}
+
+.group-style-panel.disabled > .card-row {
+    opacity: 0.5;
 }
 
 /* --- the shared group menu ---------------------------------------------- */
