@@ -28,6 +28,7 @@ import {generateTourData, GuidedTour} from "./utilities/tour.js";
 import {initApiClient} from "./managers/api_client.js";
 import {initRail} from "./managers/rail.js";
 import {initTheme} from "./utilities/theme.js";
+import {initUiTooltips} from "./utilities/ui_tooltip.js";
 import {initInspector} from "./managers/inspector.js";
 import {initWorkbench} from "./managers/workbench.js";
 import {initFilterSearch} from "./managers/filter_search.js";
@@ -482,6 +483,7 @@ window.addEventListener("DOMContentLoaded", () => {
   cache.workbench = initWorkbench(cache);
   initFilterSearch();
   cache.palette = initCommandPalette(cache);
+  initUiTooltips(document);
   cache.ui.updateDarkModeButton();
   // cache.initialize();
 

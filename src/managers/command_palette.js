@@ -47,7 +47,8 @@ function controlName(el) {
   const inner = el.querySelector?.('.rail-vb-t, .rail-menu-label')?.textContent;
   const label = el.getAttribute?.('aria-label');
   const own = el.textContent;
-  const title = el.getAttribute?.('title')?.split(/[—:(]/)[0];
+  // data-tip fallback: ui_tooltip.js stashes the title there while hovered.
+  const title = (el.getAttribute?.('title') ?? el.dataset?.tip)?.split(/[—:(]/)[0];
   const candidates = el.hasAttribute?.('aria-expanded')
     ? [label, title, inner, own]
     : [inner, label, own, title];
@@ -55,7 +56,7 @@ function controlName(el) {
 }
 
 function accelerator(el) {
-  return el.getAttribute?.('title')?.match(ACCEL_RE)?.[1] ?? '';
+  return (el.getAttribute?.('title') ?? el.dataset?.tip)?.match(ACCEL_RE)?.[1] ?? '';
 }
 
 /** Hidden by an attribute or an inline style anywhere below `root`. */

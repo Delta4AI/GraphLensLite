@@ -512,7 +512,9 @@ class UIManager {
       btn.disabled = !layer || blank;
       // The enabled title is authored once (markup or makeCollapsible); stash it
       // the first time so the hint can be swapped in and back out.
-      btn.dataset.baseTitle ??= btn.title;
+      // ui_tooltip.js stashes the title in data-tip while hovered; without the
+      // fallback a mid-hover sync would freeze baseTitle at "".
+      btn.dataset.baseTitle ??= btn.title || btn.dataset.tip || '';
       btn.title = blank ? emptyHint : btn.dataset.baseTitle;
     }
 
@@ -1018,15 +1020,14 @@ class UIManager {
       onModeChange?.(mode);
     };
 
-    for (const [mode, tip] of [
-      ['OR', 'Match any active filter'],
-      ['AND', 'Match every active filter'],
-    ]) {
+    // The segments carry no own titles: the group tooltip above already
+    // explains both modes, and per-segment titles made the tooltip swap
+    // three times across one small control.
+    for (const mode of ['OR', 'AND']) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'filter-join-segment';
       btn.textContent = mode;
-      btn.title = tip;
       btn.addEventListener('click', async () => {
         if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
         if (layout().filterJoinMode === mode) return;

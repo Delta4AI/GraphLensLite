@@ -7115,3 +7115,61 @@ input:checked + .slider:before {
     align-items: center;
     gap: 6px;
 }
+
+/* ---------- ui-tip: styled replacement for native title tooltips ---------- */
+
+.ui-tip {
+    position: fixed;
+    z-index: 10010;
+    max-width: 280px;
+    padding: 6px 9px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.45;
+    /* Titles are authored with \n line breaks and space-indented └─ trees
+       (formatPropsAsTree) — preserve both, still wrap long lines. */
+    white-space: pre-wrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(3px);
+}
+
+.ui-tip.show {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    /* WCAG 1.4.13: the tip must survive being hovered itself. */
+    pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-tip.show {
+        transition: none;
+    }
+}
+
+.ui-tip-lead {
+    display: block;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.ui-tip kbd {
+    margin-left: 8px;
+    padding: 1px 5px;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-strong);
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    white-space: nowrap;
+}

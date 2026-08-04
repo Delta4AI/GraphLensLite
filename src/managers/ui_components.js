@@ -1106,9 +1106,9 @@ class UIComponentManager {
     const displayField = document.createElement('span');
     displayField.className = 'checkboxLabel';
     displayField.textContent = prop;
-    // The label clamps at two lines with an ellipsis; the tooltip is the only
-    // place the clamped-away tail of a long property name survives.
-    displayField.title = prop;
+    // No own title: the label clamps at two lines, but the wrapper tooltip
+    // (getCheckboxTT) already ends its └─ tree with the full property name —
+    // a second title here would swap tooltips mid-row.
 
     const updateCheckbox = () => {
       customCheckbox.textContent = input.checked ? '✔' : '';
