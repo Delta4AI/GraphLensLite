@@ -1919,6 +1919,22 @@ h5 {
     pointer-events: auto;
 }
 
+/* A card is disabled by putting .disabled either on the card ("Arrange
+   Selection" needs >1 node, so the whole section is off at once) or on its
+   individual buttons ("Act on Selection" mixes a >=1-node threshold with
+   Shortest Path's exactly-2, so it can only speak per button). Both are
+   correct; what must not differ is how they LOOK. Dimming the card dimmed its
+   heading too, so the same state read as two different treatments. Keep the
+   title — pseudo-element or collapse bar — at full strength and dim only what
+   is actually unavailable. */
+.card-labeled.disabled {
+    opacity: 1;
+}
+
+.card-labeled.disabled > :not(.card-collapse-bar) {
+    opacity: 0.5;
+}
+
 .bubble-set-config-card-header::before {
     font-size: 12px;
 }
