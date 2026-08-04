@@ -29,6 +29,29 @@ function writeExportScale(scale) {
 }
 
 /**
+ * Which bubble groups a SAVED layout carries. `bubbleSetStyle` is the authority
+ * whenever the file has one — an empty object means "this workspace has no
+ * groups", which is a real state, not a missing field. Only a file that predates
+ * `bubbleSetStyle` entirely falls back to inferring groups from its
+ * `${group}Props` / `${group}ManualMembers` keys, so a pre-1.17 model does not
+ * lose the groups it stored.
+ * @param {object} layout raw, unparsed layout from the JSON model
+ * @returns {string[]} group keys
+ */
+function savedLayoutGroupKeys(layout) {
+  if (layout?.bubbleSetStyle) return Object.keys(layout.bubbleSetStyle);
+  const derived = new Set();
+  for (const key of Object.keys(layout ?? {})) {
+    for (const suffix of ['ManualMembers', 'Props']) {
+      if (key.length > suffix.length && key.endsWith(suffix)) {
+        derived.add(key.slice(0, -suffix.length));
+      }
+    }
+  }
+  return [...derived];
+}
+
+/**
  * Replace boolean D4Data values with 'true'/'false' strings, in place, on
  * every node and edge. Raw booleans mis-classify as numeric downstream
  * (isNaN(true) === false) and become degenerate [1,1] range sliders whose
@@ -1804,11 +1827,16 @@ class IOManager {
             : new Map(Object.entries(layout.edgeStyles || {})),
         bubbleSetStyle: (() => {
           const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE;
-          const saved = layout.bubbleSetStyle;
-          if (!saved) return structuredClone(defaults);
           const merged = {};
-          for (const group of Object.keys(defaults)) {
-            merged[group] = { ...defaults[group], ...(saved[group] || {}) };
+          // Iterate the SAVED group keys, never the defaults': a model is the
+          // authority on which groups it has, and the defaults are a template
+          // that does not enumerate them. Keying off the defaults would drop
+          // every group a file names that the template does not.
+          for (const group of savedLayoutGroupKeys(layout)) {
+            merged[group] = {
+              ...(defaults[group] ?? {}),
+              ...(layout.bubbleSetStyle?.[group] || {}),
+            };
           }
           return merged;
         })(),
@@ -1818,7 +1846,12 @@ class IOManager {
         annotations: sanitizeAnnotations(layout.annotations),
       };
 
-      for (let group of this.cache.bs.traverseBubbleSets()) {
+      // Keyed off the layout BEING PARSED, not traverseBubbleSets(): that reads
+      // data.layouts[data.selectedLayout], a different and not-yet-installed
+      // workspace. Once the group list is per-layout, a load into a workspace
+      // with a different set of groups would leave these as raw arrays instead
+      // of Sets, and getEffectiveGroupMembers would throw on `.has()`.
+      for (let group of Object.keys(parsedLayouts[key].bubbleSetStyle)) {
         parsedLayouts[key][`${group}Props`] = new Set(layout[`${group}Props`] || []);
         // Also restore ManualMembers if not already restored
         parsedLayouts[key][`${group}ManualMembers`] =

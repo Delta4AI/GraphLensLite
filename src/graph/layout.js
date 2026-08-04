@@ -247,10 +247,14 @@ class GraphLayoutManager {
         this.cache.data.layouts[result.name]['query'] = currentLayout['query'];
       }
 
-      // Copy bubble group props and manual members
-      for (let group of this.cache.bs.traverseBubbleSets()) {
+      // Copy bubble group props and manual members. The group list comes from
+      // the SOURCE layout's own bubbleSetStyle, not from traverseBubbleSets():
+      // that reads the selected layout, which is only the source by accident of
+      // ordering here and would silently copy the wrong set of groups if this
+      // ever moved after the switch.
+      for (let group of Object.keys(currentLayout.bubbleSetStyle ?? {})) {
         this.cache.data.layouts[result.name][`${group}Props`] = structuredClone(
-          currentLayout[`${group}Props`]
+          currentLayout[`${group}Props`] || new Set()
         );
         this.cache.data.layouts[result.name][`${group}ManualMembers`] = structuredClone(
           currentLayout[`${group}ManualMembers`] || new Set()
@@ -304,8 +308,12 @@ class GraphLayoutManager {
         bubbleSetStyle: structuredClone(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE),
       };
 
-      // Initialize empty bubble group props (no groups selected)
-      for (let group of this.cache.bs.traverseBubbleSets()) {
+      // Initialize empty bubble group props (no groups selected). Keyed off the
+      // NEW layout's own bubbleSetStyle — traverseBubbleSets() would describe
+      // the workspace being left behind.
+      for (let group of Object.keys(
+        this.cache.data.layouts[result.name].bubbleSetStyle ?? {}
+      )) {
         this.cache.data.layouts[result.name][`${group}Props`] = new Set();
         this.cache.data.layouts[result.name][`${group}ManualMembers`] = new Set();
       }
@@ -765,7 +773,9 @@ class GraphLayoutManager {
       defLayout.layoutType = this.cache.DEFAULTS.LAYOUT;
     }
 
-    for (let group of this.cache.bs.traverseBubbleSets()) {
+    // Keyed off this layout's own style map: createDefaultLayout can run before
+    // any layout is selected, so traverseBubbleSets() has nothing to describe.
+    for (let group of Object.keys(defLayout.bubbleSetStyle ?? {})) {
       defLayout[`${group}Props`] = new Set();
     }
 
