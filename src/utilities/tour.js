@@ -137,17 +137,17 @@ const TOUR_STEPS = [
     title: 'The Rail',
     text: `Everything session-level lives on the <strong>rail</strong> at the top:
            <br><br>
-           <strong>◆ App menu</strong> — load data (Excel, JSON, or the STRING database), download the
-           Excel template, take this tour, start over, or open the project on GitHub
+           <strong>The logo</strong>, far left — the app menu: load data (Excel, JSON, or the STRING
+           database), download the Excel template, take this tour, start over, or open the project
+           on GitHub
            <br><strong>Workspace chip</strong> — which workspace you're in, plus live shown/total counts
            <br><strong>↶ ↷</strong> — undo / redo the last change to the workspace
            (<strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong>). The selection has its own pair, further along
-           <br><strong>⊡ Fit · ↻ Layout · ➰ Lasso · ✨ Hover · ◈ Select · ✎ Note · ⌕ Search</strong>
+           <br><strong>⊡ Fit · ↻ Layout · ➰ Lasso · ✨ Hover · ◈ Select · ✎ Note</strong>
            — the everyday canvas verbs
+           <br><strong>⌕ Search</strong> (<strong>Ctrl+K</strong>, ⌘K on a Mac) — find any control, node or
+           property by name. Each result tells you where it lives, so you only have to look it up once
            <br><strong>Selection chip</strong> — what's selected, with focus, clear and undo/redo
-           <br><br>
-           <strong>⌕ Search</strong> (<strong>Ctrl+K</strong>, ⌘K on a Mac) finds any control, node or
-           property by name. Each result tells you where it lives, so you only have to look it up once.
            <br><br>
            The <strong>tab strip</strong> opens the main panels:
            <br><br>
