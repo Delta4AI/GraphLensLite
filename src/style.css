@@ -60,6 +60,17 @@ body, html {
     color: var(--text);
 }
 
+/* One focus ring for everything that does not name its own. Without it those
+   controls fell through to Chrome's `outline: auto`, a near-black #101010 ring
+   — most visible after the palette's "show me where", which focuses the
+   control it revealed, so the black ring stayed put long after the flash had
+   faded. Deliberately FIRST: a component that sets its own :focus-visible, or
+   that clears the outline outright, still wins. */
+:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
+}
+
 /* Shell: rail on top, main content flexes, bottom bar rises from below. */
 body {
     display: flex;
@@ -2954,6 +2965,19 @@ hr {
     margin: 0;
     padding: 0;
     pointer-events: none;
+}
+
+/* A 0x0 transparent input cannot show a ring, but the browser drew one anyway:
+   a black speck floating beside the filter row with no control under it. Hand
+   the ring to the box the user can actually see. */
+.hidden-checkbox:focus-visible {
+    outline: none;
+}
+
+.hidden-checkbox:focus-visible + .checkbox,
+.hidden-checkbox:focus-visible + .custom-checkbox {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
 }
 
 .checkboxWrapper {
