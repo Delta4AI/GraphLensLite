@@ -1,3 +1,4 @@
+import {Popup} from '../../utilities/popup.js'
 import {OllamaClient} from './client.js'
 import {SYSTEM_PROMPT} from './system_prompt.js'
 import {buildContextSnapshot, serializeSnapshot} from './context.js'
@@ -715,7 +716,13 @@ class AssistantManager {
     }
   }
 
-  clearHistory() {
+  async clearHistory() {
+    // One click would otherwise drop a whole conversation with no undo. An
+    // empty one has nothing to lose, so it clears without the interruption.
+    if (this._history.length) {
+      const confirmed = await Popup.confirm('Clear the conversation? This cannot be undone.')
+      if (!confirmed) return
+    }
     // Clearing is an explicit "stop and reset" signal — kill any in-flight
     // stream so tokens don't keep landing on a detached bubble. Ollama's
     // /api/chat is stateless (we replay the full history each request), so
