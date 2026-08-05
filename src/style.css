@@ -8,6 +8,7 @@
     --surface: #f4f4f4;
     --surface-2: #f0eff4;
     --surface-3: #e4e3ea;
+    --card-wash: #E4E3EA80;
     --row-hover: #e6f3ff;
     --surface-translucent: rgba(244, 244, 244, 0.85);
     --input-bg: #ffffff;
@@ -32,6 +33,7 @@
     --surface: #211f2b;
     --surface-2: #262433;
     --surface-3: #322f40;
+    --card-wash: #2b2937cc;
     --row-hover: #2c3a4f;
     --surface-translucent: rgba(33, 31, 43, 0.88);
     --input-bg: #2a2837;
@@ -1723,7 +1725,7 @@ h5 {
     border-radius: 5px;
     margin-top: 8px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    background-color: #E4E3EA80;
+    background-color: var(--card-wash);
     transition: opacity 0.1s ease-in-out;
     text-align: center;
 }
@@ -1842,7 +1844,7 @@ h5 {
 
 .card-labeled.layer-card:not(.collapsed) {
     border: 1px solid var(--brand-border);
-    background-color: #E4E3EA80;
+    background-color: var(--card-wash);
     padding-bottom: 6px;
 }
 
