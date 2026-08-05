@@ -22,3 +22,10 @@ export function clampPopoverLeft(anchorLeft, popoverWidth, viewportWidth, margin
   const maxLeft = viewportWidth - popoverWidth - margin;
   return Math.max(margin, Math.min(anchorLeft, maxLeft));
 }
+
+/**
+ * Same clamp on the vertical axis: top offset for a popover that would
+ * otherwise truncate at the bottom edge (anchor near the bottom border).
+ * The maths is axis-agnostic, only the name differs.
+ */
+export const clampPopoverTop = clampPopoverLeft;

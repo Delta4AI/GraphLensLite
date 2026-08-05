@@ -6,7 +6,7 @@
  * rail's plain buttons keep the same inline onclick wiring as the rest of the
  * app.
  */
-import { clampPopoverLeft } from '../utilities/popover_position.js';
+import { clampPopoverLeft, clampPopoverTop } from '../utilities/popover_position.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
 
 const MENU_OFFSET_PX = 6;
@@ -63,7 +63,7 @@ class RailMenu {
     const rect = this.anchor.getBoundingClientRect();
     this.el.classList.add('open');
     this.anchor.setAttribute('aria-expanded', 'true');
-    this.el.style.top = `${rect.bottom + MENU_OFFSET_PX}px`;
+    this.el.style.top = `${clampPopoverTop(rect.bottom + MENU_OFFSET_PX, this.el.offsetHeight, window.innerHeight)}px`;
     this.el.style.left = `${clampPopoverLeft(rect.left, this.el.offsetWidth, window.innerWidth)}px`;
 
     this._outsideHandler = (e) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clampPopoverLeft } from "../src/utilities/popover_position.js";
+import { clampPopoverLeft, clampPopoverTop } from "../src/utilities/popover_position.js";
 
 // ==========================================================================
 // Popover left-edge placement. The bug: when the anchor sits near the right
@@ -39,5 +39,26 @@ describe("clampPopoverLeft", () => {
 
   it("does not pull left when the anchor already sits at the left margin", () => {
     expect(clampPopoverLeft(8, WIDTH, VIEWPORT)).toBe(8);
+  });
+});
+
+// Vertical variant: a rail menu opened from a control near the bottom border
+// (e.g. adding a filter to a bubble group) must slide up instead of truncating.
+describe("clampPopoverTop", () => {
+  const HEIGHT = 300;
+  const VIEWPORT_H = 800;
+
+  it("keeps the below-anchor position when the menu fits", () => {
+    expect(clampPopoverTop(100, HEIGHT, VIEWPORT_H)).toBe(100);
+  });
+
+  it("pulls up so the bottom edge stays inside the viewport margin", () => {
+    const top = clampPopoverTop(700, HEIGHT, VIEWPORT_H);
+    expect(top).toBe(VIEWPORT_H - HEIGHT - 8);
+    expect(top + HEIGHT).toBeLessThanOrEqual(VIEWPORT_H - 8);
+  });
+
+  it("clamps to the top margin when the menu is taller than the viewport", () => {
+    expect(clampPopoverTop(100, HEIGHT, 200)).toBe(8);
   });
 });
