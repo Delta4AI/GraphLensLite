@@ -531,6 +531,55 @@ describe("computeOutlinePoints padding/corridor knobs", () => {
   });
 });
 
+// Refit-time field-ring conditioning: uniform resample + Taubin smoothing.
+// Douglas-Peucker keeps the extreme points of grid-scale field wobble, so
+// unconditioned rings carry sharp turns and wildly uneven spacing that the
+// painter's turn-damped Catmull-Rom renders as kinks and angular chords.
+describe("field-ring conditioning (resample + Taubin)", () => {
+  // Cluster with avoid-node pressure — the negative field makes the traced
+  // contour wobble. Unconditioned, this ring measured 128° max turn and a
+  // 53 px max spacing at a 5.9 px median.
+  const members = [[430, 330], [520, 290], [390, 390], [470, 400], [340, 260]]
+    .map(([x, y]) => rectAt(x, y, 15));
+  const avoid = [[370, 200], [460, 210], [560, 210], [250, 300], [560, 480], [420, 520]]
+    .map(([x, y]) => rectAt(x, y, 15));
+  const ring = computeOutlinePoints(members, avoid, { padding: 1, corridor: 1, avoidance: 1 });
+  const n = ring.length;
+
+  it("keeps vertex spacing near-uniform (no long angular chords)", () => {
+    const spacings = [];
+    for (let i = 0; i < n; i++) {
+      const p = ring[i];
+      const q = ring[(i + 1) % n];
+      spacings.push(Math.hypot(q.x - p.x, q.y - p.y));
+    }
+    spacings.sort((a, b) => a - b);
+    expect(spacings[n - 1]).toBeLessThan(2 * spacings[n >> 1]);
+  });
+
+  it("keeps every turn gentle enough for the painter to round", () => {
+    let maxTurn = 0;
+    for (let i = 0; i < n; i++) {
+      const p0 = ring[(i - 1 + n) % n];
+      const p1 = ring[i];
+      const p2 = ring[(i + 1) % n];
+      const a = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+      const b = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      let turn = Math.abs(b - a);
+      if (turn > Math.PI) turn = 2 * Math.PI - turn;
+      maxTurn = Math.max(maxTurn, turn);
+    }
+    expect(maxTurn).toBeLessThan(Math.PI / 2);
+  });
+
+  it("still encloses every member and stays a simple ring", () => {
+    expect(polygonSelfIntersects(ring)).toBe(false);
+    for (const m of members) {
+      expect(pointInPolygon({ x: m.x + m.width / 2, y: m.y + m.height / 2 }, ring)).toBe(true);
+    }
+  });
+});
+
 // Interior avoid holes: the field can only carve fjords from the boundary,
 // so a non-member fully INSIDE the hull gets a disc hole punched via polygon
 // difference (computeOutlineGeometry.holes; rendered even-odd).

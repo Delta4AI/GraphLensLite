@@ -40,6 +40,24 @@ const OUTLINE_SIMPLIFY_TOLERANCE_RATIO = 1;
 // float-noise duplicate/degenerate vertices that trip its sweep line.
 const CLIP_SNAP = 32;
 
+// Refit-time conditioning of the FIELD ring (marching-squares outline only —
+// geometric reconstructions are exact shapes already). Simplification alone
+// cannot remove field wobble: Douglas-Peucker keeps the EXTREME points of the
+// grid-scale ripple, so the painted curve still weaves through its peaks, and
+// the sharp survivors stay sharp because the painter's turn-falloff damping
+// deliberately refuses to round them (the wedge fix). Averaging is what
+// removes noise — the ring is resampled to uniform spacing and smoothed with
+// Taubin's shrink-compensated λ|μ Laplacian, once per refit, never per frame.
+// A conditioned ring also has evenly spaced, gently turning vertices, which
+// is exactly the input the Catmull-Rom painter renders smoothest. The result
+// is guarded: if smoothing pinches a thin corridor into a self-intersection,
+// the unconditioned ring is kept, and the enclosure guarantee downstream
+// repairs any member the smoothing shaved.
+const RING_RESAMPLE_SPACING_CELLS = 1.5;
+const RING_SMOOTH_PASSES = 8;
+const RING_SMOOTH_LAMBDA = 0.5;
+const RING_SMOOTH_MU = -0.53;
+
 // bubblesets-js' influence-field defaults (nodeR0 15, nodeR1 50, edgeR0 10,
 // edgeR1 20, morphBuffer 10, pixelGroup 4) are ABSOLUTE pixel radii tuned
 // for ~15 px-radius nodes. Used raw they give every group a constant ~15 px
@@ -293,11 +311,92 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
       const repaired = repairSelfIntersections(outline);
       if (repaired.length >= 3) outline = repaired;
     }
+    outline = conditionFieldRing(outline, pixelGroupPx);
   }
   outline = ensureMembersEnclosed(outline, memberRects, nodeR0px, linkRPx);
   // Hole breathing room = the padding radius (per-node proportional floor
   // applied inside): carved non-members get the same visual gap members do.
   return carveAvoidHoles(outline, memberRects, effectiveAvoidRects, nodeR0px, nodeR0px);
+}
+
+/**
+ * Resample a closed ring to (near-)uniform vertex spacing by walking its
+ * perimeter. Spacing grows as needed to respect the point cap.
+ *
+ * @param {Array<{x: number, y: number}>} ring  closed ring, open form
+ * @param {number} spacing  target vertex spacing (px)
+ * @returns {Array<{x: number, y: number}>}
+ */
+function resampleRing(ring, spacing) {
+  const n = ring.length;
+  let perimeter = 0;
+  for (let i = 0; i < n; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % n];
+    perimeter += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  if (perimeter === 0) return ring;
+  const count = Math.max(8, Math.min(OUTLINE_MAX_SAMPLED_POINTS, Math.round(perimeter / spacing)));
+  const step = perimeter / count;
+  const out = [];
+  let next = 0; // arc length of the next emitted point
+  let walked = 0;
+  for (let i = 0; i < n && out.length < count; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % n];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    while (next <= walked + len && out.length < count) {
+      const t = len === 0 ? 0 : (next - walked) / len;
+      out.push({ x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+      next += step;
+    }
+    walked += len;
+  }
+  return out.length >= 3 ? out : ring;
+}
+
+/**
+ * Taubin λ|μ smoothing of a closed ring: alternating Laplacian steps with a
+ * positive (shrink) and slightly larger negative (re-inflate) factor, so
+ * noise damps without the curve-shortening collapse plain Laplacian has.
+ *
+ * @param {Array<{x: number, y: number}>} ring  closed ring, open form
+ * @returns {Array<{x: number, y: number}>}
+ */
+function taubinSmoothRing(ring) {
+  const n = ring.length;
+  let pts = ring;
+  for (let pass = 0; pass < 2 * RING_SMOOTH_PASSES; pass++) {
+    const factor = pass % 2 === 0 ? RING_SMOOTH_LAMBDA : RING_SMOOTH_MU;
+    const out = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const prev = pts[(i - 1 + n) % n];
+      const cur = pts[i];
+      const nxt = pts[(i + 1) % n];
+      out[i] = {
+        x: cur.x + factor * ((prev.x + nxt.x) / 2 - cur.x),
+        y: cur.y + factor * ((prev.y + nxt.y) / 2 - cur.y),
+      };
+    }
+    pts = out;
+  }
+  return pts;
+}
+
+/**
+ * Condition the field ring for painting (see the RING_SMOOTH_* note):
+ * uniform resample + Taubin smoothing, reverted wholesale if the smoothed
+ * ring self-intersects (a pinched-shut thin corridor).
+ *
+ * @param {Array<{x: number, y: number}>} ring
+ * @param {number} pixelGroupPx  marching-grid cell size (px)
+ * @returns {Array<{x: number, y: number}>}
+ */
+function conditionFieldRing(ring, pixelGroupPx) {
+  if (ring.length < 8) return ring;
+  const spacing = RING_RESAMPLE_SPACING_CELLS * pixelGroupPx;
+  const smoothed = taubinSmoothRing(resampleRing(ring, spacing));
+  return polygonSelfIntersects(smoothed) ? ring : smoothed;
 }
 
 /**
