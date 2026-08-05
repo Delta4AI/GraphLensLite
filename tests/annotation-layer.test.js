@@ -35,6 +35,12 @@ function makeCache(annotations = []) {
   return {
     data: { selectedLayout: 'Default', layouts: { Default: { annotations } } },
     ui: { info: () => {}, error: () => {} },
+    history: {
+      commits: [],
+      commit(label) {
+        this.commits.push(label);
+      },
+    },
   };
 }
 
@@ -287,6 +293,128 @@ describe('editing', () => {
 
     expect(ann.text).toBe('new text');
     expect(el.classList.contains('editing')).toBe(false);
+  });
+});
+
+// Notes persist by mutating the layout, so an uncommitted note change is one
+// the next unrelated undo silently reverts. One entry per user gesture — not
+// per mutation, or a colour drag would bury the history.
+describe('undo entries', () => {
+  const baseAnn = () => ({
+    id: 'a',
+    text: 'note',
+    x: 0,
+    y: 0,
+    fontSize: 14,
+    fontColor: '#000000',
+    borderColor: '#000000',
+    borderWidth: 1,
+  });
+
+  const openPopover = (container) => {
+    const el = noteEls(container)[0];
+    el.dispatchEvent(
+      new MouseEvent('pointerdown', { button: 0, clientX: 400, clientY: 300, bubbles: true })
+    );
+    el.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+    return document.querySelector('.annotation-popover');
+  };
+
+  it('records a placed note even when its default text is left untouched', () => {
+    const { layer, cache, container } = makeLayer();
+    layer.armPlacement();
+    layer.placementOverlay.dispatchEvent(
+      new MouseEvent('pointerdown', { button: 0, clientX: 500, clientY: 200, bubbles: true })
+    );
+    const el = noteEls(container)[0];
+    el.dispatchEvent(new Event('blur'));
+
+    expect(cache.data.layouts.Default.annotations).toHaveLength(1);
+    expect(cache.history.commits).toEqual(['Add note']);
+  });
+
+  it('records nothing when a fresh note is abandoned without typing', () => {
+    const { layer, cache, container } = makeLayer();
+    layer.armPlacement();
+    layer.placementOverlay.dispatchEvent(
+      new MouseEvent('pointerdown', { button: 0, clientX: 500, clientY: 200, bubbles: true })
+    );
+    const el = noteEls(container)[0];
+    el.textContent = '';
+    el.dispatchEvent(new Event('blur'));
+
+    // Nothing was added and nothing was lost, so an undo slot here would be a
+    // step that changes nothing.
+    expect(cache.data.layouts.Default.annotations).toHaveLength(0);
+    expect(cache.history.commits).toEqual([]);
+  });
+
+  it('records an edit only when the text actually changed', () => {
+    const { layer, cache, container } = makeLayer({ annotations: [baseAnn()] });
+    layer.sync();
+    const el = noteEls(container)[0];
+
+    el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    el.dispatchEvent(new Event('blur'));
+    expect(cache.history.commits).toEqual([]);
+
+    el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    el.textContent = 'changed';
+    el.dispatchEvent(new Event('blur'));
+    expect(cache.history.commits).toEqual(['Edit note']);
+  });
+
+  it('records a move on drag, but not a click that only opens the popover', () => {
+    const { layer, cache, container } = makeLayer({ annotations: [baseAnn()] });
+    layer.sync();
+    const el = noteEls(container)[0];
+
+    el.dispatchEvent(
+      new MouseEvent('pointerdown', { button: 0, clientX: 400, clientY: 300, bubbles: true })
+    );
+    el.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+    expect(cache.history.commits).toEqual([]);
+
+    el.dispatchEvent(
+      new MouseEvent('pointerdown', { button: 0, clientX: 400, clientY: 300, bubbles: true })
+    );
+    el.dispatchEvent(new MouseEvent('pointermove', { clientX: 500, clientY: 400, bubbles: true }));
+    el.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+    expect(cache.history.commits).toEqual(['Move note']);
+  });
+
+  it('collapses a whole popover styling session into one entry, on close', () => {
+    const { layer, cache, container } = makeLayer({ annotations: [baseAnn()] });
+    layer.sync();
+    const popover = openPopover(container);
+    const [fontSize] = popover.querySelectorAll('input');
+
+    for (const value of ['20', '30', '40']) {
+      fontSize.value = value;
+      fontSize.dispatchEvent(new Event('input'));
+    }
+    expect(cache.history.commits).toEqual([]); // still open — nothing recorded yet
+
+    document.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    expect(cache.history.commits).toEqual(['Style note']);
+  });
+
+  it('records nothing when a popover is opened and closed untouched', () => {
+    const { layer, cache, container } = makeLayer({ annotations: [baseAnn()] });
+    layer.sync();
+    openPopover(container);
+
+    document.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    expect(cache.history.commits).toEqual([]);
+  });
+
+  it('records a delete from the popover', () => {
+    const { layer, cache, container } = makeLayer({ annotations: [baseAnn()] });
+    layer.sync();
+    const popover = openPopover(container);
+
+    popover.querySelector('.annotation-popover-delete').click();
+    expect(cache.history.commits).toEqual(['Delete note']);
   });
 });
 

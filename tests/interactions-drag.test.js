@@ -53,6 +53,7 @@ function makeManager({
     selectedNodes,
     CFG: {},
     lm: { persistNodePositions: vi.fn(async () => {}) },
+    history: { commit: vi.fn() },
   };
   const adapter = { sigma, graph };
   const container = { appendChild: () => {} };
@@ -166,5 +167,39 @@ describe("node drag movement", () => {
 
     expect(graph.getNodeAttributes("a")).toMatchObject({ x: 0, y: 0 });
     expect(cache.lm.persistNodePositions).not.toHaveBeenCalled();
+  });
+});
+
+// A drag that persists without committing is worse than one that does neither:
+// the move survives, but the next unrelated undo takes it back to a baseline
+// captured before the drag happened.
+describe("node drag undo entry", () => {
+  // mouseup is fired through #guard, which keeps the promise to itself — so the
+  // handler's own awaits need a real turn of the loop, not just one microtask.
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("commits after a real drag, and only once the positions are persisted", async () => {
+    const { sigma, cache } = makeManager();
+
+    sigma.handlers.downNode({ node: "a" });
+    sigma.captorHandlers.mousemovebody(moveEvent(5, 7));
+    await sigma.captorHandlers.mouseup();
+    await settle();
+
+    expect(cache.history.commit).toHaveBeenCalledWith("Move nodes");
+    // The snapshot reads the layout, so persisting has to land first.
+    expect(cache.lm.persistNodePositions.mock.invocationCallOrder[0]).toBeLessThan(
+      cache.history.commit.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("does not commit when the node never moved", async () => {
+    const { sigma, cache } = makeManager();
+
+    sigma.handlers.downNode({ node: "a" });
+    await sigma.captorHandlers.mouseup();
+    await settle();
+
+    expect(cache.history.commit).not.toHaveBeenCalled();
   });
 });

@@ -186,6 +186,9 @@ class InteractionManager {
     // persist in order instead of racing.
     this.persistChain = this.persistChain.then(() => this.cache.lm.persistNodePositions());
     await this.persistChain;
+    // Only after the positions are in the layout: the snapshot reads from
+    // there, so committing earlier would record the pre-drag coordinates.
+    this.cache.history?.commit('Move nodes');
   }
 
   // ----------------------------------------------------------------- clicks

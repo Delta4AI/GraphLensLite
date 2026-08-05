@@ -159,14 +159,21 @@ class AnnotationLayer {
     if (el) this.#startEditing(ann, el, { selectAll: true });
   }
 
-  /** Remove a note by id (popover delete). */
-  removeAnnotation(id) {
+  /**
+   * Remove a note by id (popover delete).
+   *
+   * `record: false` is for discarding a note the user never really made — a
+   * fresh placement blurred without typing. Committing there would push an
+   * undo entry whose before and after are the same state.
+   */
+  removeAnnotation(id, { record = true } = {}) {
     const layout = this.cache.data?.layouts?.[this.cache.data.selectedLayout];
     if (!layout?.annotations) return;
     layout.annotations = layout.annotations.filter((a) => a.id !== id);
     this.#closePopover();
     this.sync();
     this.cache.ui?.syncOverlays?.();
+    if (record) this.cache.history?.commit('Delete note');
   }
 
   // ------------------------------------------------------------------- sync
@@ -304,6 +311,7 @@ class AnnotationLayer {
       el.removeEventListener('pointerup', onUp);
       el.removeEventListener('pointercancel', onUp);
       if (!moved) this.#openPopover(ann.id);
+      else this.cache.history?.commit('Move note');
     };
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
@@ -322,6 +330,9 @@ class AnnotationLayer {
   #startEditing(ann, el, { selectAll }) {
     this.#closePopover();
     this.editingId = ann.id;
+    // Only #createAt selects all, so this doubles as "the note was just placed"
+    // — it has to be committed even if the default text is left untouched.
+    this.editingIsNew = selectAll;
     el.classList.add('editing');
     // plaintext-only strips markup from paste natively; engines that reject
     // the keyword fall back to "true", where the explicit paste handler below
@@ -366,6 +377,8 @@ class AnnotationLayer {
 
   #commitEditing(id, el) {
     this.editingId = null;
+    const wasNew = this.editingIsNew === true;
+    this.editingIsNew = false;
     el.contentEditable = 'false';
     el.classList.remove('editing');
     const ann = this.#annotationById(id);
@@ -377,12 +390,17 @@ class AnnotationLayer {
       .replace(/\n+$/, '')
       .slice(0, MAX_TEXT_LENGTH);
     if (text.trim() === '') {
-      this.removeAnnotation(id);
+      this.removeAnnotation(id, { record: false });
       return;
     }
+    const changed = ann.text !== text;
     ann.text = text;
     delete el.dataset.signature; // force a restyle with the committed text
     this.sync();
+    // A note is created and opened for typing in one gesture, so this is where
+    // "add a note" ends as far as undo is concerned.
+    if (wasNew) this.cache.history?.commit('Add note');
+    else if (changed) this.cache.history?.commit('Edit note');
   }
 
   // ----------------------------------------------------------------- popover
@@ -392,6 +410,9 @@ class AnnotationLayer {
     const ann = this.#annotationById(id);
     if (!ann) return;
     this.popoverId = id;
+    // Style inputs mutate the note live and fire per keystroke and per colour
+    // drag, so the undo entry is recorded once when the popover closes.
+    this.popoverDirty = false;
 
     const pop = document.createElement('div');
     pop.className = 'annotation-popover';
@@ -412,7 +433,7 @@ class AnnotationLayer {
       input.addEventListener('input', () => {
         const n = Number(input.value);
         if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
-        this.sync();
+        this.#afterStyleEdit();
       });
       return input;
     };
@@ -422,7 +443,7 @@ class AnnotationLayer {
       input.value = value;
       input.addEventListener('input', () => {
         onChange(input.value);
-        this.sync();
+        this.#afterStyleEdit();
       });
       return input;
     };
@@ -433,7 +454,7 @@ class AnnotationLayer {
       input.checked = checked;
       input.addEventListener('input', () => {
         onChange(input.checked);
-        this.sync();
+        this.#afterStyleEdit();
       });
       return input;
     };
@@ -502,6 +523,12 @@ class AnnotationLayer {
     document.addEventListener('keydown', this.popoverEscape, true);
   }
 
+  /** A style input changed the note: repaint now, record the undo on close. */
+  #afterStyleEdit() {
+    this.popoverDirty = true;
+    this.sync();
+  }
+
   #positionPopover() {
     const el = this.els.get(this.popoverId);
     if (!el || !this.popover) return;
@@ -523,6 +550,10 @@ class AnnotationLayer {
     this.popoverOutside = null;
     document.removeEventListener('keydown', this.popoverEscape, true);
     this.popoverEscape = null;
+    if (this.popoverDirty) {
+      this.popoverDirty = false;
+      this.cache.history?.commit('Style note');
+    }
   }
 
   // ------------------------------------------------------------------ export
