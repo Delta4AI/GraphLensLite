@@ -214,7 +214,7 @@ describe('initRail', () => {
 
   it('layout menu lists the algorithms, marks the current one, and re-layouts on click', () => {
     document.getElementById('relayoutBtn').click();
-    const layoutMenu = document.querySelectorAll('.rail-menu')[2];
+    const layoutMenu = document.querySelector('.rail-menu.open');
     const items = [...layoutMenu.querySelectorAll('.rail-menu-item')];
 
     const force = items.find((i) => i.textContent.includes('force'));
@@ -235,7 +235,7 @@ describe('initRail', () => {
 
   it('export menu offers PNG scales (remembered one checked), SVG, JSON and Excel', () => {
     document.getElementById('exportMenuBtn').click();
-    const exportMenu = document.querySelectorAll('.rail-menu')[3];
+    const exportMenu = document.querySelector('.rail-menu.open');
     const items = [...exportMenu.querySelectorAll('.rail-menu-item')];
     const labels = items.map((i) => i.querySelector('.rail-menu-label').textContent);
 

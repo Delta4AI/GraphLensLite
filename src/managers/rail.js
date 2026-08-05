@@ -22,19 +22,27 @@ class RailMenu {
   constructor(anchor, build, { staticBuild = false } = {}) {
     this.anchor = anchor;
     this.build = build;
+    this.staticBuild = staticBuild;
     this.el = document.createElement('div');
     this.el.className = 'rail-menu';
-    document.body.appendChild(this.el);
+    // A static menu hosts spans other modules find by id (#dataSourceLabel,
+    // #versionInfo), so it has to stay in the document. Every other menu is in
+    // the DOM only while it is open: their anchors are group rows and filter
+    // chips, discarded and rebuilt constantly, and a body-appended div outlives
+    // the anchor it belongs to — one orphan per row per rebuild.
     if (staticBuild) {
+      document.body.appendChild(this.el);
       this.build(this.el);
       this.build = null;
     }
     this._outsideHandler = null;
     this._escapeHandler = null;
+    this._scrollHandler = null;
     // Disclosure pattern: plain buttons in a toggled container, state exposed
     // via aria-expanded (no role=menu, so no arrow-key contract to honor).
+    this._anchorClick = () => this.toggle();
     anchor.setAttribute('aria-expanded', 'false');
-    anchor.addEventListener('click', () => this.toggle());
+    anchor.addEventListener('click', this._anchorClick);
   }
 
   get isOpen() {
@@ -61,11 +69,17 @@ class RailMenu {
       this.el.innerHTML = '';
       this.build(this.el);
     }
+    // Before any measuring: offsetHeight/offsetWidth are 0 while detached.
+    if (!this.el.isConnected) document.body.appendChild(this.el);
     const rect = this.anchor.getBoundingClientRect();
     this.el.classList.add('open');
     this.anchor.setAttribute('aria-expanded', 'true');
     this.el.style.top = `${clampPopoverTop(rect.bottom + MENU_OFFSET_PX, this.el.offsetHeight, window.innerHeight)}px`;
     this.el.style.left = `${clampPopoverLeft(rect.left, this.el.offsetWidth, window.innerWidth)}px`;
+    // The menu is body-appended, so it sits at the end of the tab order rather
+    // than after its anchor. Moving focus in is what makes it reachable at all;
+    // Escape below puts focus back on the anchor.
+    this.el.querySelector('button')?.focus();
 
     this._outsideHandler = (e) => {
       if (!this.el.contains(e.target) && !this.anchor.contains(e.target)) this.close();
@@ -78,6 +92,13 @@ class RailMenu {
       }
     };
     document.addEventListener('keydown', this._escapeHandler, true);
+    // Fixed position is set once from the anchor's rect, so scrolling the panel
+    // under it leaves the menu floating somewhere unrelated. Its own overflow
+    // scrolling is exempt.
+    this._scrollHandler = (e) => {
+      if (!this.el.contains(e.target)) this.close();
+    };
+    document.addEventListener('scroll', this._scrollHandler, { capture: true, passive: true });
   }
 
   close() {
@@ -91,6 +112,23 @@ class RailMenu {
       document.removeEventListener('keydown', this._escapeHandler, true);
       this._escapeHandler = null;
     }
+    if (this._scrollHandler) {
+      document.removeEventListener('scroll', this._scrollHandler, { capture: true });
+      this._scrollHandler = null;
+    }
+    if (!this.staticBuild) this.el.remove();
+  }
+
+  /**
+   * Release everything the constructor attached. Needed when the anchor
+   * OUTLIVES the menu — the static "Add to group" button, re-wired on every
+   * buildUI — since there the stale menu would keep its click listener and open
+   * alongside the new one.
+   */
+  destroy() {
+    this.close();
+    this.anchor.removeEventListener('click', this._anchorClick);
+    this.el.remove();
   }
 }
 

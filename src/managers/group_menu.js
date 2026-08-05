@@ -42,8 +42,16 @@ function groupDot(color) {
  * @param {() => object} getOpts
  * @returns {RailMenu}
  */
+/** One menu per anchor, so re-wiring a surviving button replaces rather than stacks. */
+const attached = new WeakMap();
+
 export function attachGroupMenu(anchor, cache, getOpts) {
+  // buildUI re-wires the static Selection-panel button on every graph load and
+  // data edit. Each attach used to add another click listener to the same
+  // button, so one click opened one menu per load.
+  attached.get(anchor)?.destroy();
   const menu = new RailMenu(anchor, (el) => build(el, menu, cache, getOpts()));
+  attached.set(anchor, menu);
   return menu;
 }
 
