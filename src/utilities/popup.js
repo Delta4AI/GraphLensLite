@@ -1,3 +1,9 @@
+// Popups nest: a flow inside one opens Popup.confirm on top of it. Escape has
+// to dismiss the topmost only, which a per-popup document listener cannot know
+// on its own.
+const openPopups = [];
+let dialogSeq = 0;
+
 class Popup {
   /**
    * // Simple text popup
@@ -315,12 +321,20 @@ static async prompt(message) {
 
 
   init(content) {
+    // Whoever had focus gets it back on close — otherwise focus lands on <body>
+    // and a keyboard user restarts from the top of the document.
+    this._invoker = document.activeElement;
     this.createPopup(content);
     this.setupCloseHandlers();
     if (this.options.showFullscreenButton) {
       this.setupFullscreenButton();
     }
     this.show();
+    openPopups.push(this);
+    // Focus the dialog itself, not a control inside it: the static helpers
+    // (confirm/prompt) focus their own button or input from a timeout, which
+    // runs after this and still wins.
+    this.popup.focus();
     requestAnimationFrame(() => this.updateExpandButtonVisibility());
     this._resizeHandler = () => {
       if (this.isExpanded) {
@@ -342,6 +356,13 @@ static async prompt(message) {
   createPopup(content) {
     this.popup = document.createElement('div');
     this.popup.className = 'p-custom';
+    // A screen reader has to be told this is a modal dialog; without the role
+    // it reads as one more div and the user never learns focus is trapped in it.
+    this.popup.setAttribute('role', 'dialog');
+    this.popup.setAttribute('aria-modal', 'true');
+    // Focusable so the dialog itself can take focus when it has no controls of
+    // its own to hand it to.
+    this.popup.tabIndex = -1;
 
     // Header bar
     const headerDiv = document.createElement('div');
@@ -350,6 +371,8 @@ static async prompt(message) {
     if (this.options.title) {
       const titleEl = document.createElement('span');
       titleEl.className = 'p-title';
+      titleEl.id = `p-title-${++dialogSeq}`;
+      this.popup.setAttribute('aria-labelledby', titleEl.id);
       if (typeof this.options.title === 'string') {
         titleEl.textContent = this.options.title;
       } else {
@@ -530,6 +553,17 @@ static async prompt(message) {
     if (this.options.closeOnClickOutside) {
       this.overlay.addEventListener('click', () => this.close());
     }
+
+    // Escape is the only dismissal a keyboard user can reach without hunting
+    // for the × in the tab order. Topmost popup only, so a nested confirm does
+    // not take its parent down with it.
+    this._escapeHandler = (e) => {
+      if (e.key !== 'Escape') return;
+      if (openPopups[openPopups.length - 1] !== this) return;
+      e.stopPropagation();
+      this.close();
+    };
+    document.addEventListener('keydown', this._escapeHandler, true);
   }
 
   show() {
@@ -540,12 +574,22 @@ static async prompt(message) {
   close() {
     if (this._resizeHandler) {
       window.removeEventListener('resize', this._resizeHandler);
+      this._resizeHandler = null;
     }
+    if (this._escapeHandler) {
+      document.removeEventListener('keydown', this._escapeHandler, true);
+      this._escapeHandler = null;
+    }
+    const at = openPopups.indexOf(this);
+    if (at !== -1) openPopups.splice(at, 1);
     if (this.options.onClose) {
       this.options.onClose();
     }
     this.popup.remove();
     this.overlay.remove();
+    // Only if it is still in the document — the popup may have replaced the very
+    // control that opened it.
+    if (this._invoker?.isConnected) this._invoker.focus?.();
   }
 }
 
