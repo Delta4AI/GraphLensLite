@@ -1176,9 +1176,18 @@ class UIComponentManager {
       e.stopPropagation();
       const slider = this.cache.propIDToInvertibleRangeSliders.get(propID);
       const dropdown = this.cache.propIDToDropdownChecklists.get(propID);
+      const boolToggle = this.cache.propIDToBooleanToggles.get(propID);
 
       let queryFragment;
-      if (slider) {
+      if (boolToggle) {
+        // Same shape the query generator emits for a boolean filter
+        // (query.js): "Any" is both leaves ORed, not a missing condition.
+        const state = boolToggle.state();
+        queryFragment =
+          state === 'any'
+            ? `(${propID} IS TRUE) OR (${propID} IS FALSE)`
+            : `${propID} IS ${state === 'true' ? 'TRUE' : 'FALSE'}`;
+      } else if (slider) {
         if (this.cache.CFG.QUERY_BTN_USE_CURRENT_FILTER) {
           queryFragment = slider.isInverted
             ? `${propID} LOWER THAN ${slider.currentMax} OR GREATER THAN ${slider.currentMin}`

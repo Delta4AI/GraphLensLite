@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { BooleanToggle } from '../src/managers/ui_components.js';
+import { BooleanToggle, UIComponentManager } from '../src/managers/ui_components.js';
 import { QueryManager } from '../src/managers/query.js';
+import { GraphFilterManager } from '../src/graph/filter.js';
 
 // ==========================================================================
 // BooleanToggle (§6.1): three-state Any/True/False segment for boolean-
@@ -84,6 +85,58 @@ describe('BooleanToggle', () => {
     expect(toggle.state()).toBe('false');
     toggle.applyFromQuery('false'); // idempotent
     expect(toggle.state()).toBe('false');
+  });
+});
+
+// A boolean segment narrows the graph exactly like a slider or a checklist, so
+// the two places that walk "every widget for this section" have to include it.
+describe('BooleanToggle in the shared filter surfaces', () => {
+  const boolCache = () => {
+    const cache = makeCache(new Set(['true', 'false']));
+    cache.propIDs = new Set([PROP]);
+    cache.propIDToInvertibleRangeSliders = new Map();
+    cache.propIDToDropdownChecklists = new Map();
+    cache.ui = { checkCheckbox: vi.fn(), showLoading: vi.fn(), hideLoading: vi.fn() };
+    cache.bs = { cleanupManualGroupMembers: vi.fn() };
+    cache.gcm = { decideToRenderOrDraw: vi.fn().mockResolvedValue(undefined) };
+    cache.EVENT_LOCKS.QUERY_UPDATE_EVENT = false;
+    cache.qm = { resetQuery: vi.fn(), updateQueryTextArea: vi.fn(), handleQueryValidationEvent: vi.fn() };
+    cache.CFG = { QUERY_BTN_USE_CURRENT_FILTER: true };
+    cache.query = { text: document.createElement('div') };
+    return cache;
+  };
+
+  it('section reset widens a narrowed segment back to Any', async () => {
+    const cache = boolCache();
+    const toggle = new BooleanToggle(PROP, cache);
+    toggle.appendTo(document.createElement('div'));
+    await toggle.handleSelection('true');
+    expect(toggle.state()).toBe('true');
+
+    await new GraphFilterManager(cache).resetFilters('Node filters', 'group');
+
+    expect(toggle.state()).toBe('any');
+    expect([...cache.data.layouts.L.filters.get(PROP).categories].sort()).toEqual([
+      'false',
+      'true',
+    ]);
+  });
+
+  it('"Add to query" writes an IS TRUE / IS FALSE predicate, never "(undefined)"', async () => {
+    const cache = boolCache();
+    const toggle = new BooleanToggle(PROP, cache);
+    toggle.appendTo(document.createElement('div'));
+    const ui = new UIComponentManager(cache);
+
+    // Any: both leaves, matching what the query generator emits.
+    ui.createAddToQueryButton(PROP).click();
+    expect(cache.data.layouts.L.query).toBe(`((${PROP} IS TRUE) OR (${PROP} IS FALSE))`);
+
+    delete cache.data.layouts.L.query;
+    await toggle.handleSelection('false');
+    ui.createAddToQueryButton(PROP).click();
+    expect(cache.data.layouts.L.query).toBe(`(${PROP} IS FALSE)`);
+    expect(cache.data.layouts.L.query).not.toContain('undefined');
   });
 });
 
