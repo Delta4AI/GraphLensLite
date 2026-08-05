@@ -55,6 +55,17 @@ export function attachGroupMenu(anchor, cache, getOpts) {
   return menu;
 }
 
+/**
+ * The callbacks reach into the model and can reject (a group operation redraws
+ * and persists). Fired bare, a rejection is an unhandled promise the user never
+ * hears about — the quadrant handlers this menu replaced reported it.
+ */
+function run(action, cache) {
+  Promise.resolve(action?.()).catch((err) =>
+    cache.ui?.error?.(`Group action failed: ${err?.message ?? err}`)
+  );
+}
+
 function build(el, menu, cache, opts) {
   const groups = [...(cache.bs?.traverseBubbleSets() ?? [])];
   const styles = cache.data?.layouts?.[cache.data?.selectedLayout]?.bubbleSetStyle ?? {};
@@ -78,7 +89,7 @@ function build(el, menu, cache, opts) {
       title: checked ? `Remove from "${name}"` : `Add to "${name}"`,
       onClick: () => {
         menu.close();
-        opts.onToggle?.(group);
+        run(() => opts.onToggle?.(group), cache);
       },
     });
     // Partial membership is a third state ✓/no-✓ cannot express, and it is the
@@ -103,7 +114,7 @@ function build(el, menu, cache, opts) {
       label: opts.newLabel,
       onClick: () => {
         menu.close();
-        opts.onNew?.();
+        run(() => opts.onNew?.(), cache);
       },
     })
   );

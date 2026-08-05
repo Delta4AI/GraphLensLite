@@ -156,4 +156,78 @@ describe('group menu', () => {
     expect(dots).toHaveLength(2);
     expect(dots[0].style.background).toBe('rgb(17, 17, 17)');
   });
+
+  // buildUI re-wires the static Selection-panel button on every graph load and
+  // data edit, and the button outlives all of them.
+  it('replaces its menu when an anchor is wired more than once', () => {
+    const anchor = mount();
+    const opts = () => ({
+      isChecked: () => false, onToggle: vi.fn(), onNew: vi.fn(), newLabel: 'New',
+    });
+    for (let i = 0; i < 4; i++) attachGroupMenu(anchor, makeCache(), opts);
+
+    anchor.click();
+    expect(document.querySelectorAll('.rail-menu.open')).toHaveLength(1);
+    expect(document.querySelectorAll('body > .rail-menu')).toHaveLength(1);
+  });
+
+  it('leaves nothing in the body once closed', () => {
+    const anchor = mount();
+    attachGroupMenu(anchor, makeCache(), () => ({
+      isChecked: () => false, onToggle: vi.fn(), onNew: vi.fn(), newLabel: 'New',
+    }));
+    anchor.click();
+    expect(document.querySelectorAll('body > .rail-menu')).toHaveLength(1);
+
+    // Anchors here are filter chips and group rows, discarded on every rebuild.
+    // A menu that outlives its anchor is an orphan nothing can reach or remove.
+    document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.querySelectorAll('body > .rail-menu')).toHaveLength(0);
+  });
+
+  it('reports a failing group action instead of dropping the rejection', async () => {
+    const anchor = mount();
+    const cache = makeCache();
+    cache.ui = { error: vi.fn() };
+    attachGroupMenu(anchor, cache, () => ({
+      isChecked: () => false,
+      onToggle: async () => {
+        throw new Error('draw failed');
+      },
+      onNew: vi.fn(),
+      newLabel: 'New',
+    }));
+    anchor.click();
+    rows()[0].click();
+
+    await vi.waitFor(() => expect(cache.ui.error).toHaveBeenCalledOnce());
+    expect(cache.ui.error.mock.calls[0][0]).toContain('draw failed');
+  });
+
+  it('moves focus into the menu so it is reachable by keyboard', () => {
+    const anchor = mount();
+    attachGroupMenu(anchor, makeCache(), () => ({
+      isChecked: () => false, onToggle: vi.fn(), onNew: vi.fn(), newLabel: 'New',
+    }));
+    anchor.click();
+
+    // Body-appended, so the rows sit at the end of the tab order rather than
+    // after the anchor — without a focus move there is no way in.
+    expect(openMenu().contains(document.activeElement)).toBe(true);
+  });
+
+  it('closes when the panel under it scrolls, but not on its own overflow', () => {
+    const anchor = mount();
+    attachGroupMenu(anchor, makeCache(), () => ({
+      isChecked: () => false, onToggle: vi.fn(), onNew: vi.fn(), newLabel: 'New',
+    }));
+    anchor.click();
+
+    // Its own list scrolls (max-height + overflow-y) and must survive that.
+    openMenu().dispatchEvent(new Event('scroll', { bubbles: true }));
+    expect(openMenu()).not.toBeNull();
+
+    document.body.dispatchEvent(new Event('scroll', { bubbles: true }));
+    expect(openMenu()).toBeNull();
+  });
 });
