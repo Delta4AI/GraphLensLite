@@ -268,7 +268,10 @@ describe('collectPropertyKeys', () => {
 describe('category colors', () => {
   it('uses the brand palette first, then generated hues, deterministically', () => {
     expect(categoryColor(0)).toBe('#C33D35'); // SLICE_PALETTE[0]
-    expect(categoryColor(7)).toMatch(/^#[0-9A-F]{6}$/);
+    // Generated hues come from config's shared hslToHex, which writes lowercase
+    // — the palette entries stay as authored. Case is meaningless to every
+    // consumer (CSS, canvas, and <input type=color> lowercases anyway).
+    expect(categoryColor(7)).toMatch(/^#[0-9a-f]{6}$/);
     expect(categoryColor(7)).toBe(categoryColor(7));
     expect(categoryColor(7)).not.toBe(categoryColor(8));
   });

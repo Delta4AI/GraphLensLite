@@ -18,7 +18,7 @@
 import { Popup } from './popup.js';
 import { StaticUtilities } from './static.js';
 import { applyGraph } from '../managers/api_client.js';
-import { DEFAULTS } from '../config.js';
+import { DEFAULTS, hslToHex, GOLDEN_ANGLE_DEG } from '../config.js';
 
 const sanitizeForAST = StaticUtilities.sanitizeForAST;
 // Edge strokes get this alpha suffix so auto-colored edges stay subordinate
@@ -163,6 +163,57 @@ async function countQueryRows(config, query, opts = {}) {
 }
 
 /**
+ * Count → warn if huge → fetch → reject an empty result. Shared by the import
+ * flow and the join popup, which had it (and its two user-facing strings)
+ * written out twice.
+ *
+ * Returns null when the user declined the size warning, abandoned the flow, or
+ * the query returned nothing graph-shaped — the caller has already been told
+ * which. `busy` is the caller's own progress surface (full-screen overlay vs
+ * in-button spinner), so its wording stays with the caller.
+ *
+ * @returns {Promise<{nodes: object[], relationships: object[]}|null>}
+ */
+async function fetchGraphWithPreflight({
+  config,
+  query,
+  opts = {},
+  confirm,
+  busy,
+  onError,
+  shouldContinue,
+  countingLabel = 'Counting matching rows …',
+  fetchingLabel = 'Fetching graph data …',
+}) {
+  await busy(countingLabel);
+  const rowCount = await countQueryRows(config, query, opts);
+  await busy(null);
+
+  if (rowCount !== null && rowCount > LARGE_RESULT_ROW_THRESHOLD) {
+    const proceed = await confirm(
+      `The query matches ${rowCount.toLocaleString()} rows, which may be slow to fetch and render. Continue anyway? (Tip: add a LIMIT clause.)`,
+    );
+    if (proceed !== true) return null;
+  }
+  // The confirm is a await point long enough for the user to close the dialog
+  // that started this.
+  if (shouldContinue && !shouldContinue()) return null;
+
+  await busy(fetchingLabel);
+  const results = await runCypher(config, [{ statement: query, resultDataContents: ['graph'] }], opts);
+  const graph = collectGraph(results);
+  await busy(null);
+
+  if (graph.nodes.length === 0) {
+    onError(
+      'The query returned no graph elements. Return nodes, relationships, or paths (e.g. MATCH (n)-[r]->(m) RETURN n, r, m).',
+    );
+    return null;
+  }
+  return graph;
+}
+
+/**
  * Collect unique nodes and relationships from a tx/commit `graph`-format
  * result (the same entity appears once per row it occurs in).
  *
@@ -273,20 +324,6 @@ function nodeDisplayLabel(node) {
   return `${primaryLabel(node)} ${node.id}`;
 }
 
-/** hsl(h°, s%, l%) → #RRGGBB */
-function hslToHex(h, s, l) {
-  s /= 100;
-  l /= 100;
-  const k = (n) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
-  const toHex = (x) =>
-    Math.round(255 * x)
-      .toString(16)
-      .padStart(2, '0');
-  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`.toUpperCase();
-}
-
 /**
  * Deterministic categorical color: the app's brand palette first, then a
  * golden-angle hue walk so any number of categories stays distinguishable.
@@ -294,7 +331,7 @@ function hslToHex(h, s, l) {
 function categoryColor(index) {
   const palette = DEFAULTS.NODE.PIE.SLICE_PALETTE;
   if (index < palette.length) return palette[index];
-  return hslToHex((index * 137.508) % 360, 55, 55);
+  return hslToHex((index * GOLDEN_ANGLE_DEG) % 360, 0.55, 0.55);
 }
 
 /**
@@ -305,7 +342,7 @@ function categoryColor(index) {
  * to a theme switch). Offset from blue so index 0 differs from the node red.
  */
 function edgeCategoryColor(index) {
-  return hslToHex((210 + index * 137.508) % 360, 55, 45);
+  return hslToHex((210 + index * GOLDEN_ANGLE_DEG) % 360, 0.55, 0.45);
 }
 
 /**
@@ -705,32 +742,16 @@ async function executeNeo4jImport(cache, config, deps = {}) {
   const opts = deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {};
 
   try {
-    await progress('Counting matching rows …');
-    const rowCount = await countQueryRows(config, config.query, opts);
-    await progress(null);
-
-    if (rowCount !== null && rowCount > LARGE_RESULT_ROW_THRESHOLD) {
-      const proceed = await confirm(
-        `The query matches ${rowCount.toLocaleString()} rows, which may be slow to fetch and render. Continue anyway? (Tip: add a LIMIT clause.)`,
-      );
-      if (proceed !== true) return false;
-    }
-
-    await progress('Fetching graph data …');
-    const results = await runCypher(
+    const graph = await fetchGraphWithPreflight({
       config,
-      [{ statement: config.query, resultDataContents: ['graph'] }],
+      query: config.query,
       opts,
-    );
-    const { nodes, relationships } = collectGraph(results);
-    await progress(null);
-
-    if (nodes.length === 0) {
-      onError(
-        'The query returned no graph elements. Return nodes, relationships, or paths (e.g. MATCH (n)-[r]->(m) RETURN n, r, m).',
-      );
-      return false;
-    }
+      confirm,
+      busy: progress,
+      onError,
+    });
+    if (!graph) return false;
+    const { nodes, relationships } = graph;
 
     deps.onFetched?.();
     const exclusions = await checklist(collectPropertyKeys(nodes, relationships));
@@ -875,6 +896,7 @@ export {
   runCypher,
   connectionHint,
   countQueryRows,
+  fetchGraphWithPreflight,
   collectGraph,
   collectPropertyKeys,
   toAppFormat,
@@ -887,7 +909,6 @@ export {
   categoryColor,
   edgeCategoryColor,
   buildCategoryColors,
-  hslToHex,
   readSavedSettings,
   saveSettings,
   showPropertyChecklist,

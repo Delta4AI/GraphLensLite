@@ -361,6 +361,10 @@ const CFG = {
   // setup/settings modal — nothing to keep in sync here.
 }
 
+// Successive multiples of the golden angle land far apart on the hue circle,
+// which is what keeps an unbounded number of generated colours separable.
+const GOLDEN_ANGLE_DEG = 137.508;
+
 /** HSL (h 0-360, s/l 0-1) to `#rrggbb`. */
 function hslToHex(h, s, l) {
   const a = s * Math.min(l, 1 - l);
@@ -387,7 +391,7 @@ function hslToHex(h, s, l) {
 function bubbleGroupColor(index) {
   const palette = DEFAULTS.BUBBLE_GROUP_PALETTE;
   if (index < palette.length) return palette[index];
-  return hslToHex((index * 137.508) % 360, 0.55, 0.55);
+  return hslToHex((index * GOLDEN_ANGLE_DEG) % 360, 0.55, 0.55);
 }
 
 /**
@@ -409,4 +413,4 @@ function bubbleGroupStyle(index, name) {
   };
 }
 
-export {VERSION, DEFAULTS, CFG, bubbleGroupColor, bubbleGroupStyle}
+export {VERSION, DEFAULTS, CFG, bubbleGroupColor, bubbleGroupStyle, hslToHex, GOLDEN_ANGLE_DEG}

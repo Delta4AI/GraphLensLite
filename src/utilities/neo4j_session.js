@@ -27,7 +27,7 @@ import { settlePinnedForce } from '../graph/layout_algorithms.js';
 import {
   runCypher,
   connectionHint,
-  countQueryRows,
+  fetchGraphWithPreflight,
   collectGraph,
   toAppFormat,
   getNeo4jSession,
@@ -635,36 +635,24 @@ function openNeo4jJoinPopup(cache, deps = {}) {
       const opts = deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {};
 
       try {
-        setBusy('Counting …');
-        const rowCount = await countQueryRows(session.config, query, opts);
-        if (rowCount !== null && rowCount > LARGE_RESULT_ROW_THRESHOLD) {
-          setBusy(null);
-          const proceed = await confirm(
-            `The query matches ${rowCount.toLocaleString()} rows, which may be slow to fetch and render. Continue anyway? (Tip: add a LIMIT clause.)`,
-          );
-          if (proceed !== true) return;
-        }
-
-        // The × stays live while the fetch runs, and onClose settles the
-        // promise — so a dismissal mid-flight means the user is done. Merging
-        // anyway would replace their graph (and reset filters and undo) after
-        // the popup they cancelled had already gone.
-        if (settled) return;
-
-        setBusy('Fetching …');
-        const results = await runCypher(
-          session.config,
-          [{ statement: query, resultDataContents: ['graph'] }],
+        const graph = await fetchGraphWithPreflight({
+          config: session.config,
+          query,
           opts,
-        );
-        const { nodes, relationships } = collectGraph(results);
-        if (nodes.length === 0) {
-          setBusy(null);
-          showError(
-            'The query returned no graph elements. Return nodes, relationships, or paths (e.g. MATCH (n)-[r]->(m) RETURN n, r, m).',
-          );
-          return;
-        }
+          confirm,
+          // The labels go inside the Fetch button, so they stay short.
+          countingLabel: 'Counting …',
+          fetchingLabel: 'Fetching …',
+          busy: (message) => setBusy(message),
+          onError: showError,
+          // The × stays live while the query runs, and onClose settles the
+          // promise — so a dismissal mid-flight means the user is done. Merging
+          // anyway would replace their graph (and reset filters and undo) after
+          // the popup they cancelled had already gone.
+          shouldContinue: () => !settled,
+        });
+        if (!graph) return;
+        const { nodes, relationships } = graph;
 
         if (stitchBox.checked) {
           setBusy('Stitching …');
