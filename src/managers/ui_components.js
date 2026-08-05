@@ -826,6 +826,7 @@ class UIComponentManager {
         const label = this.#groupNameForProp(propID);
         const group = this.cache.bs.createGroup({ name: label, fromProp: propID });
         if (!group) return;
+        this.cache.bs.tuneGroupGeometry?.(group);
         this.refreshGroupChips();
         await this.cache.gcm.decideToRenderOrDraw();
         this.cache.bs.afterMembershipChange(`New bubble group (${label})`);

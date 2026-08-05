@@ -507,30 +507,9 @@ class BubbleSetLayer {
    *   holes: Array<Array<{x: number, y: number}>>}} graph-space rings
    */
   #fitGraphOutline(state, visibleMembers) {
-    const graph = this.adapter.graph;
-    const sigma = this.adapter.sigma;
-    const { width, height } = sigma.getDimensions();
-    const camera = sigma.getCamera().getState();
-    const cx = width / 2;
-    const cy = height / 2;
-    const r = camera.ratio;
-    // graphToViewport divides the offset-from-centre by the ratio; multiply it
-    // back to land at the ratio-1 viewport (ratio cancels, so this is the same
-    // at any zoom). Node radius is taken at ratio 1 too.
-    const toRefRect = (attrs) => {
-      const v = sigma.graphToViewport({ x: attrs.x, y: attrs.y });
-      const rx = cx + (v.x - cx) * r;
-      const ry = cy + (v.y - cy) * r;
-      return nodeViewportRect(rx, ry, sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1));
-    };
+    const { toRefRect, toGraph } = this.#refSpace();
     const memberRects = visibleMembers.map(({ attrs }) => toRefRect(attrs));
-    const avoidRects = [];
-    for (const id of state.avoidMembers) {
-      if (!graph.hasNode(id)) continue;
-      const attrs = graph.getNodeAttributes(id);
-      if (attrs.hidden) continue;
-      avoidRects.push(toRefRect(attrs));
-    }
+    const avoidRects = this.referenceRects(state.avoidMembers);
 
     const outlineOpts = {
       virtualEdges: state.opts.virtualEdges,
@@ -546,12 +525,57 @@ class BubbleSetLayer {
     }
     // Reference-viewport → graph space (undo the ratio-1 mapping, then the
     // camera): the cache holds zoom-independent graph coords.
-    const toGraph = (p) =>
-      sigma.viewportToGraph({ x: cx + (p.x - cx) / r, y: cy + (p.y - cy) / r });
     return {
       outer: geometry.outer.map(toGraph),
       holes: geometry.holes.map((h) => h.map(toGraph)),
     };
+  }
+
+  /**
+   * The ratio-1 reference space the fit runs in: graph coords → the viewport
+   * the camera would show at ratio 1 (graphToViewport divides the
+   * offset-from-centre by the ratio; multiplying it back cancels the zoom, so
+   * the mapping is the same at any camera). Node radius is taken at ratio 1
+   * too. `toGraph` is the inverse, for caching fitted rings zoom-free.
+   */
+  #refSpace() {
+    const sigma = this.adapter.sigma;
+    const { width, height } = sigma.getDimensions();
+    const { ratio } = sigma.getCamera().getState();
+    const cx = width / 2;
+    const cy = height / 2;
+    return {
+      toRefRect: (attrs) => {
+        const v = sigma.graphToViewport({ x: attrs.x, y: attrs.y });
+        const rx = cx + (v.x - cx) * ratio;
+        const ry = cy + (v.y - cy) * ratio;
+        return nodeViewportRect(rx, ry, sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1));
+      },
+      toGraph: (p) =>
+        sigma.viewportToGraph({ x: cx + (p.x - cx) / ratio, y: cy + (p.y - cy) / ratio }),
+    };
+  }
+
+  /**
+   * Reference-space rects for a set of node ids (hidden or missing nodes
+   * skipped) — exactly the rects a fit would consume, exposed so the
+   * bubble-set manager can measure a group's surroundings for layout-aware
+   * initial settings (bubble_tuning.js).
+   *
+   * @param {Iterable<string>} ids
+   * @returns {Array<{x: number, y: number, width: number, height: number}>}
+   */
+  referenceRects(ids) {
+    const graph = this.adapter.graph;
+    const { toRefRect } = this.#refSpace();
+    const rects = [];
+    for (const id of ids) {
+      if (!graph.hasNode(id)) continue;
+      const attrs = graph.getNodeAttributes(id);
+      if (attrs.hidden) continue;
+      rects.push(toRefRect(attrs));
+    }
+    return rects;
   }
 
   /**

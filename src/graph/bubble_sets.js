@@ -1,4 +1,5 @@
 import {bubbleGroupStyle} from "../config.js";
+import {suggestGroupGeometry} from "./bubble_tuning.js";
 import {StaticUtilities} from "../utilities/static.js";
 import {detectCommunities as computeCommunityAssignments} from "./communities.js";
 import {clampPopoverLeft} from "../utilities/popover_position.js";
@@ -131,12 +132,62 @@ class GraphBubbleSetManager {
     const group = this.createGroup({ name });
     if (!group) return null;
     this.#layout()[`${group}ManualMembers`] = new Set(selected);
+    this.tuneGroupGeometry(group);
     this.selectedGroup = group;
     await this.afterMembershipChange(`New bubble group (${this.groupName(group)})`);
     this.cache.ui.info(
       `Created "${this.groupName(group)}" with ${selected.length} node${selected.length === 1 ? '' : 's'}`
     );
     return group;
+  }
+
+  /**
+   * Layout-aware initial settings: measure the group's surroundings in the
+   * same reference space the outline fit uses and write the suggested
+   * padding / corridor / avoidance into its style (bubble_tuning.js). Runs
+   * once per creation path and from the row menu's ✨ Re-tune — NEVER
+   * automatically on membership or layout changes, so values the user set
+   * stay theirs. The sliders show whatever was picked.
+   *
+   * @param {string} group
+   * @returns {{padding, corridor, avoidance}|null} null when there is nothing
+   *   to measure (fewer than 2 visible members, or no rendered layer yet)
+   */
+  tuneGroupGeometry(group) {
+    const style = this.#layout()?.bubbleSetStyle?.[group];
+    const layer = this.cache.graph?.bubbleLayer;
+    if (!style || !layer?.referenceRects) return null;
+    const members = this.getEffectiveGroupMembers(group);
+    if (members.size < 2) return null;
+    const suggestion = suggestGroupGeometry(
+      layer.referenceRects(members),
+      layer.referenceRects(this.getAvoidMembers(members))
+    );
+    if (suggestion) Object.assign(style, suggestion);
+    return suggestion;
+  }
+
+  /**
+   * The ⋯ menu's ✨ Re-tune: re-run the creation-time suggestion against the
+   * CURRENT layout, on demand. This is the one sanctioned way settings get
+   * recomputed after creation.
+   * @param {string} group
+   */
+  async retuneGroup(group) {
+    const name = this.groupName(group);
+    const suggestion = this.tuneGroupGeometry(group);
+    if (!suggestion) {
+      this.cache.ui.warning(`"${name}" needs at least two visible nodes to re-tune`);
+      return;
+    }
+    await this.#groupInstance(group).update({ ...this.#layout().bubbleSetStyle[group] });
+    await this.cache.gcm.decideToRenderOrDraw(true);
+    this.refreshBubbleStyleElements();
+    this.cache.history?.commit(`Re-tune group shape (${name})`);
+    this.cache.ui.info(
+      `Re-tuned "${name}": padding ${suggestion.padding}, corridor ${suggestion.corridor}, ` +
+        `avoidance ${suggestion.avoidance ? 'on' : 'off'}`
+    );
   }
 
   /**
@@ -538,6 +589,9 @@ class GraphBubbleSetManager {
     // an empty group is clutter, not a result.
     for (const group of created) {
       if ((currentLayout[`${group}ManualMembers`]?.size ?? 0) === 0) this.#dropGroupState(group);
+    }
+    for (const group of created) {
+      if (currentLayout.bubbleSetStyle[group]) this.tuneGroupGeometry(group);
     }
 
     await this.afterMembershipChange('Auto-group');

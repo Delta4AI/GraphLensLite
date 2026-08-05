@@ -272,6 +272,20 @@ function attachRowMenu(bs, anchor, group) {
         },
       })
     );
+    el.appendChild(
+      menuItem({
+        icon: '✨',
+        label: 'Re-tune shape',
+        disabled: bs.getEffectiveGroupMembers(group).size < 2,
+        title:
+          `Pick padding, corridor width and avoidance to suit how "${name}" ` +
+          'sits in the current layout. Your sliders update to the picked values.',
+        onClick: async () => {
+          menu.close();
+          await bs.retuneGroup(group);
+        },
+      })
+    );
     el.appendChild(menuSeparator());
     // The two source-specific clears only exist when that source does — a group
     // fed only by a filter has no "manual nodes" to drop.

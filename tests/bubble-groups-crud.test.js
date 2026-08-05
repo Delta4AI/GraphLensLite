@@ -174,6 +174,105 @@ describe('createGroupFromSelection', () => {
   });
 });
 
+// Layout-aware initial settings (bubble_tuning.js): the manager measures the
+// group's surroundings through the layer's reference rects and writes the
+// suggestion into the style — once, at creation or on an explicit Re-tune.
+describe('tuneGroupGeometry', () => {
+  // 4 clustered members with bystanders threaded between them at ~1-radius
+  // gaps: crowded enough that the suggestion must differ from the template
+  // defaults (padding tightens, avoidance stays on).
+  const nodes = {
+    n1: [100, 100], n2: [160, 110], n3: [120, 170], n4: [180, 170],
+    a1: [130, 130], a2: [150, 150], a3: [95, 140], a4: [175, 140],
+  };
+  const rectFor = (id) => {
+    const [x, y] = nodes[id];
+    return { x: x - 10, y: y - 10, width: 20, height: 20 };
+  };
+
+  function wire(cache) {
+    cache.CFG.AVOID_MEMBERS_IN_BUBBLE_GROUPS = false; // avoid rects flow again
+    cache.nodeRef = new Map(Object.keys(nodes).map((id) => [id, {}]));
+    cache.graph.bubbleLayer.referenceRects = (ids) => [...ids].map(rectFor);
+    const bs = bsFor(cache);
+    bs.renderGroupList = vi.fn();
+    bs.syncGroupRows = vi.fn();
+    bs.refreshBubbleStyleElements = vi.fn();
+    bs.updateBubbleSetIfChanged = vi.fn(async () => {});
+    bs.redrawBubbleSets = vi.fn(async () => {});
+    return bs;
+  }
+
+  it('createGroupFromSelection applies a layout-aware suggestion', async () => {
+    const cache = makeCache();
+    cache.selectedNodes = ['n1', 'n2', 'n3', 'n4'];
+    const bs = wire(cache);
+
+    const key = await bs.createGroupFromSelection('Crowded');
+    const style = cache.data.layouts.Default.bubbleSetStyle[key];
+
+    expect(style.padding).toBeGreaterThan(0);
+    expect(style.padding).toBeLessThan(0.3); // crowded → tighter than lush
+    expect(style.avoidance).toBe(1); // bystanders interleaved → steer around
+  });
+
+  it('leaves the template defaults alone when there is nothing to measure', async () => {
+    const cache = makeCache();
+    cache.selectedNodes = ['n1']; // one member: no gaps, no spans
+    const bs = wire(cache);
+
+    const key = await bs.createGroupFromSelection('Lonely');
+    const style = cache.data.layouts.Default.bubbleSetStyle[key];
+    const untouched = cache.data.layouts.Default.bubbleSetStyle[bs.createGroup()];
+
+    expect(bs.tuneGroupGeometry(key)).toBeNull();
+    expect(style.padding).toBe(untouched.padding);
+    expect(style.corridor).toBe(untouched.corridor);
+  });
+
+  it('retuneGroup redraws, commits one undo step and reports the values', async () => {
+    const cache = makeCache();
+    cache.selectedNodes = ['n1', 'n2', 'n3', 'n4'];
+    cache.gcm = { decideToRenderOrDraw: vi.fn(async () => {}) };
+    const instance = { update: vi.fn(async () => {}), members: new Map() };
+    cache.graph.getPluginInstance = () => instance;
+    const bs = wire(cache);
+    const key = await bs.createGroupFromSelection('Crowded');
+    cache.history.commit.mockClear();
+
+    await bs.retuneGroup(key);
+
+    expect(instance.update).toHaveBeenCalled();
+    expect(cache.gcm.decideToRenderOrDraw).toHaveBeenCalledWith(true);
+    expect(cache.history.commit).toHaveBeenCalledTimes(1);
+    expect(cache.ui.info).toHaveBeenCalledWith(expect.stringContaining('Re-tuned'));
+  });
+
+  it('retuneGroup warns instead of touching anything on a too-small group', async () => {
+    const cache = makeCache();
+    cache.selectedNodes = ['n1'];
+    const bs = wire(cache);
+    const key = await bs.createGroupFromSelection('Lonely');
+    cache.history.commit.mockClear();
+
+    await bs.retuneGroup(key);
+
+    expect(cache.ui.warning).toHaveBeenCalledWith(expect.stringContaining('at least two'));
+    expect(cache.history.commit).not.toHaveBeenCalled();
+  });
+
+  it('survives a cache with no bubble layer (headless tests, early boot)', () => {
+    const cache = makeCache();
+    cache.selectedNodes = ['n1', 'n2'];
+    const bs = wire(cache);
+    delete cache.graph.bubbleLayer;
+    const key = bs.createGroup({ name: 'NoLayer' });
+    cache.data.layouts.Default[`${key}ManualMembers`] = new Set(['n1', 'n2']);
+
+    expect(bs.tuneGroupGeometry(key)).toBeNull();
+  });
+});
+
 describe('toggleSelectedNodesInManualGroup', () => {
   function wire(cache) {
     const bs = bsFor(cache);
