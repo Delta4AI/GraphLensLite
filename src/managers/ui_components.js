@@ -469,8 +469,34 @@ class InvertibleRangeSlider {
       input.size = Math.max(this.boxSize, exact.length + 1);
       input.select();
     });
+    // Enter and blur apply the same way: a typed number that stays on screen
+    // but never reaches the filter is the one outcome nobody can read.
+    const applyTyped = () => {
+      if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
+      const typed = parseFloat(input.value);
+      // Non-numeric text has no value to apply — the caller restores the
+      // real one rather than rendering "NaN".
+      if (isNaN(typed)) return;
+      // Equal once rounded means nothing changed at display precision. Skipping
+      // keeps a plain focus-and-leave (and a blur right after Enter) from
+      // re-firing the filter or rounding the exact value down behind the user.
+      if (this.formatThreshold(typed) === this.formatThreshold(readExact())) return;
+      // Out of range is corrected rather than silently reverted, matching what
+      // setTo() does for the same value arriving from a query.
+      const clamped = Math.min(Math.max(typed, this.sliderMin), this.sliderMax);
+      if (clamped !== typed) {
+        this.cache.ui.warning(
+          `Threshold for ${this.propID} corrected to ${this.formatThreshold(clamped)} (from ${typed})`
+        );
+      }
+      const sliderElem = document.getElementById(relatedSliderId);
+      sliderElem.value = clamped;
+      sliderElem.dispatchEvent(new Event('input'));
+      sliderElem.dispatchEvent(new Event('change'));
+    };
     input.addEventListener('blur', () => {
-      input.value = this.formatThreshold(parseFloat(input.value));
+      applyTyped();
+      input.value = this.formatThreshold(readExact());
       input.size = this.boxSize;
     });
     input.addEventListener('keydown', (ev) => {
@@ -478,17 +504,7 @@ class InvertibleRangeSlider {
         ev.preventDefault();
         return;
       }
-      if (ev.key === 'Enter') {
-        let newValue = parseFloat(input.value);
-        const sliderElem = document.getElementById(relatedSliderId);
-        if (isNaN(newValue) || newValue < this.sliderMin || newValue > this.sliderMax) {
-          input.value = sliderElem.value;
-        } else {
-          sliderElem.value = newValue;
-          sliderElem.dispatchEvent(new Event('input'));
-          sliderElem.dispatchEvent(new Event('change'));
-        }
-      }
+      if (ev.key === 'Enter') applyTyped();
     });
     return input;
   }

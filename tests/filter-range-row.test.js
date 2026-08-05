@@ -142,16 +142,60 @@ describe('numeric filter row', () => {
     expect(slider.sliderStart.value).toBe('1200');
   });
 
-  it('rejects an out-of-range value by snapping back to the handle', () => {
-    const { parent, slider } = mount();
+  it('corrects an out-of-range value to the bound and says so', () => {
+    // Snapping back silently was indistinguishable from "the app ignored me",
+    // and disagreed with setTo(), which clamps-and-warns for the same value
+    // arriving from a query.
+    const { parent, slider, cache } = mount();
     const [low] = boxes(parent);
-    const before = slider.currentMin;
+    const warnings = [];
+    cache.ui.warning = (message) => warnings.push(message);
 
     low.value = '999999';
     low.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter' }));
 
-    expect(low.value).toBe(slider.sliderStart.value);
+    expect(slider.currentMin).toBe(slider.sliderMax);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('999999');
+  });
+
+  it('applies a typed value on blur, not only on Enter', () => {
+    // Typing a threshold and clicking away used to leave the number on screen
+    // while the graph kept the old one.
+    const { parent, slider } = mount();
+    const [low] = boxes(parent);
+
+    low.dispatchEvent(new Event('focus'));
+    low.value = '1200';
+    low.dispatchEvent(new Event('blur'));
+
+    expect(slider.currentMin).toBe(1200);
+    expect(low.value).toBe('1200');
+  });
+
+  it('shows the real value again when the box is left non-numeric', () => {
+    const { parent, slider } = mount();
+    const [low] = boxes(parent);
+    const before = slider.currentMin;
+
+    low.dispatchEvent(new Event('focus'));
+    low.value = 'not a number';
+    low.dispatchEvent(new Event('blur'));
+
+    expect(low.value).toBe(String(slider.formatThreshold(before)));
+    expect(low.value).not.toBe('NaN');
     expect(slider.currentMin).toBe(before);
+  });
+
+  it('applies nothing on blur while a manual query holds the filters', () => {
+    const { parent, slider } = mount({ locked: true });
+    const [low] = boxes(parent);
+
+    low.dispatchEvent(new Event('focus'));
+    low.value = '1200';
+    low.dispatchEvent(new Event('blur'));
+
+    expect(slider.currentMin).toBe(-11);
   });
 
   it('refuses input while a manual query holds the filters', () => {
