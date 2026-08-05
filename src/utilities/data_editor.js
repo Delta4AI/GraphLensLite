@@ -361,15 +361,16 @@ class DataTable {
     this.render();
   }
 
+  /** @returns {string} HTML — imported header text is escaped, the markup is ours. */
   formatHeaderForDisplay(header) {
     // Check if header contains the property structure (e.g., "Node filters::GROUP::PROPERTY")
     if (!header.includes('::')) {
-      return header;
+      return StaticUtilities.escapeHtml(header);
     }
 
     const parts = header.split('::');
     if (parts.length !== 3) {
-      return header;
+      return StaticUtilities.escapeHtml(header);
     }
 
     const [typePrefix, group, property] = parts;
@@ -392,7 +393,7 @@ class DataTable {
     // Strip "Node filters" or "Edge filters" prefix since Type column already indicates this
     // Display group as a styled badge and property as main text with dynamic scaling
     // Always break into two lines: badge on first line, property on second line
-    return `<span class="data-table-header-group-badge">${group}</span><br><span class="${sizeClass}">${property}</span>`;
+    return `<span class="data-table-header-group-badge">${StaticUtilities.escapeHtml(group)}</span><br><span class="${sizeClass}">${StaticUtilities.escapeHtml(property)}</span>`;
   }
 
   render() {
@@ -441,7 +442,11 @@ class DataTable {
         td.dataset.col = colIndex;
 
         if (colIndex === 0) {
-          td.innerHTML = `<button class="data-table-delete-row-btn" title="Delete row ${rowIndex + 1} (${rowData[2]} ${rowData[3]})">×</button>`;
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'data-table-delete-row-btn';
+          deleteBtn.title = `Delete row ${rowIndex + 1} (${rowData[2]} ${rowData[3]})`;
+          deleteBtn.textContent = '×';
+          td.appendChild(deleteBtn);
           td.classList.add('data-table-delete-row-column');
         } else {
           // Explicitly check for null/undefined to preserve 0 values
