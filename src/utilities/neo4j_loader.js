@@ -116,14 +116,21 @@ async function runCypher(config, statements, opts = {}) {
   return payload.results ?? [];
 }
 
+/** Write clauses that make a query unsafe to run twice (count preflight + fetch). */
+const WRITE_CLAUSE_RE = /\b(CREATE|MERGE|SET|DELETE|REMOVE|DROP|FOREACH)\b/i;
+
 /**
  * Preflight row count by wrapping the query in a CALL subquery (Neo4j 4.1+).
  * Returns null when the count cannot be determined (older server, query shape
  * the wrapper cannot handle) — callers then proceed without a size warning.
  *
+ * Write-shaped queries are skipped outright: the preflight fully executes the
+ * user's Cypher, so counting first would apply their writes twice.
+ *
  * @returns {Promise<number|null>}
  */
 async function countQueryRows(config, query, opts = {}) {
+  if (WRITE_CLAUSE_RE.test(query)) return null;
   try {
     const results = await runCypher(
       config,

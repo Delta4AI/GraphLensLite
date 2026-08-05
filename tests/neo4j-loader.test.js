@@ -144,6 +144,25 @@ describe('countQueryRows', () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error('boom'));
     expect(await countQueryRows(CONFIG, 'MATCH (n) RETURN n', { fetchImpl })).toBeNull();
   });
+
+  it('never runs the preflight for write-shaped queries (it would write twice)', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ results: [{ data: [{ row: [1] }] }], errors: [] }));
+    const writes = [
+      'CREATE (n:Person {name: "x"}) RETURN n',
+      'MATCH (n) SET n.seen = true RETURN n',
+      'MERGE (n:Tag {id: 1}) RETURN n',
+      'MATCH (n) DETACH DELETE n',
+      'MATCH (n) REMOVE n.tmp RETURN n',
+      'match (n) create (n)-[:R]->(n) return n',
+      'FOREACH (x IN [1] | CREATE (:N))',
+    ];
+    for (const query of writes) {
+      expect(await countQueryRows(CONFIG, query, { fetchImpl })).toBeNull();
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 });
 
 describe('collectGraph', () => {
