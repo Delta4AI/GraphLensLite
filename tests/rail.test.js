@@ -93,6 +93,54 @@ describe('initRail', () => {
     expect(document.getElementById('versionInfo')).not.toBeNull();
   });
 
+  // "Close graph and start over" asks first; opening a file destroys exactly as
+  // much (every workspace, style and group) and used to go straight through.
+  describe('Open graph file…', () => {
+    const openItem = () => {
+      document.getElementById('appMenuBtn').click();
+      return [...document.querySelectorAll('.rail-menu button')].find((b) =>
+        b.textContent.includes('Open graph file')
+      );
+    };
+    const confirmButton = (kind) =>
+      document.querySelector(`.p-button-${kind === 'ok' ? 'primary' : 'secondary'}`);
+
+    it('asks before replacing a loaded graph, and honours a cancel', async () => {
+      const fileInput = document.getElementById('fileInput');
+      fileInput.click = vi.fn();
+
+      openItem().click();
+      await vi.waitFor(() => expect(confirmButton('cancel')).not.toBeNull());
+      expect(fileInput.click).not.toHaveBeenCalled();
+
+      confirmButton('cancel').click();
+      await Promise.resolve();
+      expect(fileInput.click).not.toHaveBeenCalled();
+    });
+
+    it('opens the picker once confirmed', async () => {
+      const fileInput = document.getElementById('fileInput');
+      fileInput.click = vi.fn();
+
+      openItem().click();
+      await vi.waitFor(() => expect(confirmButton('ok')).not.toBeNull());
+      confirmButton('ok').click();
+
+      await vi.waitFor(() => expect(fileInput.click).toHaveBeenCalledOnce());
+    });
+
+    it('goes straight to the picker when no graph is loaded', async () => {
+      cache.initialized = false;
+      const fileInput = document.getElementById('fileInput');
+      fileInput.click = vi.fn();
+
+      openItem().click();
+
+      await vi.waitFor(() => expect(fileInput.click).toHaveBeenCalledOnce());
+      expect(confirmButton('ok')).toBeNull();
+    });
+  });
+
   it('opens and closes a menu on anchor clicks', () => {
     const appMenuBtn = document.getElementById('appMenuBtn');
     const menu = document.querySelector('.rail-menu');

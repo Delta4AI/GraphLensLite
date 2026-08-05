@@ -8,6 +8,7 @@
  */
 import { clampPopoverLeft, clampPopoverTop } from '../utilities/popover_position.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
+import { Popup } from '../utilities/popup.js';
 
 const MENU_OFFSET_PX = 6;
 
@@ -187,6 +188,19 @@ class Rail {
     };
   }
 
+  /**
+   * Opening a file rebuilds the model, which drops every workspace, style and
+   * group with it — so it asks first, like "Close graph and start over" does.
+   */
+  async #openGraphFile() {
+    const pick = () => document.getElementById('fileInput')?.click();
+    if (!this.cache.initialized) return pick();
+    const confirmed = await Popup.confirm(
+      'Opening a file replaces the loaded graph, discarding every workspace, style and group in it. Continue?'
+    );
+    if (confirmed) pick();
+  }
+
   #buildAppMenu(el) {
     el.classList.add('rail-menu-app');
     el.append(
@@ -194,7 +208,7 @@ class Rail {
         icon: '📂',
         label: 'Open graph file…',
         title: 'Load graph data from Excel (.xlsx, .xls) or a saved model (.json)',
-        onClick: this.#closeAnd(() => document.getElementById('fileInput')?.click()),
+        onClick: this.#closeAnd(() => this.#openGraphFile()),
       }),
       menuItem({
         icon: '📥',
