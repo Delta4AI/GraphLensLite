@@ -6,6 +6,7 @@ import {
   openNeo4jPopup,
   runCypher,
   countQueryRows,
+  connectionHint,
   collectGraph,
   collectPropertyKeys,
   toAppFormat,
@@ -671,6 +672,47 @@ describe('openNeo4jPopup', () => {
     expect(await promise).toBe(false);
   });
 
+  it('rejects a scheme-less URL, which URL() would wave through', async () => {
+    // "localhost:7474" parses as scheme "localhost:", so the only thing that
+    // caught it before was a generic network error minutes later.
+    const promise = openNeo4jPopup({ ui: {} });
+
+    document.getElementById('neo4j-url').value = 'localhost:7474';
+    document.getElementById('neo4j-load-btn').click();
+    const errorBox = document.getElementById('neo4j-error');
+    expect(errorBox.hidden).toBe(false);
+    expect(errorBox.textContent).toContain('http://');
+
+    document.getElementById('neo4j-cancel-btn').click();
+    expect(await promise).toBe(false);
+  });
+
+  it('submits on Enter from the single-line fields', async () => {
+    const promise = openNeo4jPopup({ ui: {} });
+
+    const url = document.getElementById('neo4j-url');
+    url.value = 'not a url';
+    url.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    // Reaching validation at all proves the submit ran.
+    expect(document.getElementById('neo4j-error').textContent).toBe('Invalid server URL: not a url');
+
+    document.getElementById('neo4j-cancel-btn').click();
+    expect(await promise).toBe(false);
+  });
+
+  it('warns that importing replaces the graph, only when one is loaded', async () => {
+    const fresh = openNeo4jPopup({ ui: {} });
+    expect(document.getElementById('neo4j-replace-note').hidden).toBe(true);
+    document.getElementById('neo4j-cancel-btn').click();
+    await fresh;
+
+    const loaded = openNeo4jPopup({ ui: {}, initialized: true });
+    expect(document.getElementById('neo4j-replace-note').hidden).toBe(false);
+    document.getElementById('neo4j-cancel-btn').click();
+    await loaded;
+  });
+
   it('shows fetch failures inline and re-enables the buttons', async () => {
     vi.stubGlobal(
       'fetch',
@@ -762,5 +804,30 @@ describe('showPropertyChecklist', () => {
       excludedNodeProps: new Set(['born', 'name']),
       excludedEdgeProps: new Set(),
     });
+  });
+});
+
+describe('connectionHint', () => {
+  // Connect mapped these to actionable text; expand and join surfaced the raw
+  // strings, which name none of the causes.
+  it('names the timeout', () => {
+    const err = new Error('x');
+    err.name = 'TimeoutError';
+    expect(connectionHint(err)).toContain('timed out');
+  });
+
+  it('recognises an unreachable server by type, not by Chromium wording', () => {
+    // Firefox and Safari word this differently, so the message match alone
+    // left them without the URL/CORS guidance.
+    expect(connectionHint(new TypeError('NetworkError when attempting to fetch'))).toContain(
+      'Could not reach the server',
+    );
+    expect(connectionHint(new TypeError('Failed to fetch'))).toContain('Could not reach the server');
+  });
+
+  it('passes a Cypher error through untouched', () => {
+    expect(connectionHint(new Error('Neo.ClientError.Statement.SyntaxError: bad'))).toBe(
+      'Neo.ClientError.Statement.SyntaxError: bad',
+    );
   });
 });

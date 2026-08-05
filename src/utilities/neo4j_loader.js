@@ -120,6 +120,24 @@ async function runCypher(config, statements, opts = {}) {
 const WRITE_CLAUSE_RE = /\b(CREATE|MERGE|SET|DELETE|REMOVE|DROP|FOREACH)\b/i;
 
 /**
+ * Turn a transport failure into something the user can act on. Every flow —
+ * connect, expand, join — fails these same three ways, and the raw text names
+ * none of the causes: "Failed to fetch" is what a wrong port, a disabled HTTP
+ * connector and a CORS rejection all look like from here.
+ *
+ * A dead server is matched by TYPE, not by message: only Chromium words it
+ * "Failed to fetch", so matching the string left Firefox and Safari users
+ * without the URL/CORS guidance.
+ */
+function connectionHint(err) {
+  if (err?.name === 'TimeoutError') return 'The request timed out.';
+  if (err instanceof TypeError || err?.message === 'Failed to fetch') {
+    return 'Could not reach the server — check the URL, that the HTTP connector is enabled, and CORS settings.';
+  }
+  return err?.message ?? String(err);
+}
+
+/**
  * Preflight row count by wrapping the query in a CALL subquery (Neo4j 4.1+).
  * Returns null when the count cannot be determined (older server, query shape
  * the wrapper cannot handle) — callers then proceed without a size warning.
@@ -411,6 +429,10 @@ function startNeo4jSession(config, nodes, relationships, exclusions) {
     rawNodes: new Map(nodes.map((node) => [node.id, node])),
     rawRels: new Map(relationships.map((rel) => [rel.id, rel])),
     exclusions,
+    // Element ids a stitch pass has already covered. Until every loaded node is
+    // in here, a stitch has to sweep the full set rather than just the newest
+    // batch (see appendStitch).
+    stitchedIds: null,
   };
   refreshNeo4jSessionUI();
 }
@@ -621,6 +643,9 @@ function buildConnectionForm(saved) {
       <textarea id="neo4j-query" rows="4" class="p-prompt neo4j-query">MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 500</textarea>
       <span class="neo4j-hint">Must return nodes, relationships, or paths.</span>
     </div>
+    <div id="neo4j-replace-note" class="neo4j-warning" hidden>
+      Importing replaces the loaded graph — its positions, filters, groups and undo history go with it.
+    </div>
     <div id="neo4j-error" class="neo4j-error" role="alert" hidden></div>
     <div class="neo4j-info">
       No server at hand? <a href="#" id="neo4j-demo-link">Fill in the Stack Overflow demo</a> —
@@ -719,13 +744,7 @@ async function executeNeo4jImport(cache, config, deps = {}) {
     return rendered;
   } catch (err) {
     await progress(null);
-    const hint =
-      err.name === 'TimeoutError'
-        ? 'The request timed out.'
-        : err.message === 'Failed to fetch'
-          ? 'Could not reach the server — check the URL, that the HTTP connector is enabled, and CORS settings.'
-          : err.message;
-    onError(`Neo4j: ${hint}`);
+    onError(`Neo4j: ${connectionHint(err)}`);
     return false;
   }
 }
@@ -744,6 +763,9 @@ function openNeo4jPopup(cache) {
   const loadBtn = form.querySelector('#neo4j-load-btn');
   const cancelBtn = form.querySelector('#neo4j-cancel-btn');
   const errorBox = form.querySelector('#neo4j-error');
+  // Only say it when there is something to lose — on a fresh app the warning
+  // would be describing a graph that does not exist.
+  if (cache.initialized) form.querySelector('#neo4j-replace-note').hidden = false;
 
   return new Promise((resolve) => {
     // Popup.close() always fires onClose, so guard against double-settling
@@ -794,10 +816,18 @@ function openNeo4jPopup(cache) {
         showError('Server URL and Cypher query are required.');
         return;
       }
+      // "localhost:7474" parses cleanly — as scheme "localhost:" — so URL alone
+      // waves through the most common mistake, which then resurfaces minutes
+      // later as a generic network error.
+      let parsed;
       try {
-        new URL(config.url);
+        parsed = new URL(config.url);
       } catch {
         showError(`Invalid server URL: ${config.url}`);
+        return;
+      }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        showError('The server URL must start with http:// or https:// (e.g. http://localhost:7474).');
         return;
       }
 
@@ -819,6 +849,16 @@ function openNeo4jPopup(cache) {
     };
 
     loadBtn.addEventListener('click', handleLoad);
+    // Enter submits from the single-line fields. Not from the query box: a
+    // Cypher query is multi-line and Enter belongs to the textarea.
+    for (const id of ['#neo4j-url', '#neo4j-username', '#neo4j-password', '#neo4j-database']) {
+      form.querySelector(id)?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !loadBtn.disabled) {
+          e.preventDefault();
+          handleLoad();
+        }
+      });
+    }
     cancelBtn.addEventListener('click', () => {
       popup.close();
       settle(false);
@@ -833,6 +873,7 @@ export {
   buildConnectionForm,
   sanitizeForAST,
   runCypher,
+  connectionHint,
   countQueryRows,
   collectGraph,
   collectPropertyKeys,

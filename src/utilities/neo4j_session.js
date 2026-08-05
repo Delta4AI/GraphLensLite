@@ -26,6 +26,7 @@ import { applyGraph } from '../managers/api_client.js';
 import { settlePinnedForce } from '../graph/layout_algorithms.js';
 import {
   runCypher,
+  connectionHint,
   countQueryRows,
   collectGraph,
   toAppFormat,
@@ -112,7 +113,24 @@ function buildExpandFetch(elementIds, pairs) {
  * join makes it one O(1) probe per relationship. `<=` returns each
  * relationship once instead of once per direction (self-loops included).
  */
-function buildStitchQuery(elementIds) {
+function buildStitchQuery(elementIds, newIds = null) {
+  // Incremental form: a relationship between two nodes that were BOTH already
+  // stitched was found by the earlier pass, so only those touching the new
+  // batch can be missing. Requiring one endpoint in $newIds turns work that
+  // grew with the whole accumulated graph into work that scales with the batch.
+  // No `<=` here — with asymmetric sets it would drop a new↔old relationship
+  // whose new endpoint sorts higher, and collectGraph dedupes by id anyway.
+  if (newIds) {
+    return {
+      statement:
+        'MATCH (n)-[r]-(m) ' +
+        'USING JOIN ON m ' +
+        'WHERE elementId(n) IN $newIds AND elementId(m) IN $ids ' +
+        'RETURN r',
+      parameters: { ids: elementIds, newIds },
+      resultDataContents: ['graph'],
+    };
+  }
   return {
     statement:
       'MATCH (n)-[r]-(m) ' +
@@ -139,14 +157,45 @@ function allElementIds(session, newNodes) {
  * the session accumulator — the relationships are the point.
  */
 async function appendStitch(session, nodes, relationships, opts) {
-  const results = await runCypher(
-    session.config,
-    [buildStitchQuery(allElementIds(session, nodes))],
-    opts,
-  );
+  const allIds = allElementIds(session, nodes);
+  const newIds = nodes.map((node) => node.elementId ?? String(node.id));
+
+  // The batch-scoped form is only sound when every node ALREADY in the graph
+  // has been through a stitch — then the only relationships that can still be
+  // missing are the ones touching this batch. A merge the user chose not to
+  // stitch leaves ids uncovered, and tracking that as a plain "have we ever
+  // stitched" flag silently skipped them forever; hence the covered set.
+  const covered = session.stitchedIds;
+  const allCovered =
+    covered != null &&
+    [...session.rawNodes.values()].every((node) =>
+      covered.has(node.elementId ?? String(node.id)),
+    );
+  const query = allCovered ? buildStitchQuery(allIds, newIds) : buildStitchQuery(allIds);
+
+  const results = await runCypher(session.config, [query], opts);
+  // allIds is everything loaded plus this batch, so it IS the new covered set.
+  session.stitchedIds = new Set(allIds);
   const stitched = collectGraph(results);
   nodes.push(...stitched.nodes);
   relationships.push(...stitched.relationships);
+}
+
+/**
+ * Stitching is an enhancement, not the payload: the fetch has already
+ * succeeded by the time it runs, and an unplannable USING JOIN hint used to
+ * throw the whole expand or join away with it. Degrade to the unstitched
+ * merge and say what is missing.
+ */
+async function stitchOrWarn(cache, session, nodes, relationships, opts) {
+  try {
+    await appendStitch(session, nodes, relationships, opts);
+  } catch (err) {
+    cache.ui.warning(
+      `Neo4j: the data arrived but linking it to the loaded graph failed (${connectionHint(err)}). ` +
+        'Merging without those extra links.',
+    );
+  }
 }
 
 /** The stitch checkbox row shared by the expand checklist and the join popup. */
@@ -480,7 +529,7 @@ async function expandNeo4jSelection(cache, deps = {}) {
 
     if (chosen.stitch) {
       await progress('Stitching …');
-      await appendStitch(session, nodes, relationships, opts);
+      await stitchOrWarn(cache, session, nodes, relationships, opts);
     }
     await progress(null);
 
@@ -619,7 +668,7 @@ function openNeo4jJoinPopup(cache, deps = {}) {
 
         if (stitchBox.checked) {
           setBusy('Stitching …');
-          await appendStitch(session, nodes, relationships, opts);
+          await stitchOrWarn(cache, session, nodes, relationships, opts);
         }
 
         if (settled) return;

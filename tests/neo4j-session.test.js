@@ -72,6 +72,7 @@ function makeCache(renderedNodes = [], selectedNodes = []) {
       setDataSourceLabel: vi.fn(),
       error: vi.fn(),
       info: vi.fn(),
+      warning: vi.fn(),
     },
   };
 }
@@ -803,5 +804,100 @@ describe('openNeo4jJoinPopup', () => {
 
     document.getElementById('neo4j-join-cancel-btn').click();
     expect(await promise).toBe(false);
+  });
+});
+
+// ==========================================================================
+// Stitching is an enhancement layered on top of a fetch that already
+// succeeded, and it used to be able to throw the fetch away or re-scan the
+// entire accumulated graph on every merge.
+// ==========================================================================
+
+describe('stitch scope', () => {
+  const stitchStatements = (fetchImpl) =>
+    fetchImpl.mock.calls
+      .map((call) => JSON.parse(call[1].body).statements[0])
+      .filter((st) => st.statement.includes('USING JOIN ON m'));
+
+  /** Each graph fetch returns a DIFFERENT new node, so merges really accumulate. */
+  function makeFetchImpl({ stitchFails = false } = {}) {
+    let seq = 0;
+    return vi.fn(async (_url, init) => {
+      const st = JSON.parse(init.body).statements[0].statement;
+      if (st.startsWith('CALL {')) {
+        return jsonResponse({ results: [{ data: [{ row: [1] }] }], errors: [] });
+      }
+      if (st.includes('USING JOIN')) {
+        if (stitchFails) throw new Error('Cannot use USING JOIN with this plan');
+        return graphResponse([], []);
+      }
+      seq += 1;
+      return graphResponse([rawNode(`n${seq}`, 'Gene', {}, { elementId: `e${seq}` })], []);
+    });
+  }
+
+  async function joinWithStitch(cache, fetchImpl, { stitch = true } = {}) {
+    const promise = openNeo4jJoinPopup(cache, { fetchImpl, apply: async () => true });
+    document.getElementById('neo4j-join-stitch').checked = stitch;
+    document.getElementById('neo4j-join-query').value = 'MATCH (g:Gene) RETURN g';
+    document.getElementById('neo4j-join-fetch-btn').click();
+    return promise;
+  }
+
+  it('sweeps everything on the first stitch, then only the new batch', async () => {
+    startNeo4jSession(CONFIG, [rawNode('1', 'Person', {}, { elementId: 'e0' })], [], NO_EXCLUSIONS);
+    const cache = makeCache([{ id: '1', style: { x: 0, y: 0 } }]);
+    const fetchImpl = makeFetchImpl();
+
+    expect(await joinWithStitch(cache, fetchImpl)).toBe(true);
+    let stitches = stitchStatements(fetchImpl);
+    expect(stitches).toHaveLength(1);
+    // Nothing has been stitched yet, so the batch-scoped form would miss
+    // relationships among the already-loaded nodes.
+    expect(stitches[0].statement).toContain('elementId(n) IN $ids AND elementId(m) IN $ids');
+    expect(stitches[0].parameters.newIds).toBeUndefined();
+
+    expect(await joinWithStitch(cache, fetchImpl)).toBe(true);
+    stitches = stitchStatements(fetchImpl);
+    expect(stitches).toHaveLength(2);
+    expect(stitches[1].statement).toContain('elementId(n) IN $newIds AND elementId(m) IN $ids');
+    // The batch, not the accumulated graph.
+    expect(stitches[1].parameters.newIds).toEqual(['e2']);
+    expect(stitches[1].parameters.ids.length).toBeGreaterThan(1);
+  });
+
+  it('sweeps again after a merge the user chose not to stitch', async () => {
+    startNeo4jSession(CONFIG, [rawNode('1', 'Person', {}, { elementId: 'e0' })], [], NO_EXCLUSIONS);
+    const cache = makeCache([{ id: '1', style: { x: 0, y: 0 } }]);
+    const fetchImpl = makeFetchImpl();
+
+    await joinWithStitch(cache, fetchImpl); // full sweep, earns incremental
+    await joinWithStitch(cache, fetchImpl, { stitch: false }); // adds an uncovered node
+    await joinWithStitch(cache, fetchImpl);
+
+    const stitches = stitchStatements(fetchImpl);
+    expect(stitches).toHaveLength(2);
+    // Back to the full form: the unstitched batch was never covered, and a
+    // batch-scoped query would never revisit it.
+    expect(stitches[1].statement).toContain('elementId(n) IN $ids AND elementId(m) IN $ids');
+    expect(stitches[1].parameters.ids).toContain('e2'); // the skipped batch is in scope
+  });
+
+  it('merges unstitched with a warning when the stitch query fails', async () => {
+    startNeo4jSession(CONFIG, [rawNode('1', 'Person', {}, { elementId: 'e0' })], [], NO_EXCLUSIONS);
+    const cache = makeCache([{ id: '1', style: { x: 0, y: 0 } }]);
+    const apply = vi.fn().mockResolvedValue(true);
+    const fetchImpl = makeFetchImpl({ stitchFails: true });
+
+    const promise = openNeo4jJoinPopup(cache, { fetchImpl, apply });
+    document.getElementById('neo4j-join-query').value = 'MATCH (g:Gene) RETURN g';
+    document.getElementById('neo4j-join-fetch-btn').click();
+
+    // The fetch succeeded; losing it because an optional extra query could not
+    // be planned is the bug.
+    expect(await promise).toBe(true);
+    expect(apply).toHaveBeenCalledOnce();
+    expect(cache.ui.warning).toHaveBeenCalledOnce();
+    expect(cache.ui.warning.mock.calls[0][0]).toContain('USING JOIN');
   });
 });
