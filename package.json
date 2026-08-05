@@ -91,7 +91,6 @@
     "exceljs": "^4.4.0",
     "globals": "^17.6.0",
     "inline-source": "^8.0.3",
-    "inline-source-cli": "^1.2.0",
     "jsdom": "^29.0.2",
     "playwright": "^1.60.0",
     "prettier": "^3.8.4",
