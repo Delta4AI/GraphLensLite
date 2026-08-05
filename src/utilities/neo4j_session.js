@@ -596,6 +596,12 @@ function openNeo4jJoinPopup(cache, deps = {}) {
           if (proceed !== true) return;
         }
 
+        // The × stays live while the fetch runs, and onClose settles the
+        // promise — so a dismissal mid-flight means the user is done. Merging
+        // anyway would replace their graph (and reset filters and undo) after
+        // the popup they cancelled had already gone.
+        if (settled) return;
+
         setBusy('Fetching …');
         const results = await runCypher(
           session.config,
@@ -616,6 +622,7 @@ function openNeo4jJoinPopup(cache, deps = {}) {
           await appendStitch(session, nodes, relationships, opts);
         }
 
+        if (settled) return;
         dataFetched = true;
         popup.close();
         settle(await mergeAndApply(cache, nodes, relationships, deps));

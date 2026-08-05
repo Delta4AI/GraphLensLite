@@ -676,6 +676,42 @@ describe('openNeo4jJoinPopup', () => {
     expect(cache.ui.setDataSourceLabel).toHaveBeenCalledWith('Neo4j: movies');
   });
 
+  it('abandons the merge when the popup is dismissed mid-flight', async () => {
+    // The × stays live while the fetch runs. Merging after it replaces the
+    // user's graph (and resets filters and undo) from a dialog they dismissed.
+    startNeo4jSession(CONFIG, [rawNode('1', 'Person')], [], NO_EXCLUSIONS);
+    const cache = makeCache([{ id: '1', style: { x: 1, y: 2 } }]);
+    let releaseCount;
+    const fetchImpl = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseCount = () =>
+              resolve(jsonResponse({ results: [{ data: [{ row: [2] }] }], errors: [] }));
+          }),
+      )
+      .mockResolvedValueOnce(graphResponse([rawNode('7', 'Gene')], []));
+    const apply = vi.fn().mockResolvedValue(true);
+    const promise = openNeo4jJoinPopup(cache, { fetchImpl, apply });
+
+    document.getElementById('neo4j-join-stitch').checked = false; // plain path
+    document.getElementById('neo4j-join-query').value = 'MATCH (g:Gene) RETURN g';
+    document.getElementById('neo4j-join-fetch-btn').click();
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+
+    document.querySelector('.p-icon').click(); // the × the audit found still live
+    releaseCount();
+
+    expect(await promise).toBe(false);
+    // The promise settles on close, so the abandoned handler still has to be
+    // given the chance to do the damage before asserting that it didn't.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(apply).not.toHaveBeenCalled();
+    // Bailing before the fetch also spares the doomed second roundtrip.
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('shows fetch failures inline and re-enables the buttons', async () => {
     startNeo4jSession(CONFIG, [], [], NO_EXCLUSIONS);
     const fetchImpl = vi
