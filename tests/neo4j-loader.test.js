@@ -800,11 +800,15 @@ describe('showPropertyChecklist', () => {
       { kind: 'edge', key: 'weight', type: 'number', examples: ['1'], largeArray: false },
     ]);
 
-    const checkboxes = [...document.querySelectorAll('.p-custom input[data-key]')];
-    expect(checkboxes).toHaveLength(3);
-    expect(checkboxes.find((c) => c.dataset.key === 'embedding').checked).toBe(false);
+    // Rows are in listed order, nodes before relationships.
+    const rows = [...document.querySelectorAll('.p-custom .neo4j-prop-row')];
+    expect(rows).toHaveLength(3);
+    const boxFor = (key) =>
+      rows.find((row) => row.querySelector('.neo4j-prop-name').textContent === key)
+        .querySelector('input');
+    expect(boxFor('embedding').checked).toBe(false);
 
-    checkboxes.find((c) => c.dataset.key === 'weight').checked = false;
+    boxFor('weight').checked = false;
     const buttons = [...document.querySelectorAll('.p-custom button')];
     buttons.find((b) => b.textContent === 'Import').click();
 

@@ -569,7 +569,7 @@ describe('showExpandChecklist', () => {
     const names = [...document.querySelectorAll('.neo4j-prop-name')].map((el) => el.textContent);
     expect(names).toEqual(['ACTED_IN → Movie', 'KNOWS → Node']);
 
-    const boxes = [...document.querySelectorAll('.p-custom input[data-index]')];
+    const boxes = [...document.querySelectorAll('.p-custom .neo4j-prop-row input')];
     boxes[1].checked = false;
     boxes[1].dispatchEvent(new Event('change', { bubbles: true }));
 
@@ -612,7 +612,7 @@ describe('showExpandChecklist', () => {
     expect(warning.textContent).toContain('slow');
 
     // Unchecking drops the sum back under the threshold.
-    const boxes = [...document.querySelectorAll('.p-custom input[data-index]')];
+    const boxes = [...document.querySelectorAll('.p-custom .neo4j-prop-row input')];
     boxes[0].checked = false;
     boxes[0].dispatchEvent(new Event('change', { bubbles: true }));
     expect(warning.hidden).toBe(true);

@@ -22,6 +22,7 @@
  */
 
 import { Popup } from './popup.js';
+import { buildChecklistSection, openChecklistPopup } from './checklist_popup.js';
 import { applyGraph } from '../managers/api_client.js';
 import { settlePinnedForce } from '../graph/layout_algorithms.js';
 import {
@@ -360,117 +361,56 @@ async function mergeAndApply(cache, newNodes, newRels, deps = {}) {
  * @returns {Promise<{pairs: Array<{relType: string, neighborLabel: string, count: number}>, stitch: boolean}|null>}
  */
 function showExpandChecklist(pairs) {
-  return new Promise((resolve) => {
-    const content = document.createElement('div');
-    const intro = document.createElement('p');
-    intro.className = 'neo4j-hint';
-    intro.textContent =
-      'Neighbors of the selected nodes, grouped by relationship type and label. ' +
-      'Checked groups are fetched and merged into the graph.';
-    content.appendChild(intro);
+  const content = document.createElement('div');
+  const intro = document.createElement('p');
+  intro.className = 'neo4j-hint';
+  intro.textContent =
+    'Neighbors of the selected nodes, grouped by relationship type and label. ' +
+    'Checked groups are fetched and merged into the graph.';
+  content.appendChild(intro);
 
-    const heading = document.createElement('div');
-    heading.className = 'neo4j-props-heading';
-    const headingLabel = document.createElement('label');
-    const toggleAll = document.createElement('input');
-    toggleAll.type = 'checkbox';
-    headingLabel.appendChild(toggleAll);
-    headingLabel.appendChild(document.createTextNode(' Neighbor groups'));
-    heading.appendChild(headingLabel);
-    content.appendChild(heading);
+  const warning = document.createElement('div');
+  warning.className = 'neo4j-warning';
+  warning.setAttribute('role', 'status'); // announced when the sum crosses the threshold
+  warning.hidden = true;
 
-    const list = document.createElement('div');
-    list.className = 'neo4j-props-list';
-    const rowBoxes = [];
-    pairs.forEach((pair, index) => {
-      const row = document.createElement('label');
-      row.className = 'neo4j-prop-row';
+  let fetchBtn = null;
+  const syncState = (checked) => {
+    const sum = checked.reduce((total, pair) => total + pair.count, 0);
+    warning.hidden = sum <= LARGE_RESULT_ROW_THRESHOLD;
+    warning.textContent = warning.hidden
+      ? ''
+      : `The checked groups sum to ${sum.toLocaleString()} relationships, which may be slow to fetch and render.`;
+    if (fetchBtn) fetchBtn.disabled = checked.length === 0;
+  };
 
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = true;
-      checkbox.dataset.index = index;
-      rowBoxes.push(checkbox);
-      row.appendChild(checkbox);
+  const { elements, rows } = buildChecklistSection({
+    title: 'Neighbor groups',
+    rows: pairs.map((pair) => ({
+      label: `${pair.relType} → ${pair.neighborLabel || 'Node'}`,
+      meta: String(pair.count),
+      metaTitle: 'Matching relationships',
+      data: pair,
+    })),
+    onChange: syncState,
+  });
+  content.append(...elements, warning);
 
-      const name = document.createElement('span');
-      name.className = 'neo4j-prop-name';
-      name.textContent = `${pair.relType} → ${pair.neighborLabel || 'Node'}`;
-      row.appendChild(name);
+  const { row: stitchRow, checkbox: stitchBox } = buildStitchRow();
+  content.appendChild(stitchRow);
 
-      const count = document.createElement('span');
-      count.className = 'neo4j-prop-type';
-      count.textContent = String(pair.count);
-      count.title = 'Matching relationships';
-      row.appendChild(count);
-
-      list.appendChild(row);
-    });
-    content.appendChild(list);
-
-    const warning = document.createElement('div');
-    warning.className = 'neo4j-warning';
-    warning.setAttribute('role', 'status'); // announced when the sum crosses the threshold
-    warning.hidden = true;
-    content.appendChild(warning);
-
-    const { row: stitchRow, checkbox: stitchBox } = buildStitchRow();
-    content.appendChild(stitchRow);
-
-    const footer = document.createElement('div');
-    footer.className = 'p-footer';
-    const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = 'Cancel';
-    cancelBtn.className = 'p-button p-button-secondary';
-    const fetchBtn = document.createElement('button');
-    fetchBtn.textContent = 'Fetch & merge';
-    fetchBtn.className = 'p-button p-button-primary';
-    footer.appendChild(cancelBtn);
-    footer.appendChild(fetchBtn);
-    content.appendChild(footer);
-
-    const syncState = () => {
-      const checked = rowBoxes.filter((box) => box.checked);
-      toggleAll.checked = checked.length === rowBoxes.length;
-      toggleAll.indeterminate = checked.length > 0 && checked.length < rowBoxes.length;
-      fetchBtn.disabled = checked.length === 0;
-      const sum = checked.reduce((total, box) => total + pairs[box.dataset.index].count, 0);
-      warning.hidden = sum <= LARGE_RESULT_ROW_THRESHOLD;
-      warning.textContent = warning.hidden
-        ? ''
-        : `The checked groups sum to ${sum.toLocaleString()} relationships, which may be slow to fetch and render.`;
-    };
-    syncState();
-    toggleAll.addEventListener('change', () => {
-      rowBoxes.forEach((box) => (box.checked = toggleAll.checked));
-      syncState();
-    });
-    list.addEventListener('change', syncState);
-
-    let resolved = false;
-    const popup = new Popup(content, {
-      title: 'Expand from Neo4j',
-      width: '480px',
-      showFullscreenButton: false,
-      closeOnClickOutside: false,
-      onClose: () => {
-        if (!resolved) resolve(null);
-      },
-    });
-
-    fetchBtn.addEventListener('click', () => {
-      resolved = true;
-      popup.close();
-      resolve({
-        pairs: rowBoxes.filter((box) => box.checked).map((box) => pairs[box.dataset.index]),
-        stitch: stitchBox.checked,
-      });
-    });
-    cancelBtn.addEventListener('click', () => {
-      resolved = true;
-      popup.close();
-      resolve(null);
-    });
+  const checkedPairs = () => rows.filter((row) => row.input.checked).map((row) => row.data);
+  return openChecklistPopup({
+    title: 'Expand from Neo4j',
+    content,
+    confirmLabel: 'Fetch & merge',
+    // The button does not exist during the section's first sync, so catch it up
+    // here — nothing checked must mean nothing to fetch.
+    onReady: (button) => {
+      fetchBtn = button;
+      syncState(checkedPairs());
+    },
+    onConfirm: () => ({ pairs: checkedPairs(), stitch: stitchBox.checked }),
   });
 }
 

@@ -16,6 +16,7 @@
  */
 
 import { Popup } from './popup.js';
+import { buildChecklistSection, openChecklistPopup } from './checklist_popup.js';
 import { StaticUtilities } from './static.js';
 import { applyGraph } from '../managers/api_client.js';
 import { DEFAULTS, hslToHex, GOLDEN_ANGLE_DEG } from '../config.js';
@@ -542,118 +543,48 @@ function showPropertyChecklist(propertyKeys) {
     return Promise.resolve({ excludedNodeProps: new Set(), excludedEdgeProps: new Set() });
   }
 
-  return new Promise((resolve) => {
-    const content = document.createElement('div');
-    const intro = document.createElement('p');
-    intro.className = 'neo4j-hint';
-    intro.textContent =
-      'Select the properties to import. Deselected properties are dropped before the graph is built.';
-    content.appendChild(intro);
+  const content = document.createElement('div');
+  const intro = document.createElement('p');
+  intro.className = 'neo4j-hint';
+  intro.textContent =
+    'Select the properties to import. Deselected properties are dropped before the graph is built.';
+  content.appendChild(intro);
 
-    const buildSection = (title, entries) => {
-      if (entries.length === 0) return;
-
-      const heading = document.createElement('div');
-      heading.className = 'neo4j-props-heading';
-      const headingLabel = document.createElement('label');
-      const toggleAll = document.createElement('input');
-      toggleAll.type = 'checkbox';
-      headingLabel.appendChild(toggleAll);
-      headingLabel.appendChild(document.createTextNode(` ${title}`));
-      heading.appendChild(headingLabel);
-      content.appendChild(heading);
-
-      const list = document.createElement('div');
-      list.className = 'neo4j-props-list';
-      const rowBoxes = [];
-      for (const entry of entries) {
-        const row = document.createElement('label');
-        row.className = 'neo4j-prop-row';
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = !entry.largeArray;
-        checkbox.dataset.kind = entry.kind;
-        checkbox.dataset.key = entry.key;
-        rowBoxes.push(checkbox);
-        row.appendChild(checkbox);
-
-        const name = document.createElement('span');
-        name.className = 'neo4j-prop-name';
-        name.textContent = entry.key;
-        row.appendChild(name);
-
-        const type = document.createElement('span');
-        type.className = 'neo4j-prop-type';
-        type.textContent = entry.largeArray ? 'large list' : entry.type;
-        if (entry.largeArray) type.title = 'Long array (e.g. an embedding) — deselected by default';
-        row.appendChild(type);
-
-        if (entry.examples.length) {
-          const examples = document.createElement('span');
-          examples.className = 'neo4j-prop-examples';
-          examples.textContent = `e.g. ${entry.examples.join('  ·  ')}`;
-          row.appendChild(examples);
-        }
-        list.appendChild(row);
-      }
-      content.appendChild(list);
-
-      const syncToggleAll = () => {
-        const checked = rowBoxes.filter((box) => box.checked).length;
-        toggleAll.checked = checked === rowBoxes.length;
-        toggleAll.indeterminate = checked > 0 && checked < rowBoxes.length;
-      };
-      syncToggleAll();
-      toggleAll.addEventListener('change', () => {
-        rowBoxes.forEach((box) => (box.checked = toggleAll.checked));
-      });
-      list.addEventListener('change', syncToggleAll);
-    };
-    buildSection('Node properties', propertyKeys.filter((p) => p.kind === 'node'));
-    buildSection('Relationship properties', propertyKeys.filter((p) => p.kind === 'edge'));
-
-    const footer = document.createElement('div');
-    footer.className = 'p-footer';
-    const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = 'Cancel';
-    cancelBtn.className = 'p-button p-button-secondary';
-    const importBtn = document.createElement('button');
-    importBtn.textContent = 'Import';
-    importBtn.className = 'p-button p-button-primary';
-    footer.appendChild(cancelBtn);
-    footer.appendChild(importBtn);
-    content.appendChild(footer);
-
-    let resolved = false;
-    const popup = new Popup(content, {
-      title: 'Neo4j Properties',
-      width: '480px',
-      showFullscreenButton: false,
-      closeOnClickOutside: false,
-      onClose: () => {
-        if (!resolved) resolve(null);
-      },
+  const allRows = [];
+  for (const [title, kind] of [
+    ['Node properties', 'node'],
+    ['Relationship properties', 'edge'],
+  ]) {
+    const entries = propertyKeys.filter((entry) => entry.kind === kind);
+    if (entries.length === 0) continue;
+    const { elements, rows } = buildChecklistSection({
+      title,
+      rows: entries.map((entry) => ({
+        label: entry.key,
+        meta: entry.largeArray ? 'large list' : entry.type,
+        metaTitle: entry.largeArray ? 'Long array (e.g. an embedding) — deselected by default' : '',
+        note: entry.examples.length ? `e.g. ${entry.examples.join('  ·  ')}` : '',
+        checked: !entry.largeArray,
+        data: entry,
+      })),
     });
+    content.append(...elements);
+    allRows.push(...rows);
+  }
 
-    importBtn.addEventListener('click', () => {
+  return openChecklistPopup({
+    title: 'Neo4j Properties',
+    content,
+    confirmLabel: 'Import',
+    onConfirm: () => {
       const excludedNodeProps = new Set();
       const excludedEdgeProps = new Set();
-      for (const checkbox of content.querySelectorAll('input[data-key]')) {
-        if (checkbox.checked) continue;
-        (checkbox.dataset.kind === 'node' ? excludedNodeProps : excludedEdgeProps).add(
-          checkbox.dataset.key,
-        );
+      for (const { input, data } of allRows) {
+        if (input.checked) continue;
+        (data.kind === 'node' ? excludedNodeProps : excludedEdgeProps).add(data.key);
       }
-      resolved = true;
-      popup.close();
-      resolve({ excludedNodeProps, excludedEdgeProps });
-    });
-    cancelBtn.addEventListener('click', () => {
-      resolved = true;
-      popup.close();
-      resolve(null);
-    });
+      return { excludedNodeProps, excludedEdgeProps };
+    },
   });
 }
 
