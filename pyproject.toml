@@ -7,5 +7,8 @@ requires-python = ">=3.13.1"
 dependencies = [
     "openpyxl>=3.1.5",
     "pandas>=2.2.3",
-    "playwright>=1.58.0",
+    # Same floor as the npm devDependency: both ecosystems drive a browser
+    # (scripts/screenshot_tool.py here, the perf scripts there) and a version
+    # split between them is a difference in behaviour nobody is tracking.
+    "playwright>=1.60.0",
 ]

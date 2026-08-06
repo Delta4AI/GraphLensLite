@@ -24,6 +24,35 @@ const CONTENT_TYPES = {
 const DEFAULT_DOCUMENT = "graph_lens_lite.html";
 
 /**
+ * Baseline hardening for served documents.
+ *
+ * Deliberately permissive where the app genuinely needs it: inline `onclick`
+ * handlers and inline styles are everywhere, the layout worker runs from a
+ * `blob:`, the CSS carries `data:` images, and the Neo4j/STRING connectors
+ * fetch whatever origin the user types in. What it still buys is real — no
+ * external script or plugin origin, no `<base>` rewrite, no framing — and
+ * anything stricter would cost features rather than add safety.
+ */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src *",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+/** Only documents can be framed or have a base URI, so only they carry these. */
+const DOCUMENT_HEADERS = {
+  "Content-Security-Policy": CONTENT_SECURITY_POLICY,
+  "X-Frame-Options": "DENY",
+};
+
+/**
  * Resolve a URL path to an absolute file path inside `rootDir`, rejecting any
  * path-traversal attempt. Returns null when the request escapes the root.
  *
@@ -94,6 +123,7 @@ function serveStatic(req, res, rootDir) {
       return;
     }
 
+    const isDocument = path.extname(filePath).toLowerCase() === ".html";
     res.writeHead(200, {
       "Content-Type": contentTypeFor(filePath),
       "Content-Length": stats.size,
@@ -101,6 +131,7 @@ function serveStatic(req, res, rootDir) {
       "Cache-Control": "no-cache",
       ETag: etag,
       "Last-Modified": lastModified,
+      ...(isDocument ? DOCUMENT_HEADERS : {}),
     });
     fs.createReadStream(filePath).pipe(res);
   });
@@ -131,4 +162,10 @@ function isNotModified(req, etag, mtimeMs) {
   return false;
 }
 
-module.exports = { serveStatic, resolveStaticPath, contentTypeFor, DEFAULT_DOCUMENT };
+module.exports = {
+  serveStatic,
+  resolveStaticPath,
+  contentTypeFor,
+  DEFAULT_DOCUMENT,
+  CONTENT_SECURITY_POLICY,
+};

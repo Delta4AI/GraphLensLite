@@ -48,6 +48,15 @@ Graph Lens Lite has two attack surfaces worth calling out:
    a firewall or reverse proxy. Auth bypass, request-smuggling, path traversal,
    and denial-of-service against this endpoint are in scope.
 
+   Two properties of that service are by design, not oversights. **Reads are
+   unauthenticated:** `GET /api/graph` and `GET /api/events` serve whatever the
+   last push stored, so the bearer token gates writing, not viewing. And a
+   **`session` id is a routing key, not a secret** — it is a plain query-string
+   parameter, it appears in logs and browser history, and knowing one is enough
+   to read that session's graph. Off loopback, put authentication in front of
+   the service (reverse proxy) rather than relying on session ids being hard to
+   guess.
+
 Out of scope: issues that require an already-compromised host, social
 engineering, or attacks that depend on the user disabling the documented
 loopback default without further protection.

@@ -38,6 +38,7 @@ afterAll(() => {
 });
 
 const getAsset = (headers = {}) => fetch(`${baseUrl}/style.css`, { headers });
+const getDocument = () => fetch(`${baseUrl}/graph_lens_lite.html`);
 
 describe("static cache headers", () => {
   it("serves assets with no-cache and revalidation validators", async () => {
@@ -102,5 +103,27 @@ describe("conditional GET via If-Modified-Since", () => {
       "If-Modified-Since": future,
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe("served document hardening", () => {
+  it("sends a CSP and refuses framing on the document", async () => {
+    const res = await getDocument();
+    expect(res.headers.get("x-frame-options")).toBe("DENY");
+    const csp = res.headers.get("content-security-policy");
+    // Permissive where the app needs it (inline handlers, blob: worker, the
+    // Neo4j connector's arbitrary origins), strict about the rest.
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("base-uri 'none'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("script-src 'self' 'unsafe-inline'");
+  });
+
+  it("leaves plain assets alone — only documents can be framed", async () => {
+    const res = await getAsset();
+    expect(res.headers.get("content-security-policy")).toBeNull();
+    expect(res.headers.get("x-frame-options")).toBeNull();
+    // The hardening that DOES apply to every response stays.
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
   });
 });
