@@ -61,11 +61,17 @@ class UIManager {
     this._loadingHolds = 0;
   }
 
-  setDataSourceLabel(text) {
+  /**
+   * Stamp what the on-screen graph came from. `source` is the machine-readable
+   * half — code that has to recognise a source (the Neo4j session's expand/join
+   * buttons) reads that, so rewording the visible text stays a copy change.
+   */
+  setDataSourceLabel(text, source = '') {
     const label = document.getElementById('dataSourceLabel');
     if (label) {
       label.textContent = text;
       label.title = text;
+      label.dataset.source = source;
     }
     // Every loader stamps the label, so this is the one seam where "another
     // source replaced the graph" is visible — sync the Neo4j session buttons.

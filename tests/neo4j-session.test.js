@@ -34,10 +34,14 @@ const CONFIG = {
 
 const NO_EXCLUSIONS = { excludedNodeProps: new Set(), excludedEdgeProps: new Set() };
 
+// Shaped like a Neo4j 5 payload: `elementId` alongside the legacy `id`. Expand
+// and stitch match on elementId, and the session refuses both without it (4.x
+// servers), so a fixture missing it is not a neutral simplification.
 const rawNode = (id, label = 'Person', properties = {}, extra = {}) => ({
   id,
   labels: [label],
   properties,
+  elementId: `4:test:${id}`,
   ...extra,
 });
 const rawRel = (id, startNode, endNode, type = 'KNOWS') => ({
@@ -151,7 +155,9 @@ describe('elementIdsFor', () => {
   it('prefers the raw node elementId and falls back to the app id', () => {
     startNeo4jSession(
       CONFIG,
-      [rawNode('1', 'Person', {}, { elementId: '4:abc:1' }), rawNode('2')],
+      // The second node is bare on purpose: that is the 4.x shape the fallback
+      // exists for (and which the session now refuses to expand).
+      [rawNode('1', 'Person', {}, { elementId: '4:abc:1' }), { id: '2', labels: ['Person'], properties: {} }],
       [],
       NO_EXCLUSIONS,
     );
@@ -288,7 +294,7 @@ describe('mergeAndApply', () => {
     startNeo4jSession(CONFIG, [], [], NO_EXCLUSIONS);
     const cache = makeCache();
     await mergeAndApply(cache, [rawNode('1')], [], { apply: vi.fn().mockResolvedValue(true) });
-    expect(cache.ui.setDataSourceLabel).toHaveBeenCalledWith('Neo4j: movies');
+    expect(cache.ui.setDataSourceLabel).toHaveBeenCalledWith('Neo4j: movies', 'neo4j');
   });
 
   it('does not re-label when apply fails', async () => {
@@ -336,7 +342,7 @@ describe('mergeAndApply', () => {
 describe('session lifecycle and UI gating', () => {
   const mountButtons = (labelText) => {
     document.body.innerHTML = `
-      <span id="dataSourceLabel">${labelText}</span>
+      <span id="dataSourceLabel" data-source="${labelText.startsWith('Neo4j') ? 'neo4j' : ''}">${labelText}</span>
       <button id="neo4jExpandBtn"></button>
       <button id="neo4jJoinBtn"></button>
     `;
@@ -352,7 +358,9 @@ describe('session lifecycle and UI gating', () => {
   it('hides the buttons when another source labels the graph', () => {
     mountButtons('Neo4j: movies');
     startNeo4jSession(CONFIG, [], [], NO_EXCLUSIONS);
-    document.getElementById('dataSourceLabel').textContent = 'Live (API)';
+    const label = document.getElementById('dataSourceLabel');
+    label.textContent = 'Live (API)';
+    label.dataset.source = ''; // what ui.setDataSourceLabel writes for other sources
     refreshNeo4jSessionUI();
     expect(document.getElementById('neo4jExpandBtn').style.display).toBe('none');
     expect(document.getElementById('neo4jJoinBtn').style.display).toBe('none');
@@ -367,8 +375,10 @@ describe('session lifecycle and UI gating', () => {
   it('executeNeo4jImport starts the session; the password never reaches localStorage', async () => {
     mountButtons('');
     const cache = makeCache();
-    cache.ui.setDataSourceLabel = (text) => {
-      document.getElementById('dataSourceLabel').textContent = text;
+    cache.ui.setDataSourceLabel = (text, source = '') => {
+      const label = document.getElementById('dataSourceLabel');
+      label.textContent = text;
+      label.dataset.source = source;
     };
     const fetchImpl = vi
       .fn()
@@ -547,6 +557,18 @@ describe('expandNeo4jSelection', () => {
     expect(cache.ui.hideLoading).toHaveBeenCalled();
   });
 
+  it('refuses on a server whose results carry no elementId (Neo4j 4.x)', async () => {
+    // The ids in $ids would be legacy numeric ids matched against elementId(n),
+    // so the query matches nothing and the old code called that "no neighbors".
+    startNeo4jSession(CONFIG, [{ id: '1', labels: ['Person'], properties: {} }], [], NO_EXCLUSIONS);
+    const cache = makeCache([], ['1']);
+    const fetchImpl = vi.fn();
+
+    expect(await expandNeo4jSelection(cache, { fetchImpl })).toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(cache.ui.error).toHaveBeenCalledWith(expect.stringContaining('Neo4j 5'));
+  });
+
   it('maps an unreachable server to the connect hint, not the raw text', async () => {
     startNeo4jSession(CONFIG, [rawNode('1')], [], NO_EXCLUSIONS);
     const cache = makeCache([], ['1']);
@@ -599,6 +621,19 @@ describe('showExpandChecklist', () => {
 
     fetchBtn.click();
     expect(await promise).toEqual({ pairs, stitch: true });
+  });
+
+  it('offers no stitch when the server cannot support it', async () => {
+    startNeo4jSession(CONFIG, [{ id: '1', labels: ['Person'], properties: {} }], [], NO_EXCLUSIONS);
+    const promise = showExpandChecklist(pairs);
+
+    const stitchBox = document.querySelector('.p-custom .neo4j-stitch-row input');
+    expect(stitchBox.checked).toBe(false);
+    expect(stitchBox.disabled).toBe(true);
+    expect(stitchBox.closest('.neo4j-stitch-row').title).toContain('Neo4j 5');
+
+    [...document.querySelectorAll('.p-custom button')].find((b) => b.textContent === 'Cancel').click();
+    await promise;
   });
 
   it('warns when the checked counts sum past the row threshold', async () => {
@@ -684,7 +719,7 @@ describe('openNeo4jJoinPopup', () => {
     expect(merged.nodes.map((n) => n.id).sort()).toEqual(['1', '7']);
     // Join results may be disconnected — seeded at the centroid, not left bare.
     expect(merged.nodes.find((n) => n.id === '7').style.x).toBeDefined();
-    expect(cache.ui.setDataSourceLabel).toHaveBeenCalledWith('Neo4j: movies');
+    expect(cache.ui.setDataSourceLabel).toHaveBeenCalledWith('Neo4j: movies', 'neo4j');
   });
 
   it('abandons the merge when the popup is dismissed mid-flight', async () => {
@@ -805,6 +840,35 @@ describe('openNeo4jJoinPopup', () => {
     expect(stitchBody.statements[0].parameters.ids.sort()).toEqual(['4:abc:1', '4:abc:7']);
     // The stitched relationship made it into the merged payload.
     expect(apply.mock.calls[0][1].edges.map((e) => e.id)).toContain('r9');
+  });
+
+  it('skips the stitch with a warning on a server without elementIds', async () => {
+    startNeo4jSession(CONFIG, [{ id: '1', labels: ['Person'], properties: {} }], [], NO_EXCLUSIONS);
+    const cache = makeCache();
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ results: [{ data: [{ row: [1] }] }], errors: [] }))
+      .mockResolvedValueOnce(graphResponse([rawNode('7', 'Gene')], []));
+    const apply = vi.fn().mockResolvedValue(true);
+    const promise = openNeo4jJoinPopup(cache, { fetchImpl, apply });
+
+    // The checkbox is disabled, so drive the flow the way the DOM allows and
+    // check the guard, not just the widget.
+    document.getElementById('neo4j-join-stitch').checked = true;
+    document.getElementById('neo4j-join-query').value = 'MATCH (g:Gene) RETURN g';
+    document.getElementById('neo4j-join-fetch-btn').click();
+
+    expect(await promise).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(2); // count + fetch, no stitch
+    expect(cache.ui.warning).toHaveBeenCalledWith(expect.stringContaining('Neo4j 5'));
+  });
+
+  it('says up front that merging resets filters and undo', () => {
+    startNeo4jSession(CONFIG, [], [], NO_EXCLUSIONS);
+    openNeo4jJoinPopup(makeCache());
+
+    expect(document.getElementById('neo4j-join-info').textContent).toContain('undo history');
+    document.getElementById('neo4j-join-cancel-btn').click();
   });
 
   it('skips the stitch roundtrip when the checkbox is unchecked', async () => {

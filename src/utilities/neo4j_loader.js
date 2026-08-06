@@ -121,6 +121,10 @@ async function runCypher(config, statements, opts = {}) {
   return payload.results ?? [];
 }
 
+// Server-side Cypher failures arrive as "<code>: <message>" from runCypher, and
+// every code is dotted and Neo-prefixed (Neo.ClientError.Statement.SyntaxError).
+const CYPHER_ERROR_RE = /^Neo\.\w+\./;
+
 /** Write clauses that make a query unsafe to run twice (count preflight + fetch). */
 const WRITE_CLAUSE_RE = /\b(CREATE|MERGE|SET|DELETE|REMOVE|DROP|FOREACH)\b/i;
 
@@ -162,8 +166,13 @@ async function countQueryRows(config, query, opts = {}) {
     );
     const value = results[0]?.data?.[0]?.row?.[0];
     return typeof value === 'number' ? value : null;
-  } catch {
-    return null;
+  } catch (err) {
+    // A Cypher error means the CALL wrapper cannot take this query's shape —
+    // that is what returning null is for. A wrong password or an unreachable
+    // server is not: swallowing those cost a second doomed roundtrip and
+    // delayed the real message by up to COUNT_TIMEOUT_MS.
+    if (CYPHER_ERROR_RE.test(err?.message ?? '')) return null;
+    throw err;
   }
 }
 
@@ -459,6 +468,9 @@ function toAppFormat(nodes, relationships, options = {}) {
  */
 let neo4jSession = null;
 
+/** Value the Neo4j flows stamp on the data-source label (see neo4jSessionActive). */
+const NEO4J_DATA_SOURCE = 'neo4j';
+
 /**
  * @param {{url: string, username: string, password: string, database: string}} config
  * @param {object[]} nodes  raw Neo4j nodes from collectGraph
@@ -468,6 +480,10 @@ let neo4jSession = null;
 function startNeo4jSession(config, nodes, relationships, exclusions) {
   neo4jSession = {
     config,
+    // Neo4j 4.x HTTP results carry no elementId, and expand/stitch match on
+    // elementId(n). Recorded once here so both can say "needs Neo4j 5+"
+    // instead of running a query that silently matches nothing.
+    hasElementIds: nodes.length === 0 || nodes.some((node) => node.elementId != null),
     rawNodes: new Map(nodes.map((node) => [node.id, node])),
     rawRels: new Map(relationships.map((rel) => [rel.id, rel])),
     exclusions,
@@ -490,12 +506,14 @@ function clearNeo4jSession() {
 
 /**
  * True while the rendered graph belongs to the Neo4j session. Every loader
- * stamps the data-source label, so the label check alone detects that another
- * source has replaced the graph — no lifecycle events needed.
+ * stamps the data-source label, so that one seam detects "another source
+ * replaced the graph" without any lifecycle events — but it is read from the
+ * machine-readable `data-source` the setter writes, not from the words on
+ * screen, which used to mean rewording the label silently killed expand/join.
  */
 function neo4jSessionActive() {
-  const label = document.getElementById('dataSourceLabel')?.textContent ?? '';
-  return neo4jSession !== null && label.startsWith('Neo4j:');
+  const label = document.getElementById('dataSourceLabel');
+  return neo4jSession !== null && label?.dataset.source === NEO4J_DATA_SOURCE;
 }
 
 /**
@@ -690,13 +708,15 @@ async function executeNeo4jImport(cache, config, deps = {}) {
     if (!graph) return false;
     const { nodes, relationships } = graph;
 
-    deps.onFetched?.();
     const exclusions = await checklist(collectPropertyKeys(nodes, relationships));
+    // Only now is the connection form done with: cancelling the checklist used
+    // to leave the user with a closed popup and a password to retype.
     if (!exclusions) return false;
+    deps.onFetched?.();
 
     const rendered = await apply(cache, toAppFormat(nodes, relationships, exclusions));
     if (rendered) {
-      cache.ui.setDataSourceLabel(`Neo4j: ${config.database}`);
+      cache.ui.setDataSourceLabel(`Neo4j: ${config.database}`, NEO4J_DATA_SOURCE);
       startNeo4jSession(config, nodes, relationships, exclusions);
     }
     return rendered;
@@ -852,7 +872,6 @@ export {
   collectPropertyKeys,
   toAppFormat,
   coerceValue,
-  describeType,
   buildTxUrl,
   basicAuth,
   nodeDisplayLabel,
@@ -872,4 +891,5 @@ export {
   LARGE_RESULT_ROW_THRESHOLD,
   LARGE_ARRAY_THRESHOLD,
   SETTINGS_STORAGE_KEY,
+  NEO4J_DATA_SOURCE,
 };

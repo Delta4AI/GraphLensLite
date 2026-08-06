@@ -28,6 +28,7 @@ import { settlePinnedForce } from '../graph/layout_algorithms.js';
 import {
   runCypher,
   connectionHint,
+  NEO4J_DATA_SOURCE,
   fetchGraphWithPreflight,
   collectGraph,
   toAppFormat,
@@ -41,6 +42,11 @@ import {
 const SEED_RADIUS = 80;
 const SEED_JITTER = 60;
 const PREFLIGHT_TIMEOUT_MS = 30_000;
+// A merge re-applies the whole graph, so filter narrowing goes back to the
+// loaded defaults and the undo stack is reset (mergeAndApply). Said in both
+// flows' copy rather than discovered afterwards.
+const MERGE_RESET_NOTE =
+  'Merging resets filter narrowing and clears the undo history; node positions are kept.';
 
 /**
  * Expansion matches nodes by `elementId()` — the app's node ids are the
@@ -189,6 +195,13 @@ async function appendStitch(session, nodes, relationships, opts) {
  * merge and say what is missing.
  */
 async function stitchOrWarn(cache, session, nodes, relationships, opts) {
+  if (session.hasElementIds === false) {
+    cache.ui.warning(
+      'Neo4j: linking the new results to the loaded graph needs Neo4j 5 or newer ' +
+        "(this server's results carry no elementId). Merging without those extra links.",
+    );
+    return;
+  }
   try {
     await appendStitch(session, nodes, relationships, opts);
   } catch (err) {
@@ -201,13 +214,16 @@ async function stitchOrWarn(cache, session, nodes, relationships, opts) {
 
 /** The stitch checkbox row shared by the expand checklist and the join popup. */
 function buildStitchRow() {
+  const supported = getNeo4jSession()?.hasElementIds !== false;
   const row = document.createElement('label');
   row.className = 'neo4j-stitch-row';
-  row.title =
-    'One extra query after the fetch: MATCH (n)-[r]-(m) with both endpoints already in the graph. Adds no nodes, only the missing links.';
+  row.title = supported
+    ? 'One extra query after the fetch: MATCH (n)-[r]-(m) with both endpoints already in the graph. Adds no nodes, only the missing links.'
+    : "Needs Neo4j 5 or newer — this server's results carry no elementId to match on.";
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
-  checkbox.checked = true;
+  checkbox.checked = supported;
+  checkbox.disabled = !supported;
   row.appendChild(checkbox);
   row.appendChild(
     document.createTextNode(
@@ -333,7 +349,7 @@ async function mergeAndApply(cache, newNodes, newRels, deps = {}) {
   if (rendered) {
     // applyGraph stamps its own data-source label — restore the session's
     // (this also re-shows the expand/join buttons via the label hook).
-    cache.ui.setDataSourceLabel(`Neo4j: ${session.config.database}`);
+    cache.ui.setDataSourceLabel(`Neo4j: ${session.config.database}`, NEO4J_DATA_SOURCE);
 
     // Float the new nodes into place: an animated force pass over the full
     // graph with everything else pinned, then persist the settled positions
@@ -366,7 +382,8 @@ function showExpandChecklist(pairs) {
   intro.className = 'neo4j-hint';
   intro.textContent =
     'Neighbors of the selected nodes, grouped by relationship type and label. ' +
-    'Checked groups are fetched and merged into the graph.';
+    'Checked groups are fetched and merged into the graph. ' +
+    MERGE_RESET_NOTE;
   content.appendChild(intro);
 
   const warning = document.createElement('div');
@@ -426,6 +443,15 @@ async function expandNeo4jSelection(cache, deps = {}) {
   const session = getNeo4jSession();
   const selected = cache.selectedNodes ?? [];
   if (!session || selected.length === 0) return false;
+
+  if (session.hasElementIds === false) {
+    // Every expand statement matches on elementId(n); on a 4.x server the ids
+    // in $ids match nothing, which surfaced as a confident "no neighbors".
+    cache.ui.error(
+      'Expanding needs Neo4j 5 or newer — this server\'s results carry no elementId.',
+    );
+    return false;
+  }
 
   const checklist = deps.checklist ?? showExpandChecklist;
   const opts = deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {};
@@ -502,7 +528,8 @@ function buildJoinForm(database) {
   form.querySelector('#neo4j-join-info').textContent =
     `Runs against the connected session (database "${database}") and merges the ` +
     'results into the current graph. Results may be disconnected from it. ' +
-    'Properties excluded at import stay excluded — re-import to change that.';
+    'Properties excluded at import stay excluded — re-import to change that. ' +
+    MERGE_RESET_NOTE;
 
   const { row, checkbox } = buildStitchRow();
   checkbox.id = 'neo4j-join-stitch';

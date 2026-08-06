@@ -141,9 +141,28 @@ describe('countQueryRows', () => {
     );
   });
 
-  it('returns null when the count query fails', async () => {
-    const fetchImpl = vi.fn().mockRejectedValue(new Error('boom'));
+  it('returns null when the CALL wrapper cannot take the query shape', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse({
+        results: [],
+        errors: [{ code: 'Neo.ClientError.Statement.SyntaxError', message: 'nope' }],
+      }),
+    );
     expect(await countQueryRows(CONFIG, 'MATCH (n) RETURN n', { fetchImpl })).toBeNull();
+  });
+
+  it('lets a bad password or a dead server through instead of swallowing it', async () => {
+    // Swallowed, these cost a second doomed roundtrip and delayed the real
+    // message by up to COUNT_TIMEOUT_MS.
+    const unauthorized = vi.fn().mockResolvedValue(jsonResponse({}, 401));
+    await expect(countQueryRows(CONFIG, 'MATCH (n) RETURN n', { fetchImpl: unauthorized })).rejects.toThrow(
+      /Authentication failed/,
+    );
+
+    const dead = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(countQueryRows(CONFIG, 'MATCH (n) RETURN n', { fetchImpl: dead })).rejects.toThrow(
+      TypeError,
+    );
   });
 
   it('never runs the preflight for write-shaped queries (it would write twice)', async () => {
@@ -486,7 +505,9 @@ describe('executeNeo4jImport', () => {
       cache,
       expect.objectContaining({ nodes: [expect.objectContaining({ id: '1', label: 'Ada' })] }),
     );
-    expect(cache.ui.setDataSourceLabel).toHaveBeenCalledWith('Neo4j: movies');
+    // Second argument is the machine-readable source: the expand/join buttons
+    // key off that, not off the words, so the label can be reworded freely.
+    expect(cache.ui.setDataSourceLabel).toHaveBeenCalledWith('Neo4j: movies', 'neo4j');
     expect(JSON.parse(fetchImpl.mock.calls[1][1].body).statements[0].resultDataContents).toEqual([
       'graph',
     ]);
@@ -574,8 +595,10 @@ describe('executeNeo4jImport', () => {
       ['progress', null],
       ['progress', 'Fetching graph data …'],
       ['progress', null],
-      ['fetched'],
+      // The checklist comes first now: the connection popup (and the typed
+      // password) has to survive a cancelled checklist.
       ['checklist'],
+      ['fetched'],
     ]);
     // Injected progress used — the global overlay stays untouched.
     expect(cache.ui.showLoading).not.toHaveBeenCalled();
@@ -714,6 +737,58 @@ describe('openNeo4jPopup', () => {
     expect(document.getElementById('neo4j-replace-note').hidden).toBe(false);
     document.getElementById('neo4j-cancel-btn').click();
     await loaded;
+  });
+
+  it('keeps the form (and the typed password) when the checklist is cancelled', async () => {
+    // The popup used to close as soon as data arrived, so cancelling the
+    // property checklist meant retyping the password to try again.
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse({ results: [{ data: [{ row: [1] }] }], errors: [] }))
+        .mockResolvedValueOnce(
+          jsonResponse({
+            results: [
+              {
+                data: [
+                  {
+                    graph: {
+                      nodes: [{ id: '1', labels: ['Person'], properties: { name: 'Ada' } }],
+                      relationships: [],
+                    },
+                  },
+                ],
+              },
+            ],
+            errors: [],
+          }),
+        ),
+    );
+    try {
+      openNeo4jPopup({ ui: {} });
+      document.getElementById('neo4j-url').value = 'http://localhost:7474';
+      document.getElementById('neo4j-password').value = 'sup3rsecret';
+      document.getElementById('neo4j-load-btn').click();
+
+      // The property checklist opens on top; the connection form is still there.
+      await vi.waitFor(() => {
+        expect(document.body.textContent).toContain('Select the properties to import');
+      });
+      expect(document.getElementById('neo4j-password').value).toBe('sup3rsecret');
+
+      // Two popups are open, so scope to the topmost — the first Cancel in
+      // document order belongs to the connection form underneath.
+      const checklist = [...document.querySelectorAll('.p-custom')].at(-1);
+      [...checklist.querySelectorAll('button')].find((b) => b.textContent === 'Cancel').click();
+
+      await vi.waitFor(() => {
+        expect(document.getElementById('neo4j-load-btn').disabled).toBe(false);
+      });
+      expect(document.getElementById('neo4j-password').value).toBe('sup3rsecret');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('keeps Cancel live while busy and aborts the in-flight request', async () => {
