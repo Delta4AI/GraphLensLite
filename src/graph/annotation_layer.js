@@ -447,6 +447,10 @@ class AnnotationLayer {
     // Only #createAt selects all, so this doubles as "the note was just placed"
     // — it has to be committed even if the default text is left untouched.
     this.editingIsNew = selectAll;
+    // Escape means cancel (see onKey): restore this on an existing note, drop
+    // the note entirely on one that was just placed.
+    this.editingOriginal = ann.text;
+    this.editingCancelled = false;
     el.classList.add('editing');
     // plaintext-only strips markup from paste natively; engines that reject
     // the keyword fall back to "true", where the explicit paste handler below
@@ -467,6 +471,10 @@ class AnnotationLayer {
     const onKey = (event) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
+        // Escape used to blur straight into the commit path, so it SAVED — and
+        // on a freshly placed note it saved the untouched "Text" default, which
+        // is exactly what the placement toast promised Escape would not do.
+        this.editingCancelled = true;
         el.blur();
       }
     };
@@ -492,17 +500,37 @@ class AnnotationLayer {
   #commitEditing(id, el) {
     this.editingId = null;
     const wasNew = this.editingIsNew === true;
+    const cancelled = this.editingCancelled === true;
+    const original = this.editingOriginal;
     this.editingIsNew = false;
+    this.editingCancelled = false;
     el.contentEditable = 'false';
     el.classList.remove('editing');
     const ann = this.#annotationById(id);
     if (!ann) return;
+
+    if (cancelled) {
+      // A note that only existed for this edit goes with it; an older one keeps
+      // the text it had. Either way nothing reaches the undo history.
+      if (wasNew) this.removeAnnotation(id, { record: false });
+      else {
+        el.textContent = original;
+        delete el.dataset.signature;
+        this.sync();
+      }
+      return;
+    }
+
     // innerText preserves the visual line breaks contenteditable produced.
     // Same length cap as the JSON-load boundary, so a save/load round-trip
     // never silently truncates what the user just typed.
-    const text = (el.innerText ?? el.textContent ?? '')
-      .replace(/\n+$/, '')
-      .slice(0, MAX_TEXT_LENGTH);
+    const typed = (el.innerText ?? el.textContent ?? '').replace(/\n+$/, '');
+    const text = typed.slice(0, MAX_TEXT_LENGTH);
+    if (typed.length > text.length) {
+      this.cache.ui?.warning?.(
+        `Note trimmed to ${MAX_TEXT_LENGTH} characters (${typed.length} pasted).`,
+      );
+    }
     if (text.trim() === '') {
       this.removeAnnotation(id, { record: false });
       return;

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AnnotationLayer } from '../src/graph/annotation_layer.js';
 import { ANNOTATION_DEFAULTS } from '../src/graph/annotation_geometry.js';
 
@@ -39,7 +39,7 @@ function makeSigma(ratio = 1) {
 function makeCache(annotations = []) {
   return {
     data: { selectedLayout: 'Default', layouts: { Default: { annotations } } },
-    ui: { info: () => {}, error: () => {} },
+    ui: { info: () => {}, error: () => {}, warning: vi.fn() },
     history: {
       commits: [],
       commit(label) {
@@ -318,15 +318,62 @@ describe('editing', () => {
     expect(requested).toEqual(['text/plain']);
   });
 
-  it('caps committed text at the same limit the load boundary enforces', () => {
+  it('caps committed text at the same limit the load boundary enforces, and says so', () => {
     const ann = { id: 'a', text: 'x', x: 0, y: 0, fontSize: 14, fontColor: '#000', borderColor: '#000', borderWidth: 1 };
-    const { layer, container } = makeLayer({ annotations: [ann] });
+    const { layer, cache, container } = makeLayer({ annotations: [ann] });
     layer.sync();
     const el = noteEls(container)[0];
     el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     el.textContent = 'a'.repeat(5000);
     el.dispatchEvent(new Event('blur'));
     expect(ann.text).toHaveLength(2000);
+    // Silent truncation of pasted text looked like the paste had failed.
+    expect(cache.ui.warning).toHaveBeenCalledWith(expect.stringContaining('2000'));
+  });
+
+  it('does not warn about the cap when nothing was trimmed', () => {
+    const ann = { id: 'a', text: 'x', x: 0, y: 0, fontSize: 14, fontColor: '#000', borderColor: '#000', borderWidth: 1 };
+    const { layer, cache, container } = makeLayer({ annotations: [ann] });
+    layer.sync();
+    const el = noteEls(container)[0];
+    el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    el.textContent = 'a'.repeat(2000);
+    el.dispatchEvent(new Event('blur'));
+    expect(cache.ui.warning).not.toHaveBeenCalled();
+  });
+
+  it('Escape abandons a freshly placed note instead of saving the default text', () => {
+    // The placement toast promises Escape cancels; Escape blurred into the
+    // commit path, so it saved a note reading "Text".
+    const { layer, cache, container } = makeLayer();
+    layer.armPlacement();
+    container
+      .querySelector('.annotation-placement-overlay')
+      .dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 500, clientY: 200, bubbles: true }));
+    expect(cache.data.layouts.Default.annotations).toHaveLength(1);
+
+    const el = noteEls(container)[0];
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    el.dispatchEvent(new Event('blur')); // jsdom does not blur on its own
+
+    expect(cache.data.layouts.Default.annotations).toHaveLength(0);
+    expect(cache.history.commits).toEqual([]);
+  });
+
+  it('Escape on an existing note restores the text it had', () => {
+    const ann = { id: 'a', text: 'keep me', x: 0, y: 0, fontSize: 14, fontColor: '#000', borderColor: '#000', borderWidth: 1 };
+    const { layer, cache, container } = makeLayer({ annotations: [ann] });
+    layer.sync();
+    const el = noteEls(container)[0];
+
+    el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    el.textContent = 'typed over it';
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    el.dispatchEvent(new Event('blur'));
+
+    expect(ann.text).toBe('keep me');
+    expect(el.textContent).toBe('keep me');
+    expect(cache.history.commits).toEqual([]);
   });
 
   it('committing new text updates the note', () => {
