@@ -1,5 +1,5 @@
 /* global ExcelJS */ // loaded as a global via vendored src/lib/exceljs.min.js script tag
-import { DEFAULTS, CFG, VERSION, bubbleGroupStyle } from '../config.js';
+import { DEFAULTS, CFG, VERSION, bubbleGroupStyle, UNSAFE_OBJECT_KEYS } from '../config.js';
 import { sanitizeAnnotations } from '../graph/annotation_geometry.js';
 import { StaticUtilities } from '../utilities/static.js';
 import { buildDataTable } from '../utilities/data_editor.js';
@@ -955,7 +955,29 @@ class IOManager {
         trimmedKey = key.trim();
       }
 
+      // Both halves become live object keys in D4Data; a column named
+      // `__proto__` would land its properties on a prototype instead (see
+      // UNSAFE_OBJECT_KEYS). Refused here, the one place every header and cell
+      // key is decoded.
+      if (UNSAFE_OBJECT_KEYS.has(subGroup) || UNSAFE_OBJECT_KEYS.has(trimmedKey)) return null;
       return { subGroup: subGroup, key: trimmedKey };
+    };
+
+    /** decodeKey over a header list, telling the user which columns it refused. */
+    const decodeHeaders = (keys, descriptor) => {
+      const decoded = [];
+      const refused = [];
+      for (const key of keys) {
+        const entry = decodeKey(key);
+        if (entry) decoded.push(entry);
+        else refused.push(key);
+      }
+      if (refused.length > 0) {
+        this.cache.ui.warning(
+          `Ignored ${refused.length} ${descriptor} column(s) with a reserved name: ${refused.join(', ')}.`
+        );
+      }
+      return decoded;
     };
 
     const nodesDataDict = worksheetToJson(nodesSheet);
@@ -1004,26 +1026,28 @@ class IOManager {
     const nonDataNodeColumns = new Set(
       EXCEL_NODE_PROPERTIES.map((p) => p.column.toLowerCase().trim())
     );
-    const nodeDataHeaders = nodesDataDict.headers
-      .filter(
+    const nodeDataHeaders = decodeHeaders(
+      nodesDataDict.headers.filter(
         (k) =>
           !nonDataNodeColumns.has(k.toLowerCase().trim()) &&
           !k.startsWith('__EMPTY') &&
           k !== '__rowNum__'
-      )
-      .map((k) => decodeKey(k));
+      ),
+      'node'
+    );
 
     const nonDataEdgeColumns = new Set(
       EXCEL_EDGE_PROPERTIES.map((p) => p.column.toLowerCase().trim())
     );
-    const edgeDataHeaders = edgesDataDict.headers
-      .filter(
+    const edgeDataHeaders = decodeHeaders(
+      edgesDataDict.headers.filter(
         (k) =>
           !nonDataEdgeColumns.has(k.toLowerCase().trim()) &&
           !k.startsWith('__EMPTY') &&
           k !== '__rowNum__'
-      )
-      .map((k) => decodeKey(k));
+      ),
+      'edge'
+    );
 
     const addNodeOrEdgeStyle = (nodeOrEdge, row, propertyMap, descriptor) => {
       nodeOrEdge.style = {};
@@ -1093,7 +1117,9 @@ class IOManager {
         return null;
       }
 
-      return { value: val, ...decodeKey(key) };
+      const decoded = decodeKey(key);
+      if (!decoded) return null; // reserved column name — decodeHeaders warned already
+      return { value: val, ...decoded };
     };
 
     const addNodeOrEdgeUserData = (nodeOrEdge, row, propertyMap, header, descriptor) => {

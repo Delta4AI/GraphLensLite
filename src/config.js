@@ -365,6 +365,11 @@ const CFG = {
 // which is what keeps an unbounded number of generated colours separable.
 const GOLDEN_ANGLE_DEG = 137.508;
 
+// Names that reach an object's prototype through plain assignment, so they are
+// refused wherever imported text becomes a live object key (Excel headers,
+// merged property groups). Same set as the JSON reviver in server/validate.js.
+const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 /** HSL (h 0-360, s/l 0-1) to `#rrggbb`. */
 function hslToHex(h, s, l) {
   const a = s * Math.min(l, 1 - l);
@@ -413,4 +418,4 @@ function bubbleGroupStyle(index, name) {
   };
 }
 
-export {VERSION, DEFAULTS, CFG, bubbleGroupColor, bubbleGroupStyle, hslToHex, GOLDEN_ANGLE_DEG}
+export {VERSION, DEFAULTS, CFG, bubbleGroupColor, bubbleGroupStyle, hslToHex, GOLDEN_ANGLE_DEG, UNSAFE_OBJECT_KEYS}

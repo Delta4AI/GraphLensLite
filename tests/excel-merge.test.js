@@ -349,6 +349,31 @@ describe("computeMergePlan", () => {
     expect(plan.stats.newNodeColumns).toEqual(["Plain"]);
   });
 
+  it("never merges a property group named like a prototype key", () => {
+    // JSON.parse, not a literal: `{ __proto__: … }` in source sets the
+    // prototype instead of creating the own key a hostile file would carry.
+    const incoming = {
+      nodes: [
+        {
+          id: "A",
+          style: {},
+          D4Data: JSON.parse('{"__proto__": {"g": {"pwned": 1}}}'),
+        },
+      ],
+      edges: [],
+      nodeDataHeaders: [],
+      edgeDataHeaders: [],
+    };
+
+    const plan = computeMergePlan(currentGraphFixture(), incoming);
+
+    expect({}.pwned).toBeUndefined();
+    expect(Object.prototype.g).toBeUndefined();
+    const mergedA = plan.fileData.nodes.find((n) => n.id === "A");
+    expect(Object.getPrototypeOf(mergedA.D4Data)).toBe(Object.prototype);
+    expect(mergedA.D4Data[NODE_HEADER]).toEqual({ "group A": { "Feature X": 1 } });
+  });
+
   it("defaults to outer join with empty ignored lists", () => {
     const plan = computeMergePlan(currentGraphFixture(), incomingMixedFixture());
 
@@ -457,6 +482,25 @@ describe("parseExcelToJson merge mode", () => {
     expect(result.nodes).toHaveLength(1);
     expect(result.edges).toEqual([]);
     expect(result.nodeDataHeaders).toEqual([{ subGroup: "group A", key: "Feature X" }]);
+  });
+
+  it("refuses columns whose group or key would land on a prototype", async () => {
+    // A header is used as a live object key in D4Data, so `Feature [__proto__]`
+    // would file its value on a prototype instead of the element.
+    const buffer = await buildWorkbook(
+      [{ ID: "A", "Feature X [group A]": 1, "Feature Y [__proto__]": 2, "constructor [g]": 3 }],
+      null
+    );
+
+    const result = await io.parseExcelToJson(buffer, { merge: true });
+
+    expect(result.nodeDataHeaders).toEqual([{ subGroup: "group A", key: "Feature X" }]);
+    expect(Object.keys(result.nodes[0].D4Data[NODE_HEADER])).toEqual(["group A"]);
+    expect(Object.getPrototypeOf(result.nodes[0].D4Data[NODE_HEADER])).toBe(Object.prototype);
+    expect(cache.ui.warning).toHaveBeenCalledWith(
+      expect.stringContaining("Feature Y [__proto__]")
+    );
+    expect(cache.ui.warning).toHaveBeenCalledWith(expect.stringContaining("constructor [g]"));
   });
 
   it("still requires both sheets outside merge mode", async () => {
