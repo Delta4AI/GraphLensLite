@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import { initUiTooltips, parseTip } from '../src/utilities/ui_tooltip.js';
+import { hotkeyLabel } from '../src/managers/command_palette.js';
 
 // ==========================================================================
 // The styled tooltip layer replaces every native title tooltip via event
@@ -20,7 +21,10 @@ describe('parseTip', () => {
     expect(parseTip('Fit graph to screen (F)')).toEqual({
       lead: null, body: 'Fit graph to screen', shortcut: 'F',
     });
+    // hotkeyLabel's own output has to survive this round trip — it emitted
+    // "Ctrl Z" (space) before, which fell out of both readers and cost the chip.
     expect(parseTip('Search every control (Ctrl+K)').shortcut).toBe('Ctrl+K');
+    expect(parseTip(`Undo: Move nodes (${hotkeyLabel('Z')})`).shortcut).toBe(hotkeyLabel('Z'));
     expect(parseTip('Keyboard shortcuts (?)').shortcut).toBe('?');
   });
 

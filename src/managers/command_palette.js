@@ -21,10 +21,15 @@
 
 const MAX_RESULTS = 60;
 const MAX_ELEMENTS = 8;
+/** Matches the .cmdk-flash animation in style.css; the class is what drives it. */
+const FLASH_MS = 1200;
 // Rail and menu tooltips already end in "(F)", "(L)", "(D)" … — free
 // accelerators, and they cannot drift from the hotkey they document because
 // they ARE the tooltip the user reads on hover.
-const ACCEL_RE = /\(([^()\s]{1,2})\)\s*$/;
+// A trailing accelerator in a title: one bare key, a ⌘ chord, or a spelled-out
+// modifier chord. Deliberately not "any short parenthetical" — that would read
+// "(beta)" as a keystroke.
+const ACCEL_RE = /\((⌘\S{1,2}|(?:Ctrl|Alt|Shift)\+\S{1,2}|[^()\s])\)\s*$/;
 
 const hasWords = (text) => /[a-z]{2}/i.test(text || '');
 const clean = (text) =>
@@ -73,10 +78,16 @@ function visibleWithin(el, root) {
  * state glyph.
  */
 function actionables(root) {
-  const found = [...root.querySelectorAll('.rail-menu-item, button')];
-  return found.filter(
-    (el) => !found.some((other) => other !== el && other.contains(el)) && visibleWithin(el, root)
-  );
+  const kept = [];
+  // querySelectorAll is document order, so a container always precedes its
+  // descendants: checking only the last kept element skips them all, where the
+  // old `found.some(other => other.contains(el))` was a full O(n²) sweep.
+  for (const el of root.querySelectorAll('.rail-menu-item, button')) {
+    if (kept.length > 0 && kept[kept.length - 1].contains(el)) continue;
+    if (!visibleWithin(el, root)) continue;
+    kept.push(el);
+  }
+  return kept;
 }
 
 function command(el, trail, extra = {}) {
@@ -262,13 +273,16 @@ export function collectCommands(cache) {
  */
 export function matchElements(cache, query) {
   const found = [];
-  for (const [isNode, map] of [
-    [true, cache.nodeIDOrLabelToNodeIDs],
-    [false, cache.edgeIDOrLabelToEdgeIDs],
+  for (const [isNode, map, visible] of [
+    [true, cache.nodeIDOrLabelToNodeIDs, cache.nodeIDsToBeShown],
+    [false, cache.edgeIDOrLabelToEdgeIDs, cache.edgeIDsToBeShown],
   ]) {
     for (const [key, ids] of map ?? []) {
       if (found.length >= MAX_ELEMENTS) break;
       if (!String(key).toLowerCase().includes(query)) continue;
+      // Focusing something the filters hide moves the camera onto nothing. The
+      // visible sets are absent before the first render — then nothing is hidden.
+      if (visible && ![...ids].some((id) => visible.has(id))) continue;
       found.push({
         name: String(key),
         trail: isNode ? 'node' : 'edge',
@@ -335,7 +349,7 @@ export function reveal(cache, cmd) {
   const box = el.getBoundingClientRect?.().height ? el : (el.firstElementChild ?? el);
   box.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
   el.classList?.add('cmdk-flash');
-  setTimeout(() => el.classList?.remove('cmdk-flash'), 1200);
+  setTimeout(() => el.classList?.remove('cmdk-flash'), FLASH_MS);
   const target = el.matches?.('input, select, button') ? el : el.querySelector?.('input, select, button');
   target?.focus({ preventScroll: true });
 }
@@ -493,7 +507,9 @@ class CommandPalette {
  */
 export function hotkeyLabel(key) {
   const platform = globalThis.navigator?.platform ?? '';
-  return /Mac|iPhone|iPad/.test(platform) ? `⌘${key}` : `Ctrl ${key}`;
+  // "Ctrl Z" (space) parsed as neither an accelerator nor a shortcut, so the
+  // kbd chip vanished on Windows and Linux; "+" is what both readers expect.
+  return /Mac|iPhone|iPad/.test(platform) ? `⌘${key}` : `Ctrl+${key}`;
 }
 
 export function paletteAccelerator() {

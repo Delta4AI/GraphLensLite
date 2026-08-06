@@ -167,6 +167,16 @@ describe('the index is derived from the DOM', () => {
     expect(named(collectCommands(cache), 'Join')).toBeUndefined();
   });
 
+  it('indexes a menu row once, not again as the button inside it', () => {
+    // The row IS the control; the button inside is its state glyph. The scan
+    // relies on document order to skip descendants of anything it kept.
+    const cmds = collectCommands(cache);
+    const row = cache.rail.menus[0].el.querySelector('.rail-menu-item');
+    row.appendChild(Object.assign(document.createElement('button'), { title: 'inner glyph' }));
+    expect(collectCommands(cache)).toHaveLength(cmds.length);
+    expect(named(collectCommands(cache), 'inner glyph')).toBeUndefined();
+  });
+
   it('indexes rail menu rows without ever opening the menu', () => {
     const cmds = collectCommands(cache);
     expect(cache.rail.menus[0].isOpen).toBe(false);
@@ -499,6 +509,20 @@ describe('the palette dialog', () => {
     expect(cache.gcm.focusElements).toHaveBeenCalledWith(new Set(['n1']), true);
   });
 
+  it('leaves out elements the filters are hiding', () => {
+    // Focusing one moved the camera onto empty canvas: the element search read
+    // the label maps, which keep every element whether it is drawn or not.
+    cache.nodeIDsToBeShown = new Set(['n2']);
+    cache.edgeIDsToBeShown = new Set();
+    palette.open();
+    type('tp53');
+    key('Enter');
+
+    expect(cache.gcm.focusElements).not.toHaveBeenCalled();
+    // CASP3 is still visible, so it is still reachable.
+    expect(matchElements(cache, 'casp3').map((c) => c.name)).toEqual(['CASP3']);
+  });
+
   it('reports the result count and says so when there is nothing', () => {
     palette.open();
     type('fit');
@@ -540,7 +564,7 @@ describe('the palette dialog', () => {
     initCommandPalette(cache);
     // jsdom reports a non-Mac platform, so the Ctrl form is the correct one.
     const btn = document.getElementById('cmdkBtn');
-    expect(btn.title).toContain('Ctrl K');
+    expect(btn.title).toContain('Ctrl+K');
     expect(btn.textContent).not.toContain('Ctrl');
   });
 });
