@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { attachGroupMenu } from '../src/managers/group_menu.js';
+import { UIManager } from '../src/managers/ui.js';
+import { GraphBubbleSetManager } from '../src/graph/bubble_sets.js';
 
 // ==========================================================================
 // The shared group checklist.
@@ -229,5 +231,62 @@ describe('group menu', () => {
 
     document.body.dispatchEvent(new Event('scroll', { bubbles: true }));
     expect(openMenu()).toBeNull();
+  });
+});
+
+// --------------------------------------------------------------------------
+// The Selection panel's "Add to group" button wires the same menu to three
+// GraphBubbleSetManager methods by name. A typo there is invisible to every
+// other test — the menu still opens, the click just does nothing.
+// --------------------------------------------------------------------------
+
+describe('UIManager.buildAddToGroupButton wiring', () => {
+  function setUp(membership = 'none') {
+    document.body.innerHTML = '<button id="addToGroupBtn">Add to group</button>';
+    const cache = makeCache({ g1: 'Kinases' });
+    cache.bs = {
+      ...cache.bs,
+      selectionMembership: vi.fn(() => membership),
+      toggleSelectedNodesInManualGroup: vi.fn(async () => {}),
+      createGroupFromSelection: vi.fn(async () => {}),
+    };
+    const ui = Object.create(UIManager.prototype);
+    ui.cache = cache;
+    ui.buildAddToGroupButton();
+    document.getElementById('addToGroupBtn').click();
+    return cache;
+  }
+
+  it('calls the methods the manager actually exposes', () => {
+    for (const name of [
+      'selectionMembership',
+      'toggleSelectedNodesInManualGroup',
+      'createGroupFromSelection',
+    ]) {
+      expect(typeof GraphBubbleSetManager.prototype[name]).toBe('function');
+    }
+  });
+
+  it('marks a fully-covered group as checked and toggles it on click', () => {
+    const cache = setUp('all');
+
+    expect(rows()[0].querySelector('.rail-menu-check').textContent).not.toBe('');
+    rows()[0].click();
+    expect(cache.bs.toggleSelectedNodesInManualGroup).toHaveBeenCalledWith('g1');
+  });
+
+  it('reports partial membership without claiming the group is checked', () => {
+    setUp('some');
+    const row = rows()[0];
+    expect(row.className).toContain('partial');
+  });
+
+  it('creates a group from the selection through the last row', () => {
+    const cache = setUp();
+    const newRow = rows().at(-1);
+
+    expect(newRow.textContent).toContain('New group from selection');
+    newRow.click();
+    expect(cache.bs.createGroupFromSelection).toHaveBeenCalled();
   });
 });
