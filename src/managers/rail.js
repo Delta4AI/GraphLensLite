@@ -87,6 +87,10 @@ class RailMenu {
     document.addEventListener('pointerdown', this._outsideHandler, true);
     this._escapeHandler = (e) => {
       if (e.key === 'Escape') {
+        // The menu is the innermost layer while it is open, so Escape belongs to
+        // it alone — Popup's own Escape would otherwise close the dialog under
+        // an open menu at the same time (the annotation popover does the same).
+        e.stopPropagation();
         this.close();
         this.anchor.focus();
       }

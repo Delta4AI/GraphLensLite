@@ -150,6 +150,23 @@ describe('initRail', () => {
     expect(menu.classList.contains('open')).toBe(false);
   });
 
+  it('keeps Escape to itself while open, so a dialog under it survives', () => {
+    // Popup installs its own document Escape handler (topmost-only). With an
+    // open menu the menu IS the topmost layer, and both closing at once would
+    // take the dialog away from under the user.
+    const appMenuBtn = document.getElementById('appMenuBtn');
+    appMenuBtn.click();
+    const menu = document.querySelector('.rail-menu');
+    expect(menu.classList.contains('open')).toBe(true);
+
+    const seen = [];
+    document.addEventListener('keydown', (e) => seen.push(e.key));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(menu.classList.contains('open')).toBe(false);
+    expect(seen).toEqual([]); // the capture-phase handler stopped it
+  });
+
   it('exposes menu state via aria-expanded and closes on Escape', () => {
     const appMenuBtn = document.getElementById('appMenuBtn');
     expect(appMenuBtn.getAttribute('aria-expanded')).toBe('false');

@@ -301,6 +301,12 @@ export async function settlePinnedForce(graph, freeIds, opts = {}) {
   const raf = opts.raf ?? globalThis.requestAnimationFrame ?? ((cb) => setTimeout(cb, 16));
   const deadline = Date.now() + durationMs;
 
+  // ponytail: each tick runs SETTLE_ITERATIONS_PER_TICK full-graph FA2 passes
+  // and then restores every pinned node one mergeNodeAttributes at a time, so a
+  // big merge can exceed a frame. Upgrade path if merge-settle jank ever shows:
+  // restore through updateEachNodeAttributes (one pass), and drop to a single
+  // iteration per tick above a node threshold. Not done blind — the current
+  // shape is fine at the sizes this app renders.
   await new Promise((resolve) => {
     const tick = () => {
       for (let i = 0; i < SETTLE_ITERATIONS_PER_TICK; i++) {
