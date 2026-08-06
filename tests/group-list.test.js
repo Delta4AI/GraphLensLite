@@ -104,14 +104,18 @@ describe('the ＋/－ button says what a click will do', () => {
 
   it('disables itself, without a count, when nothing is selected', () => {
     render([], []);
-    expect(toggleFor('g1').disabled).toBe(true);
+    // Class + aria, not the attribute: an attribute-disabled button is outside
+    // the delegated tooltip layer's reach, and the tooltip is what explains it.
+    expect(toggleFor('g1').classList.contains('disabled')).toBe(true);
+    expect(toggleFor('g1').getAttribute('aria-disabled')).toBe('true');
     expect(toggleFor('g1').textContent).toBe('＋');
     expect(toggleFor('g1').title).toContain('Select nodes first');
   });
 
   it('offers to add when the selection is outside the group', () => {
     render(['a', 'b'], []);
-    expect(toggleFor('g1').disabled).toBe(false);
+    expect(toggleFor('g1').classList.contains('disabled')).toBe(false);
+    expect(toggleFor('g1').getAttribute('aria-disabled')).toBe('false');
     expect(toggleFor('g1').textContent).toBe('＋ 2');
     expect(toggleFor('g1').classList.contains('remove')).toBe(false);
   });

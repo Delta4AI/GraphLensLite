@@ -35,7 +35,11 @@ export function syncGroupRows(bs) {
     const state = bs.selectionMembership(group);
     const name = layoutOf(bs)?.bubbleSetStyle?.[group]?.labelText || group;
 
-    btn.disabled = count === 0;
+    // Class, not the attribute: a disabled attribute takes the button out of
+    // the delegated tooltip layer's reach, and the tooltip is the only thing
+    // that explains why the button is dead ("Select nodes first").
+    btn.classList.toggle('disabled', count === 0);
+    btn.setAttribute('aria-disabled', String(count === 0));
     btn.classList.toggle('remove', state === 'all');
     if (count === 0) {
       btn.textContent = '＋';

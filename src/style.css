@@ -2959,6 +2959,18 @@ hr {
     cursor: default;
 }
 
+/* A titled disabled control keeps its pointer events, because the tooltip
+   layer is delegated: with pointer-events none the hover never reaches the
+   element and the one thing the user needs — WHY it is disabled ("Nothing to
+   undo") — is unreadable. The clicks that come back with it are swallowed at
+   the document in initUiTooltips. `data-tip` is the same element mid-hover,
+   after the layer stashes the title away. */
+.disabled[title],
+.disabled[data-tip] {
+    pointer-events: auto;
+    cursor: not-allowed;
+}
+
 /*************************
  custom checkbox style
  **************************/

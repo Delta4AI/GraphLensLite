@@ -182,6 +182,19 @@ function initUiTooltips(doc = document) {
   });
   doc.addEventListener('focusout', hide);
   doc.addEventListener('pointerdown', dismiss);
+  // Titled `.disabled` controls keep their pointer events so the hover above
+  // can reach them (see style.css) — which also makes them clickable again.
+  // One capture-phase guard swallows those clicks for every class-disabled
+  // control at once; the alternative was a check in every handler.
+  doc.addEventListener(
+    'click',
+    (e) => {
+      if (!e.target.closest?.('.disabled')) return;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    true
+  );
   doc.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') hide();
   });

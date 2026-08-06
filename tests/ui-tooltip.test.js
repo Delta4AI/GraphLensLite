@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import fs from 'node:fs';
 import { initUiTooltips, parseTip } from '../src/utilities/ui_tooltip.js';
 
 // ==========================================================================
@@ -106,11 +107,47 @@ describe('initUiTooltips', () => {
     expect(btn.getAttribute('title')).toBe('Fresh text');
   });
 
+  it('explains a disabled control on hover but swallows its click', () => {
+    // `.disabled` used to be pointer-events: none, so the delegated layer never
+    // saw the hover and the one thing worth reading — why the control is dead —
+    // was unreachable. Pointer events came back; the clicks must not.
+    btn.classList.add('disabled');
+    btn.title = 'Nothing to undo';
+    const clicked = vi.fn();
+    btn.addEventListener('click', clicked);
+
+    hover(btn);
+    vi.advanceTimersByTime(600);
+    expect(document.getElementById('uiTip').textContent).toContain('Nothing to undo');
+
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(clicked).not.toHaveBeenCalled();
+  });
+
+  it('still lets an enabled control through', () => {
+    const clicked = vi.fn();
+    btn.addEventListener('click', clicked);
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(clicked).toHaveBeenCalledOnce();
+  });
+
   it('hides when the pointer leaves interactive elements entirely', () => {
     hover(btn);
     vi.advanceTimersByTime(600);
     hover(document.body);
     expect(document.getElementById('uiTip').classList.contains('show')).toBe(false);
     expect(btn.getAttribute('title')).toBe('Fit graph to screen (F)');
+  });
+});
+
+// The guard above is only half the fix: jsdom applies no stylesheet, so the
+// rule that gives a titled disabled control its pointer events back has to be
+// pinned here or it could be deleted with every test still green.
+describe('style.css disabled-tooltip rule', () => {
+  it('restores pointer events for titled disabled controls', () => {
+    const css = fs.readFileSync('src/style.css', 'utf8'); // vitest runs at the repo root
+    const rule = css.match(/\.disabled\[title\],\s*\.disabled\[data-tip\]\s*\{([^}]*)\}/);
+    expect(rule).not.toBeNull();
+    expect(rule[1]).toContain('pointer-events: auto');
   });
 });
