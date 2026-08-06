@@ -38,6 +38,20 @@ function currentLayout(cache) {
   return layout ? { name, layout } : null;
 }
 
+/**
+ * Comparable form of a snapshot's state. JSON alone would flatten the layout's
+ * Maps and Sets (filters, positions, group members) to `{}` and call every
+ * change equal, so both are spelled out. Key order counts as a difference —
+ * that only ever costs one redundant undo entry, never a missed one.
+ */
+function signatureOf(state) {
+  return JSON.stringify(state, (_key, value) => {
+    if (value instanceof Map) return { __map: [...value] };
+    if (value instanceof Set) return { __set: [...value] };
+    return value;
+  });
+}
+
 /** A deep copy of the current workspace's view state, or null if there is none. */
 function snapshot(cache) {
   const current = currentLayout(cache);
@@ -47,7 +61,7 @@ function snapshot(cache) {
     if (VOLATILE_KEYS.includes(key)) continue;
     state[key] = structuredClone(value);
   }
-  return { name: current.name, state };
+  return { name: current.name, state, signature: signatureOf(state) };
 }
 
 class History {
@@ -104,6 +118,11 @@ class History {
       this.baseline = after;
       return;
     }
+    // Every filter change funnels through commit(), including the ones that
+    // changed nothing (a section reset with nothing narrowed, a re-applied
+    // query). Recording those left an undo entry whose before and after are the
+    // same state — pressing undo appeared to do nothing.
+    if (this.baseline.signature === after.signature) return;
     this.past.push({ label, before: this.baseline, after });
     while (this.past.length > this.#depth()) this.past.shift();
     this.future = [];

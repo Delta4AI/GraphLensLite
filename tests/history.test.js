@@ -129,6 +129,19 @@ describe('History', () => {
     expect(layoutOf(cache).filters.get('p1').active).toBe(true);
   });
 
+  it('ignores a commit that changed nothing', () => {
+    layoutOf(cache).filters.get('p1').active = false;
+    history.commit('Filter change');
+    expect(history.past).toHaveLength(1);
+
+    // A reset with nothing narrowed, a re-applied query: same state, same label
+    // or not — either way there is nothing to undo.
+    history.commit('Filter change');
+    history.commit('Reset filters');
+    expect(history.past).toHaveLength(1);
+    expect(history.undoLabel).toBe('Filter change');
+  });
+
   it('a new change drops the redo branch', async () => {
     layoutOf(cache).layoutType = 'circular';
     history.commit('Re-layout (circular)');
