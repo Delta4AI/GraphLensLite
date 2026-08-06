@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global window, document, requestAnimationFrame, Image, Node */ // browser globals run inside page.evaluate() callbacks
+/* global window, document, requestAnimationFrame, Image */ // browser globals run inside page.evaluate() callbacks
 // Manual regression check: panel toggles must not blank the graph.
 //
 // Repro for the "graph disappears after sidebar/bottom-bar toggle until the

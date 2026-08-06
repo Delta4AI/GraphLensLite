@@ -4,7 +4,6 @@ import { StaticUtilities } from './static.js';
 import { EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from '../managers/io.js';
 import { computeMergePlan, showMergePreview } from './excel_merge.js';
 
-let dataTable;
 
 class DataTable {
   constructor(cache, containerId = 'dataTableContainer') {
@@ -373,7 +372,7 @@ class DataTable {
       return StaticUtilities.escapeHtml(header);
     }
 
-    const [typePrefix, group, property] = parts;
+    const [, group, property] = parts;
 
     // Determine scaling class based on property text length
     // Longer text gets smaller font (size-xs = 9px smallest)

@@ -41,7 +41,7 @@ async loadNetwork() {
 
     const annotations = await this._fetchFunctionalAnnotations(Array.from(allProteins));
     return this._convertToAppFormat(stringData, annotations);
-  } catch (err) {
+  } catch {
     this.cache.ui.error(`Failed to load STRING network. Make sure gene symbols and species ID exist. ${url}`);
     return null;
   }
@@ -70,7 +70,7 @@ async _loadSingleProtein() {
 
     // Convert single protein to app format (no edges, just one node)
     return this._convertSingleProteinToAppFormat(proteinInfo, annotationData);
-  } catch (err) {
+  } catch {
     this.cache.ui.error(`Failed to load protein info from STRING. Make sure gene symbol and species ID exist. ${url}`);
     return null;
   }

@@ -1,8 +1,7 @@
 /* global ExcelJS */ // loaded as a global via vendored src/lib/exceljs.min.js script tag
-import { DEFAULTS, CFG, VERSION, bubbleGroupStyle, UNSAFE_OBJECT_KEYS } from '../config.js';
+import { DEFAULTS, VERSION, bubbleGroupStyle, UNSAFE_OBJECT_KEYS } from '../config.js';
 import { sanitizeAnnotations } from '../graph/annotation_geometry.js';
 import { StaticUtilities } from '../utilities/static.js';
-import { buildDataTable } from '../utilities/data_editor.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
 
 const EXPORT_SCALE_KEY = 'gll.exportScale';
@@ -711,7 +710,7 @@ class IOManager {
           const filtersMap = new Map(Object.entries(layout.filters));
 
           // Restore Sets within each filter value
-          for (const [propId, filterValue] of filtersMap.entries()) {
+          for (const filterValue of filtersMap.values()) {
             if (filterValue.categories && Array.isArray(filterValue.categories)) {
               filterValue.categories = new Set(filterValue.categories);
             }
@@ -745,7 +744,7 @@ class IOManager {
       const filterDefaultsMap = new Map(Object.entries(jsonContent.filterDefaults));
 
       // Restore Sets within each filter default value
-      for (const [propId, filterValue] of filterDefaultsMap.entries()) {
+      for (const filterValue of filterDefaultsMap.values()) {
         if (filterValue.categories && Array.isArray(filterValue.categories)) {
           filterValue.categories = new Set(filterValue.categories);
         }

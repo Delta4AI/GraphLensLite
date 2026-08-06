@@ -220,7 +220,7 @@ static async prompt(message) {
       dropdown.style.display = 'none';
 
       // Populate dropdown with layout types
-      for (const [key, value] of Object.entries(layoutInternals)) {
+      for (const key of Object.keys(layoutInternals)) {
         const option = document.createElement('option');
         option.value = key;
         option.textContent = key.charAt(0).toUpperCase() + key.slice(1);

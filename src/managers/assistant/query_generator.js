@@ -4,12 +4,12 @@
 // of its streamed reply. This module:
 //   1. Builds a tight system prompt with a handful of contrastive few-shot
 //      examples in the structured AST form.
-//   2. Asks Ollama for a JSON response constrained by QUERY_RESPONSE_SCHEMA.
+//   2. Asks Ollama for a JSON response constrained by buildQuerySchema().
 //   3. Renders each AST into a GLL query string.
 //   4. Retries once if the renderer rejects the AST (schema enforcement is
 //      strong but not perfect; one repair pass mops up edge cases).
 
-import {QUERY_RESPONSE_SCHEMA, buildQuerySchema, flattenHierarchy, renderQueries} from './query_schema.js'
+import {buildQuerySchema, flattenHierarchy, renderQueries} from './query_schema.js'
 import {GENERATOR_SYSTEM_PROMPT} from './query_generator_prompt.js'
 
 // Levenshtein distance — small, allocation-light implementation. Used only
