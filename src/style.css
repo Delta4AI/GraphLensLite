@@ -1796,9 +1796,13 @@ h5 {
 }
 
 /* Hover tints the whole bar, as it did when the header WAS the bar — reaching
-   up rather than colouring a block that stops short of the switch. */
+   up rather than colouring a block that stops short of the switch.
+
+   The brand accent in BOTH themes, not --accent-text: that token flips to
+   #e0635b in dark, where the bar's white bold title drops to 3.3:1. Fixed, it
+   is 5.2:1 — the same trade the layer switch makes below. */
 .card-collapse-bar:has(.card-collapse-header:hover) {
-    background: var(--accent-text);
+    background: #C33D35;
 }
 
 /* Pushes the count and the chevron to the right edge of the bar. */
