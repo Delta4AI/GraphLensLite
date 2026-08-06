@@ -287,4 +287,4 @@ export function initWorkbench(cache) {
   return document.getElementById('workbench') ? new Workbench(cache) : null;
 }
 
-export { Workbench, TAB_NAMES };
+export { TAB_NAMES };

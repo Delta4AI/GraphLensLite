@@ -186,6 +186,31 @@ describe('UIManager overlay layer stack', () => {
     expect(ui.info).toHaveBeenLastCalledWith('Note placement canceled');
   });
 
+  it('toggles lasso mode on the button its markup names', () => {
+    // The anchor id was renamed to lassoToggleBtn during the redesign and the
+    // function was 0% covered: a mismatch here is a dead rail button.
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<button id="lassoToggleBtn" onclick="cache.ui.toggleLassoSelection()"></button>'
+    );
+    const [ui, cache] = makeUI();
+    ui.info = vi.fn();
+    cache.graph.setInteractionEnabled = vi.fn();
+    const btn = document.getElementById('lassoToggleBtn');
+
+    ui.toggleLassoSelection();
+    expect(btn.classList.contains('active')).toBe(true);
+    expect(cache.graph.setInteractionEnabled.mock.calls).toEqual([
+      ['lasso', true],
+      ['drag', false],
+      ['tooltip', false],
+    ]);
+
+    ui.toggleLassoSelection();
+    expect(btn.classList.contains('active')).toBe(false);
+    expect(cache.graph.setInteractionEnabled).toHaveBeenLastCalledWith('tooltip', true);
+  });
+
   it('marks the note button while the tool is armed', () => {
     document.body.insertAdjacentHTML('beforeend', '<button id="noteToggleBtn"></button>');
     const [ui] = makeUI();

@@ -5,6 +5,13 @@ import {detectCommunities as computeCommunityAssignments} from "./communities.js
 import {clampPopoverLeft} from "../utilities/popover_position.js";
 import {renderGroupList, syncGroupRows} from "../managers/group_list.js";
 
+// Community detection asks for a target group count. Two is the smallest split
+// worth drawing; the upper bound keeps a typo ("500") from minting hundreds of
+// bubbles nobody asked for.
+const DEFAULT_COMMUNITY_GROUPS = 4;
+const MIN_COMMUNITY_GROUPS = 2;
+const MAX_COMMUNITY_GROUPS = 50;
+
 class GraphBubbleSetManager {
   constructor(cache) {
     this.cache = cache;
@@ -557,7 +564,10 @@ class GraphBubbleSetManager {
       : (this.communityOptions.weightProperty ?? null);
     const resolution = options.resolution ?? this.communityOptions.resolution ?? 1;
 
-    const wanted = Math.max(2, Math.round(options.groupCount ?? this.communityOptions.groupCount ?? 4));
+    const wanted = Math.max(
+      MIN_COMMUNITY_GROUPS,
+      Math.round(options.groupCount ?? this.communityOptions.groupCount ?? DEFAULT_COMMUNITY_GROUPS)
+    );
 
     // Detection needs somewhere to put its results, and groups no longer
     // pre-exist. Mint throwaway keys to compute against, then keep only the
@@ -744,10 +754,16 @@ class GraphBubbleSetManager {
     countInput.max = "50";
     countInput.step = "1";
     countInput.className = "community-popover-count";
-    countInput.value = String(this.communityOptions.groupCount ?? 4);
+    countInput.value = String(this.communityOptions.groupCount ?? DEFAULT_COMMUNITY_GROUPS);
     countInput.title = "How many of the largest communities to turn into groups";
     countInput.addEventListener("change", () => {
-      const n = Math.min(50, Math.max(2, Math.round(Number(countInput.value) || 4)));
+      const n = Math.min(
+        MAX_COMMUNITY_GROUPS,
+        Math.max(
+          MIN_COMMUNITY_GROUPS,
+          Math.round(Number(countInput.value) || DEFAULT_COMMUNITY_GROUPS)
+        )
+      );
       this.communityOptions.groupCount = n;
       countInput.value = String(n);
     });

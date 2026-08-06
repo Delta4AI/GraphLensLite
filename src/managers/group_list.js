@@ -29,9 +29,11 @@ const layoutOf = (bs) => bs.cache.data?.layouts?.[bs.cache.data?.selectedLayout]
  * reads a stale selection and the labels desync; that was a real bug once.
  */
 export function syncGroupRows(bs) {
+  // selection.js always publishes an array (see its updateSelectedNodesAndEdges),
+  // and the count is the same for every row.
+  const count = bs.cache.selectedNodes?.length ?? 0;
   for (const btn of document.querySelectorAll('.group-row-toggle')) {
     const group = btn.dataset.group;
-    const count = bs.cache.selectedNodes?.length ?? bs.cache.selectedNodes?.size ?? 0;
     const state = bs.selectionMembership(group);
     const name = layoutOf(bs)?.bubbleSetStyle?.[group]?.labelText || group;
 

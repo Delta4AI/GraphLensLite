@@ -119,4 +119,3 @@ export function initInspector() {
   return document.getElementById('inspectorBody') ? new Inspector() : null;
 }
 
-export { Inspector };

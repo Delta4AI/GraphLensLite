@@ -510,8 +510,8 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Inspector resize — drags from its left edge (right-docked panel), same
-  // shadow-bar gesture the assistant panel below uses.
+  // Inspector resize — drags from its left edge (right-docked panel). Same
+  // shadow-bar gesture as the workbench's top edge (workbench.js).
   const inspector = document.getElementById('inspector');
   const resizeHandle = document.querySelector('.inspector-resize-handle');
   const INSPECTOR_MIN_WIDTH = 300;

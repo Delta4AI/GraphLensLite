@@ -14,7 +14,7 @@
  * see — but they keep their `.collapsed` class, so clearing the box restores
  * the folds the user had (see the `:not(.filters-searching)` collapse rule).
  */
-export function applyFilterSearch(container) {
+function applyFilterSearch(container) {
   if (!container) return;
   const query = (document.getElementById('filterSearch')?.value ?? '').trim().toLowerCase();
   // A search spans both sections, so the panel's node/edge segment steps aside

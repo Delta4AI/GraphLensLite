@@ -214,8 +214,6 @@ function initUiTooltips(doc = document) {
     attributeFilter: ['title'],
     subtree: true,
   });
-
-  return { hide };
 }
 
 export { initUiTooltips, parseTip };
