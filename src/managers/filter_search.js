@@ -9,8 +9,10 @@
 
 /**
  * Hide non-matching rows, then any sub-group or section left with nothing to
- * show. A matching group is also un-collapsed — a search that "finds" something
- * inside a folded accordion has found nothing the user can see.
+ * show. Folded groups open for the duration of the search — a search that
+ * "finds" something inside a folded accordion has found nothing the user can
+ * see — but they keep their `.collapsed` class, so clearing the box restores
+ * the folds the user had (see the `:not(.filters-searching)` collapse rule).
  */
 export function applyFilterSearch(container) {
   if (!container) return;
@@ -24,11 +26,26 @@ export function applyFilterSearch(container) {
   }
   for (const selector of ['.filter-subgroup', '.filter-section']) {
     for (const group of container.querySelectorAll(selector)) {
-      const has = !!group.querySelector('.filter-row:not([hidden])');
-      group.hidden = !has;
-      if (has && query) group.classList.remove('collapsed');
+      group.hidden = !group.querySelector('.filter-row:not([hidden])');
     }
   }
+  // Everything hidden leaves a blank panel that says nothing about whether the
+  // search or the graph came up empty.
+  const nothing = !!query && !container.querySelector('.filter-section:not([hidden])');
+  noMatchNote(container).hidden = !nothing;
+}
+
+/** The "nothing matches" line, created on demand — buildFilterUI empties the
+ * container (and this note with it) on every rebuild. */
+function noMatchNote(container) {
+  let note = container.querySelector('.filter-no-match');
+  if (!note) {
+    note = document.createElement('p');
+    note.className = 'insp-note filter-no-match';
+    note.textContent = 'No properties match this search.';
+    container.appendChild(note);
+  }
+  return note;
 }
 
 /** Safe in DOMs without the filter markup (unit tests): does nothing. */

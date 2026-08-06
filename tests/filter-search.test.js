@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
+import fs from 'node:fs';
 import { initFilterSearch } from '../src/managers/filter_search.js';
 
 // ==========================================================================
@@ -108,13 +109,44 @@ describe('filter search', () => {
     expect(edges.hidden).toBe(false);
   });
 
-  it('un-collapses a group that holds a match — a hidden hit is not a hit', () => {
+  it('keeps the folds it opens for the search, so clearing restores them', () => {
+    // Stripping `.collapsed` showed the match but lost the user's folds and
+    // left the chevron reading "▸" over an open group. The CSS suspends the
+    // collapse rule while `.filters-searching` is on instead.
     const section = document.querySelector('.filter-section');
     const subgroup = document.querySelector('.filter-subgroup');
-    expect(section.classList.contains('collapsed')).toBe(true);
     search('degree');
-    expect(section.classList.contains('collapsed')).toBe(false);
-    expect(subgroup.classList.contains('collapsed')).toBe(false);
+    expect(container().classList.contains('filters-searching')).toBe(true);
+    expect(section.classList.contains('collapsed')).toBe(true);
+    expect(subgroup.classList.contains('collapsed')).toBe(true);
+
+    search('');
+    expect(section.classList.contains('collapsed')).toBe(true);
+  });
+
+  it('says so when nothing matches, instead of showing a blank panel', () => {
+    search('zzzz');
+    const note = container().querySelector('.filter-no-match');
+    expect(note.hidden).toBe(false);
+    expect(note.textContent).toContain('No properties match');
+
+    search('degree');
+    expect(container().querySelector('.filter-no-match').hidden).toBe(true);
+    search('');
+    expect(container().querySelector('.filter-no-match').hidden).toBe(true);
+  });
+
+  it('suspends the collapse rule in CSS while a search runs', () => {
+    // The JS half only keeps the class; jsdom applies no stylesheet, so without
+    // this the rule that actually reveals the folded match could be deleted
+    // with every test still green.
+    const css = fs.readFileSync('src/style.css', 'utf8'); // vitest runs at the repo root
+    expect(css).toContain(
+      '#filterContainer:not(.filters-searching) .filter-section.collapsed > .filter-section-body'
+    );
+    expect(css).toContain(
+      '#filterContainer:not(.filters-searching) .filter-subgroup.collapsed > .filter-subgroup-body'
+    );
   });
 
   it('marks the container while a search runs, so the scope segment steps aside', () => {

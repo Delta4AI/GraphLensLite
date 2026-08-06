@@ -2397,8 +2397,13 @@ h5 {
     opacity: 0.85;
 }
 
-.filter-section.collapsed > .filter-section-body,
-.filter-subgroup.collapsed > .filter-subgroup-body {
+/* Scoped to "not searching": a search has to show what it matched even inside
+   a folded group, and stripping `.collapsed` to do that threw the user's folds
+   away (and left the chevron pointing the wrong way). Suspending the rule for
+   the duration keeps the state — and each body keeps its own display value
+   instead of having it restated here. */
+#filterContainer:not(.filters-searching) .filter-section.collapsed > .filter-section-body,
+#filterContainer:not(.filters-searching) .filter-subgroup.collapsed > .filter-subgroup-body {
     display: none;
 }
 
@@ -2462,7 +2467,12 @@ h5 {
 #filterContainer.locked .range-slider-thumb,
 #filterContainer.locked .range-slider,
 #filterContainer.locked .header-card,
-#filterContainer.locked .sub-header-card {
+#filterContainer.locked .sub-header-card,
+/* The join toggle and its "complete cases only" modifier are filter controls
+   too: their handlers already bail under the lock, so undimmed they looked live
+   and did nothing. The search box stays live — searching the list is reading,
+   not filtering. */
+#filterContainer.locked .filter-toolbar-join {
     opacity: 0.5;
     pointer-events: none !important;
     cursor: not-allowed !important;
