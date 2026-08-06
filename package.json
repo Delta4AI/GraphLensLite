@@ -86,7 +86,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@vitest/coverage-v8": "^4.1.9",
-    "electron": "^36.3.1",
+    "electron": "^43.3.0",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.25.11",
     "eslint": "^9.39.4",
