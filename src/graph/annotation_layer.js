@@ -28,6 +28,10 @@ import {
   ANNOTATION_LINE_HEIGHT,
   ANNOTATION_PADDING_PX,
   MAX_TEXT_LENGTH,
+  MIN_FONT_SIZE,
+  MAX_FONT_SIZE,
+  MAX_BORDER_WIDTH,
+  MAX_BORDER_RADIUS,
   annotationLayout,
 } from './annotation_geometry.js';
 import { clampPopoverLeft, clampPopoverTop } from '../utilities/popover_position.js';
@@ -521,11 +525,21 @@ class AnnotationLayer {
     });
 
     pop.append(
-      row('Font size', numberInput(ann.fontSize, 6, 200, 1, (v) => (ann.fontSize = v))),
+      // Same bounds the sanitizer clamps to on load — stated once, there.
+      row(
+        'Font size',
+        numberInput(ann.fontSize, MIN_FONT_SIZE, MAX_FONT_SIZE, 1, (v) => (ann.fontSize = v))
+      ),
       row('Font color', colorInput(ann.fontColor, (v) => (ann.fontColor = v))),
       row('Border color', colorInput(ann.borderColor, (v) => (ann.borderColor = v))),
-      row('Border width', numberInput(ann.borderWidth, 0, 20, 0.5, (v) => (ann.borderWidth = v))),
-      row('Corner radius', numberInput(ann.borderRadius ?? 0, 0, 40, 1, (v) => (ann.borderRadius = v))),
+      row(
+        'Border width',
+        numberInput(ann.borderWidth, 0, MAX_BORDER_WIDTH, 0.5, (v) => (ann.borderWidth = v))
+      ),
+      row(
+        'Corner radius',
+        numberInput(ann.borderRadius ?? 0, 0, MAX_BORDER_RADIUS, 1, (v) => (ann.borderRadius = v))
+      ),
       bgRow,
       row('Shadow', shadowToggle)
     );

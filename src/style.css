@@ -3660,9 +3660,11 @@ input:checked + .slider:before {
 }
 
 /* In several groups: an inset ring reads as "there is more here" without
-   pretending to name the others. */
+   pretending to name the others. The ring is a notch cut out of the fill, so it
+   takes the panel's own background — `--surface-1` was never defined in either
+   theme, which made the shadow compute to `none` and the state invisible. */
 .group-chip.multi {
-    box-shadow: inset 0 0 0 2px var(--surface-1);
+    box-shadow: inset 0 0 0 2px var(--input-bg);
 }
 
 #filterContainer.locked .group-chip {
@@ -3693,7 +3695,7 @@ input:checked + .slider:before {
     padding: 6px;
     border: 1px solid var(--border-soft);
     border-radius: 7px;
-    background: var(--surface-1, transparent);
+    background: transparent;
     cursor: pointer;
 }
 
@@ -3776,7 +3778,7 @@ input:checked + .slider:before {
 
 .group-name:focus {
     border-color: var(--accent-text);
-    background: var(--input-bg, var(--surface-1));
+    background: var(--input-bg);
     outline: none;
     text-overflow: clip;
 }
@@ -3795,26 +3797,21 @@ input:checked + .slider:before {
     padding: 0 6px;
     border: 1px solid var(--border-soft);
     border-radius: 4px;
-    background: var(--surface-1);
+    background: var(--input-bg);
     color: var(--text-strong);
     font-size: 11px;
     font-weight: 600;
     cursor: pointer;
 }
 
-.group-row-toggle:hover:not(:disabled) {
+.group-row-toggle:hover:not(.disabled) {
     border-color: var(--accent-text);
     color: var(--accent-text);
 }
 
-.group-row-toggle.remove:not(:disabled) {
+.group-row-toggle.remove:not(.disabled) {
     color: var(--danger-text);
     border-color: var(--danger-text);
-}
-
-.group-row-toggle:disabled {
-    opacity: 0.45;
-    cursor: default;
 }
 
 .group-row-more {

@@ -24,7 +24,7 @@ Sigma — which presents a stable facade over the `graphology` graph held in
 `src/graph/graph_model.js`. Managers talk to the adapter and the model, never to
 Sigma directly.
 
-### Graph layer (`src/graph/`, 27 files)
+### Graph layer (`src/graph/`)
 
 The rendering and graph-operation core. Key modules:
 
@@ -57,7 +57,7 @@ The rendering and graph-operation core. Key modules:
   `visible_graph.js`, `lasso_geometry.js`, `communities.js`, `export_svg.js`,
   `webgl_support.js`
 
-### Functional managers (`src/managers/`, 13 files + `assistant/`)
+### Functional managers (`src/managers/`, plus `assistant/`)
 
 Business logic and UI:
 
@@ -106,10 +106,10 @@ Business logic and UI:
 - `assistant/` — the natural-language Graph Assistant (intent parsing, query
   generation, settings, budget UI); rendered as a workbench tab, not a dock
 
-### Utilities (`src/utilities/`, 14 files)
+### Utilities (`src/utilities/`)
 
 - `static.js` — validation, colour math, deep-merge helpers
-- `popup.js` / `popover_position.js` — modal and popover positioning
+- `popup.js` / `popover_position.js` / `checklist_popup.js` — modal, popover positioning, checklist dialogs
 - `data_editor.js` — spreadsheet-like data editor (`DataTable`), incl. Excel export
 - `demo_loader.js` — STRING DB protein-interaction demo data
 - `neo4j_loader.js` — Neo4j connector (HTTP transactional Cypher API, no driver dependency)
@@ -173,9 +173,9 @@ src/
 ├── graph_lens_lite.html    # SPA page
 ├── style.css               # all CSS
 ├── lib/                    # vendored libs (sigma, graphology, exceljs, marked, purify)
-├── graph/                  # rendering + graph operations (27 files)
-├── managers/               # business-logic managers (7 files + assistant/)
-├── utilities/              # helpers (12 files)
+├── graph/                  # rendering + graph operations
+├── managers/               # business-logic managers + assistant/
+├── utilities/              # helpers
 └── package/                # Electron main process + build scripts
 server/                     # standalone ingest service + live viewer
 templates/                  # Excel input templates

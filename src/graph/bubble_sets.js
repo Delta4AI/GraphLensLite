@@ -101,12 +101,10 @@ class GraphBubbleSetManager {
     const layout = this.#layout();
     if (!layout?.bubbleSetStyle?.[group]) return;
 
-    delete layout.bubbleSetStyle[group];
-    delete layout[`${group}Props`];
-    delete layout[`${group}ManualMembers`];
-    delete this.cache.INSTANCES.BUBBLE_GROUPS[group];
-    this.cache.lastBubbleSetMembers.delete(group);
-    this.cache.graph?.bubbleLayer?.removeGroup(group);
+    // Through #dropGroupState, not a second copy of its six deletes: two lists
+    // to keep in step is exactly the "one stray key resurrects the group"
+    // hazard the doc comment above warns about.
+    this.#dropGroupState(group);
 
     this.cache.bubbleSetChanged = true;
     await this.cache.graph?.draw();
