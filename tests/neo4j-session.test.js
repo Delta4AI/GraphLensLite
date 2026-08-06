@@ -546,6 +546,16 @@ describe('expandNeo4jSelection', () => {
     expect(cache.ui.error).toHaveBeenCalledWith(expect.stringContaining('boom'));
     expect(cache.ui.hideLoading).toHaveBeenCalled();
   });
+
+  it('maps an unreachable server to the connect hint, not the raw text', async () => {
+    startNeo4jSession(CONFIG, [rawNode('1')], [], NO_EXCLUSIONS);
+    const cache = makeCache([], ['1']);
+    await expandNeo4jSelection(cache, {
+      fetchImpl: vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+    });
+
+    expect(cache.ui.error).toHaveBeenCalledWith(expect.stringContaining('Could not reach'));
+  });
 });
 
 describe('showExpandChecklist', () => {
@@ -711,6 +721,38 @@ describe('openNeo4jJoinPopup', () => {
     expect(apply).not.toHaveBeenCalled();
     // Bailing before the fetch also spares the doomed second roundtrip.
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps Cancel live while busy and aborts the in-flight query', async () => {
+    // Before: Cancel went dead while the query ran and nothing aborted, so the
+    // only way out was × — which left the query running to its timeout.
+    startNeo4jSession(CONFIG, [], [], NO_EXCLUSIONS);
+    let signal = null;
+    const fetchImpl = vi.fn(
+      (url, init) =>
+        new Promise((_resolve, reject) => {
+          signal = init.signal;
+          const fail = () => reject(new DOMException('aborted', 'AbortError'));
+          if (init.signal.aborted) fail();
+          else init.signal.addEventListener('abort', fail);
+        }),
+    );
+    const apply = vi.fn().mockResolvedValue(true);
+    const promise = openNeo4jJoinPopup(makeCache(), { fetchImpl, apply });
+
+    document.getElementById('neo4j-join-query').value = 'MATCH (n) RETURN n';
+    document.getElementById('neo4j-join-fetch-btn').click();
+    await vi.waitFor(() => expect(signal).not.toBeNull());
+
+    const cancelBtn = document.getElementById('neo4j-join-cancel-btn');
+    expect(cancelBtn.disabled).toBe(false);
+    cancelBtn.click();
+
+    expect(signal.aborted).toBe(true);
+    expect(await promise).toBe(false);
+    // Give the abandoned handler its chance to merge or complain anyway.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(apply).not.toHaveBeenCalled();
   });
 
   it('shows fetch failures inline and re-enables the buttons', async () => {

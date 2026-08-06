@@ -716,6 +716,43 @@ describe('openNeo4jPopup', () => {
     await loaded;
   });
 
+  it('keeps Cancel live while busy and aborts the in-flight request', async () => {
+    // Before: both buttons went dead while the query ran and nothing aborted,
+    // so dismissing left a zombie flow that popped a property checklist over
+    // whatever the user did next.
+    let signal = null;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (url, init) =>
+          new Promise((_resolve, reject) => {
+            signal = init.signal;
+            const fail = () => reject(new DOMException('aborted', 'AbortError'));
+            if (init.signal.aborted) fail();
+            else init.signal.addEventListener('abort', fail);
+          }),
+      ),
+    );
+    try {
+      const promise = openNeo4jPopup({ ui: {} });
+      document.getElementById('neo4j-url').value = 'http://localhost:7474';
+      document.getElementById('neo4j-load-btn').click();
+      await vi.waitFor(() => expect(signal).not.toBeNull());
+
+      const cancelBtn = document.getElementById('neo4j-cancel-btn');
+      expect(cancelBtn.disabled).toBe(false);
+      cancelBtn.click();
+
+      expect(signal.aborted).toBe(true);
+      expect(await promise).toBe(false);
+      // Give the abandoned flow its chance to reach the checklist anyway.
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(document.body.textContent).not.toContain('Select the properties to import');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('shows fetch failures inline and re-enables the buttons', async () => {
     vi.stubGlobal(
       'fetch',

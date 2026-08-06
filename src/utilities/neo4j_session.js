@@ -536,7 +536,7 @@ async function expandNeo4jSelection(cache, deps = {}) {
     return await mergeAndApply(cache, nodes, relationships, deps);
   } catch (err) {
     await progress(null);
-    cache.ui.error(`Neo4j expand: ${err.message}`);
+    cache.ui.error(`Neo4j expand: ${connectionHint(err)}`);
     return false;
   }
 }
@@ -595,11 +595,19 @@ function openNeo4jJoinPopup(cache, deps = {}) {
   return new Promise((resolve) => {
     let settled = false;
     let dataFetched = false;
+    // Cancel and × abort the in-flight query instead of leaving it to run out
+    // its timeout (see openNeo4jPopup).
+    let controller = null;
     const settle = (value) => {
       if (!settled) {
         settled = true;
         resolve(value);
       }
+    };
+    const dismiss = () => {
+      controller?.abort();
+      popup.close();
+      settle(false);
     };
 
     const popup = new Popup(form, {
@@ -608,13 +616,15 @@ function openNeo4jJoinPopup(cache, deps = {}) {
       showFullscreenButton: false,
       closeOnClickOutside: false,
       onClose: () => {
-        if (!dataFetched) settle(false);
+        if (!dataFetched) {
+          controller?.abort();
+          settle(false);
+        }
       },
     });
 
     const setBusy = (message) => {
       fetchBtn.disabled = !!message;
-      cancelBtn.disabled = !!message;
       fetchBtn.innerHTML = message
         ? `<span class="neo4j-btn-spinner"></span>${message}`
         : 'Fetch &amp; merge';
@@ -632,7 +642,9 @@ function openNeo4jJoinPopup(cache, deps = {}) {
         return;
       }
       const confirm = deps.confirm ?? Popup.confirm;
-      const opts = deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {};
+      controller = new AbortController();
+      const opts = { signal: controller.signal };
+      if (deps.fetchImpl) opts.fetchImpl = deps.fetchImpl;
 
       try {
         const graph = await fetchGraphWithPreflight({
@@ -664,16 +676,14 @@ function openNeo4jJoinPopup(cache, deps = {}) {
         popup.close();
         settle(await mergeAndApply(cache, nodes, relationships, deps));
       } catch (err) {
+        if (err?.name === 'AbortError') return; // the user closed the dialog
         setBusy(null);
-        showError(`Neo4j: ${err.message}`);
+        showError(`Neo4j: ${connectionHint(err)}`);
       }
     };
 
     fetchBtn.addEventListener('click', handleFetch);
-    cancelBtn.addEventListener('click', () => {
-      popup.close();
-      settle(false);
-    });
+    cancelBtn.addEventListener('click', dismiss);
     setTimeout(() => queryBox.focus(), 100);
   });
 }

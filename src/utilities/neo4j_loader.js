@@ -83,13 +83,17 @@ function logStatements(statements) {
  *
  * @param {{url: string, database?: string, username: string, password: string}} config
  * @param {Array<{statement: string, resultDataContents?: string[]}>} statements
- * @param {{timeoutMs?: number, fetchImpl?: Function}} [opts]
+ * @param {{timeoutMs?: number, fetchImpl?: Function, signal?: AbortSignal}} [opts]
  * @returns {Promise<object[]>} the `results` array
  * @throws {Error} on network failure, non-2xx status, or Cypher errors
  */
 async function runCypher(config, statements, opts = {}) {
   logStatements(statements);
   const fetchImpl = opts.fetchImpl ?? fetch;
+  // The caller's signal (a dismissed dialog) races the timeout; whichever
+  // fires first ends the request.
+  const timeout = AbortSignal.timeout(opts.timeoutMs ?? QUERY_TIMEOUT_MS);
+  const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
   const response = await fetchImpl(buildTxUrl(config.url, config.database), {
     method: 'POST',
     headers: {
@@ -98,7 +102,7 @@ async function runCypher(config, statements, opts = {}) {
       Authorization: basicAuth(config.username, config.password),
     },
     body: JSON.stringify({ statements }),
-    signal: AbortSignal.timeout(opts.timeoutMs ?? QUERY_TIMEOUT_MS),
+    signal,
   });
 
   if (response.status === 401) {
@@ -739,7 +743,9 @@ async function executeNeo4jImport(cache, config, deps = {}) {
       if (message) await cache.ui.showLoading('Neo4j', message);
       else await cache.ui.hideLoading();
     });
-  const opts = deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {};
+  const opts = {};
+  if (deps.fetchImpl) opts.fetchImpl = deps.fetchImpl;
+  if (deps.signal) opts.signal = deps.signal;
 
   try {
     const graph = await fetchGraphWithPreflight({
@@ -765,6 +771,9 @@ async function executeNeo4jImport(cache, config, deps = {}) {
     return rendered;
   } catch (err) {
     await progress(null);
+    // The user aborted (closed the dialog) — they know; reporting it back would
+    // be telling them off for cancelling.
+    if (err?.name === 'AbortError') return false;
     onError(`Neo4j: ${connectionHint(err)}`);
     return false;
   }
@@ -793,11 +802,20 @@ function openNeo4jPopup(cache) {
     // and against the deliberate close after a successful fetch.
     let settled = false;
     let dataFetched = false;
+    // Live only while a fetch is in flight. Cancel and × both abort it: the
+    // query has a five-minute timeout, and a flow left running after dismissal
+    // used to surface later as a surprise property checklist.
+    let controller = null;
     const settle = (value) => {
       if (!settled) {
         settled = true;
         resolve(value);
       }
+    };
+    const dismiss = () => {
+      controller?.abort();
+      popup.close();
+      settle(false);
     };
 
     const popup = new Popup(form, {
@@ -806,13 +824,15 @@ function openNeo4jPopup(cache) {
       showFullscreenButton: false,
       closeOnClickOutside: false,
       onClose: () => {
-        if (!dataFetched) settle(false);
+        if (!dataFetched) {
+          controller?.abort();
+          settle(false);
+        }
       },
     });
 
     const setBusy = (message) => {
       loadBtn.disabled = !!message;
-      cancelBtn.disabled = !!message;
       loadBtn.innerHTML = message
         ? `<span class="neo4j-btn-spinner"></span>${message}`
         : 'Fetch';
@@ -853,7 +873,9 @@ function openNeo4jPopup(cache) {
       }
 
       saveSettings(config);
+      controller = new AbortController();
       const rendered = await executeNeo4jImport(cache, config, {
+        signal: controller.signal,
         progress: (message) => setBusy(message),
         onError: showError,
         // Close the connection popup once data has arrived — the property
@@ -865,8 +887,9 @@ function openNeo4jPopup(cache) {
         },
       });
 
+      controller = null;
       if (dataFetched) settle(rendered);
-      else setBusy(null);
+      else if (!settled) setBusy(null);
     };
 
     loadBtn.addEventListener('click', handleLoad);
@@ -880,10 +903,7 @@ function openNeo4jPopup(cache) {
         }
       });
     }
-    cancelBtn.addEventListener('click', () => {
-      popup.close();
-      settle(false);
-    });
+    cancelBtn.addEventListener('click', dismiss);
     setTimeout(() => form.querySelector('#neo4j-url').focus(), 100);
   });
 }
