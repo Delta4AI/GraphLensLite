@@ -475,7 +475,7 @@ class GraphLayoutManager {
     }
 
     const confirmed = await Popup.confirm(
-      `Are you sure you want to delete view "${this.cache.data.selectedLayout}"?`
+      `Are you sure you want to delete workspace "${this.cache.data.selectedLayout}"?`
     );
     if (!confirmed) return false;
 

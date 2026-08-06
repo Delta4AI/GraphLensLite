@@ -23,7 +23,9 @@ function dom(propIDs) {
       ${propIDs
         .map(
           (id) => `<div class="filter-row" data-prop-id="${id}">
-                     <div class="filter-row-col1"></div>
+                     <div class="filter-row-col1">
+                       <label class="checkboxWrapper" title="Click to hide elements"></label>
+                     </div>
                      <div class="filter-row-col2"></div>
                      <div class="filter-row-col3"></div>
                    </div>`
@@ -34,6 +36,10 @@ function dom(propIDs) {
 
 function makeUI({ mode = 'AND', filters = [], defaults = [] } = {}) {
   const cache = {
+    uiComponents: {
+      getCheckboxTT: (enable, propID) => `Click to ${enable ? 'hide' : 'show'} ${propID}`,
+      getInertCheckboxTT: (propID) => `Not narrowed, so under AND it excludes nothing: ${propID}`,
+    },
     data: {
       selectedLayout: 'L',
       filterDefaults: new Map(defaults),
@@ -70,6 +76,19 @@ describe('filter constraint census', () => {
   beforeEach(() => {
     window.localStorage.clear();
     document.body.innerHTML = '';
+  });
+
+  it('retells the inert row: its checkbox stopped claiming it hides elements', () => {
+    const { ui } = makeUI({ mode: 'AND', ...THREE });
+    ui.updateFilterConstraintHints();
+
+    const titleOf = (id) =>
+      document.querySelector(`[data-prop-id="${id}"] .checkboxWrapper`).title;
+    // Narrowed row keeps the normal wording…
+    expect(titleOf('N::g::type')).toContain('Click to');
+    // …the two inert ones say why clicking them changes nothing.
+    expect(titleOf('N::g::zone')).toContain('Not narrowed');
+    expect(titleOf('N::g::score')).toContain('Not narrowed');
   });
 
   it('counts only narrowed filters under AND, and dims the rest', () => {

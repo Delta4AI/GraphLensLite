@@ -114,6 +114,27 @@ describe('buildFilterUI', () => {
     expect(document.getElementById('filterLockStatusBar').style.display).toBe('flex');
   });
 
+  it('names the filter event "Hiding Elements", not a bare "Showing"', async () => {
+    // `checked ? 'Showing' : 'Hiding' + ' Elements'` binds the concatenation to
+    // the false branch, so unchecking said "Hiding Elements" and checking said
+    // just "Showing" — the status line and the loading header both.
+    const ui = makeUI();
+    ui.buildFilterUI();
+    const box = document
+      .querySelector('[data-prop-id="Node filters::Topology::Type"]')
+      .querySelector('.items input[type="checkbox"]');
+
+    box.checked = false;
+    box.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(ui.cache.fm.handleFilterEvent).toHaveBeenCalled());
+    expect(ui.cache.fm.handleFilterEvent.mock.calls[0][0]).toBe('Hiding Elements');
+
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(ui.cache.fm.handleFilterEvent).toHaveBeenCalledTimes(2));
+    expect(ui.cache.fm.handleFilterEvent.mock.calls[1][0]).toBe('Showing Elements');
+  });
+
   it('renders a mixed-type property as an inert row with the reason', () => {
     const ui = makeUI();
     const propID = 'Node filters::Topology::Mixed';

@@ -118,6 +118,7 @@ function dom() {
         <span id="cmdkCount"></span>
       </div>
       <ul id="cmdkResults"></ul>
+      <div class="cmdk-foot"><span><kbd>↵</kbd> <span id="cmdkEnterHint">run</span></span></div>
     </dialog>`;
 }
 
@@ -521,6 +522,19 @@ describe('the palette dialog', () => {
     expect(cache.gcm.focusElements).not.toHaveBeenCalled();
     // CASP3 is still visible, so it is still reachable.
     expect(matchElements(cache, 'casp3').map((c) => c.name)).toEqual(['CASP3']);
+  });
+
+  it('says what ↵ will do to the active row', () => {
+    // A static "run" was wrong for the two thirds of rows that reveal or focus.
+    palette.open();
+    type('fit');
+    expect(document.getElementById('cmdkEnterHint').textContent).toBe('run');
+
+    type('tp53');
+    expect(document.getElementById('cmdkEnterHint').textContent).toBe('go to');
+
+    type('shortest'); // disabled → reveal
+    expect(document.getElementById('cmdkEnterHint').textContent).toBe('show');
   });
 
   it('reports the result count and says so when there is nothing', () => {

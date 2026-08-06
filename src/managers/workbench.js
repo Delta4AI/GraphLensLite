@@ -153,6 +153,11 @@ class Workbench {
       .querySelectorAll('.add-to-query-button')
       .forEach((btn) => btn.classList.remove('show'));
     this.tab = null;
+    // Expansion is an override for the open tab, not a stored preference:
+    // leaving it set meant the NEXT tab opened at 100% of the stage, with the
+    // canvas nowhere to be seen.
+    this.expanded = false;
+    this.#syncExpandButton();
     if (closing) this.#notify(closing, false);
     this.cache.graph?.resize();
   }
@@ -161,13 +166,16 @@ class Workbench {
   toggleExpanded() {
     this.expanded = !this.expanded;
     this.#applyHeight();
-    const btn = document.getElementById('workbenchExpandBtn');
-    if (btn) {
-      btn.setAttribute('aria-pressed', String(this.expanded));
-      btn.title = this.expanded ? 'Restore the previous height' : 'Expand to full height';
-      btn.textContent = this.expanded ? '⤡' : '⤢';
-    }
+    this.#syncExpandButton();
     this.cache.graph?.resize();
+  }
+
+  #syncExpandButton() {
+    const btn = document.getElementById('workbenchExpandBtn');
+    if (!btn) return;
+    btn.setAttribute('aria-pressed', String(this.expanded));
+    btn.title = this.expanded ? 'Restore the previous height' : 'Expand to full height';
+    btn.textContent = this.expanded ? '⤡' : '⤢';
   }
 
   #stageHeight() {

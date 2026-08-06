@@ -232,4 +232,21 @@ describe('workbench height', () => {
     expect(wb.expanded).toBe(false);
     expect(wb.el.style.height).toBe(restored);
   });
+
+  it('does not carry expansion into the next tab it opens', () => {
+    // close() left `expanded` set, so reopening ANY tab took the whole stage
+    // and the canvas disappeared with no ⤢ state to explain it.
+    wb.show('query');
+    wb.toggleExpanded();
+    const expandedHeight = parseInt(wb.el.style.height, 10);
+    wb.close();
+
+    expect(wb.expanded).toBe(false);
+    expect(document.getElementById('workbenchExpandBtn').getAttribute('aria-pressed')).toBe(
+      'false'
+    );
+
+    wb.show('metrics');
+    expect(parseInt(wb.el.style.height, 10)).toBeLessThan(expandedHeight);
+  });
 });

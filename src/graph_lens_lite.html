@@ -369,7 +369,7 @@
     <div id="inspectorLog" class="insp-log" hidden>
       <button id="logToggleBtn" class="insp-log-toggle" aria-expanded="false"
               aria-controls="sidebarStatusContainer"
-              title="Activity log — every message this session, oldest first"
+              title="Activity log — recent activity, oldest first"
               onclick="cache.ui.toggleLog()">
         <span class="insp-log-chevron" aria-hidden="true">▸</span>
         <span>Activity log</span>
@@ -391,7 +391,7 @@
   <ul id="cmdkResults" class="cmdk-results" role="listbox" aria-label="Results"></ul>
   <div class="cmdk-foot">
     <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
-    <span><kbd>↵</kbd> run</span>
+    <span><kbd>↵</kbd> <span id="cmdkEnterHint">run</span></span>
     <span><kbd>⇥</kbd> show me where</span>
     <span><kbd>esc</kbd> close</span>
     <span class="cmdk-foot-note">controls, nodes, edges and properties in one list</span>

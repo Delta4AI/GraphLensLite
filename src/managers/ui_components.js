@@ -122,7 +122,7 @@ class DropdownChecklist {
         : this.selectedCategories.delete(ev.target.value);
       this.anchor.textContent = `${this.selectedCategories.size}/${this.categories.size} selected`;
       await this.cache.fm.handleFilterEvent(
-        ev.target.checked ? 'Showing' : 'Hiding' + ' Elements',
+        `${ev.target.checked ? 'Showing' : 'Hiding'} Elements`,
         `Nodes and related edges for ${this.propID} ${ev.target.value}`,
         this.propID
       );
@@ -1237,6 +1237,12 @@ class UIComponentManager {
 
   getCheckboxTT(enable, propID) {
     return `Click to ${enable ? 'hide' : 'show'} elements with the property:${StaticUtilities.formatPropsAsTree(propID)}`;
+  }
+
+  /** An active-but-unnarrowed filter under AND: on, dimmed, and constraining
+   * nothing. The normal "click to hide elements" reads as a lie there. */
+  getInertCheckboxTT(propID) {
+    return `Not narrowed, so under AND it excludes nothing — narrow it, or switch to OR:${StaticUtilities.formatPropsAsTree(propID)}`;
   }
 
   createAddOrRemoveToSelectionGroup(propID) {

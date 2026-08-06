@@ -23,6 +23,8 @@ const MAX_RESULTS = 60;
 const MAX_ELEMENTS = 8;
 /** Matches the .cmdk-flash animation in style.css; the class is what drives it. */
 const FLASH_MS = 1200;
+/** What ↵ does to the active row, by kind (the footer says so). */
+const ENTER_HINTS = { run: 'run', reveal: 'show', focus: 'go to' };
 // Rail and menu tooltips already end in "(F)", "(L)", "(D)" … — free
 // accelerators, and they cannot drift from the hotkey they document because
 // they ARE the tooltip the user reads on hover.
@@ -465,6 +467,10 @@ class CommandPalette {
       row.setAttribute('aria-selected', String(active));
       if (active) row.scrollIntoView({ block: 'nearest' });
     });
+    // ↵ does three different things depending on the row; a static "run" was
+    // wrong for the two thirds of rows that reveal or focus instead.
+    const hint = document.getElementById('cmdkEnterHint');
+    if (hint) hint.textContent = ENTER_HINTS[this.#results[this.#active]?.kind] ?? 'run';
     this.input?.setAttribute(
       'aria-activedescendant',
       rows.length ? `cmdkRow${this.#active}` : ''

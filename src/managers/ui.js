@@ -1005,7 +1005,17 @@ class UIManager {
       const counts =
         !!fo.active && (!andMode || isFilterNarrowed(fo, defaults?.get(row.dataset.propId)));
       if (counts) constraining += 1;
-      row.classList.toggle('filter-row-inert', andMode && !!fo.active && !counts);
+      const inert = andMode && !!fo.active && !counts;
+      row.classList.toggle('filter-row-inert', inert);
+      // The row is dimmed but its checkbox still offered to "hide elements".
+      // This pass runs on every filter change (query.js funnels into it), so it
+      // is also where the row's tooltip is kept honest.
+      const wrapper = row.querySelector('.checkboxWrapper');
+      if (wrapper) {
+        wrapper.title = inert
+          ? this.cache.uiComponents.getInertCheckboxTT(row.dataset.propId)
+          : this.cache.uiComponents.getCheckboxTT(!!fo.active, row.dataset.propId);
+      }
     }
 
     this.renderFilterConstraintCount(andMode, constraining, total);
