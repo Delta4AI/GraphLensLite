@@ -503,6 +503,19 @@ describe('the palette dialog', () => {
     expect(palette.countEl.textContent).toBe('60 of 70 — keep typing');
   });
 
+  it('counts a capped element slate as truncation, not a complete list', () => {
+    // Element matches stop at 8 and the scan stops counting there, so the
+    // total is unknown — the old arithmetic left them out entirely and read
+    // "8 results" over a graph with hundreds of hits.
+    for (let i = 0; i < 20; i += 1) {
+      cache.nodeIDOrLabelToNodeIDs.set(`Kinase ${i}`, new Set([`k${i}`]));
+    }
+    palette.open();
+    type('kinase');
+
+    expect(palette.countEl.textContent).toBe('8 of many — keep typing');
+  });
+
   it('names the accelerator for this platform in the rail button tooltip', () => {
     // The face stays a plain glyph + label like every other rail button; the
     // key lives in the title, which is where the rest of the rail puts it.
