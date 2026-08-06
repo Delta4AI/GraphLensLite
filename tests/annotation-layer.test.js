@@ -169,6 +169,29 @@ describe('placement tool', () => {
     expect(container.querySelector('.annotation-placement-overlay')).toBeNull();
     expect(cache.data.layouts.Default.annotations).toHaveLength(0);
   });
+
+  it('reports the armed state, and drops it on every route out', () => {
+    // Armed mode had no indicator at all, so the only feedback was a toast that
+    // scrolled away. The layer owns the reporting because it owns every exit:
+    // the placing click, Escape, and the layer being hidden.
+    const { layer, cache, container } = makeLayer();
+    const armed = [];
+    cache.ui.setNotePlacementActive = (on) => armed.push(on);
+
+    layer.armPlacement();
+    expect(armed).toEqual([true]);
+
+    container
+      .querySelector('.annotation-placement-overlay')
+      .dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 500, clientY: 200, bubbles: true }));
+    expect(armed).toEqual([true, false]);
+
+    layer.armPlacement();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    layer.armPlacement();
+    layer.setVisible(false);
+    expect(armed).toEqual([true, false, true, false, true, false]);
+  });
 });
 
 describe('drag and popover', () => {
@@ -216,6 +239,26 @@ describe('drag and popover', () => {
     expect(cache.data.layouts.Default.annotations).toHaveLength(0);
     expect(document.querySelector('.annotation-popover')).toBeNull();
     expect(noteEls(container)).toHaveLength(0);
+  });
+
+  it('flips the popover above a note that sits low on screen', () => {
+    const { layer, container } = makeLayer({ annotations: [{ id: 'a', ...baseAnn() }] });
+    layer.sync();
+    const el = noteEls(container)[0];
+    // jsdom measures nothing; stand in for a note near the bottom edge and a
+    // popover tall enough that opening downwards would run off it.
+    el.getBoundingClientRect = () => ({ top: 700, bottom: 740, left: 100, width: 80, height: 40 });
+    window.innerHeight = 768;
+
+    el.dispatchEvent(
+      new MouseEvent('pointerdown', { button: 0, clientX: 140, clientY: 720, bubbles: true })
+    );
+    el.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+    const popover = document.querySelector('.annotation-popover');
+    Object.defineProperty(popover, 'offsetHeight', { value: 300, configurable: true });
+    layer.sync(); // repositions the open popover
+
+    expect(parseFloat(popover.style.top)).toBeLessThan(700);
   });
 
   it('popover inputs write through to the annotation', () => {

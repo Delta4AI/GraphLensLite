@@ -30,7 +30,7 @@ import {
   MAX_TEXT_LENGTH,
   annotationLayout,
 } from './annotation_geometry.js';
-import { clampPopoverLeft } from '../utilities/popover_position.js';
+import { clampPopoverLeft, clampPopoverTop } from '../utilities/popover_position.js';
 
 // A press that travels less than this many screen px is a click (open the
 // style popover), not a drag.
@@ -138,12 +138,16 @@ class AnnotationLayer {
     document.addEventListener('keydown', this.placementEscape, true);
     this.container.appendChild(overlay);
     this.placementOverlay = overlay;
+    this.cache.ui?.setNotePlacementActive?.(true);
   }
 
   cancelPlacement() {
     if (!this.placementOverlay) return;
     this.placementOverlay.remove();
     this.placementOverlay = null;
+    // Every route out of placement lands here — the placing click, Escape,
+    // hiding the layer — so the rail button's armed look is dropped here too.
+    this.cache.ui?.setNotePlacementActive?.(false);
     document.removeEventListener('keydown', this.placementEscape, true);
     this.placementEscape = null;
   }
@@ -563,7 +567,15 @@ class AnnotationLayer {
     const el = this.els.get(this.popoverId);
     if (!el || !this.popover) return;
     const rect = el.getBoundingClientRect();
-    this.popover.style.top = `${rect.bottom + POPOVER_OFFSET_PX}px`;
+    // Below the note by default, above it when the colour rows and Delete would
+    // fall off the bottom edge (same flip as the tooltip layer). The clamp is
+    // the last resort for a popover taller than the space on either side.
+    const height = this.popover.offsetHeight;
+    let top = rect.bottom + POPOVER_OFFSET_PX;
+    if (top + height > window.innerHeight - POPOVER_OFFSET_PX) {
+      top = rect.top - height - POPOVER_OFFSET_PX;
+    }
+    this.popover.style.top = `${clampPopoverTop(top, height, window.innerHeight)}px`;
     this.popover.style.left = `${clampPopoverLeft(
       rect.left,
       this.popover.offsetWidth,

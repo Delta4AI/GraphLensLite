@@ -164,6 +164,39 @@ describe('UIManager overlay layer stack', () => {
     expect(sw('Notes').getAttribute('aria-checked')).toBe('true');
   });
 
+  it('disarms on a second press instead of re-arming', () => {
+    // The ✎ button is a toggle now (like Lasso): pressing it again while armed
+    // used to arm a second time, with no way back except Escape.
+    const [ui, cache] = makeUI();
+    ui.info = vi.fn();
+    const layer = cache.graph.annotationLayer;
+    layer.armPlacement = vi.fn(() => {
+      layer.placementOverlay = {};
+    });
+    layer.cancelPlacement = vi.fn(() => {
+      layer.placementOverlay = null;
+    });
+
+    ui.startTextAnnotation();
+    expect(layer.armPlacement).toHaveBeenCalledTimes(1);
+
+    ui.startTextAnnotation();
+    expect(layer.cancelPlacement).toHaveBeenCalledTimes(1);
+    expect(layer.armPlacement).toHaveBeenCalledTimes(1);
+    expect(ui.info).toHaveBeenLastCalledWith('Note placement canceled');
+  });
+
+  it('marks the note button while the tool is armed', () => {
+    document.body.insertAdjacentHTML('beforeend', '<button id="noteToggleBtn"></button>');
+    const [ui] = makeUI();
+    const btn = document.getElementById('noteToggleBtn');
+
+    ui.setNotePlacementActive(true);
+    expect(btn.classList.contains('active')).toBe(true);
+    ui.setNotePlacementActive(false);
+    expect(btn.classList.contains('active')).toBe(false);
+  });
+
   // --------------------------------------------------------- the group count
 
   it('labels the Groups row with the number of groups that have members', () => {

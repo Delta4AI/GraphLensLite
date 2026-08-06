@@ -419,11 +419,20 @@ class UIManager {
     this.info(enableLasso ? 'Switched to lasso selection mode' : 'Switched to click and drag mode');
   }
 
-  /** Arm the one-shot text-note tool: the next canvas click places a note. */
+  /**
+   * Arm the one-shot text-note tool: the next canvas click places a note.
+   * A second press disarms it, and the button shows the armed state — same
+   * contract as the lasso toggle, which this button sits next to.
+   */
   startTextAnnotation() {
     const layer = this.cache.graph?.annotationLayer;
     if (!layer) {
       this.error('Load a graph first.');
+      return;
+    }
+    if (layer.placementOverlay) {
+      layer.cancelPlacement();
+      this.info('Note placement canceled');
       return;
     }
     // Placing a note into a hidden layer would look like a no-op, so the tool
@@ -431,6 +440,12 @@ class UIManager {
     if (!layer.visible) this.setOverlayVisible('notes', true);
     layer.armPlacement();
     this.info('Click the canvas to place a text note — Escape to cancel');
+  }
+
+  /** The armed look on the note button. Driven from the layer, which owns every
+   * route out of placement (the placing click, Escape, hiding the layer). */
+  setNotePlacementActive(active) {
+    document.getElementById('noteToggleBtn')?.classList.toggle('active', active);
   }
 
   // ------------------------------------------------------- the overlay stack
