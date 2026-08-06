@@ -82,7 +82,8 @@ describe('group menu', () => {
     const [partial, plain] = rows();
     expect(partial.classList.contains('partial')).toBe(true);
     expect(partial.querySelector('.rail-menu-check').textContent).toBe('–');
-    expect(partial.title).toContain('Some of the selection');
+    // The tooltip names the action, not the state: the mark carries the state.
+    expect(partial.title).toBe('Add the rest of the selection to "Kinases" (some are already in it)');
     expect(plain.classList.contains('partial')).toBe(false);
   });
 

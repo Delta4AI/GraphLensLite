@@ -100,7 +100,9 @@ function build(el, menu, cache, opts) {
       mark.className = 'rail-menu-check';
       mark.textContent = '–';
       row.append(mark);
-      row.title = `Some of the selection is already in "${name}"`;
+      // What the click does, not what the state is — the mark already says the
+      // state (same wording as the group rows in group_list.js).
+      row.title = `Add the rest of the selection to "${name}" (some are already in it)`;
     }
     row.prepend(groupDot(style.fill));
     el.appendChild(row);
