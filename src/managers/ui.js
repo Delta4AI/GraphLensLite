@@ -692,30 +692,60 @@ class UIManager {
   buildFilterUI() {
     const div = document.getElementById('filterContainer');
     div.innerHTML = '';
+    this.#buildFilterLockBar(div);
+    div.appendChild(this.#buildFilterToolbar());
 
-    // Always create lock status bar, show/hide based on lock state
-    const statusBar = this.createFilterLockStatusBar();
-    statusBar.id = 'filterLockStatusBar';
-    statusBar.style.display = this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY
-      ? 'flex'
-      : 'none';
-    div.appendChild(statusBar);
+    // Each section (and sub-group) is a collapsible accordion so large
+    // property sets can be folded down to just the groups in use.
+    const sectionBodies = new Map();
+    const subBodies = new Map();
+    const propIDs = [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()];
+    if (this.cache.CFG.SORT_FILTERS) propIDs.sort();
 
-    // Add/remove locked class on container
-    if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
-      div.classList.add('locked');
-    } else {
-      div.classList.remove('locked');
+    for (const propID of propIDs) {
+      const [section, subSection, prop] = StaticUtilities.decodePropHashId(propID);
+      if (!sectionBodies.has(section)) {
+        sectionBodies.set(section, this.#buildFilterSection(div, section));
+      }
+      const subKey = `${section}::${subSection}`;
+      if (!subBodies.has(subKey)) {
+        const body = this.#buildFilterSubgroup(sectionBodies.get(section), section, subSection);
+        subBodies.set(subKey, body);
+      }
+      const { row, widget } = this.#buildFilterRow(propID, section, subSection, prop);
+      subBodies.get(subKey).append(row);
+      // Strictly after the append: InvertibleRangeSlider.appendListeners looks
+      // its parts up with getElementById, which finds nothing off-document.
+      widget?.appendListeners();
     }
 
-    // Panel-level control bar. Sits above every section so its controls read
-    // as global, not scoped to the adjacent section: the OR/AND join toggle
-    // and its "complete cases" modifier.
+    this.buildFilterScopeToggle(div);
+
+    this.cache.qm.updateQueryTextArea();
+  }
+
+  /** The manual-query lock: its explanatory bar, and the class every locked
+   * control's dimming hangs off. */
+  #buildFilterLockBar(div) {
+    const locked = this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY;
+    const statusBar = this.createFilterLockStatusBar();
+    statusBar.id = 'filterLockStatusBar';
+    statusBar.style.display = locked ? 'flex' : 'none';
+    div.appendChild(statusBar);
+    div.classList.toggle('locked', locked);
+  }
+
+  /**
+   * Panel-level control bar. Sits above every section so its controls read as
+   * global, not scoped to the adjacent section: the OR/AND join toggle and its
+   * "complete cases" modifier, the search box, the constraint count.
+   */
+  #buildFilterToolbar() {
     const toolbar = document.createElement('div');
     toolbar.className = 'filter-toolbar';
-    // OR/AND join control (left). "Complete cases only" is a modifier of AND,
-    // revealed only under AND (the join toggle drives its visibility). It sits
-    // to the RIGHT of the toggle so switching OR<->AND never shifts the toggle.
+    // "Complete cases only" is a modifier of AND, revealed only under AND (the
+    // join toggle drives its visibility). It sits to the RIGHT of the toggle so
+    // switching OR<->AND never shifts the toggle.
     const strictCheckbox = this.createFilterStrictCheckbox();
     const joinToggle = this.createFilterJoinToggle((mode) => {
       strictCheckbox.hidden = mode !== 'AND';
@@ -724,130 +754,121 @@ class UIManager {
     joinCluster.className = 'filter-toolbar-join';
     joinCluster.append(joinToggle, strictCheckbox);
     toolbar.append(joinCluster, this.createFilterSearch(), this.createFilterConstraintCount());
-    div.appendChild(toolbar);
+    return toolbar;
+  }
 
-    // Each section (and sub-group) is a collapsible accordion so large
-    // property sets can be folded down to just the groups in use.
-    const sectionBodies = new Map();
-    const subBodies = new Map();
-    const sortedPropIDs = this.cache.CFG.SORT_FILTERS
-      ? [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()].sort()
-      : [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()];
+  /** @returns {HTMLElement} the section's body, for sub-groups to append to */
+  #buildFilterSection(div, section) {
+    const sectionWrap = document.createElement('div');
+    sectionWrap.className = 'filter-section';
+    sectionWrap.dataset.section = section;
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'header-card';
+    const header = document.createElement('h4');
+    header.textContent = section;
+    header.className = 'm-0 white';
+    headerDiv.appendChild(header);
+    headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(false, section));
+    headerDiv.appendChild(this.cache.uiComponents.createSectionResetButton(section));
+    headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(true, section));
+    const sectionBody = document.createElement('div');
+    sectionBody.className = 'filter-section-body';
+    this.makeFilterGroupCollapsible(sectionWrap, headerDiv);
+    sectionWrap.append(headerDiv, sectionBody);
+    div.appendChild(sectionWrap);
+    return sectionBody;
+  }
 
-    for (let propID of sortedPropIDs) {
-      let [section, subSection, prop] = StaticUtilities.decodePropHashId(propID);
-      if (!sectionBodies.has(section)) {
-        const sectionWrap = document.createElement('div');
-        sectionWrap.className = 'filter-section';
-        sectionWrap.dataset.section = section;
-        const headerDiv = document.createElement('div');
-        headerDiv.className = 'header-card';
-        const header = document.createElement('h4');
-        header.textContent = section;
-        header.className = 'm-0 white';
-        headerDiv.appendChild(header);
-        headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(false, section));
-        headerDiv.appendChild(this.cache.uiComponents.createSectionResetButton(section));
-        headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(true, section));
-        const sectionBody = document.createElement('div');
-        sectionBody.className = 'filter-section-body';
-        this.makeFilterGroupCollapsible(sectionWrap, headerDiv);
-        sectionWrap.append(headerDiv, sectionBody);
-        div.appendChild(sectionWrap);
-        sectionBodies.set(section, sectionBody);
-      }
-      const sectionBody = sectionBodies.get(section);
+  /** @returns {HTMLElement} the sub-group's body, for rows to append to */
+  #buildFilterSubgroup(sectionBody, section, subSection) {
+    const subWrap = document.createElement('div');
+    subWrap.className = 'filter-subgroup';
+    const subHeaderDiv = document.createElement('div');
+    subHeaderDiv.className = 'sub-header-card';
+    const subHeader = document.createElement('h5');
+    subHeader.textContent = subSection;
+    subHeader.className = 'm-0 inline';
+    subHeaderDiv.append(
+      subHeader,
+      this.cache.uiComponents.createSectionToggleButton(false, section, subSection),
+      this.cache.uiComponents.createSectionResetButton(section, subSection),
+      this.cache.uiComponents.createSectionToggleButton(true, section, subSection)
+    );
+    const subBody = document.createElement('div');
+    subBody.className = 'filter-subgroup-body';
+    this.makeFilterGroupCollapsible(subWrap, subHeaderDiv);
+    subWrap.append(subHeaderDiv, subBody);
+    sectionBody.appendChild(subWrap);
+    return subBody;
+  }
 
-      const subKey = `${section}::${subSection}`;
-      if (!subBodies.has(subKey)) {
-        const subWrap = document.createElement('div');
-        subWrap.className = 'filter-subgroup';
-        const subHeaderDiv = document.createElement('div');
-        subHeaderDiv.className = 'sub-header-card';
-        const subHeader = document.createElement('h5');
-        subHeader.textContent = subSection;
-        subHeader.className = 'm-0 inline';
-        subHeaderDiv.appendChild(subHeader);
-        subHeaderDiv.appendChild(
-          this.cache.uiComponents.createSectionToggleButton(false, section, subSection)
-        );
-        subHeaderDiv.appendChild(
-          this.cache.uiComponents.createSectionResetButton(section, subSection)
-        );
-        subHeaderDiv.appendChild(
-          this.cache.uiComponents.createSectionToggleButton(true, section, subSection)
-        );
-        const subBody = document.createElement('div');
-        subBody.className = 'filter-subgroup-body';
-        this.makeFilterGroupCollapsible(subWrap, subHeaderDiv);
-        subWrap.append(subHeaderDiv, subBody);
-        sectionBody.appendChild(subWrap);
-        subBodies.set(subKey, subBody);
-      }
-      const subBody = subBodies.get(subKey);
+  /**
+   * One property's row: checkbox, its widget, and the per-row actions.
+   *
+   * The widget comes back unwired — its appendListeners() resolves parts by id
+   * and so has to run after the caller has put the row in the document.
+   *
+   * @returns {{row: HTMLElement, widget: object|null}}
+   */
+  #buildFilterRow(propID, section, subSection, prop) {
+    const filterDefault = this.cache.data.filterDefaults.get(propID);
 
-      const filterDefault = this.cache.data.filterDefaults.get(propID);
+    const row = document.createElement('div');
+    row.className = 'filter-row';
+    // Identity on the row, so the search matches on data instead of scraping
+    // rendered label text.
+    row.dataset.propId = propID;
+    row.dataset.search = `${section} ${subSection} ${prop}`.toLowerCase();
+    const col1 = document.createElement('div');
+    col1.className = 'filter-row-col1';
+    col1.appendChild(this.cache.uiComponents.createCheckbox(propID, prop));
+    const col2 = document.createElement('div');
+    col2.className = 'filter-row-col2';
+    row.append(col1, col2);
 
-      const row = document.createElement('div');
-      row.className = 'filter-row';
-      // Identity on the row, so the search matches on data instead of scraping
-      // rendered label text.
-      row.dataset.propId = propID;
-      row.dataset.search = `${section} ${subSection} ${prop}`.toLowerCase();
-      const col1 = document.createElement('div');
-      col1.className = 'filter-row-col1';
-      col1.appendChild(this.cache.uiComponents.createCheckbox(propID, prop));
-      row.appendChild(col1);
-      const col2 = document.createElement('div');
-      col2.className = 'filter-row-col2';
-      row.appendChild(col2);
-
-      // Mixed-type property (§6.2): rendered, but disabled with the reason —
-      // no widget, no per-row actions, checkbox inert via the row class.
-      if (filterDefault.unusable) {
-        row.classList.add('filter-row-unusable');
-        const reason = document.createElement('div');
-        reason.className = 'filter-unusable-reason';
-        reason.textContent =
-          `Mixes ${filterDefault.numericCount} numeric and ` +
-          `${filterDefault.textCount} text values — filter disabled`;
-        reason.title =
-          'This column holds both numbers and text, so neither a range slider nor a ' +
-          'category list fits it. Clean the column to a single type to filter by it.';
-        // ponytail: "jump to offending rows in the data table" (spec §6.2)
-        // needs data-editor search/filter support that does not exist yet;
-        // add the link here once the data editor can focus a row subset.
-        col2.appendChild(reason);
-        row.appendChild(document.createElement('div'));
-        subBody.append(row);
-        continue;
-      }
-
-      const widget = filterDefault.isBoolean
-        ? new BooleanToggle(propID, this.cache)
-        : filterDefault.isCategory
-          ? new DropdownChecklist(propID, this.cache)
-          : new InvertibleRangeSlider(propID, this.cache);
-
-      widget.appendTo(col2);
-      const col3 = document.createElement('div');
-      col3.className = 'filter-row-col3';
-      if (this.cache.nodeExclusiveProps.has(propID) || this.cache.mixedProps.has(propID)) {
-        col3.appendChild(this.cache.uiComponents.createGroupChip(propID));
-      } else {
-        const placeHolder = document.createElement('div');
-        placeHolder.style.width = '18px';
-        col3.appendChild(placeHolder);
-      }
-      col3.appendChild(this.cache.uiComponents.createAddOrRemoveToSelectionGroup(propID));
-      row.appendChild(col3);
-      subBody.append(row);
-      widget.appendListeners();
+    // Mixed-type property (§6.2): rendered, but disabled with the reason —
+    // no widget, no per-row actions, checkbox inert via the row class.
+    if (filterDefault.unusable) {
+      row.classList.add('filter-row-unusable');
+      col2.appendChild(this.#buildUnusableReason(filterDefault));
+      row.appendChild(document.createElement('div'));
+      return { row, widget: null };
     }
 
-    this.buildFilterScopeToggle(div);
+    const widget = filterDefault.isBoolean
+      ? new BooleanToggle(propID, this.cache)
+      : filterDefault.isCategory
+        ? new DropdownChecklist(propID, this.cache)
+        : new InvertibleRangeSlider(propID, this.cache);
 
-    this.cache.qm.updateQueryTextArea();
+    widget.appendTo(col2);
+    const col3 = document.createElement('div');
+    col3.className = 'filter-row-col3';
+    if (this.cache.nodeExclusiveProps.has(propID) || this.cache.mixedProps.has(propID)) {
+      col3.appendChild(this.cache.uiComponents.createGroupChip(propID));
+    } else {
+      const placeHolder = document.createElement('div');
+      placeHolder.style.width = '18px';
+      col3.appendChild(placeHolder);
+    }
+    col3.appendChild(this.cache.uiComponents.createAddOrRemoveToSelectionGroup(propID));
+    row.appendChild(col3);
+    return { row, widget };
+  }
+
+  #buildUnusableReason(filterDefault) {
+    const reason = document.createElement('div');
+    reason.className = 'filter-unusable-reason';
+    reason.textContent =
+      `Mixes ${filterDefault.numericCount} numeric and ` +
+      `${filterDefault.textCount} text values — filter disabled`;
+    reason.title =
+      'This column holds both numbers and text, so neither a range slider nor a ' +
+      'category list fits it. Clean the column to a single type to filter by it.';
+    // ponytail: "jump to offending rows in the data table" (spec §6.2) needs
+    // data-editor search/filter support that does not exist yet; add the link
+    // here once the data editor can focus a row subset.
+    return reason;
   }
 
   /**
