@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
+import fs from 'node:fs';
 import { InvertibleRangeSlider } from '../src/managers/ui_components.js';
 import { CFG, DEFAULTS } from '../src/config.js';
 
@@ -242,6 +243,22 @@ describe('numeric filter row', () => {
 
     expect(low.getAttribute('aria-label')).toBe('altitude_m — lower threshold');
     expect(high.getAttribute('aria-label')).toBe('altitude_m — upper threshold');
+  });
+
+  // The row holds three inputs one level apart: the two exact-value boxes are
+  // its own children, the slider's two <input type=range> handles sit inside
+  // div[slider]. A descendant selector styles both — and `max-width: 10ch` on
+  // a handle cut its 117px track to 58px, parking both native thumbs in the
+  // left half of a slider whose visual thumbs still spanned the full width.
+  // The right thumb then had no hit area under it at all. jsdom lays nothing
+  // out, so the child combinator has to be pinned at the source.
+  it('scopes the box styling to direct children, never the range handles', () => {
+    const css = fs.readFileSync('src/style.css', 'utf8'); // vitest runs at the repo root
+    const selectors = [...css.matchAll(/^\.filter-range-row[^{]*\binput\b[^{]*\{/gm)].map((m) => m[0]);
+    expect(selectors.length).toBeGreaterThan(0);
+    for (const sel of selectors) {
+      expect(sel).toMatch(/\.filter-range-row[^>]*>\s*input/);
+    }
   });
 
   it('registers no window-level listeners — the fixed bubbles are gone', () => {

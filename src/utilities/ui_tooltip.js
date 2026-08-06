@@ -148,6 +148,18 @@ function initUiTooltips(doc = document) {
     anchor = null;
   }
 
+  /**
+   * Is the pointer inside the visible tip? The tip keeps `pointer-events: none`
+   * so it can never swallow a click meant for the control it covers, which
+   * means it is never an event target either — hover-persistence (WCAG 1.4.13)
+   * has to be tested against its box.
+   */
+  function overTip(e) {
+    if (!tip.classList.contains('show')) return false;
+    const r = tip.getBoundingClientRect();
+    return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+  }
+
   function engage(el, { viaFocus = false } = {}) {
     if (el === anchor) {
       // Focus showed the tip without stripping; a later hover still must
@@ -168,7 +180,7 @@ function initUiTooltips(doc = document) {
   }
 
   doc.addEventListener('pointerover', (e) => {
-    if (tip.contains(e.target)) return; // hovering the tip keeps it open (WCAG 1.4.13)
+    if (overTip(e)) return; // hovering the tip keeps it open (WCAG 1.4.13)
     const el = e.target.closest?.('[title], [data-tip]');
     if (el) engage(el);
     else if (anchor && !anchor.contains(e.target)) hide();

@@ -144,6 +144,53 @@ describe('initUiTooltips', () => {
   });
 });
 
+// A tip is up to 153px tall and lands on top of whatever sits below its
+// anchor — four filter slider rows, in the panel that reported this. While it
+// took pointer events, the first click on a covered thumb hit the tip instead
+// of the thumb. It must stay transparent to the pointer AND still survive
+// being hovered (WCAG 1.4.13), which is now a geometric test.
+describe('the tip never intercepts a pointer', () => {
+  let btn;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    document.body.innerHTML = '<button id="b" title="Fit graph to screen (F)">Fit</button>';
+    btn = document.getElementById('b');
+    initUiTooltips(document);
+    hover(btn);
+    vi.advanceTimersByTime(600);
+    const tip = document.getElementById('uiTip');
+    // jsdom lays nothing out; give the tip the box a real one would have.
+    tip.getBoundingClientRect = () => ({ left: 100, right: 380, top: 200, bottom: 353 });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    document.getElementById('uiTip')?.remove();
+  });
+
+  function pointerAt(clientX, clientY) {
+    document.body.dispatchEvent(new MouseEvent('pointerover', { bubbles: true, clientX, clientY }));
+  }
+
+  it('stays open while the pointer is inside its box', () => {
+    pointerAt(240, 280);
+    expect(document.getElementById('uiTip').classList.contains('show')).toBe(true);
+  });
+
+  it('hides once the pointer is outside its box', () => {
+    pointerAt(240, 500);
+    expect(document.getElementById('uiTip').classList.contains('show')).toBe(false);
+  });
+
+  it('keeps pointer-events off the shown tip in the stylesheet', () => {
+    const css = fs.readFileSync('src/style.css', 'utf8'); // vitest runs at the repo root
+    const rule = css.match(/\.ui-tip\.show\s*\{([^}]*)\}/);
+    expect(rule).not.toBeNull();
+    // Declarations only — the rule's comment says why the property is absent.
+    const declarations = rule[1].replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(declarations).not.toContain('pointer-events');
+  });
+});
+
 // The guard above is only half the fix: jsdom applies no stylesheet, so the
 // rule that gives a titled disabled control its pointer events back has to be
 // pinned here or it could be deleted with every test still green.

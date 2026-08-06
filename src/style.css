@@ -2152,7 +2152,12 @@ h5 {
    sibling) shift mid-drag and the thumb jump under the cursor. The cap keeps a
    pathological column from eating the row; the exact value is one click away
    regardless. */
-.filter-range-row input {
+/* Child combinator, not a descendant one: the row also contains the slider's
+   two <input type=range> handles, one level down inside div[slider]. They were
+   picking up `max-width: 10ch` here, which cut their 117px track to 58px — so
+   both native thumbs sat in the left half while the visual thumbs were painted
+   across the full width, and the right thumb had no hit area under it. */
+.filter-range-row > input {
     flex: 0 1 auto;
     width: auto;
     max-width: 10ch;
@@ -2173,21 +2178,21 @@ h5 {
 /* Inverted: sliderStart holds the HIGHER value, so its box belongs at the
    right-hand end. Only the visual order swaps — each box still drives its own
    handle. */
-.filter-range-row.flipped input:first-child {
+.filter-range-row.flipped > input:first-child {
     order: 1;
 }
 
-.filter-range-row.flipped input:last-child {
+.filter-range-row.flipped > input:last-child {
     order: -1;
 }
 
-.filter-range-row input:hover {
+.filter-range-row > input:hover {
     border-color: var(--border-soft);
     background: var(--surface-3);
 }
 
 /* Focus shows the exact value, so the box needs room for it. */
-.filter-range-row input:focus {
+.filter-range-row > input:focus {
     outline: none;
     max-width: 16ch;
     flex: 0 0 auto;
@@ -2198,7 +2203,7 @@ h5 {
     box-shadow: 0 0 0 2px rgba(195, 61, 53, 0.25);
 }
 
-.filter-range-row input.red {
+.filter-range-row > input.red {
     color: var(--accent-text);
     font-weight: 600;
 }
@@ -7171,8 +7176,11 @@ input:checked + .slider:before {
     visibility: visible;
     transform: none;
     transition: opacity 0.12s ease, transform 0.12s ease;
-    /* WCAG 1.4.13: the tip must survive being hovered itself. */
-    pointer-events: auto;
+    /* Stays pointer-events: none. A tip is up to 153px tall and lands right on
+       top of whatever is below its anchor — in the filter panel that is four
+       slider rows, whose thumbs then took a click each to reach: the first
+       pointerdown hit the tip. WCAG 1.4.13 hover-persistence is geometric
+       instead, see overTip() in ui_tooltip.js. */
 }
 
 @media (prefers-reduced-motion: reduce) {
