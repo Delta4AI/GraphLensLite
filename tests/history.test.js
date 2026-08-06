@@ -73,7 +73,13 @@ describe('History', () => {
     await history.undo();
 
     expect(layoutOf(cache).filters.get('p1').active).toBe(true);
-    expect(cache.lm.changeLayout).toHaveBeenCalledWith('Undone: Filter change');
+    // Second argument: the loading overlay's own wording. Without it the
+    // restore borrowed changeLayout's "Switching Workspace" full-screen header,
+    // so undoing a slider tweak flashed a workspace switch that never happened.
+    expect(cache.lm.changeLayout).toHaveBeenCalledWith('Undone: Filter change', {
+      header: 'Undoing',
+      text: 'Filter change',
+    });
   });
 
   it('redoes what it undid', async () => {
@@ -85,7 +91,10 @@ describe('History', () => {
     await history.redo();
 
     expect(layoutOf(cache).filters.get('p1').active).toBe(false);
-    expect(cache.lm.changeLayout).toHaveBeenLastCalledWith('Redone: Filter change');
+    expect(cache.lm.changeLayout).toHaveBeenLastCalledWith('Redone: Filter change', {
+      header: 'Redoing',
+      text: 'Filter change',
+    });
   });
 
   it('covers anything stored on the layout, not a fixed list of operations', async () => {

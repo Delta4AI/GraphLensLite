@@ -16,11 +16,19 @@ class GraphLayoutManager {
   /**
    * Apply the selected workspace's stored state to the screen. `message`
    * overrides the closing status line — undo/redo re-use this path and say what
-   * they restored rather than claiming a workspace switch.
+   * they restored rather than claiming a workspace switch. `busy` does the same
+   * for the loading overlay: a full-screen "Switching Workspace" over an undone
+   * slider tweak announces a switch that never happened.
+   *
+   * @param {string|null} message
+   * @param {{header: string, text: string}|null} busy
    */
-  async changeLayout(message = null) {
+  async changeLayout(message = null, busy = null) {
     this.cache.data.selectedLayout = document.getElementById('selectView').value;
-    await this.cache.ui.showLoading('Switching Workspace', this.cache.data.selectedLayout);
+    await this.cache.ui.showLoading(
+      busy?.header ?? 'Switching Workspace',
+      busy?.text ?? this.cache.data.selectedLayout
+    );
     // Pin the overlay up across the whole switch so the inner render's
     // #postRefresh hideLoading() can't drop it before bubble-sync and
     // hide-disconnected finish. Released right before the position tween (which

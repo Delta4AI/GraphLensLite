@@ -115,7 +115,10 @@ class History {
     if (!this.canUndo) return false;
     const entry = this.past.pop();
     this.future.push(entry);
-    const done = await this.#install(entry.before, `Undone: ${entry.label}`);
+    const done = await this.#install(entry.before, `Undone: ${entry.label}`, {
+      header: 'Undoing',
+      text: entry.label,
+    });
     if (!done) {
       // The snapshot's workspace is gone — the entry is unusable, drop it.
       this.future.pop();
@@ -128,7 +131,10 @@ class History {
     if (!this.canRedo) return false;
     const entry = this.future.pop();
     this.past.push(entry);
-    const done = await this.#install(entry.after, `Redone: ${entry.label}`);
+    const done = await this.#install(entry.after, `Redone: ${entry.label}`, {
+      header: 'Redoing',
+      text: entry.label,
+    });
     if (!done) {
       this.past.pop();
     }
@@ -150,7 +156,7 @@ class History {
   }
 
   /** Put a snapshot back on screen. False when its workspace no longer exists. */
-  async #install(entry, message) {
+  async #install(entry, message, busy) {
     const layouts = this.cache.data?.layouts;
     if (!layouts?.[entry.name] || !this.cache.graph) return false;
 
@@ -169,7 +175,7 @@ class History {
 
       const select = document.getElementById('selectView');
       if (select) select.value = entry.name;
-      await this.cache.lm.changeLayout(message);
+      await this.cache.lm.changeLayout(message, busy);
       this.baseline = snapshot(this.cache);
     } finally {
       this.restoring = false;
