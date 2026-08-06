@@ -27,7 +27,12 @@ function makeSigma(ratio = 1) {
     // Linear stand-in for sigma's projection: graph y-up → screen y-down.
     graphToViewport: (p) => ({ x: CX + (p.x * K) / ratio, y: CY - (p.y * K) / ratio }),
     viewportToGraph: (p) => ({ x: ((p.x - CX) * ratio) / K, y: ((CY - p.y) * ratio) / K }),
-    getCamera: () => ({ getState: () => ({ ratio }) }),
+    // Mutable so tests can move the camera; the layer fingerprints this state
+    // to decide whether a rendered frame needs a re-anchor at all.
+    camera: { x: 0, y: 0, ratio, angle: 0 },
+    getCamera() {
+      return { getState: () => this.camera };
+    },
   };
 }
 
@@ -569,5 +574,76 @@ describe('destroy', () => {
     layer.destroy();
     expect(container.querySelector('.annotation-layer')).toBeNull();
     expect(sigma.handlers.afterRender).toBeUndefined();
+  });
+});
+
+describe('per-frame sync gate', () => {
+  const ann = () => ({ id: 'a', text: 'x'.repeat(500), x: 1, y: 2, ...ANNOTATION_DEFAULTS });
+
+  /** Drive one rendered frame and let the layer's rAF callback run. */
+  async function frame(sigma) {
+    sigma.handlers.afterRender();
+    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  }
+
+  function counting(layer) {
+    const real = layer.sync.bind(layer);
+    const calls = { n: 0 };
+    layer.sync = () => {
+      calls.n++;
+      real();
+    };
+    return calls;
+  }
+
+  it('skips the reconcile while nothing moves', async () => {
+    const { layer, sigma } = makeLayer({ annotations: [ann()] });
+    const syncs = counting(layer);
+
+    await frame(sigma); // first frame has nothing to compare against
+    expect(syncs.n).toBe(1);
+
+    await frame(sigma);
+    await frame(sigma);
+    expect(syncs.n).toBe(1); // hover frames must not rebuild anything
+  });
+
+  // The next two pass with and without the gate by design: they pin the
+  // correctness the gate must not trade away for the skipped frames.
+  it('re-anchors when the camera moves', async () => {
+    const { layer, sigma, container } = makeLayer({ annotations: [ann()] });
+    await frame(sigma);
+    const before = noteEls(container)[0].style.transform;
+
+    sigma.camera = { ...sigma.camera, x: 5, ratio: 2 };
+    await frame(sigma);
+
+    expect(noteEls(container)[0].style.transform).not.toBe(before);
+  });
+
+  it('notices a workspace whose notes were swapped out', async () => {
+    // Undo restores a cloned layout: same length, different array.
+    const { layer, sigma, cache, container } = makeLayer({ annotations: [ann()] });
+    await frame(sigma);
+
+    cache.data.layouts.Default.annotations = [{ ...ann(), id: 'b' }];
+    await frame(sigma);
+
+    expect(noteEls(container)).toHaveLength(1);
+    expect(layer.els.has('b')).toBe(true);
+  });
+
+  it('re-anchors on unhide after the camera moved while hidden', async () => {
+    const { layer, sigma, container } = makeLayer({ annotations: [ann()] });
+    await frame(sigma);
+    const before = noteEls(container)[0].style.transform;
+
+    layer.setVisible(false);
+    sigma.camera = { ...sigma.camera, ratio: 4 };
+    await frame(sigma); // frames while hidden do nothing
+    expect(noteEls(container)[0].style.transform).toBe(before);
+
+    layer.setVisible(true);
+    expect(noteEls(container)[0].style.transform).not.toBe(before);
   });
 });

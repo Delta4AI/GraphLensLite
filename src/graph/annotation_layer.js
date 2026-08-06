@@ -66,6 +66,9 @@ class AnnotationLayer {
 
     this.renderHandler = () => this.scheduleSync();
     adapter.sigma.on('afterRender', this.renderHandler);
+    // Camera + note-set fingerprint of the last reconcile, so the per-frame
+    // hook can tell "nothing moved" from "re-anchor everything" (see #stale).
+    this.syncStamp = null;
   }
 
   /**
@@ -80,7 +83,12 @@ class AnnotationLayer {
     if (!visible) {
       this.cancelPlacement();
       this.#closePopover();
+      return;
     }
+    // Frames rendered while hidden are skipped, so a camera that moved in the
+    // meantime left the notes anchored to their old spots. Nothing re-renders
+    // on unhide by itself — re-anchor them here.
+    if (this.#stale()) this.sync();
   }
 
   destroy() {
@@ -182,8 +190,30 @@ class AnnotationLayer {
     if (this.killed || this.rafHandle !== null) return;
     this.rafHandle = requestAnimationFrame(() => {
       this.rafHandle = null;
-      this.sync();
+      if (this.#stale()) this.sync();
     });
+  }
+
+  /**
+   * Has anything changed that the notes' DOM depends on? This runs on every
+   * rendered frame — hover included — where a full sync() would rebuild a
+   * signature string per note (note text runs to 2000 chars) and rewrite every
+   * transform for nothing.
+   *
+   * The fingerprint covers the camera and the note-set identity. Content edits
+   * mutate a note in place and call sync() directly, so they never need to be
+   * detected here; a restored workspace (undo) swaps the array, which does show
+   * up as a new reference.
+   */
+  #stale() {
+    if (!this.visible) return false;
+    const camera = this.adapter.sigma.getCamera().getState();
+    const anns = this.annotations();
+    const stamp = `${camera.x}|${camera.y}|${camera.ratio}|${camera.angle}|${anns.length}`;
+    if (stamp === this.syncStamp && anns === this.lastAnns) return false;
+    this.syncStamp = stamp;
+    this.lastAnns = anns;
+    return true;
   }
 
   /** Reconcile the DOM notes with the selected workspace, immediately. */
