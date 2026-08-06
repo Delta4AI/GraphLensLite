@@ -248,6 +248,23 @@ describe('the index is derived from the DOM', () => {
     expect(cmd).toMatchObject({ disabled: true, kind: 'reveal' });
   });
 
+  it('treats the class the app actually disables with as disabled', () => {
+    // ui.toggleDisabledElements adds `.disabled` — to controls and to whole
+    // cards. Checked only for the attribute, Enter click()ed a selection-gated
+    // button: a loading flash and a no-op undo entry.
+    const btn = document.getElementById('fitBtn');
+    btn.classList.add('disabled');
+    expect(named(collectCommands(cache), 'Fit')).toMatchObject({
+      disabled: true,
+      kind: 'reveal',
+    });
+
+    btn.classList.remove('disabled');
+    btn.closest('#rail').classList.add('disabled'); // an ancestor counts too
+    expect(named(collectCommands(cache), 'Fit').kind).toBe('reveal');
+    btn.closest('#rail').classList.remove('disabled');
+  });
+
   it('leaves colour swatches out — the row that holds them is the destination', () => {
     const row = document.createElement('div');
     row.className = 'card-row';

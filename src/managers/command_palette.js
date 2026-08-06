@@ -82,7 +82,14 @@ function actionables(root) {
 function command(el, trail, extra = {}) {
   const name = controlName(el);
   if (!name) return null;
-  const disabled = el.disabled || el.getAttribute?.('aria-disabled') === 'true';
+  // The app disables far more by class than by attribute (ui.js
+  // toggleDisabledElements, and whole cards carry it) — checking only the
+  // attribute made the palette Enter-click selection-gated controls, which
+  // flashes a loading overlay and files a no-op undo entry.
+  const disabled =
+    el.disabled ||
+    el.getAttribute?.('aria-disabled') === 'true' ||
+    !!el.closest?.('.disabled');
   return {
     name,
     trail,
