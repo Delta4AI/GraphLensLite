@@ -804,6 +804,10 @@ class GraphCoreManager {
         await (redo ? this.cache.history?.redo() : this.cache.history?.undo());
         return;
       }
+      // Every other chord belongs to the browser or the OS. The switch below
+      // matches the bare key, so Ctrl+A toggled the assistant, Ctrl+F fitted
+      // the view and Ctrl+S/Ctrl+P fired exports over the browser's own dialog.
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
 
       switch (event.key) {
         case 'p':
