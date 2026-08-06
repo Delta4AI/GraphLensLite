@@ -139,40 +139,85 @@ function buildGroupRow(bs, group, layout) {
     row.style.setProperty('--row-color', style.fill || 'transparent');
   }
 
+  const head = document.createElement('div');
+  head.className = 'group-row-head';
+  head.append(
+    buildChevron(bs, group, name, expanded),
+    buildSwatch(bs, group, name, style),
+    buildNameInput(bs, group, name),
+    buildCount(count),
+    buildToggle(bs, group),
+    buildRowMenuButton(bs, group, name)
+  );
+  // Only the HEAD selects the row. The settings pane below is content, and a
+  // handler on the whole row swallowed clicks on its switches — a switch is a
+  // <label><span>, neither a button nor an input, so it slipped past the guard
+  // and the rebuild destroyed the control before the toggle completed.
+  head.addEventListener('click', (e) => {
+    // …and within the head, a click on a control is meant for that control.
+    if (e.target.closest('button, input')) return;
+    bs.selectedGroup = group;
+    renderGroupList(bs);
+  });
+  row.appendChild(head);
+
+  const filters = groupFilterNames(bs, group);
+  if (filters.length > 0) {
+    row.appendChild(buildSourceLine(filters, layout[`${group}ManualMembers`]?.size ?? 0));
+  }
+
+  return row;
+}
+
+/** Fill colour. Also the row's identity cue — the same colour as its hull. */
+function buildSwatch(bs, group, name, style) {
   const swatch = document.createElement('input');
   swatch.type = 'color';
   swatch.className = 'group-swatch';
   swatch.value = /^#[0-9a-f]{6}$/i.test(style.fill) ? style.fill : '#403C53';
   swatch.title = `Fill colour of "${name}"`;
-  swatch.setAttribute('aria-label', `Fill colour of "${name}"`);
+  swatch.setAttribute('aria-label', swatch.title);
   swatch.addEventListener('change', async () => {
     await bs.updateBubbleSetStyle(`Bubble Set ${group} Fill Color`, swatch.value);
     renderGroupList(bs);
   });
+  return swatch;
+}
 
-  // The row name IS labelText, the string painted on the hull, so the list and
-  // the canvas cannot disagree about what a group is called.
-  const nameInput = document.createElement('input');
-  nameInput.type = 'text';
-  nameInput.className = 'group-name';
-  nameInput.value = name;
-  nameInput.title = 'Rename this group (this is the label drawn on the bubble)';
-  nameInput.setAttribute('aria-label', `Name of group "${name}"`);
-  nameInput.addEventListener('change', async () => {
-    await bs.updateBubbleSetStyle(`Bubble Set ${group} Label Text`, nameInput.value.trim());
+/** The row name IS labelText, the string painted on the hull, so the list and
+ * the canvas cannot disagree about what a group is called. */
+function buildNameInput(bs, group, name) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'group-name';
+  input.value = name;
+  input.title = 'Rename this group (this is the label drawn on the bubble)';
+  input.setAttribute('aria-label', `Name of group "${name}"`);
+  input.addEventListener('change', async () => {
+    await bs.updateBubbleSetStyle(`Bubble Set ${group} Label Text`, input.value.trim());
     renderGroupList(bs);
   });
+  return input;
+}
 
-  const countEl = document.createElement('span');
-  countEl.className = 'group-count';
-  countEl.textContent = `${count} node${count === 1 ? '' : 's'}`;
+function buildCount(count) {
+  const el = document.createElement('span');
+  el.className = 'group-count';
+  el.textContent = `${count} node${count === 1 ? '' : 's'}`;
+  return el;
+}
 
+/** ＋/－ for the current selection; its label and state come from syncGroupRows. */
+function buildToggle(bs, group) {
   const toggle = document.createElement('button');
   toggle.type = 'button';
   toggle.className = 'group-row-toggle';
   toggle.dataset.group = group;
   toggle.addEventListener('click', () => bs.toggleSelectedNodesInManualGroup(group));
+  return toggle;
+}
 
+function buildRowMenuButton(bs, group, name) {
   const more = document.createElement('button');
   more.type = 'button';
   more.className = 'group-row-more';
@@ -180,10 +225,13 @@ function buildGroupRow(bs, group, layout) {
   more.title = `More actions for "${name}"`;
   more.setAttribute('aria-label', more.title);
   attachRowMenu(bs, more, group);
+  return more;
+}
 
-  // The affordance for "open this group's appearance settings". Without it the
-  // only cue was a faint row highlight, and nothing said the pane below
-  // belonged to the highlighted row.
+/** The affordance for "open this group's appearance settings". Without it the
+ * only cue was a faint row highlight, and nothing said the pane below belonged
+ * to the highlighted row. */
+function buildChevron(bs, group, name, expanded) {
   const chevron = document.createElement('button');
   chevron.type = 'button';
   chevron.className = 'group-row-chevron';
@@ -197,53 +245,35 @@ function buildGroupRow(bs, group, layout) {
     bs.selectedGroup = expanded ? null : group;
     renderGroupList(bs);
   });
+  return chevron;
+}
 
-  const head = document.createElement('div');
-  head.className = 'group-row-head';
-  head.append(chevron, swatch, nameInput, countEl, toggle, more);
-  // Only the HEAD selects the row. The settings pane below is content, and a
-  // handler on the whole row swallowed clicks on its switches — a switch is a
-  // <label><span>, neither a button nor an input, so it slipped past the guard
-  // and the rebuild destroyed the control before the toggle completed.
-  head.addEventListener('click', (e) => {
-    // …and within the head, a click on a control is meant for that control.
-    if (e.target.closest('button, input')) return;
-    bs.selectedGroup = group;
-    renderGroupList(bs);
-  });
-  row.appendChild(head);
+/** The thing the old UI never admitted: a group can be fed by a live filter AND
+ * by a hand-picked node set at the same time. */
+function buildSourceLine(filters, manualCount) {
+  const source = document.createElement('div');
+  source.className = 'group-row-source';
 
-  // The second line is the thing the old UI never admitted: a group can be fed
-  // by a live filter AND by a hand-picked node set at the same time.
-  const filters = groupFilterNames(bs, group);
-  const manualCount = layout[`${group}ManualMembers`]?.size ?? 0;
-  if (filters.length > 0) {
-    const source = document.createElement('div');
-    source.className = 'group-row-source';
+  const fromFilter = document.createElement('span');
+  fromFilter.className = 'group-source-part';
+  fromFilter.textContent = `⚙ follows ${filters.join(', ')}`;
+  fromFilter.title =
+    `This group takes whichever nodes match ${filters.join(' and ')}, and ` +
+    'follows those filters as you change them.';
+  source.appendChild(fromFilter);
 
-    const fromFilter = document.createElement('span');
-    fromFilter.className = 'group-source-part';
-    fromFilter.textContent = `⚙ follows ${filters.join(', ')}`;
-    fromFilter.title =
-      `This group takes whichever nodes match ${filters.join(' and ')}, and ` +
-      'follows those filters as you change them.';
-    source.appendChild(fromFilter);
-
-    // "+2 manual" read as jargon. Say what the number IS: nodes someone put
-    // there by hand, which stay put whatever the filter does.
-    if (manualCount) {
-      const byHand = document.createElement('span');
-      byHand.className = 'group-source-part';
-      byHand.textContent = `＋ ${manualCount} added by hand`;
-      byHand.title =
-        `${manualCount} node(s) added from a selection. They stay in the group ` +
-        'regardless of the filter above.';
-      source.appendChild(byHand);
-    }
-    row.appendChild(source);
+  // "+2 manual" read as jargon. Say what the number IS: nodes someone put there
+  // by hand, which stay put whatever the filter does.
+  if (manualCount) {
+    const byHand = document.createElement('span');
+    byHand.className = 'group-source-part';
+    byHand.textContent = `＋ ${manualCount} added by hand`;
+    byHand.title =
+      `${manualCount} node(s) added from a selection. They stay in the group ` +
+      'regardless of the filter above.';
+    source.appendChild(byHand);
   }
-
-  return row;
+  return source;
 }
 
 function attachRowMenu(bs, anchor, group) {

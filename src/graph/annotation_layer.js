@@ -41,6 +41,82 @@ import { clampPopoverLeft, clampPopoverTop } from '../utilities/popover_position
 const DRAG_THRESHOLD_PX = 3;
 const POPOVER_OFFSET_PX = 8;
 
+// ------------------------------------------------------------ popover inputs
+// Row + input builders for the note style popover. Module scope rather than
+// closures inside #openPopover, which was 114 lines mostly made of these.
+// `after` is the caller's per-edit hook (repaint + mark dirty).
+
+function popoverRow(labelText, input) {
+  const label = document.createElement('label');
+  label.className = 'annotation-popover-row';
+  const span = document.createElement('span');
+  span.textContent = labelText;
+  label.append(span, input);
+  return label;
+}
+
+function popoverNumberInput(value, min, max, step, onChange, after) {
+  const input = document.createElement('input');
+  input.type = 'number';
+  Object.assign(input, { min, max, step, value });
+  input.addEventListener('input', () => {
+    const n = Number(input.value);
+    if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
+    after();
+  });
+  return input;
+}
+
+function popoverColorInput(value, onChange, after) {
+  const input = document.createElement('input');
+  input.type = 'color';
+  input.value = value;
+  input.addEventListener('input', () => {
+    onChange(input.value);
+    after();
+  });
+  return input;
+}
+
+function popoverCheckboxInput(checked, onChange, after) {
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = checked;
+  input.addEventListener('input', () => {
+    onChange(input.checked);
+    after();
+  });
+  return input;
+}
+
+/**
+ * The two rows that depend on each other: background (a toggle plus a colour,
+ * because <input type=color> has no "none") and shadow, which needs a fill to
+ * be visible at all (see ANNOTATION_SHADOW) and so switches the background on
+ * rather than doing nothing.
+ */
+function buildPopoverFillRows(ann, after) {
+  const bgColorInput = popoverColorInput(ann.bgColor ?? '#ffffff', (v) => {
+    if (ann.bgColor != null) ann.bgColor = v;
+  }, after);
+  const bgToggle = popoverCheckboxInput(ann.bgColor != null, (on) => {
+    ann.bgColor = on ? bgColorInput.value : null;
+  }, after);
+  const bgControls = document.createElement('span');
+  bgControls.className = 'annotation-popover-pair';
+  bgControls.append(bgToggle, bgColorInput);
+  const bgRow = popoverRow('Background', bgControls);
+
+  const shadowToggle = popoverCheckboxInput(ann.shadow === true, (on) => {
+    ann.shadow = on;
+    if (on && ann.bgColor == null) {
+      ann.bgColor = bgColorInput.value;
+      bgToggle.checked = true;
+    }
+  }, after);
+  return { bgRow, shadowToggle };
+}
+
 class AnnotationLayer {
   /**
    * @param {object} adapter  SigmaAdapter (owns sigma + graphology)
@@ -456,92 +532,33 @@ class AnnotationLayer {
     pop.className = 'annotation-popover';
     pop.setAttribute('role', 'group');
     pop.setAttribute('aria-label', 'Note style');
-    const row = (labelText, input) => {
-      const label = document.createElement('label');
-      label.className = 'annotation-popover-row';
-      const span = document.createElement('span');
-      span.textContent = labelText;
-      label.append(span, input);
-      return label;
-    };
-    const numberInput = (value, min, max, step, onChange) => {
-      const input = document.createElement('input');
-      input.type = 'number';
-      Object.assign(input, { min, max, step, value });
-      input.addEventListener('input', () => {
-        const n = Number(input.value);
-        if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
-        this.#afterStyleEdit();
-      });
-      return input;
-    };
-    const colorInput = (value, onChange) => {
-      const input = document.createElement('input');
-      input.type = 'color';
-      input.value = value;
-      input.addEventListener('input', () => {
-        onChange(input.value);
-        this.#afterStyleEdit();
-      });
-      return input;
-    };
+    // Every input reports through the same hook: repaint now, record one undo
+    // entry when the popover closes.
+    const after = () => this.#afterStyleEdit();
+    const numberInput = (value, min, max, step, onChange) =>
+      popoverNumberInput(value, min, max, step, onChange, after);
+    const colorInput = (value, onChange) => popoverColorInput(value, onChange, after);
 
-    const checkboxInput = (checked, onChange) => {
-      const input = document.createElement('input');
-      input.type = 'checkbox';
-      input.checked = checked;
-      input.addEventListener('input', () => {
-        onChange(input.checked);
-        this.#afterStyleEdit();
-      });
-      return input;
-    };
-
-    // Background = toggle + color in one row; the toggle maps to bgColor
-    // null/value (there is no "none" in <input type=color>).
-    const bgColorInput = colorInput(ann.bgColor ?? '#ffffff', (v) => {
-      if (ann.bgColor != null) ann.bgColor = v;
-    });
-    const bgToggle = checkboxInput(ann.bgColor != null, (on) => {
-      ann.bgColor = on ? bgColorInput.value : null;
-    });
-    const bgControls = document.createElement('span');
-    bgControls.className = 'annotation-popover-pair';
-    bgControls.append(bgToggle, bgColorInput);
-    const bgRow = document.createElement('label');
-    bgRow.className = 'annotation-popover-row';
-    const bgLabel = document.createElement('span');
-    bgLabel.textContent = 'Background';
-    bgRow.append(bgLabel, bgControls);
-
-    // A shadow needs the fill (see ANNOTATION_SHADOW), so checking it
-    // switches the background on rather than silently doing nothing.
-    const shadowToggle = checkboxInput(ann.shadow === true, (on) => {
-      ann.shadow = on;
-      if (on && ann.bgColor == null) {
-        ann.bgColor = bgColorInput.value;
-        bgToggle.checked = true;
-      }
-    });
+    const { bgRow, shadowToggle } = buildPopoverFillRows(ann, after);
 
     pop.append(
       // Same bounds the sanitizer clamps to on load — stated once, there.
-      row(
+      popoverRow(
         'Font size',
         numberInput(ann.fontSize, MIN_FONT_SIZE, MAX_FONT_SIZE, 1, (v) => (ann.fontSize = v))
       ),
-      row('Font color', colorInput(ann.fontColor, (v) => (ann.fontColor = v))),
-      row('Border color', colorInput(ann.borderColor, (v) => (ann.borderColor = v))),
-      row(
+      popoverRow('Font color', colorInput(ann.fontColor, (v) => (ann.fontColor = v))),
+      popoverRow('Border color', colorInput(ann.borderColor, (v) => (ann.borderColor = v))),
+      popoverRow(
         'Border width',
         numberInput(ann.borderWidth, 0, MAX_BORDER_WIDTH, 0.5, (v) => (ann.borderWidth = v))
       ),
-      row(
+      popoverRow(
         'Corner radius',
         numberInput(ann.borderRadius ?? 0, 0, MAX_BORDER_RADIUS, 1, (v) => (ann.borderRadius = v))
       ),
       bgRow,
-      row('Shadow', shadowToggle)
+      popoverRow('Shadow', shadowToggle)
     );
     const del = document.createElement('button');
     del.type = 'button';
@@ -554,7 +571,12 @@ class AnnotationLayer {
     this.popover = pop;
     this.#positionPopover();
     pop.querySelector('input')?.focus();
+    this.#wirePopoverDismiss(id, pop);
+  }
 
+  /** Outside-pointerdown and Escape, both scoped to this popover's lifetime.
+   * Escape hands focus back to the note it belongs to. */
+  #wirePopoverDismiss(id, pop) {
     this.popoverOutside = (event) => {
       const noteEl = this.els.get(id);
       if (pop.contains(event.target) || noteEl?.contains(event.target)) return;
