@@ -202,6 +202,12 @@ function initUiTooltips(doc = document) {
     'click',
     (e) => {
       if (!e.target.closest?.('.disabled')) return;
+      // `.disabled` covers a whole subtree, and one thing inside it is meant to
+      // stay live: a disabled card's collapse bar, which style.css hands its
+      // pointer events back so a section can still be folded (and its layer
+      // switch flipped) while its controls are off. Swallowing that click made
+      // the chevron on a dimmed card inert.
+      if (e.target.closest('.card-collapse-bar')) return;
       e.preventDefault();
       e.stopPropagation();
     },

@@ -128,6 +128,34 @@ describe('initUiTooltips', () => {
     expect(clicked).not.toHaveBeenCalled();
   });
 
+  it('still folds a disabled card, whose collapse bar stays live', () => {
+    // A card is disabled as a whole ("Node Configuration" with nothing
+    // selected), and style.css deliberately keeps its collapse bar clickable so
+    // the section can be folded out of the way while its controls are off. The
+    // guard above walks ancestors, so it swallowed that click too.
+    document.body.innerHTML = `
+      <div class="card-labeled card-collapsible disabled">
+        <div class="card-collapse-bar">
+          <button class="card-collapse-header"><span class="card-collapse-title">Node Configuration</span></button>
+        </div>
+        <button id="inner">Shrink</button>
+      </div>`;
+    const fold = vi.fn();
+    const header = document.querySelector('.card-collapse-header');
+    header.addEventListener('click', fold);
+    // The real click lands on the title span inside the header, not the button.
+    document
+      .querySelector('.card-collapse-title')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(fold).toHaveBeenCalledOnce();
+
+    // The card's actual controls stay dead.
+    const inner = vi.fn();
+    document.getElementById('inner').addEventListener('click', inner);
+    document.getElementById('inner').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(inner).not.toHaveBeenCalled();
+  });
+
   it('still lets an enabled control through', () => {
     const clicked = vi.fn();
     btn.addEventListener('click', clicked);
