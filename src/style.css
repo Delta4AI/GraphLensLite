@@ -244,8 +244,8 @@ body {
     border-color: var(--border);
 }
 
-/* On-state (lasso active, hover highlight enabled — driven by the existing
-   green/highlight and active class conventions). */
+/* On-state (lasso active, hover highlight enabled). `.highlight` is kept for
+   the workbench tabs that still use it; rail buttons all speak `.active`. */
 .rail-vb.highlight,
 .rail-vb.active {
     background: var(--surface-3);
@@ -2360,7 +2360,8 @@ h5 {
    3.43:1. Flip the fill's foreground dark, as the Concept C mockups do for
    every brand-filled pill in dark mode. */
 [data-theme="dark"] .filter-join-segment.active,
-[data-theme="dark"] .insp-pill.active {
+[data-theme="dark"] .insp-pill.active,
+[data-theme="dark"] .rail-tab.highlight .rail-vb-t {
     color: #15131c;
 }
 
@@ -4317,9 +4318,17 @@ input:checked + .slider:before {
     cursor: pointer;
 }
 
-.p-button:hover {
+.p-button:hover:not(:disabled) {
     background-color: #C33D35;
     border-color: #C33D35;
+}
+
+/* Neo4j's Fetch and the assistant's Save disable natively, and without this a
+   dead button looked live and still lit up on hover. Dimming the button it
+   already is beats repainting it, so each variant keeps its own colour. */
+.p-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .p-button-primary {
@@ -4327,7 +4336,7 @@ input:checked + .slider:before {
     border-color: #015C0C;
 }
 
-.p-button-primary:hover {
+.p-button-primary:hover:not(:disabled) {
     background-color: #018a12;
     border-color: #018a12;
 }
@@ -4338,7 +4347,7 @@ input:checked + .slider:before {
     color: white;
 }
 
-.p-button-secondary:hover {
+.p-button-secondary:hover:not(:disabled) {
     background-color: #6b6d78;
     border-color: #6b6d78;
 }
@@ -6583,7 +6592,7 @@ input:checked + .slider:before {
     flex-direction: column;
     gap: 4px;
     padding: 8px 10px;
-    border: 1px solid #dde2ec;
+    border: 1px solid var(--border-soft);
     border-radius: 4px;
 }
 
@@ -6603,16 +6612,16 @@ input:checked + .slider:before {
 }
 
 .assistant-budget-modal-fits {
-    color: #2b7a3a;
+    color: var(--success-text);
 }
 
 .assistant-budget-modal-overflow {
-    color: #a33;
+    color: var(--danger-text);
 }
 
 .assistant-budget-modal-action-danger {
-    border-color: #e3b5b5;
-    background-color: #fdf7f7;
+    border-color: var(--danger-text);
+    background-color: var(--surface-2);
 }
 
 /*************************
@@ -6977,6 +6986,15 @@ input:checked + .slider:before {
     box-shadow: inset 0 0 0 1px var(--accent-text);
 }
 
+/* A disabled command is still a live palette row: it reveals the control
+   instead of running it (command_palette.js kind: 'reveal'), which the Enter
+   hint promises. The generic .disabled pointer-events kill made that promise
+   keyboard-only — a mouse click did nothing at all. */
+.cmdk-row.disabled {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
 .cmdk-row.disabled .cmdk-name {
     color: var(--text-muted);
 }
@@ -7149,12 +7167,12 @@ input:checked + .slider:before {
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--input-bg);
-    color: #c33d35;
+    color: var(--danger-text);
     cursor: pointer;
 }
 
 .annotation-popover-delete:hover {
-    border-color: #c33d35;
+    border-color: var(--danger-text);
 }
 
 .annotation-popover-pair {
