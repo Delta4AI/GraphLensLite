@@ -231,16 +231,17 @@ class Rail {
   }
 
   /**
-   * Opening a file rebuilds the model, which drops every workspace, style and
-   * group with it — so it asks first, like "Close graph and start over" does.
+   * Every route that rebuilds the model drops every workspace, style and group
+   * with it — so they all ask first, like "Close graph and start over" does.
+   * @param {string} lead  what the user is about to do, as a sentence subject
+   * @param {Function} action  run once the user has agreed
    */
-  async #openGraphFile() {
-    const pick = () => document.getElementById('fileInput')?.click();
-    if (!this.cache.initialized) return pick();
+  async #replacingGraph(lead, action) {
+    if (!this.cache.initialized) return action();
     const confirmed = await Popup.confirm(
-      'Opening a file replaces the loaded graph, discarding every workspace, style and group in it. Continue?'
+      `${lead} replaces the loaded graph, discarding every workspace, style and group in it. Continue?`
     );
-    if (confirmed) pick();
+    if (confirmed) action();
   }
 
   #buildAppMenu(el) {
@@ -250,7 +251,11 @@ class Rail {
         icon: '📂',
         label: 'Open graph file…',
         title: 'Load graph data from Excel (.xlsx, .xls) or a saved model (.json)',
-        onClick: this.#closeAnd(() => this.#openGraphFile()),
+        onClick: this.#closeAnd(() =>
+          this.#replacingGraph('Opening a file', () =>
+            document.getElementById('fileInput')?.click()
+          )
+        ),
       }),
       menuItem({
         icon: '📥',
@@ -260,7 +265,9 @@ class Rail {
       menuItem({
         icon: '🔍',
         label: 'Load from STRING database…',
-        onClick: this.#closeAnd(() => window.loadDemoData()),
+        onClick: this.#closeAnd(() =>
+          this.#replacingGraph('Loading from STRING', () => window.loadDemoData())
+        ),
       }),
       menuItem({
         icon: '🛢️',
@@ -270,7 +277,9 @@ class Rail {
       menuItem({
         icon: '🗺️',
         label: 'Take a tour',
-        onClick: this.#closeAnd(() => window.startTour()),
+        onClick: this.#closeAnd(() =>
+          this.#replacingGraph('The tour, which loads sample data,', () => window.startTour())
+        ),
       }),
       menuSeparator(),
       menuItem({

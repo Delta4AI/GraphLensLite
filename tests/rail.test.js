@@ -141,6 +141,47 @@ describe('initRail', () => {
     });
   });
 
+  // Both also replace the loaded graph — the tour with sample data, STRING with
+  // a fresh fetch — and both used to fire on a single click.
+  describe.each([
+    ['Load from STRING', 'loadDemoData'],
+    ['Take a tour', 'startTour'],
+  ])('%s', (label, globalFn) => {
+    const openItem = () => {
+      document.getElementById('appMenuBtn').click();
+      return [...document.querySelectorAll('.rail-menu button')].find((b) =>
+        b.textContent.includes(label)
+      );
+    };
+    const confirmButton = (kind) =>
+      document.querySelector(`.p-button-${kind === 'ok' ? 'primary' : 'secondary'}`);
+
+    it('asks before replacing a loaded graph, and honours a cancel', async () => {
+      window[globalFn] = vi.fn();
+
+      openItem().click();
+      await vi.waitFor(() => expect(confirmButton('cancel')).not.toBeNull());
+      expect(window[globalFn]).not.toHaveBeenCalled();
+
+      confirmButton('cancel').click();
+      await Promise.resolve();
+      expect(window[globalFn]).not.toHaveBeenCalled();
+    });
+
+    it('runs once confirmed, and straight away with no graph loaded', async () => {
+      window[globalFn] = vi.fn();
+      openItem().click();
+      await vi.waitFor(() => expect(confirmButton('ok')).not.toBeNull());
+      confirmButton('ok').click();
+      await vi.waitFor(() => expect(window[globalFn]).toHaveBeenCalledOnce());
+
+      cache.initialized = false;
+      window[globalFn] = vi.fn();
+      openItem().click();
+      await vi.waitFor(() => expect(window[globalFn]).toHaveBeenCalledOnce());
+    });
+  });
+
   it('opens and closes a menu on anchor clicks', () => {
     const appMenuBtn = document.getElementById('appMenuBtn');
     const menu = document.querySelector('.rail-menu');
