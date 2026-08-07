@@ -357,6 +357,11 @@ class DataTable {
     this.tableData = this.tableDataBackup.map((row) => [...row]);
     this.sortState = {};
     this.originalOrder = this.tableData.map((_, index) => index);
+    // The table alone is not the state — Apply replays pendingChanges, so
+    // leaving them behind would rebuild the graph from the very edits and row
+    // deletions the user just discarded.
+    this.pendingChanges.clear();
+    this.notifyPendingChanges();
     this.render();
   }
 
