@@ -105,8 +105,8 @@ body {
 }
 
 .rail-mark {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     border-radius: 8px;
     border: 1px solid transparent;
     background: none;
@@ -275,7 +275,7 @@ body {
     gap: 2px;
     width: 52px;
     padding: 3px 0 4px;
-    border-radius: 7px;
+    border-radius: 8px;
     border: none;
     background: none;
     cursor: pointer;
@@ -374,7 +374,7 @@ body {
 .rail-mini {
     width: 24px;
     height: 24px;
-    border-radius: 6px;
+    border-radius: 8px;
     border: 1px solid transparent;
     background: none;
     cursor: pointer;
@@ -427,7 +427,7 @@ body {
     border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
     color: var(--text);
-    font-size: 12.5px;
+    font-size: 13px;
 }
 
 .rail-menu.open {
@@ -485,7 +485,7 @@ body {
 }
 
 .rail-menu-header {
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -615,7 +615,7 @@ body {
     gap: 8px;
     max-width: min(560px, 80vw);
     padding: 7px 8px 7px 12px;
-    font-size: 12.5px;
+    font-size: 13px;
     line-height: 1.35;
     color: var(--text);
     background: var(--surface-translucent);
@@ -1050,7 +1050,7 @@ body {
    on the panel background is 3.54:1 — fine for an icon, a fail for a sentence. */
 .insp-note {
     margin: 0 0 8px 0;
-    font-size: 11.5px;
+    font-size: 12px;
     line-height: 1.45;
     color: var(--text-muted);
 }
@@ -1643,7 +1643,7 @@ h5 {
     align-items: center;
     gap: 5px;
     margin: 10px 0 4px;
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.11em;
     text-transform: uppercase;
@@ -1895,6 +1895,10 @@ h5 {
     transform: translateX(12px);
 }
 
+.layer-switch:hover:not(:disabled) {
+    border-color: #fff;
+}
+
 .layer-switch:disabled {
     opacity: 0.45;
     cursor: not-allowed;
@@ -2137,7 +2141,7 @@ h5 {
     min-width: 0;
     height: 18px;
     padding: 0 3px;
-    font-size: 10.5px;
+    font-size: 11px;
     font-variant-numeric: tabular-nums;
     text-align: center;
     border: 1px solid transparent;
@@ -2173,7 +2177,7 @@ h5 {
     color: var(--text-strong);
     background: var(--input-bg);
     border-color: var(--accent-text);
-    box-shadow: 0 0 0 2px rgba(195, 61, 53, 0.25);
+    box-shadow: 0 0 0 2px var(--accent-ring);
 }
 
 .filter-range-row > input.red {
@@ -3662,7 +3666,7 @@ input:checked + .slider:before {
     flex-wrap: wrap;
     gap: 2px 8px;
     margin: 3px 0 0 24px;
-    font-size: 10.5px;
+    font-size: 11px;
     line-height: 1.4;
     color: var(--text-muted);
     overflow-wrap: anywhere;
@@ -3970,7 +3974,7 @@ input:checked + .slider:before {
 .nw-graph-metrics-table {
     border-collapse: collapse;
     width: 100%;
-    font-size: 12.5px;
+    font-size: 13px;
     background: var(--surface-3);
     border: 1px solid var(--border-soft);
     border-radius: 6px;
@@ -5065,11 +5069,6 @@ input:checked + .slider:before {
 .tour-btn-next:hover {
     background-color: #018a12;
     border-color: #018a12;
-}
-
-.tour-btn-prev {
-    background-color: #878996;
-    border-color: #878996;
 }
 
 .tour-green {
@@ -6438,7 +6437,7 @@ input:checked + .slider:before {
 }
 
 .neo4j-hint {
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--text-faint);
 }
 
@@ -6462,7 +6461,7 @@ input:checked + .slider:before {
     border: 1px solid var(--danger-text);
     border-radius: 4px;
     color: var(--danger-text);
-    font-size: 12.5px;
+    font-size: 13px;
     margin-bottom: 12px;
     white-space: pre-wrap;
     overflow-wrap: break-word;
@@ -6475,7 +6474,7 @@ input:checked + .slider:before {
     border: 1px solid #9a5b1f;
     border-radius: 4px;
     color: #9a5b1f;
-    font-size: 12.5px;
+    font-size: 13px;
     margin: 8px 0 12px;
     overflow-wrap: break-word;
 }
@@ -6490,7 +6489,7 @@ input:checked + .slider:before {
     display: flex;
     align-items: baseline;
     gap: 6px;
-    font-size: 12.5px;
+    font-size: 13px;
     margin-bottom: 12px;
     cursor: pointer;
 }
@@ -6560,7 +6559,7 @@ input:checked + .slider:before {
 }
 
 .neo4j-prop-type {
-    font-size: 10.5px;
+    font-size: 11px;
     padding: 1px 8px;
     border-radius: 10px;
     background-color: var(--surface-3);
@@ -6570,7 +6569,7 @@ input:checked + .slider:before {
 
 .neo4j-prop-examples {
     grid-column: 2 / -1;
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--text-faint);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -6843,7 +6842,7 @@ input:checked + .slider:before {
 .cmdk-flash,
 .filter-row.cmdk-flash > * {
     animation: cmdk-flash 1.2s ease-out;
-    border-radius: 6px;
+    border-radius: 7px;
 }
 
 @keyframes cmdk-flash {
@@ -6884,11 +6883,6 @@ input:checked + .slider:before {
     user-select: none;
 }
 
-.annotation-note:focus-visible {
-    outline: 2px solid var(--accent-text, #4d90fe);
-    outline-offset: 2px;
-}
-
 .annotation-note.editing {
     cursor: text;
     user-select: text;
@@ -6918,7 +6912,7 @@ input:checked + .slider:before {
     border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
     color: var(--text);
-    font-size: 12.5px;
+    font-size: 13px;
 }
 
 .annotation-popover-row {

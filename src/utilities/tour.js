@@ -547,7 +547,7 @@ class GuidedTour {
 
     if (this.currentStep > 0) {
       const prevBtn = document.createElement('button');
-      prevBtn.className = 'p-button tour-btn-prev';
+      prevBtn.className = 'p-button p-button-secondary';
       prevBtn.textContent = '← Back';
       prevBtn.addEventListener('click', () => {
         this.currentStep--;
