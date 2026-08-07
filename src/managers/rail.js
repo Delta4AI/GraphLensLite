@@ -91,8 +91,7 @@ class RailMenu {
         // it alone — Popup's own Escape would otherwise close the dialog under
         // an open menu at the same time (the annotation popover does the same).
         e.stopPropagation();
-        this.close();
-        this.anchor.focus();
+        this.close(); // restores focus to the anchor
       }
     };
     document.addEventListener('keydown', this._escapeHandler, true);
@@ -106,6 +105,10 @@ class RailMenu {
   }
 
   close() {
+    // open() moves focus into the menu, so closing it — by Escape, by picking
+    // an item, by clicking away — would otherwise strand focus on a detached
+    // element and drop the user back at the top of the tab order.
+    const hadFocus = this.el.contains(document.activeElement);
     this.el.classList.remove('open');
     this.anchor.setAttribute('aria-expanded', 'false');
     if (this._outsideHandler) {
@@ -121,6 +124,7 @@ class RailMenu {
       this._scrollHandler = null;
     }
     if (!this.staticBuild) this.el.remove();
+    if (hadFocus) this.anchor.focus();
   }
 
   /**

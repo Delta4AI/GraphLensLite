@@ -220,6 +220,19 @@ describe('initRail', () => {
     expect(document.querySelector('.rail-menu').classList.contains('open')).toBe(false);
   });
 
+  it('returns focus to the anchor when a menu item is activated', () => {
+    // open() focuses the first item, so without a restore in close() focus is
+    // stranded on a removed element and the user is back at the tab order top.
+    const exportBtn = document.getElementById('exportMenuBtn');
+    exportBtn.click();
+    const item = document.querySelector('.rail-menu.open .rail-menu-item');
+    item.focus();
+
+    item.click();
+
+    expect(document.activeElement).toBe(exportBtn);
+  });
+
   it('disabled menu items are aria-disabled and never fire, even via keyboard', () => {
     document.getElementById('workspaceChip').click();
     const wsMenu = document.querySelectorAll('.rail-menu')[1];
