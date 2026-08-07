@@ -12,6 +12,10 @@ import {
 
 const NODE_CONNECTIVITY_METRICS_PRECISION = 5;
 const POWER_ITERATION_OPTIONS = {maxIterations: 100, tolerance: 1e-6};
+// Every calculator shares the n <= 1 guard, so "no scores" always means the
+// visible graph is too small — whether nothing is loaded or a filter emptied it.
+const EMPTY_METRIC_NOTE =
+  'Not computable for this view — the metric needs at least two visible nodes.';
 const METRIC_VALUE_LABELS = {
   centrality: "Centrality",
   betweenness: "Score",
@@ -50,6 +54,7 @@ class NetworkMetrics {
     this.selected = 'centrality';
     this.multiselect = null;
     this.table = null;
+    this.emptyNote = null;
     this.m = metrics;
     // The Metrics workbench tab starts closed. Metrics are computed lazily —
     // only while the tab is visible — so this gate must start true to match
@@ -162,13 +167,19 @@ class NetworkMetrics {
       this.table.appendChild(row);
     });
 
-    /* 🛈 explanation for the metric now on screen */
+    /* 🛈 explanation for the metric now on screen — nothing to explain when
+       the metric did not run, so the button says so instead of opening blank */
     const infoBtn = document.getElementById("metricInfoBtn");
     if (infoBtn) {
-      infoBtn.onclick = () => {
-        this.cache.popup = new Popup(entry.popupContent, {title: entry.popupTitle, width: '400px'});
-      };
+      infoBtn.disabled = !entry.popupContent;
+      infoBtn.onclick = entry.popupContent
+        ? () => {
+            this.cache.popup = new Popup(entry.popupContent, {title: entry.popupTitle, width: '400px'});
+          }
+        : null;
     }
+
+    if (this.emptyNote) this.emptyNote.hidden = entry.scores.length > 0;
 
     this.renderedMetric = metricId;
   }
@@ -177,11 +188,14 @@ class NetworkMetrics {
   // values — otherwise a cache hit could satisfy the scale pickers but not a
   // repaint. Scale-picker consumers read label/valueLabel/values only.
   storeMetricValues(metricId, metricResult) {
-    if (!metricResult?.nodeValues) return;
+    if (!metricResult) return;
     this.metricValueCache.set(metricId, {
       label: this.m[metricId]?.label || metricId,
       valueLabel: METRIC_VALUE_LABELS[metricId] || "Value",
-      values: metricResult.nodeValues,
+      // A subgraph too small to score is a result, not a missing one. Dropping
+      // it here used to leave the panel showing the previous subgraph's numbers
+      // under the new metric's name.
+      values: metricResult.nodeValues ?? new Map(),
       scores: metricResult.scores || [],
       graphLevelMetrics: metricResult.graphLevelMetrics || {},
       popupContent: metricResult.popupContent,
@@ -342,6 +356,12 @@ class NetworkMetrics {
     this.multiselect.id = 'metricsMultiselect';
     this.multiselect.setAttribute('aria-label', 'Nodes ranked by the selected metric');
     ranking.appendChild(this.multiselect);
+
+    this.emptyNote = document.createElement('p');
+    this.emptyNote.className = 'nw-empty';
+    this.emptyNote.hidden = true;
+    this.emptyNote.textContent = EMPTY_METRIC_NOTE;
+    ranking.appendChild(this.emptyNote);
 
     /* right column: whole-graph summary ----------------------------- */
     const summary = document.createElement('div');

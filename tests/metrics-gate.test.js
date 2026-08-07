@@ -53,6 +53,44 @@ beforeEach(() => {
   globalThis.requestAnimationFrame = (cb) => cb()
 })
 
+describe('NetworkMetrics empty results', () => {
+  it('clears the panel and says so when the view is too small to score', async () => {
+    // A filter can leave one visible node; every calculator returns no scores
+    // there, and the panel used to keep the pre-filter numbers on screen.
+    const cache = makeCache()
+    const metrics = makeMetrics(cache)
+    await metrics.updateMetricUI()
+    expect(metrics.multiselect.options.length).toBe(3)
+
+    cache.nodeIDsToBeShown = new Set(['A'])
+    cache.edgeIDsToBeShown = new Set()
+    cache.visibleElementsChanged = true
+    await metrics.updateMetricUI()
+
+    expect(metrics.multiselect.options.length).toBe(0)
+    expect(metrics.table.querySelectorAll('tr').length).toBe(0)
+    expect(metrics.emptyNote.hidden).toBe(false)
+    expect(document.getElementById('metricInfoBtn').disabled).toBe(true)
+  })
+
+  it('hides the note again once the view can be scored', async () => {
+    const cache = makeCache()
+    cache.nodeIDsToBeShown = new Set(['A'])
+    cache.edgeIDsToBeShown = new Set()
+    const metrics = makeMetrics(cache)
+    await metrics.updateMetricUI()
+    expect(metrics.emptyNote.hidden).toBe(false)
+
+    cache.nodeIDsToBeShown = new Set(['A', 'B', 'C'])
+    cache.edgeIDsToBeShown = new Set(['A::B', 'B::C'])
+    cache.visibleElementsChanged = true
+    await metrics.updateMetricUI()
+
+    expect(metrics.emptyNote.hidden).toBe(true)
+    expect(document.getElementById('metricInfoBtn').disabled).toBe(false)
+  })
+})
+
 describe('NetworkMetrics.updateMetricUI gating', () => {
   it('computes on fresh load when visibleElementsChanged is false and cache is empty', async () => {
     // Arrange
