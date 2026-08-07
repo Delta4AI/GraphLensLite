@@ -42,6 +42,10 @@ function noMatchNote(container) {
   if (!note) {
     note = document.createElement('p');
     note.className = 'insp-note filter-no-match';
+    // Typing into the search box changes the list silently otherwise: a screen
+    // reader user gets no signal that the filter matched nothing.
+    note.setAttribute('role', 'status');
+    note.setAttribute('aria-live', 'polite');
     note.textContent = 'No properties match this search.';
     container.appendChild(note);
   }

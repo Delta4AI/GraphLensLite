@@ -104,6 +104,9 @@ function build(el, menu, cache, opts) {
       // state (same wording as the group rows in group_list.js).
       row.title = `Add the rest of the selection to "${name}" (some are already in it)`;
     }
+    // ✓/–/nothing is a visual three-state; say it.
+    row.setAttribute('role', 'menuitemcheckbox');
+    row.setAttribute('aria-checked', checked ? 'true' : partial ? 'mixed' : 'false');
     row.prepend(groupDot(style.fill));
     el.appendChild(row);
   }

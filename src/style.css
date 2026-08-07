@@ -340,6 +340,13 @@ body {
     cursor: help;
 }
 
+/* 11px on the chip's --input-bg puts the shared accent at 4.19:1 — a marginal
+   fail. Lightened here rather than in the token, which is tuned for larger
+   text and for white-on-accent pills. 5.9:1. */
+[data-theme="dark"] .rail-selchip-warning {
+    color: #ea8c86;
+}
+
 .rail-chip-btn {
     font: inherit;
     font-size: 13px;

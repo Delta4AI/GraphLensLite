@@ -12,6 +12,8 @@
 // (Concept C decision 5).
 const HEIGHT_KEY = 'gll.workbench.heights';
 const MIN_HEIGHT_PX = 120;
+const KEYBOARD_RESIZE_STEP_PX = 24;
+const KEYBOARD_RESIZE_COARSE = 4; // Shift+arrow, for crossing the stage quickly
 const DEFAULT_HEIGHT_FRACTION = 0.35;
 // ⤢ takes the whole stage. The mockup argued for leaving a sliver of canvas
 // showing, but a ~76px strip of a dense graph reads as a rendering artefact
@@ -113,7 +115,11 @@ class Workbench {
       pane?.toggleAttribute('hidden', !active);
       const toolbar = spec.toolbar && document.querySelector(spec.toolbar);
       if (toolbar) toolbar.style.display = active ? 'flex' : 'none';
-      document.getElementById(spec.btn)?.classList.toggle('highlight', active);
+      const tabBtn = document.getElementById(spec.btn);
+      tabBtn?.classList.toggle('highlight', active);
+      // The class is the only thing that said "this tab is the open one";
+      // toggleExpanded already carries aria-pressed, the tabs did not.
+      tabBtn?.setAttribute('aria-pressed', String(active));
     }
 
     const spec = TABS[name];
@@ -182,13 +188,20 @@ class Workbench {
     return this.el?.parentElement?.clientHeight || window.innerHeight;
   }
 
-  #applyHeight() {
-    if (!this.el) return;
+  /**
+   * The height the panel is meant to have. Not offsetHeight: that is 0 without
+   * layout and stale while a drag preview is in flight.
+   */
+  #currentHeight() {
     const stage = this.#stageHeight();
-    const height = this.expanded
+    return this.expanded
       ? stage * EXPANDED_HEIGHT_FRACTION
       : (this.heights[this.tab] ?? stage * DEFAULT_HEIGHT_FRACTION);
-    this.#setHeight(this.#clamp(height));
+  }
+
+  #applyHeight() {
+    if (!this.el) return;
+    this.#setHeight(this.#clamp(this.#currentHeight()));
   }
 
   /**
@@ -229,6 +242,24 @@ class Workbench {
   #wireResize() {
     const handle = this.el?.querySelector('.resize-handle');
     if (!handle) return;
+    // Drag is a pointer-only gesture; the same control has to be operable from
+    // the keyboard. A separator with arrow keys is the standard pairing.
+    handle.setAttribute('role', 'separator');
+    handle.setAttribute('aria-orientation', 'horizontal');
+    handle.setAttribute('aria-label', 'Resize the workbench');
+    handle.tabIndex = 0;
+    handle.addEventListener('keydown', (e) => {
+      const step = KEYBOARD_RESIZE_STEP_PX * (e.shiftKey ? KEYBOARD_RESIZE_COARSE : 1);
+      const delta = e.key === 'ArrowUp' ? step : e.key === 'ArrowDown' ? -step : 0;
+      if (!delta || !this.isOpen) return;
+      e.preventDefault();
+      const from = this.#currentHeight();
+      this.expanded = false; // an explicit resize overrides ⤢, like a drag
+      const height = this.#clamp(from + delta);
+      this.#rememberHeight(height);
+      this.#applyHeight();
+      this.cache.graph?.resize();
+    });
     let startY = 0;
     let startHeight = 0;
     let shadow = null;

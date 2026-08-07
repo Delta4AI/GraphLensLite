@@ -282,6 +282,8 @@ class BooleanToggle {
     this.container = document.createElement('div');
     this.container.id = this.propID + '-bool-toggle';
     this.container.className = 'filter-join-toggle filter-bool-toggle';
+    this.container.setAttribute('role', 'group');
+    this.container.setAttribute('aria-label', 'Filter by boolean value');
     this.segments = new Map();
 
     for (const [key, label] of BooleanToggle.STATES) {
@@ -307,7 +309,9 @@ class BooleanToggle {
     if (!this.segments) return; // not rendered (e.g. sync before appendTo)
     const current = this.state();
     for (const [key, btn] of this.segments.entries()) {
-      btn.classList.toggle('active', key === current);
+      const active = key === current;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', String(active));
     }
   }
 

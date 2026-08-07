@@ -84,6 +84,31 @@ describe('workbench tabs', () => {
     expect(highlighted('queryToggleBtn')).toBe(true);
   });
 
+  it('says which tab is open through aria-pressed, not just a class', () => {
+    wb.show('query');
+    expect(document.getElementById('queryToggleBtn').getAttribute('aria-pressed')).toBe('true');
+    expect(document.getElementById('dataToggleBtn').getAttribute('aria-pressed')).toBe('false');
+
+    wb.show('data');
+    expect(document.getElementById('queryToggleBtn').getAttribute('aria-pressed')).toBe('false');
+    expect(document.getElementById('dataToggleBtn').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('resizes from the keyboard, not only by dragging', () => {
+    wb.show('query');
+    const handle = document.querySelector('.resize-handle');
+    expect(handle.getAttribute('role')).toBe('separator');
+    expect(handle.tabIndex).toBe(0);
+
+    const el = document.getElementById('workbench');
+    const before = parseFloat(el.style.height);
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(parseFloat(el.style.height)).toBeGreaterThan(before);
+
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(parseFloat(el.style.height)).toBe(before);
+  });
+
   it('shows exactly one pane at a time, for every tab', () => {
     for (const tab of TAB_NAMES) {
       wb.show(tab);
