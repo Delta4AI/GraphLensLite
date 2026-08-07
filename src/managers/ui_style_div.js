@@ -1,4 +1,5 @@
 import {StaticUtilities} from "../utilities/static.js";
+import {attachCommunityMenu} from "./community_menu.js";
 
 // ----------------------------------------------------------- DOM primitives
 // The style div's generic control builders. They only ever needed their
@@ -1131,7 +1132,12 @@ function createStyleDiv(cache) {
     detectBtn.title =
       "Auto-group by community (Louvain): pick edge weighting, resolution and how " +
       "many groups to create. Adds new groups; existing ones are left alone.";
-    detectBtn.onclick = () => cache.bs.toggleCommunityDetectionPopover();
+    // A RailMenu, so Escape, aria-expanded, close-on-scroll and focus restore
+    // come with it (see managers/community_menu.js). It attaches its own click
+    // handler; the assignment below keeps the "is it wired" check meaningful for
+    // the card's tests and mirrors the other buttons here.
+    detectBtn.onclick = null;
+    attachCommunityMenu(detectBtn, cache.bs);
     tools.appendChild(detectBtn);
 
     bubbleDiv.appendChild(tools);

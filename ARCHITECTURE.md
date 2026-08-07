@@ -102,6 +102,9 @@ Business logic and UI:
   the per-row group chip, tooltips
 - `group_menu.js` — the one group checklist, opened by both assign sites (a filter
   row assigns a property, the Selection panel assigns nodes); built on `RailMenu`
+- `community_menu.js` — the 🧩 Auto-detect configurator (Louvain weighting,
+  resolution, how many groups); also a `RailMenu`, so Escape, `aria-expanded`,
+  close-on-scroll and focus restore come for free
 - `group_list.js` — the Groups list under Overlays › Groups (rows, the ⋯ menu, the
   ＋/－ selection buttons). DOM only: it is handed the bubble-set MANAGER rather
   than reaching for it through the cache, and every state change routes back

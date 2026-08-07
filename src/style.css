@@ -1252,25 +1252,14 @@ body.presentation #workbench {
     display: none;
 }
 
-/* Louvain community-detection configurator (anchored to the 🧩 button) */
+/* Louvain community-detection configurator (anchored to the 🧩 button). It IS a
+   .rail-menu — position, layer, surface, border and open/closed come from there;
+   only the form's own metrics live here. */
 .community-detection-popover {
-    position: fixed;
-    z-index: var(--z-menu);
-    display: none;
-    flex-direction: column;
     gap: 8px;
     width: 240px;
     padding: 12px;
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
-    border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-    color: var(--text);
     font-size: 12px;
-}
-
-.community-detection-popover.open {
-    display: flex;
 }
 
 .community-popover-title {

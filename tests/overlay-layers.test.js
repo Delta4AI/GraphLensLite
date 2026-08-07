@@ -367,7 +367,9 @@ describe('createStyleDiv layer rows', () => {
       DEFAULTS,
       CFG,
       data: { selectedLayout: 'Default', layouts: { Default: { bubbleSetStyle } } },
-      bs: { traverseBubbleSets: () => groups },
+      // The 🧩 menu reads and writes communityOptions on the manager, the same
+      // object detectCommunities defaults from.
+      bs: { traverseBubbleSets: () => groups, communityOptions: { resolution: 1 } },
       ui: {},
       nodeLabels: [],
       edgeLabels: [],
@@ -388,13 +390,19 @@ describe('createStyleDiv layer rows', () => {
     expect(card.querySelector('.card-collapse-title').textContent).toBe('Groups');
   });
 
-  it('keeps Auto-detect inside the Groups row, and clickable', () => {
+  it('keeps Auto-detect inside the Groups row, and wired to its menu', () => {
     // It is the only way to create a group, so it must never be greyed out with
     // the rest of the card — that would lock the user out of the only exit.
     const card = build().querySelector('[data-label="Bubble Sets"]');
     const detect = card.querySelector('#detectCommunitiesBtn');
     expect(detect).not.toBeNull();
-    expect(detect.onclick).toBeTypeOf('function');
+    // A RailMenu attaches its own click listener and exposes the disclosure
+    // state, so that — not an onclick — is what "wired" looks like here.
+    expect(detect.getAttribute('aria-expanded')).toBe('false');
+    detect.click();
+    expect(detect.getAttribute('aria-expanded')).toBe('true');
+    expect(document.querySelector('.community-detection-popover.open')).not.toBeNull();
+
     expect(card.querySelector('#clearManualGroupsBtn').onclick).toBeTypeOf('function');
   });
 
