@@ -1940,10 +1940,8 @@ class IOManager {
   }
 
   async loadFileWrapper(event) {
-    let file = event.target.files[0];
+    const file = event.target.files[0];
     if (!file) return;
-
-    this.cache.ui.setDataSourceLabel(file.name);
 
     await this.cache.ui.showLoading(
       'Loading',
@@ -1951,67 +1949,63 @@ class IOManager {
     );
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
-    if (this.cache.graph) {
-      await this.cache.gcm.destroyGraphAndRollBackUI();
-      await this.cache.gcm.resetEventLocks();
+    try {
+      // Parse before destroying anything. The old order tore the graph down
+      // first, so a malformed file left an empty stage with nothing to go
+      // back to. Every failure path inside loadFile reports its own reason.
+      const fileData = await this.cache.io.loadFile(event);
+      if (!fileData) return;
+
+      this.cache.ui.setDataSourceLabel(file.name);
+
+      if (this.cache.graph) {
+        await this.cache.gcm.destroyGraphAndRollBackUI();
+        await this.cache.gcm.resetEventLocks();
+      }
+
+      this.cache.io.preProcessData(fileData);
+      this.cache.ui.updateHoverToggleButton();
+      this.cache.buildDataTable(fileData);
+      this.cache.ui.buildUI();
+
+      // Check if there's a saved query and set lock state
+      const savedQuery = this.cache.data.layouts[this.cache.data.selectedLayout]['query'];
+      if (savedQuery) {
+        this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
+        this.cache.qm.updateQueryTextArea();
+        this.cache.qm.updateUIFromQueryInstructions();
+      }
+
+      await this.cache.gcm.createGraphInstance();
+
+      if (!this.cache.graph) {
+        this.cache.ui.error('Graph not initialized, aborting.');
+        return;
+      }
+      await this.cache.graph.render();
+      await this.cache.gcm.fitViewToVisibleNodes();
+      this.cache.io.restoreHeatmapFromImport(fileData);
+
+      // Restored ManualMembers populate the layout, but the selection-panel
+      // badges (per-group deselect toggles) only refresh via these calls —
+      // mirror the post-layout sync so loaded groups stay deselectable.
+      this.cache.bs.renderGroupList();
+
+      this.cache.ui.debug('Initial graph rendered.');
+
+      // Update UI lock state if query was applied
+      if (savedQuery) {
+        this.cache.ui.updateFilterLockState();
+      }
+    } catch (errorMsg) {
+      this.cache.ui.error(`Error loading graph: ${errorMsg}`);
+    } finally {
+      await this.cache.ui.hideLoading();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      // Without this, re-picking the same file fires no change event and the
+      // click does nothing at all.
+      event.target.value = '';
     }
-
-    this.cache.io
-      .loadFile(event)
-      .then(async (fileData) => {
-        if (!fileData) {
-          this.cache.ui.error('File data is empty.');
-          await this.cache.ui.hideLoading();
-          await new Promise((resolve) => requestAnimationFrame(resolve));
-          return;
-        }
-
-        this.cache.io.preProcessData(fileData);
-        this.cache.ui.updateHoverToggleButton();
-        this.cache.buildDataTable(fileData);
-        this.cache.ui.buildUI();
-
-        // Check if there's a saved query and set lock state
-        const savedQuery = this.cache.data.layouts[this.cache.data.selectedLayout]['query'];
-        if (savedQuery) {
-          this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
-          this.cache.qm.updateQueryTextArea();
-          this.cache.qm.updateUIFromQueryInstructions();
-        }
-
-        await this.cache.gcm.createGraphInstance();
-
-        if (!this.cache.graph) {
-          this.cache.ui.error('Graph not initialized, aborting.');
-          await this.cache.ui.hideLoading();
-          await new Promise((resolve) => requestAnimationFrame(resolve));
-          return;
-        }
-        await this.cache.graph.render();
-        await this.cache.gcm.fitViewToVisibleNodes();
-        this.cache.io.restoreHeatmapFromImport(fileData);
-
-        // Restored ManualMembers populate the layout, but the selection-panel
-        // badges (per-group deselect toggles) only refresh via these calls —
-        // mirror the post-layout sync so loaded groups stay deselectable.
-        this.cache.bs.renderGroupList();
-
-        this.cache.ui.debug('Initial graph rendered.');
-
-        // Update UI lock state if query was applied
-        if (savedQuery) {
-          this.cache.ui.updateFilterLockState();
-        }
-      })
-      .catch(async (errorMsg) => {
-        this.cache.ui.error(`Error loading graph: ${errorMsg}`);
-        await this.cache.ui.hideLoading();
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-      })
-      .finally(async () => {
-        await this.cache.ui.hideLoading();
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-      });
   }
 
   /**
