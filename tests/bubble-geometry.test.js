@@ -4,6 +4,8 @@ import {
   computeOutlineGeometry,
   polygonSelfIntersects,
   outlineLabelAnchor,
+  resolveBubbleLabel,
+  LABEL_STANDOFF_PX,
 } from "../src/graph/bubble_geometry.js";
 import { smoothClosedPath, sampleSmoothedRing } from "../src/graph/bubble_smoothing.js";
 import { pointInPolygon } from "../src/graph/lasso_geometry.js";
@@ -689,4 +691,101 @@ describe("smoothClosedPath", () => {
     }
   });
 
+});
+
+// ==========================================================================
+// resolveBubbleLabel: the geometry BOTH label sinks paint from. bubble_layer
+// #drawLabel and export_svg bubbleLabelPrimitives used to re-implement the
+// standoff maths, the rotation predicate and the background rect line for line,
+// with export_svg carrying its own copies of the constants annotated
+// "// bubble_layer.js" — a comment is not a dependency.
+// ==========================================================================
+
+describe("resolveBubbleLabel", () => {
+  // A unit-width font, so textWidth === text.length and the box maths is legible.
+  const measure = (text) => text.length;
+  const anchor = { x: 200, y: 200, angle: -Math.PI / 4, nx: Math.SQRT1_2, ny: Math.SQRT1_2 };
+
+  it("returns null without text or without an anchor", () => {
+    expect(resolveBubbleLabel(anchor, {}, {}, measure)).toBeNull();
+    expect(resolveBubbleLabel(null, { labelText: "grp" }, {}, measure)).toBeNull();
+  });
+
+  it("pushes an off-path label out by half the padded font box plus the standoff", () => {
+    const label = resolveBubbleLabel(
+      anchor,
+      { labelText: "grp", labelCloseToPath: false, labelAutoRotate: false, labelFontSize: 12, labelPadding: 2 },
+      {},
+      measure
+    );
+
+    const standoff = 12 / 2 + 2 + LABEL_STANDOFF_PX;
+    expect(label.x).toBeCloseTo(200 + Math.SQRT1_2 * standoff, 6);
+    expect(label.y).toBeCloseTo(200 + Math.SQRT1_2 * standoff, 6);
+    // Not rotated, so the paint coordinates are the absolute ones.
+    expect(label.rotated).toBe(false);
+    expect([label.lx, label.ly]).toEqual([label.x, label.y]);
+  });
+
+  it("hugs the path at zero standoff, and rotates only there", () => {
+    const hugging = resolveBubbleLabel(anchor, { labelText: "grp" }, {}, measure);
+    expect(hugging.x).toBe(200);
+    expect(hugging.rotated).toBe(true);
+    // Rotated labels paint inside a translate+rotate frame, so their own
+    // coordinates are relative to it.
+    expect([hugging.lx, hugging.ly]).toEqual([0, 0]);
+    expect(hugging.angle).toBe(anchor.angle);
+
+    // "center" has no tangent to rotate onto.
+    const centered = resolveBubbleLabel(
+      anchor,
+      { labelText: "grp", labelPlacement: "center" },
+      {},
+      measure
+    );
+    expect(centered.rotated).toBe(false);
+  });
+
+  it("sizes the background box around the measured text", () => {
+    const label = resolveBubbleLabel(
+      anchor,
+      { labelText: "12345", labelBackground: true, labelFontSize: 10, labelPadding: 3 },
+      {},
+      measure
+    );
+
+    expect(label.background).toEqual({
+      x: 0 - 5 / 2 - 3,
+      y: 0 - 10 / 2 - 3,
+      width: 5 + 6,
+      height: 10 + 6,
+      radius: 5,
+      fill: "#403C53",
+    });
+  });
+
+  it("omits the background box when it is off, and resolves through defaults", () => {
+    const off = resolveBubbleLabel(anchor, { labelText: "grp" }, {}, measure);
+    expect(off.background).toBeNull();
+
+    const fromDefaults = resolveBubbleLabel(
+      anchor,
+      { labelText: "grp" },
+      { labelBackground: true, labelBackgroundFill: "#123456", labelFill: "#abcdef", labelFontSize: 20 },
+      measure
+    );
+    expect(fromDefaults.background.fill).toBe("#123456");
+    expect(fromDefaults.fill).toBe("#abcdef");
+    expect(fromDefaults.font).toBe("20px Arial, sans-serif");
+  });
+
+  it("applies the user's label offsets on top", () => {
+    const label = resolveBubbleLabel(
+      anchor,
+      { labelText: "grp", labelOffsetX: 10, labelOffsetY: -4 },
+      {},
+      measure
+    );
+    expect([label.x, label.y]).toEqual([210, 196]);
+  });
 });

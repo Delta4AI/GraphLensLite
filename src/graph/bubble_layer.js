@@ -29,6 +29,8 @@ import {
   computeOutlineGeometry,
   polygonSelfIntersects,
   outlineLabelAnchor,
+  resolveBubbleLabel,
+  OUTLINE_STROKE_WIDTH,
 } from './bubble_geometry.js';
 import { idsKey, positionsChecksum, styleKey } from './overlay_keys.js';
 import { smoothClosedPath } from './bubble_smoothing.js';
@@ -37,11 +39,6 @@ import { FrameCoalescer } from './overlay_frame.js';
 
 const LAYER_NAME = 'bubbleSets';
 const LABEL_LAYER_NAME = 'bubbleSetsLabels';
-const OUTLINE_STROKE_WIDTH = 2;
-// Extra screen-px gap (beyond half the font box) between the outline and a
-// label drawn with labelCloseToPath: false.
-const LABEL_STANDOFF_PX = 8;
-
 // --- refit deferral (drag responsiveness) ----------------------------------
 // Fitting an outline is bubblesets' marching-squares pass over an influence
 // field; on a dense graph with avoidance on it costs far more than a frame.
@@ -331,7 +328,6 @@ class BubbleSetLayer {
    */
   exportOutlines() {
     if (!this.visible) return [];
-    const graph = this.adapter.graph;
     const sigma = this.adapter.sigma;
     const out = [];
     for (const [group, state] of this.groups) {
@@ -340,12 +336,7 @@ class BubbleSetLayer {
       let graphPoints = cached?.graphPoints;
       let graphHoles = cached?.graphHoles ?? [];
       if (!graphPoints?.length) {
-        const visibleMembers = [];
-        for (const id of state.members.keys()) {
-          if (!graph.hasNode(id)) continue;
-          const attrs = graph.getNodeAttributes(id);
-          if (!attrs.hidden) visibleMembers.push({ id, attrs });
-        }
+        const visibleMembers = this.#visibleNodes(state.members.keys());
         if (visibleMembers.length === 0) continue;
         ({ outer: graphPoints, holes: graphHoles } = this.#fitGraphOutline(state, visibleMembers));
       }
@@ -414,23 +405,16 @@ class BubbleSetLayer {
    * @returns {boolean} true when the cached outline was replaced
    */
   #syncGroupOutline(group, state) {
-    const graph = this.adapter.graph;
     const sigma = this.adapter.sigma;
-    const memberPositions = [];
-    const visibleMembers = [];
-    for (const id of state.members.keys()) {
-      if (!graph.hasNode(id)) continue;
-      const attrs = graph.getNodeAttributes(id);
-      if (attrs.hidden) continue;
-      visibleMembers.push({ id, attrs });
-      // The ratio-1 radius feeds the fit (see #fitGraphOutline), so fold it
-      // into the checksum: a node-size change must invalidate the outline.
-      memberPositions.push({
-        x: attrs.x,
-        y: attrs.y,
-        s: sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1),
-      });
-    }
+    const visibleMembers = this.#visibleNodes(state.members.keys());
+    // The ratio-1 radius feeds the fit (see #fitGraphOutline), so fold it into
+    // the checksum: a node-size change must invalidate the outline.
+    const checksumPoint = ({ attrs }) => ({
+      x: attrs.x,
+      y: attrs.y,
+      s: sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1),
+    });
+    const memberPositions = visibleMembers.map(checksumPoint);
 
     // Avoid-node MOVES reshape the fit too (their negative field pushes the
     // outline), so their positions/sizes fold into the key as well — without
@@ -440,19 +424,9 @@ class BubbleSetLayer {
     // the manager passes no avoid members at all (see getAvoidMembers).
     const avoidanceRaw = Number(state.opts.avoidance ?? 1);
     const avoidanceActive = !Number.isFinite(avoidanceRaw) || avoidanceRaw !== 0;
-    const avoidPositions = [];
-    if (avoidanceActive) {
-      for (const id of state.avoidMembers) {
-        if (!graph.hasNode(id)) continue;
-        const attrs = graph.getNodeAttributes(id);
-        if (attrs.hidden) continue;
-        avoidPositions.push({
-          x: attrs.x,
-          y: attrs.y,
-          s: sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1),
-        });
-      }
-    }
+    const avoidPositions = avoidanceActive
+      ? this.#visibleNodes(state.avoidMembers).map(checksumPoint)
+      : [];
 
     // membersKey/avoidKey are precomputed in #updateGroup, so the per-frame
     // cost here is the O(n) position checksums. Hidden flips stay correct: an
@@ -580,6 +554,28 @@ class BubbleSetLayer {
   }
 
   /**
+   * The visible nodes of an id set, with their attributes — the ONE definition
+   * of "a member that counts": present in the graph and not hidden. Three copies
+   * of this loop (#syncGroupOutline, exportOutlines, referenceRects) could
+   * disagree about that, and a disagreement means the fit and the export draw
+   * different hulls.
+   *
+   * @param {Iterable<string>} ids
+   * @returns {Array<{id: string, attrs: object}>}
+   */
+  #visibleNodes(ids) {
+    const graph = this.adapter.graph;
+    const out = [];
+    for (const id of ids) {
+      if (!graph.hasNode(id)) continue;
+      const attrs = graph.getNodeAttributes(id);
+      if (attrs.hidden) continue;
+      out.push({ id, attrs });
+    }
+    return out;
+  }
+
+  /**
    * Reference-space rects for a set of node ids (hidden or missing nodes
    * skipped) — exactly the rects a fit would consume, exposed so the
    * bubble-set manager can measure a group's surroundings for layout-aware
@@ -589,16 +585,8 @@ class BubbleSetLayer {
    * @returns {Array<{x: number, y: number, width: number, height: number}>}
    */
   referenceRects(ids) {
-    const graph = this.adapter.graph;
     const { toRefRect } = this.#refSpace();
-    const rects = [];
-    for (const id of ids) {
-      if (!graph.hasNode(id)) continue;
-      const attrs = graph.getNodeAttributes(id);
-      if (attrs.hidden) continue;
-      rects.push(toRefRect(attrs));
-    }
-    return rects;
+    return this.#visibleNodes(ids).map(({ attrs }) => toRefRect(attrs));
   }
 
   /**
@@ -635,51 +623,34 @@ class BubbleSetLayer {
    * outline tangent. labelOffsetX/Y stay additive in screen space.
    */
   #drawLabel(ctx, anchor, opts, defaults) {
-    const text = opts.labelText ?? defaults.labelText ?? '';
-    if (!text || !anchor) return;
-    const placement = opts.labelPlacement ?? defaults.labelPlacement ?? 'bottom';
-    const closeToPath = opts.labelCloseToPath ?? defaults.labelCloseToPath ?? true;
-    const autoRotate = opts.labelAutoRotate ?? defaults.labelAutoRotate ?? true;
+    // Geometry from resolveBubbleLabel (bubble_geometry.js), so this and the SVG
+    // export cannot disagree about standoff, rotation or the background box.
+    // Measuring needs the font set first; the resolver hands back the same
+    // string it measured with.
+    const label = resolveBubbleLabel(anchor, opts, defaults, (text, font) => {
+      ctx.font = font;
+      return ctx.measureText(text).width;
+    });
+    if (!label) return;
 
-    const fontSize = opts.labelFontSize ?? defaults.labelFontSize ?? 12;
-    const padding = opts.labelPadding ?? defaults.labelPadding ?? 2;
-    // Off-path labels clear the outline by half the padded font box plus a
-    // fixed gap, pushed along the outward normal (no-op for "center").
-    const standoff = closeToPath ? 0 : fontSize / 2 + padding + LABEL_STANDOFF_PX;
-    const x = anchor.x + anchor.nx * standoff + (opts.labelOffsetX ?? 0);
-    const y = anchor.y + anchor.ny * standoff + (opts.labelOffsetY ?? 0);
-
-    ctx.font = `${fontSize}px Arial, sans-serif`;
+    ctx.font = label.font;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const textWidth = ctx.measureText(text).width;
-
-    // Rotation only makes sense hugging the path; "center" has no tangent.
-    const rotated = autoRotate && closeToPath && placement !== 'center';
-    if (rotated) {
+    if (label.rotated) {
       ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(anchor.angle);
+      ctx.translate(label.x, label.y);
+      ctx.rotate(label.angle);
     }
-    const lx = rotated ? 0 : x;
-    const ly = rotated ? 0 : y;
-
-    if (opts.labelBackground ?? defaults.labelBackground) {
-      const radius = opts.labelBackgroundRadius ?? defaults.labelBackgroundRadius ?? 5;
-      ctx.fillStyle = opts.labelBackgroundFill ?? defaults.labelBackgroundFill ?? '#403C53';
+    if (label.background) {
+      const bg = label.background;
+      ctx.fillStyle = bg.fill;
       ctx.beginPath();
-      ctx.roundRect(
-        lx - textWidth / 2 - padding,
-        ly - fontSize / 2 - padding,
-        textWidth + 2 * padding,
-        fontSize + 2 * padding,
-        radius
-      );
+      ctx.roundRect(bg.x, bg.y, bg.width, bg.height, bg.radius);
       ctx.fill();
     }
-    ctx.fillStyle = opts.labelFill ?? defaults.labelFill ?? '#fff';
-    ctx.fillText(text, lx, ly);
-    if (rotated) ctx.restore();
+    ctx.fillStyle = label.fill;
+    ctx.fillText(label.text, label.lx, label.ly);
+    if (label.rotated) ctx.restore();
   }
 }
 

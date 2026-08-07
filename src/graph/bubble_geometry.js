@@ -868,4 +868,90 @@ function outlineLabelAnchor(points, placement = "top") {
   return { x: anchor.x, y: anchor.y, angle, nx, ny };
 }
 
-export { nodeViewportRect, computeOutlineGeometry, polygonSelfIntersects, outlineLabelAnchor };
+// --- group label + outline paint constants -------------------------------
+// Node-safe, and the ONE definition: the canvas layer and the SVG export both
+// draw a group's label, and export_svg carried its own literals annotated
+// "// bubble_layer.js" — a comment is not a dependency, so the two drifted.
+const OUTLINE_STROKE_WIDTH = 2;
+// Off-path labels clear the outline by half the padded font box plus this gap.
+const LABEL_STANDOFF_PX = 8;
+const BUBBLE_LABEL_FONT_FAMILY = "Arial, sans-serif";
+
+/**
+ * Resolve a group label to pure geometry: where the text goes, whether it is
+ * rotated onto the path, and the background box behind it. Both sinks then only
+ * PAINT — bubble_layer #drawLabel and export_svg bubbleLabelPrimitives used to
+ * re-implement the standoff maths, the rotation predicate and the background
+ * rect line for line.
+ *
+ * The `label` on/off gate stays with the callers: the live layer reads it from
+ * manager-merged opts, the export resolves it through opts ?? defaults.
+ *
+ * @param {{x: number, y: number, angle: number, nx: number, ny: number}|null} anchor
+ * @param {object} opts per-group style
+ * @param {object} defaults BUBBLE_GROUP_STYLE_TEMPLATE
+ * @param {(text: string, font: string) => number} measureText
+ * @returns {null|{text: string, font: string, fontSize: number, x: number,
+ *   y: number, lx: number, ly: number, rotated: boolean, angle: number,
+ *   fill: string, background: null|{x: number, y: number, width: number,
+ *   height: number, radius: number, fill: string}}}
+ */
+function resolveBubbleLabel(anchor, opts = {}, defaults = {}, measureText) {
+  const text = String(opts.labelText ?? defaults.labelText ?? "");
+  if (!text || !anchor) return null;
+
+  const placement = opts.labelPlacement ?? defaults.labelPlacement ?? "bottom";
+  const closeToPath = opts.labelCloseToPath ?? defaults.labelCloseToPath ?? true;
+  const autoRotate = opts.labelAutoRotate ?? defaults.labelAutoRotate ?? true;
+  const fontSize = opts.labelFontSize ?? defaults.labelFontSize ?? 12;
+  const padding = opts.labelPadding ?? defaults.labelPadding ?? 2;
+
+  const standoff = closeToPath ? 0 : fontSize / 2 + padding + LABEL_STANDOFF_PX;
+  const x = anchor.x + anchor.nx * standoff + (opts.labelOffsetX ?? 0);
+  const y = anchor.y + anchor.ny * standoff + (opts.labelOffsetY ?? 0);
+  const font = `${fontSize}px ${BUBBLE_LABEL_FONT_FAMILY}`;
+  const textWidth = measureText(text, font);
+
+  // Rotation only makes sense hugging the path; "center" has no tangent.
+  const rotated = autoRotate && closeToPath && placement !== "center";
+  // Rotated labels paint inside a translate(x,y) rotate(angle) frame, so their
+  // own coordinates are relative to it.
+  const lx = rotated ? 0 : x;
+  const ly = rotated ? 0 : y;
+
+  const background = (opts.labelBackground ?? defaults.labelBackground)
+    ? {
+        x: lx - textWidth / 2 - padding,
+        y: ly - fontSize / 2 - padding,
+        width: textWidth + 2 * padding,
+        height: fontSize + 2 * padding,
+        radius: opts.labelBackgroundRadius ?? defaults.labelBackgroundRadius ?? 5,
+        fill: opts.labelBackgroundFill ?? defaults.labelBackgroundFill ?? "#403C53",
+      }
+    : null;
+
+  return {
+    text,
+    font,
+    fontSize,
+    x,
+    y,
+    lx,
+    ly,
+    rotated,
+    angle: anchor.angle,
+    fill: opts.labelFill ?? defaults.labelFill ?? "#fff",
+    background,
+  };
+}
+
+export {
+  nodeViewportRect,
+  computeOutlineGeometry,
+  polygonSelfIntersects,
+  outlineLabelAnchor,
+  resolveBubbleLabel,
+  OUTLINE_STROKE_WIDTH,
+  LABEL_STANDOFF_PX,
+  BUBBLE_LABEL_FONT_FAMILY,
+};

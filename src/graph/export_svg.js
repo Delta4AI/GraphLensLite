@@ -36,7 +36,12 @@ import {
   ANNOTATION_SHADOW,
   annotationLayout,
 } from "./annotation_geometry.js";
-import { outlineLabelAnchor } from "./bubble_geometry.js";
+import {
+  outlineLabelAnchor,
+  resolveBubbleLabel,
+  OUTLINE_STROKE_WIDTH,
+  BUBBLE_LABEL_FONT_FAMILY,
+} from "./bubble_geometry.js";
 import { smoothClosedPath } from "./bubble_smoothing.js";
 import { placementVector, BAKED_DEFAULT_LABEL_COLOR } from "./label_renderers.js";
 
@@ -52,17 +57,19 @@ const FALLBACK_COLOR = "#999999";
 
 // Geometry constants mirrored from the live renderers (kept literal here so
 // this module never imports browser-only files; values are asserted by the
-// visual-check pass, see tests).
-const OUTLINE_STROKE_WIDTH = 2; // bubble_layer.js
-const LABEL_STANDOFF_PX = 8; // bubble_layer.js
+// visual-check pass, see tests). The bubble group's own constants are NOT
+// mirrored — they come from bubble_geometry.js, which is node-safe.
 const BACKGROUND_RADIUS = 4; // label_renderers.js
+// SVG text sits on the ALPHABETIC baseline; canvas centres it (textBaseline
+// "middle"). Nudging down by this fraction of the font size lands the SVG glyph
+// where the canvas one is — the same fudge every text primitive here needs.
+const ALPHABETIC_BASELINE_SHIFT = 0.35;
 const ANCHOR_GAP = 2; // label_renderers.js
 const FALLBACK_LABEL_SIZE = 14; // label_renderers.js
 const BADGE_TEXT_COLOR = "#FFFFFF";
 const FALLBACK_BADGE_COLOR = "#C33D35";
 const FALLBACK_BADGE_FONT_SIZE = 8;
 const BADGE_PADDING = 2;
-const BUBBLE_LABEL_FONT_FAMILY = "Arial, sans-serif"; // bubble_layer.js font string
 
 // edge_programs.js marker shader constants.
 const DEFAULT_EDGE_CURVATURE = 0.25; // @sigma/edge-curve default
@@ -486,7 +493,7 @@ function badgePrimitives(node, env) {
       rx: boxHeight / 2, // pill: fully rounded ends
       fill: safeColor(data.badgePalette?.[index] ?? FALLBACK_BADGE_COLOR),
     });
-    prims.push(textPrimitive(cx, cy + size * 0.35, text, BADGE_TEXT_COLOR, size, env.labelFont, "bold"));
+    prims.push(textPrimitive(cx, cy + size * ALPHABETIC_BASELINE_SHIFT, text, BADGE_TEXT_COLOR, size, env.labelFont, "bold"));
   });
   return prims;
 }
@@ -518,7 +525,7 @@ function nodeLabelPrimitives(node, env) {
       fill: safeColor(data.labelBackgroundColor),
     });
   }
-  prims.push(textPrimitive(cx, cy + size * 0.35, data.label, color, size, env.labelFont, env.labelWeight));
+  prims.push(textPrimitive(cx, cy + size * ALPHABETIC_BASELINE_SHIFT, data.label, color, size, env.labelFont, env.labelWeight));
   prims.push(...badgePrimitives(node, env)); // badges follow label visibility
   return prims;
 }
@@ -575,7 +582,7 @@ function edgeLabelPrimitives(edge, env) {
       fill: safeColor(data.labelBackgroundColor),
     });
   }
-  children.push(textPrimitive(0, size * 0.35, data.label, color, size, env.edgeLabelFont, env.edgeLabelWeight));
+  children.push(textPrimitive(0, size * ALPHABETIC_BASELINE_SHIFT, data.label, color, size, env.edgeLabelFont, env.edgeLabelWeight));
   return [
     {
       kind: "group",
@@ -627,53 +634,46 @@ function bubbleBodyPrimitives({ points, holes = [], opts = {}, defaults = {} }) 
 function bubbleLabelPrimitives({ points, opts = {}, defaults = {} }, measureText) {
   if (!points || points.length < 2) return [];
   if (!(opts.label ?? defaults.label)) return [];
-  const text = String(opts.labelText ?? defaults.labelText ?? "");
-  if (!text) return [];
   const placement = opts.labelPlacement ?? defaults.labelPlacement ?? "bottom";
-  const closeToPath = opts.labelCloseToPath ?? defaults.labelCloseToPath ?? true;
-  const autoRotate = opts.labelAutoRotate ?? defaults.labelAutoRotate ?? true;
-  const anchor = outlineLabelAnchor(points, placement);
-  if (!anchor) return [];
-
-  const fontSize = opts.labelFontSize ?? defaults.labelFontSize ?? 12;
-  const padding = opts.labelPadding ?? defaults.labelPadding ?? 2;
-  const standoff = closeToPath ? 0 : fontSize / 2 + padding + LABEL_STANDOFF_PX;
-  const x = anchor.x + anchor.nx * standoff + (opts.labelOffsetX ?? 0);
-  const y = anchor.y + anchor.ny * standoff + (opts.labelOffsetY ?? 0);
-  const textWidth = measureText(text, `${fontSize}px ${BUBBLE_LABEL_FONT_FAMILY}`);
-
-  const rotated = autoRotate && closeToPath && placement !== "center";
-  const lx = rotated ? 0 : x;
-  const ly = rotated ? 0 : y;
+  // Every number below comes from the shared resolver, so this export and the
+  // live canvas cannot drift on standoff, rotation or the background box.
+  const label = resolveBubbleLabel(
+    outlineLabelAnchor(points, placement),
+    opts,
+    defaults,
+    measureText,
+  );
+  if (!label) return [];
 
   const prims = [];
-  if (opts.labelBackground ?? defaults.labelBackground) {
+  if (label.background) {
+    const bg = label.background;
     prims.push({
       kind: "rect",
-      x: lx - textWidth / 2 - padding,
-      y: ly - fontSize / 2 - padding,
-      width: textWidth + 2 * padding,
-      height: fontSize + 2 * padding,
-      rx: opts.labelBackgroundRadius ?? defaults.labelBackgroundRadius ?? 5,
-      fill: safeColor(opts.labelBackgroundFill ?? defaults.labelBackgroundFill ?? "#403C53"),
+      x: bg.x,
+      y: bg.y,
+      width: bg.width,
+      height: bg.height,
+      rx: bg.radius,
+      fill: safeColor(bg.fill),
     });
   }
   prims.push(
     textPrimitive(
-      lx,
-      ly + fontSize * 0.35,
-      text,
-      safeColor(opts.labelFill ?? defaults.labelFill ?? "#fff"),
-      fontSize,
+      label.lx,
+      label.ly + label.fontSize * ALPHABETIC_BASELINE_SHIFT,
+      label.text,
+      safeColor(label.fill),
+      label.fontSize,
       BUBBLE_LABEL_FONT_FAMILY,
       "normal",
     ),
   );
-  if (!rotated) return prims;
+  if (!label.rotated) return prims;
   return [
     {
       kind: "group",
-      transform: `translate(${fmt(x)} ${fmt(y)}) rotate(${fmt(anchor.angle * RAD_TO_DEG)})`,
+      transform: `translate(${fmt(label.x)} ${fmt(label.y)}) rotate(${fmt(label.angle * RAD_TO_DEG)})`,
       children: prims,
     },
   ];
@@ -753,7 +753,7 @@ function annotationPrimitives({ ann, x, y, k }, measureText) {
         // canvas paints with textBaseline "middle" at the line center; the
         // 0.35 em drop is the same alphabetic-baseline approximation the
         // bubble labels use.
-        originY + (i + 0.5) * layout.lineHeight + ann.fontSize * 0.35,
+        originY + (i + 0.5) * layout.lineHeight + ann.fontSize * ALPHABETIC_BASELINE_SHIFT,
         line,
         safeColor(ann.fontColor),
         ann.fontSize,
