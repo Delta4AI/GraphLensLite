@@ -80,6 +80,140 @@ function normalizeD4DataBooleans(fileData) {
 }
 
 
+// ------------------------------------------------------ Excel parsing helpers
+// Pure functions lifted out of IOManager.parseExcelToJson, which was a
+// 500-line method with a dozen helper closures trapped inside it — none of
+// them reachable by a test, though these five are where the actual cell
+// decoding happens.
+
+  function getOrNull(row, key) {
+    const lowerCaseKey = key.toString().toLowerCase().trim();
+    const value = row[Object.keys(row).find((key) => key.toLowerCase() === lowerCaseKey)];
+    // Explicitly check for null/undefined to preserve 0 values
+    if (value !== null && value !== undefined && value.toString().trim() !== '') {
+      return value;
+    }
+    return null;
+  }
+
+  function cellValueToPrimitive(value) {
+    if (value === null || typeof value !== 'object' || value instanceof Date) return value;
+    if (Array.isArray(value.richText)) return value.richText.map((run) => run.text).join('');
+    if (value.text !== undefined) return cellValueToPrimitive(value.text); // hyperlink cell
+    if (value.result !== undefined) return cellValueToPrimitive(value.result); // formula cell
+    return null; // formula without cached result, error cell, unknown shape → empty
+  }
+
+  function worksheetToJson(worksheet) {
+    if (!worksheet) return { headers: [], jsonData: [] };
+
+    const jsonData = [];
+    const headers = [];
+
+    const firstRow = worksheet.getRow(1);
+    firstRow.eachCell((cell, colNumber) => {
+      headers[colNumber] = cellValueToPrimitive(cell.value);
+    });
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+
+      const rowData = { __rowNum__: rowNumber - 2 };
+
+      row.eachCell((cell, colNumber) => {
+        const header = headers[colNumber];
+        if (header) {
+          rowData[header] = cellValueToPrimitive(cell.value);
+        }
+      });
+
+      // __rowNum__ is bookkeeping, not data — counting it made this guard
+      // always true, so the blank-row skip only ever worked because ExcelJS's
+      // eachRow leaves fully empty rows out in the first place.
+      const hasData = Object.entries(rowData).some(
+        ([key, val]) => key !== '__rowNum__' && val !== null && val !== undefined && val !== ''
+      );
+      if (hasData) {
+        jsonData.push(rowData);
+      }
+    });
+
+    return { headers: headers, jsonData: jsonData };
+  }
+
+/**
+ * Split a column header into its property key and its sub-group: the LAST
+ * bracketed segment names the group, everything before it is the key.
+ *
+ * @returns {{subGroup: string, key: string}|null} null for a reserved name
+ */
+  function decodeKey(key, uncategorizedSubGroup) {
+    let subGroup = uncategorizedSubGroup;
+    let trimmedKey;
+
+    const matches = key.match(/\[.*?\]/g);
+    if (matches && matches.length >= 2) {
+      const lastBracketContent = matches[matches.length - 1];
+      subGroup = lastBracketContent.substring(1, lastBracketContent.length - 1).trim();
+
+      // For multiple brackets, preserve all except the last one in the key
+      const lastBracketIndex = key.lastIndexOf(matches[matches.length - 1]);
+      trimmedKey = key.substring(0, lastBracketIndex).trim();
+    } else if (matches && matches.length === 1) {
+      const bracketContent = matches[0];
+      subGroup = bracketContent.substring(1, bracketContent.length - 1).trim();
+      trimmedKey = key.substring(0, key.indexOf('[')).trim();
+    } else {
+      trimmedKey = key.trim();
+    }
+
+    // Both halves become live object keys in D4Data; a column named
+    // `__proto__` would land its properties on a prototype instead (see
+    // UNSAFE_OBJECT_KEYS). Refused here, the one place every header and cell
+    // key is decoded.
+    if (UNSAFE_OBJECT_KEYS.has(subGroup) || UNSAFE_OBJECT_KEYS.has(trimmedKey)) return null;
+    return { subGroup: subGroup, key: trimmedKey };
+  }
+
+  function validateUserData(row, key, uncategorizedSubGroup) {
+    const val = row[key];
+
+    // Explicitly check for null/undefined to preserve 0 values
+    if (val === null || val === undefined || val.toString().trim() === '') {
+      return null;
+    }
+
+    const decoded = decodeKey(key, uncategorizedSubGroup);
+    if (!decoded) return null; // reserved column name — decodeHeaders warned already
+    return { value: val, ...decoded };
+  }
+
+  function addNodeOrEdgeUserData(nodeOrEdge, row, propertyMap, header, uncategorizedSubGroup) {
+    nodeOrEdge.D4Data = {
+      [header]: {},
+    };
+
+    let propsAdded = 0;
+    const reservedProperties = propertyMap.map((p) => p.column.toLowerCase().trim());
+
+    for (let key in row) {
+      if (key === '__rowNum__' || reservedProperties.includes(key.toLowerCase())) continue;
+
+      const userData = validateUserData(row, key, uncategorizedSubGroup);
+
+      if (!userData) continue;
+
+      if (!Object.prototype.hasOwnProperty.call(nodeOrEdge.D4Data[header], userData.subGroup)) {
+        nodeOrEdge.D4Data[header][userData.subGroup] = {};
+      }
+
+      nodeOrEdge.D4Data[header][userData.subGroup][userData.key] = userData.value;
+      propsAdded++;
+    }
+
+    return propsAdded;
+  }
+
 class IOManager {
   constructor(cache) {
     this.cache = cache;
@@ -229,15 +363,6 @@ class IOManager {
       return;
     }
 
-    const getOrNull = (row, key) => {
-      const lowerCaseKey = key.toString().toLowerCase().trim();
-      const value = row[Object.keys(row).find((key) => key.toLowerCase() === lowerCaseKey)];
-      // Explicitly check for null/undefined to preserve 0 values
-      if (value !== null && value !== undefined && value.toString().trim() !== '') {
-        return value;
-      }
-      return null;
-    };
 
     const validateColumns = (requiredColumns, firstRowKeys, sheetName) => {
       for (const column of requiredColumns) {
@@ -337,82 +462,15 @@ class IOManager {
     // formulas, error cells). Normalize to the primitive the user sees in the
     // sheet — raw objects leaking into D4Data corrupt change detection and
     // crash the category filters downstream.
-    const cellValueToPrimitive = (value) => {
-      if (value === null || typeof value !== 'object' || value instanceof Date) return value;
-      if (Array.isArray(value.richText)) return value.richText.map((run) => run.text).join('');
-      if (value.text !== undefined) return cellValueToPrimitive(value.text); // hyperlink cell
-      if (value.result !== undefined) return cellValueToPrimitive(value.result); // formula cell
-      return null; // formula without cached result, error cell, unknown shape → empty
-    };
 
-    const worksheetToJson = (worksheet) => {
-      if (!worksheet) return { headers: [], jsonData: [] };
 
-      const jsonData = [];
-      const headers = [];
-
-      const firstRow = worksheet.getRow(1);
-      firstRow.eachCell((cell, colNumber) => {
-        headers[colNumber] = cellValueToPrimitive(cell.value);
-      });
-
-      worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber === 1) return;
-
-        const rowData = { __rowNum__: rowNumber - 2 };
-
-        row.eachCell((cell, colNumber) => {
-          const header = headers[colNumber];
-          if (header) {
-            rowData[header] = cellValueToPrimitive(cell.value);
-          }
-        });
-
-        const hasData = Object.values(rowData).some(
-          (val) => val !== null && val !== undefined && val !== ''
-        );
-        if (hasData) {
-          jsonData.push(rowData);
-        }
-      });
-
-      return { headers: headers, jsonData: jsonData };
-    };
-
-    const decodeKey = (key) => {
-      let subGroup = this.cache.CFG.EXCEL_UNCATEGORIZED_SUBHEADER;
-      let trimmedKey;
-
-      const matches = key.match(/\[.*?\]/g);
-      if (matches && matches.length >= 2) {
-        const lastBracketContent = matches[matches.length - 1];
-        subGroup = lastBracketContent.substring(1, lastBracketContent.length - 1).trim();
-
-        // For multiple brackets, preserve all except the last one in the key
-        const lastBracketIndex = key.lastIndexOf(matches[matches.length - 1]);
-        trimmedKey = key.substring(0, lastBracketIndex).trim();
-      } else if (matches && matches.length === 1) {
-        const bracketContent = matches[0];
-        subGroup = bracketContent.substring(1, bracketContent.length - 1).trim();
-        trimmedKey = key.substring(0, key.indexOf('[')).trim();
-      } else {
-        trimmedKey = key.trim();
-      }
-
-      // Both halves become live object keys in D4Data; a column named
-      // `__proto__` would land its properties on a prototype instead (see
-      // UNSAFE_OBJECT_KEYS). Refused here, the one place every header and cell
-      // key is decoded.
-      if (UNSAFE_OBJECT_KEYS.has(subGroup) || UNSAFE_OBJECT_KEYS.has(trimmedKey)) return null;
-      return { subGroup: subGroup, key: trimmedKey };
-    };
 
     /** decodeKey over a header list, telling the user which columns it refused. */
     const decodeHeaders = (keys, descriptor) => {
       const decoded = [];
       const refused = [];
       for (const key of keys) {
-        const entry = decodeKey(key);
+        const entry = decodeKey(key, this.cache.CFG.EXCEL_UNCATEGORIZED_SUBHEADER);
         if (entry) decoded.push(entry);
         else refused.push(key);
       }
@@ -553,44 +611,7 @@ class IOManager {
       });
     };
 
-    const validateUserData = (row, key) => {
-      const val = row[key];
 
-      // Explicitly check for null/undefined to preserve 0 values
-      if (val === null || val === undefined || val.toString().trim() === '') {
-        return null;
-      }
-
-      const decoded = decodeKey(key);
-      if (!decoded) return null; // reserved column name — decodeHeaders warned already
-      return { value: val, ...decoded };
-    };
-
-    const addNodeOrEdgeUserData = (nodeOrEdge, row, propertyMap, header, descriptor) => {
-      nodeOrEdge.D4Data = {
-        [header]: {},
-      };
-
-      let propsAdded = 0;
-      const reservedProperties = propertyMap.map((p) => p.column.toLowerCase().trim());
-
-      for (let key in row) {
-        if (key === '__rowNum__' || reservedProperties.includes(key.toLowerCase())) continue;
-
-        const userData = validateUserData(row, key);
-
-        if (!userData) continue;
-
-        if (!Object.prototype.hasOwnProperty.call(nodeOrEdge.D4Data[header], userData.subGroup)) {
-          nodeOrEdge.D4Data[header][userData.subGroup] = {};
-        }
-
-        nodeOrEdge.D4Data[header][userData.subGroup][userData.key] = userData.value;
-        propsAdded++;
-      }
-
-      return propsAdded;
-    };
 
     const nodeIDs = new Set();
 
@@ -624,7 +645,7 @@ class IOManager {
           row,
           EXCEL_NODE_PROPERTIES,
           this.cache.CFG.EXCEL_NODE_HEADER,
-          descriptor
+          this.cache.CFG.EXCEL_UNCATEGORIZED_SUBHEADER
         );
         node._propsAdded = propsAdded;
 
@@ -688,7 +709,7 @@ class IOManager {
           row,
           EXCEL_EDGE_PROPERTIES,
           this.cache.CFG.EXCEL_EDGE_HEADER,
-          descriptor
+          this.cache.CFG.EXCEL_UNCATEGORIZED_SUBHEADER
         );
         edge._propsAdded = propsAdded;
 
@@ -1536,4 +1557,10 @@ export {
   EXCEL_EDGE_PROPERTIES,
   IOManager,
   normalizeD4DataBooleans,
+  cellValueToPrimitive,
+  worksheetToJson,
+  decodeKey,
+  getOrNull,
+  validateUserData,
+  addNodeOrEdgeUserData,
 };
