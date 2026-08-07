@@ -2,6 +2,13 @@
    Theme tokens — light defaults in :root, dark overrides via
    <html data-theme="dark"> (src/utilities/theme.js). Brand backgrounds
    (#403C53 purple, #C33D35 red) stay fixed; surfaces/text/borders flip.
+
+   So a raw brand hex on `color` or `border-color` is a bug — it stays light
+   while everything around it flips, which is what produced this release's
+   repeated one-off dark-mode fixes. The exception is a border that traces its
+   OWN same-coloured background (`.p-button:hover`, `.p-button-primary`,
+   `.tour-btn-next`, `.panel-header-btn:hover`): the fill is deliberately fixed,
+   so a tokenized border would slide off it in dark.
    ========================================================================== */
 :root {
     --bg: #ffffff;
@@ -26,6 +33,28 @@
     --success-text: #015C0C;
     --danger-text: #8a2d2d;
     color-scheme: light;
+
+    /* Stacking order, bottom to top. Theme-independent, so they live here once
+       rather than in both blocks. Every app-level layer takes its z-index from
+       one of these — 20 ad-hoc values from 0 to 10010 is what produced this
+       release's menu-clamping and stacking fixes, and the invisible-toast bug
+       (toasts at 900 behind a 10000 landing page). Values are unchanged, only
+       named; the +1s stay relative so a bump cannot separate a pair.
+       PURELY LOCAL stacking (a slider thumb over its track, a caret over a
+       textarea) keeps its own small integers — those are relative to their own
+       stacking context and mean nothing on this scale. */
+    --z-minimap: 500;
+    --z-workbench: 600;
+    --z-resize-bar: 700;
+    --z-rail: 900;
+    --z-armed-overlay: 950;
+    --z-menu: 1000;
+    --z-popover: 1100;
+    --z-drag-ghost: 9999;
+    --z-scrim: 10000;
+    --z-modal: 10001;
+    --z-toast: 10005;
+    --z-tip: 10010;
 }
 
 [data-theme="dark"] {
@@ -101,7 +130,7 @@ body {
     border-bottom: 1px solid var(--border);
     box-sizing: border-box;
     position: relative;
-    z-index: 900;
+    z-index: var(--z-rail);
 }
 
 .rail-mark {
@@ -415,7 +444,7 @@ body {
 /* Rail dropdown menus (app / workspace / layout / export) */
 .rail-menu {
     position: fixed;
-    z-index: 1000;
+    z-index: var(--z-menu);
     display: none;
     flex-direction: column;
     min-width: 210px;
@@ -519,7 +548,7 @@ body {
     background: rgba(64, 60, 83, 0.3);
     border-right: 2px solid var(--brand-border);
     pointer-events: none;
-    z-index: 9999;
+    z-index: var(--z-drag-ghost);
     display: none;
     backdrop-filter: blur(1px);
 }
@@ -600,7 +629,7 @@ body {
     /* Above every overlay that can be on screen while a message fires — the
        landing page (10000), popup overlays (10001/10002) and the tour. A
        load error raised before the landing page clears is otherwise invisible. */
-    z-index: 10005;
+    z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -674,7 +703,7 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 600;
+    z-index: var(--z-workbench);
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -819,7 +848,7 @@ body {
     background: rgba(64, 60, 83, 0.3);
     border-top: 2px solid var(--brand-border);
     pointer-events: none;
-    z-index: 700;
+    z-index: var(--z-resize-bar);
     display: none;
     backdrop-filter: blur(1px);
 }
@@ -832,7 +861,7 @@ body {
     height: 4px;
     background: transparent;
     cursor: ns-resize;
-    z-index: 1001;
+    z-index: calc(var(--z-menu) + 1);
 }
 
 .resize-handle:hover {
@@ -906,7 +935,7 @@ body {
     bottom: min(calc(10px + var(--workbench-height, 0px)), calc(100% - 132px));
     right: 10px;
     transition: bottom 0.05s linear;
-    z-index: 500;
+    z-index: var(--z-minimap);
     border: 1px solid var(--brand-border);
     border-radius: 5px;
     background-color: var(--surface-translucent);
@@ -938,7 +967,7 @@ body {
     width: 4px;
     background: transparent;
     cursor: ew-resize;
-    z-index: 1000;
+    z-index: var(--z-menu);
 }
 
 .inspector-resize-handle:hover {
@@ -1228,7 +1257,7 @@ body.presentation #workbench {
 /* Louvain community-detection configurator (anchored to the 🧩 button) */
 .community-detection-popover {
     position: fixed;
-    z-index: 1000;
+    z-index: var(--z-menu);
     display: none;
     flex-direction: column;
     gap: 8px;
@@ -2008,7 +2037,7 @@ h5 {
     padding: 16px;
     background: transparent;
     color: var(--text);
-    z-index: 10001;
+    z-index: var(--z-modal);
     transition: opacity 0.18s ease;
 }
 
@@ -2560,7 +2589,7 @@ h5 {
     box-sizing: border-box !important;
     transition: width 0.2s ease, height 0.2s ease !important;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
-    z-index: 1100 !important;
+    z-index: var(--z-popover) !important;
 }
 
 .tooltip.expanded {
@@ -2874,7 +2903,7 @@ hr {
 }
 
 .toggle-section-btn:hover {
-    border-color: #C33D35;
+    border-color: var(--accent-text);
     color: var(--accent-text);
 }
 
@@ -3030,7 +3059,7 @@ hr {
 
 .checkbox-green {
     color: var(--accent-text);
-    border: 1px solid #C33D35;
+    border: 1px solid var(--accent-text);
     border-radius: 3px;
 }
 
@@ -3040,7 +3069,7 @@ hr {
 
 input:checked + .checkbox-green {
     color: var(--success-text);
-    border-color: #015C0C;
+    border-color: var(--success-text);
 }
 
 input:checked + .checkbox-green::after {
@@ -3133,7 +3162,7 @@ input:checked + .checkbox-green::after {
 
 .pm-group:hover,
 .pm-group:focus-within {
-    border-color: #C33D35;
+    border-color: var(--accent-text);
     transform: scale(2.5);
     z-index: 99;
 }
@@ -3171,7 +3200,7 @@ input:checked + .checkbox-green::after {
 
 .style-inner-button:hover {
     color: var(--accent-text);
-    border: 1px solid #C33D35;
+    border: 1px solid var(--accent-text);
 }
 
 .style-color-button-container {
@@ -3782,7 +3811,7 @@ input:checked + .slider:before {
     border-radius: 3px;
     border-top: none;
     background-color: var(--input-bg);
-    z-index: 1000;
+    z-index: var(--z-menu);
     width: auto;
     list-style: none;
     text-align: left;
@@ -3818,7 +3847,7 @@ input:checked + .slider:before {
     height: 14px;
     flex-shrink: 0;
     margin-right: 10px;
-    border: 1px solid #C33D35;
+    border: 1px solid var(--accent-text);
     border-radius: 3px;
     background-color: var(--input-bg);
     vertical-align: middle;
@@ -4050,7 +4079,7 @@ input:checked + .slider:before {
     border-radius: 8px;
     border: 2px solid var(--brand-border);
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
-    z-index: 10002;
+    z-index: calc(var(--z-modal) + 1);
     max-width: 90vw;
     max-height: 90vh;
     overflow: hidden;
@@ -4116,7 +4145,7 @@ input:checked + .slider:before {
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
-    z-index: 10001;
+    z-index: var(--z-modal);
 }
 
 .p-icon {
@@ -4995,16 +5024,16 @@ input:checked + .slider:before {
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 10000;
+    z-index: var(--z-scrim);
     pointer-events: none;
     background: rgba(0, 0, 0, 0.5);
 }
 
 .tour-highlight {
     position: fixed;
-    border: 3px solid #C33D35;
+    border: 3px solid var(--accent-text);
     border-radius: 6px;
-    z-index: 10001;
+    z-index: var(--z-modal);
     pointer-events: none;
     box-sizing: border-box;
     animation: tour-pulse 1.5s ease-in-out infinite;
@@ -5106,7 +5135,7 @@ input:checked + .slider:before {
 #landingPage {
     position: fixed;
     inset: 0;
-    z-index: 10000;
+    z-index: var(--z-scrim);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -5233,7 +5262,7 @@ input:checked + .slider:before {
 }
 
 .landing-card:hover {
-    border-color: #C33D35;
+    border-color: var(--accent-text);
     transform: translateY(-1px);
     box-shadow: 0 4px 16px rgba(195, 61, 53, 0.12);
 }
@@ -6880,7 +6909,10 @@ input:checked + .slider:before {
 
 /* --- Text annotations (notes) — annotation_layer.js ----------------------- */
 
-/* Full-stage host; individual notes re-enable pointer events themselves. */
+/* Full-stage host; individual notes re-enable pointer events themselves.
+   z-index 5 is LOCAL to the graph container's canvas stack (it only has to beat
+   sigma's own canvases), which is why it is not on the --z-* scale — the minimap
+   at --z-minimap deliberately draws over the notes. */
 .annotation-layer {
     position: absolute;
     inset: 0;
@@ -6916,14 +6948,14 @@ input:checked + .slider:before {
 .annotation-placement-overlay {
     position: absolute;
     inset: 0;
-    z-index: 950;
+    z-index: var(--z-armed-overlay);
     cursor: crosshair;
     touch-action: none;
 }
 
 .annotation-popover {
     position: fixed;
-    z-index: 1100;
+    z-index: var(--z-popover);
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -6980,7 +7012,7 @@ input:checked + .slider:before {
 
 .ui-tip {
     position: fixed;
-    z-index: 10010;
+    z-index: var(--z-tip);
     max-width: 280px;
     padding: 6px 9px;
     background: var(--surface);
