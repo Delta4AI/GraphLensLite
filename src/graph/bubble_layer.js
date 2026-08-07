@@ -34,6 +34,7 @@ import {
   styleKey,
 } from './bubble_geometry.js';
 import { smoothClosedPath } from './bubble_smoothing.js';
+import { prepareOverlayCanvas } from './dpr_watch.js';
 
 const LAYER_NAME = 'bubbleSets';
 const LABEL_LAYER_NAME = 'bubbleSetsLabels';
@@ -261,8 +262,8 @@ class BubbleSetLayer {
     if (!outlinesChanged && signature === this.lastPaintSignature) return;
     this.lastPaintSignature = signature;
 
-    this.#prepareCanvas(this.canvas, this.ctx, width, height, dpr);
-    this.#prepareCanvas(this.labelCanvas, this.labelCtx, width, height, dpr);
+    prepareOverlayCanvas(this.canvas, this.ctx, width, height, dpr);
+    prepareOverlayCanvas(this.labelCanvas, this.labelCtx, width, height, dpr);
     this.#drawOutlines(shown, sigma);
   }
 
@@ -367,26 +368,6 @@ class BubbleSetLayer {
     } finally {
       ctx.restore();
     }
-  }
-
-  /** Resize (if needed) and clear a layer canvas, scaled to the device ratio. */
-  #prepareCanvas(canvas, ctx, width, height, dpr) {
-    if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-    }
-    // Own the CSS display size too: sigma.createCanvasContext only sets
-    // position:absolute, and sigma.resize() (the sole writer of element.style
-    // width/height) runs once at construction — before this canvas exists — and
-    // early-returns on unchanged dimensions. Left unset, the canvas displays at
-    // its backing-store size (width*dpr CSS px), which is dpr* too large on a
-    // >1 DPR display, so the group lands in the wrong place until a panel toggle
-    // forces a real sigma resize. Setting it here keeps the overlay 1:1 with the
-    // WebGL layers regardless of sigma's resize timing or the display's DPR.
-    if (canvas.style.width !== `${width}px`) canvas.style.width = `${width}px`;
-    if (canvas.style.height !== `${height}px`) canvas.style.height = `${height}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, width, height);
   }
 
   /**

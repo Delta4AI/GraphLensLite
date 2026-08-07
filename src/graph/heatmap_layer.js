@@ -37,6 +37,7 @@
 import { DEFAULTS } from '../config.js';
 import { currentTheme } from '../utilities/theme.js';
 import { positionsChecksum } from './bubble_geometry.js';
+import { prepareOverlayCanvas } from './dpr_watch.js';
 import {
   graphBBox,
   splatTransform,
@@ -212,7 +213,7 @@ class HeatmapLayer {
     // Disabled: clear once, then scheduleRedraw stays a no-op (early return
     // BEFORE any signature computation).
     if (!this.heatmapEnabled) {
-      this.#prepareCanvas(width, height, dpr);
+      prepareOverlayCanvas(this.canvas, this.ctx, width, height, dpr);
       this.cleared = true;
       this.lastPaintSignature = null;
       return;
@@ -244,26 +245,9 @@ class HeatmapLayer {
     if (signature === this.lastPaintSignature) return;
     this.lastPaintSignature = signature;
 
-    this.#prepareCanvas(width, height, dpr);
+    prepareOverlayCanvas(this.canvas, this.ctx, width, height, dpr);
     this.#syncHeatmap(positions, heatKey, rampStops);
     this.#drawHeatmap();
-  }
-
-  /** Resize (if needed) and clear the layer canvas, scaled to the device ratio. */
-  #prepareCanvas(width, height, dpr) {
-    if (this.canvas.width !== width * dpr || this.canvas.height !== height * dpr) {
-      this.canvas.width = width * dpr;
-      this.canvas.height = height * dpr;
-    }
-    // Own the CSS display size too (see bubble_layer.js #prepareCanvas): sigma
-    // never sets element.style width/height on a custom canvas created after its
-    // construction-time resize, so without this the field displays at its
-    // backing-store size (dpr* too large on a >1 DPR monitor) until a panel
-    // toggle forces a real sigma resize.
-    if (this.canvas.style.width !== `${width}px`) this.canvas.style.width = `${width}px`;
-    if (this.canvas.style.height !== `${height}px`) this.canvas.style.height = `${height}px`;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.ctx.clearRect(0, 0, width, height);
   }
 
   /** @returns {Array<{x: number, y: number}>} positions of non-hidden nodes */

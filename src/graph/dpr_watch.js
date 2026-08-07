@@ -40,4 +40,34 @@ function watchDevicePixelRatio(onChange) {
   return () => detach?.();
 }
 
-export { watchDevicePixelRatio };
+/**
+ * Resize (if needed) and clear an overlay canvas, scaled to the device ratio.
+ * Shared by the bubble and heatmap layers, which are both canvases sigma did
+ * not create and therefore does not size.
+ *
+ * Owning the CSS display size is the whole point: sigma.createCanvasContext
+ * only sets position:absolute, and sigma.resize() — the sole writer of
+ * element.style width/height — runs once at construction, before these
+ * canvases exist, and early-returns on unchanged dimensions. Left unset, a
+ * canvas displays at its backing-store size (width*dpr CSS px), dpr* too
+ * large on a >1 DPR display, so the overlay lands in the wrong place until a
+ * panel toggle forces a real sigma resize.
+ *
+ * @param {HTMLCanvasElement} canvas
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} width   CSS pixels
+ * @param {number} height  CSS pixels
+ * @param {number} dpr
+ */
+function prepareOverlayCanvas(canvas, ctx, width, height, dpr) {
+  if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+  }
+  if (canvas.style.width !== `${width}px`) canvas.style.width = `${width}px`;
+  if (canvas.style.height !== `${height}px`) canvas.style.height = `${height}px`;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+}
+
+export { watchDevicePixelRatio, prepareOverlayCanvas };
