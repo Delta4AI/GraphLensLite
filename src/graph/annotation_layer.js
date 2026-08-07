@@ -532,7 +532,11 @@ class AnnotationLayer {
       );
     }
     if (text.trim() === '') {
-      this.removeAnnotation(id, { record: false });
+      // A note that only existed for this edit leaves no trace. An older one
+      // is a deletion the user never asked for by name, so it gets both an
+      // undo entry and a word about what just happened.
+      this.removeAnnotation(id, { record: !wasNew });
+      if (!wasNew) this.cache.ui?.info?.('Note deleted — its text was emptied.');
       return;
     }
     const changed = ann.text !== text;
