@@ -324,7 +324,11 @@ class AssistantManager {
       return
     }
     input.value = ''
-    await this.send(text)
+    // A cancelled budget modal (or a send that never started) used to eat the
+    // typed question. Put it back — unless the user has typed something else
+    // in the meantime.
+    const sent = await this.send(text)
+    if (sent === false && !input.value) input.value = text
   }
 
   // Starter chips in the empty state send immediately — they're presented
@@ -341,22 +345,21 @@ class AssistantManager {
     this.send(text)
   }
 
+  /**
+   * Run one chat turn. Returns false when nothing went out (already streaming,
+   * no container, budget modal cancelled) so the caller can put the user's
+   * question back in the input box.
+   */
   async send(userText, options = {}) {
-    if (this._streaming) return
+    if (this._streaming) return false
     const container = document.getElementById('assistantMessages')
-    if (!container) return
+    if (!container) return false
 
     const {
       excludeHistory = false,
       minimalSelection = false,
       overrideBudget = false,
-      suppressUserBubble = false,
     } = options
-
-    // We render the user's message once per user-triggered send. Retries
-    // routed through the over-budget modal re-enter send() with
-    // suppressUserBubble:true so the bubble isn't duplicated.
-    if (!suppressUserBubble) appendBubble('user', userText, container)
 
     // Build the full-fat snapshot. Minimal variant is only used when the
     // user picks "Send without selection details" from the budget modal.
@@ -386,21 +389,31 @@ class AssistantManager {
         const remediation = await this._resolveOverBudget({
           budget, historyChars, userChars, graphChars: graphJson.length,
         })
-        if (!remediation) return // cancelled
+        // Nothing was sent, so nothing may be left behind: no bubble is on
+        // screen yet (it is appended below, past every gate), the caller puts
+        // the question back in the box, and the meter still shows the estimate
+        // the modal was arguing about.
+        if (!remediation) {
+          this._refreshBudgetMeter()
+          return false
+        }
         if (remediation.openSettings) {
           this.openSettings()
-          return
+          return false
         }
-        // Re-enter with the chosen remediation. The user bubble is already
-        // on screen; suppress the duplicate.
+        // Re-enter with the chosen remediation.
         return this.send(userText, {
           excludeHistory: excludeHistory || !!remediation.excludeHistory,
           minimalSelection: minimalSelection || !!remediation.minimalSelection,
           overrideBudget: !!remediation.overrideBudget,
-          suppressUserBubble: true,
         })
       }
     }
+
+    // Past every gate: this turn is going out, so the question becomes a
+    // bubble. Rendering it earlier left an orphan bubble behind whenever the
+    // budget modal was cancelled.
+    appendBubble('user', userText, container)
 
     // Explicit delimitation so the model treats graph data as data, not as
     // instructions. See system_prompt.md "Untrusted data boundaries".
@@ -487,6 +500,14 @@ class AssistantManager {
       if (!thinkingEndedAt) finalizeThinking(bubble, Date.now() - turnStart)
       bubble.classList.remove('assistant-bubble-streaming')
       const displayText = stripSentinelForDisplay(fullResponse)
+      // A turn can stream nothing visible (pure reasoning, or a sentinel-only
+      // reply). Say so like the cancel branch does instead of leaving a blank
+      // bubble, and keep the empty turn out of history — replaying an empty
+      // assistant message only confuses the next request.
+      if (!displayText.trim()) {
+        setBubbleContent(bubble, '<em>(no reply)</em>')
+        return
+      }
       setBubbleContent(bubble, renderMarkdown(displayText))
 
       // History stores the cleaned-up assistant reply so future turns don't
@@ -651,8 +672,18 @@ class AssistantManager {
   // not already visible, clear the existing query, fill in the new one, and
   // let the user decide whether to Filter or Select. This mirrors the
   // "📝 Add to query" affordance from the side-panel filter UI.
-  _openQueryInEditor(queryText) {
+  async _openQueryInEditor(queryText) {
     if (!queryText || !this.cache?.qm) return
+    // Replacing a hand-typed query is a silent loss — the sibling Select path
+    // deliberately preserves the editor's contents, so this one at least asks.
+    const existing = this.cache.query?.text?.textContent?.trim()
+    if (existing && existing !== queryText.trim()) {
+      const proceed = await Popup.confirm(
+        'The query editor already holds a query. Replace it with the generated one?',
+        'Replace query'
+      )
+      if (proceed !== true) return
+    }
     const queryBtn = document.getElementById('queryToggleBtn')
     const isOpen = queryBtn?.classList.contains('highlight')
     if (!isOpen && this.cache.ui?.toggleQueryEditor) {
@@ -743,10 +774,15 @@ class AssistantManager {
         `In browser mode, set OLLAMA_ORIGINS="*" on the Ollama host. ` +
         `Open Settings (⚙) to verify or change the endpoint.`
     }
-    if (msg.includes('404') || msg.includes('model')) {
+    // 404 (or the server saying so in words) is the missing-model case.
+    // Matching any message containing "model" also caught "model requires more
+    // system memory than is available" and told the user to pull it again.
+    if (err.status === 404 || /not found/i.test(msg)) {
       return `Model not found on the configured endpoint. Run: ollama pull <model> — or change model in Settings (⚙).`
     }
-    return 'The assistant backend returned an error. Check the console for details.'
+    // The message itself, not "check the console": a packaged Electron build
+    // has no console to check.
+    return `The assistant backend returned an error: ${msg}`
   }
 
   openSettings() {
