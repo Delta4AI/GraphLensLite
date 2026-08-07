@@ -511,8 +511,13 @@ class AnnotationLayer {
     if (cancelled) {
       // A note that only existed for this edit goes with it; an older one keeps
       // the text it had. Either way nothing reaches the undo history.
-      if (wasNew) this.removeAnnotation(id, { record: false });
-      else {
+      if (wasNew) {
+        this.removeAnnotation(id, { record: false });
+        // Escape on a fresh note takes the note AND everything typed into it,
+        // with no undo entry to get it back — so it has to say so, the way
+        // cancelPlacement already does.
+        this.cache.ui?.info?.('Note discarded.');
+      } else {
         el.textContent = original;
         delete el.dataset.signature;
         this.sync();

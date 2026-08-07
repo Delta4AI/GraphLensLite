@@ -5077,6 +5077,12 @@ input:checked + .slider:before {
     gap: 6px;
 }
 
+/* Left edge, so it never sits next to Next as a mis-click. Absent on the last
+   step, where Back/Finish stay right-aligned on their own. */
+.tour-btn-skip {
+    margin-right: auto;
+}
+
 .tour-btn-next {
     background-color: #015C0C;
     border-color: #015C0C;

@@ -99,6 +99,50 @@ describe('GuidedTour.finish', () => {
   });
 });
 
+// ==========================================================================
+// Getting out. The 14-step tour replaces the user's graph with sample data to
+// start, and its only exit used to be the popup's × titled "Close popup".
+// ==========================================================================
+
+describe('the tour footer', () => {
+  const skipBtn = () =>
+    [...document.querySelectorAll('button')].find((b) => b.textContent === 'Skip tour');
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('offers Skip tour, and ending it puts the shell back', async () => {
+    const cache = makeCache();
+    const tour = new GuidedTour(cache);
+    await tour.showStep();
+
+    expect(skipBtn()).toBeTruthy();
+    expect(document.querySelector('.p-icon[title="Exit tour"]')).toBeTruthy();
+
+    skipBtn().click();
+    expect(cache.workbench.close).toHaveBeenCalled();
+    expect(cache.inspector.setContext).toHaveBeenCalledWith('filters');
+  });
+
+  it('drops Skip on the last step, where Finish is the same thing', async () => {
+    const tour = new GuidedTour(makeCache());
+    await tour.showStep();
+    // "Step 1 of N" is the only public statement of how many steps there are.
+    const total = Number(
+      document.querySelector('.tour-step-indicator').textContent.match(/of (\d+)/)[1],
+    );
+
+    tour.currentStep = total - 1;
+    await tour.showStep();
+
+    expect(skipBtn()).toBeUndefined();
+    expect(
+      [...document.querySelectorAll('button')].some((b) => b.textContent === 'Finish ✓'),
+    ).toBe(true);
+  });
+});
+
 describe('generateTourData', () => {
   it('builds a connected sample graph with the properties the steps point at', () => {
     const data = generateTourData();

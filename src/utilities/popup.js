@@ -31,6 +31,9 @@ class Popup {
       closeOnClickOutside: true,
       onClose: null,
       showFullscreenButton: true,
+      // What the × does, when "Close popup" is not what the user is doing —
+      // the tour's × ends a 14-step tour.
+      closeTitle: 'Close popup',
       ...options
     };
 
@@ -412,7 +415,7 @@ class Popup {
     this.closeBtn = document.createElement('button');
     this.closeBtn.className = 'p-icon';
     this.closeBtn.innerHTML = '×';
-    this.closeBtn.title = 'Close popup';
+    this.closeBtn.title = this.options.closeTitle;
     actionsDiv.appendChild(this.closeBtn);
 
     headerDiv.appendChild(actionsDiv);

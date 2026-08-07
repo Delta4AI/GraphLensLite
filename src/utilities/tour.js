@@ -567,6 +567,20 @@ class GuidedTour {
 
     footer.appendChild(leftGroup);
 
+    // The only way out used to be the popup's × titled "Close popup", on a
+    // 14-step tour that replaced the user's graph with sample data to start.
+    if (!isLast) {
+      const skipBtn = document.createElement('button');
+      skipBtn.className = 'p-button p-button-secondary tour-btn-skip';
+      skipBtn.textContent = 'Skip tour';
+      skipBtn.title = 'End the tour here';
+      skipBtn.addEventListener('click', () => {
+        this.cleanup();
+        this.finish();
+      });
+      footer.insertBefore(skipBtn, leftGroup);
+    }
+
     content.appendChild(footer);
 
     // Build title with step indicator
@@ -588,6 +602,7 @@ class GuidedTour {
       width: '460px',
       showFullscreenButton: false,
       closeOnClickOutside: false,
+      closeTitle: 'Exit tour',
       onClose: () => {
         // Popup.close() fires onClose unconditionally — including when we
         // programmatically close mid-transition. cleanup() sets this flag

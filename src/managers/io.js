@@ -1,6 +1,6 @@
 /* global ExcelJS */ // loaded as a global via vendored src/lib/exceljs.min.js script tag
 import { VERSION, bubbleGroupStyle, UNSAFE_OBJECT_KEYS } from '../config.js';
-import { sanitizeAnnotations } from '../graph/annotation_geometry.js';
+import { sanitizeAnnotations, MAX_ANNOTATIONS } from '../graph/annotation_geometry.js';
 import { StaticUtilities } from '../utilities/static.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
 import { excelData, EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from './excel_schema.js';
@@ -1282,6 +1282,10 @@ class IOManager {
 
   parseLayouts(jsonLayouts) {
     const parsedLayouts = {};
+    // Notes past MAX_ANNOTATIONS (and malformed records) are dropped at the
+    // trust boundary. Silently, until now — while the same feature warns when
+    // it trims a single note's text.
+    let droppedNotes = 0;
     Object.entries(jsonLayouts).forEach(([key, layout]) => {
       const positions =
         layout.positions instanceof Map
@@ -1332,7 +1336,12 @@ class IOManager {
         // Trust boundary for loaded text notes: malformed records are dropped,
         // fields are clamped/defaulted (annotation_geometry.js). Pre-note
         // files simply get [].
-        annotations: sanitizeAnnotations(layout.annotations),
+        annotations: (() => {
+          const kept = sanitizeAnnotations(layout.annotations);
+          const raw = Array.isArray(layout.annotations) ? layout.annotations.length : 0;
+          droppedNotes += Math.max(0, raw - kept.length);
+          return kept;
+        })(),
       };
 
       // Keyed off the layout BEING PARSED, not traverseBubbleSets(): that reads
@@ -1349,6 +1358,12 @@ class IOManager {
             : new Set(layout[`${group}ManualMembers`] || []);
       }
     });
+    if (droppedNotes > 0) {
+      this.cache.ui?.warning?.(
+        `${droppedNotes} text note${droppedNotes === 1 ? '' : 's'} could not be loaded ` +
+          `(the limit is ${MAX_ANNOTATIONS} per workspace).`,
+      );
+    }
     return parsedLayouts;
   }
 

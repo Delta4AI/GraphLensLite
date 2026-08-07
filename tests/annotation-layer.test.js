@@ -39,7 +39,7 @@ function makeSigma(ratio = 1) {
 function makeCache(annotations = []) {
   return {
     data: { selectedLayout: 'Default', layouts: { Default: { annotations } } },
-    ui: { info: () => {}, error: () => {}, warning: vi.fn() },
+    ui: { info: vi.fn(), error: () => {}, warning: vi.fn() },
     history: {
       commits: [],
       commit(label) {
@@ -358,6 +358,8 @@ describe('editing', () => {
 
     expect(cache.data.layouts.Default.annotations).toHaveLength(0);
     expect(cache.history.commits).toEqual([]);
+    // No undo entry to bring it back, so it has to be said out loud.
+    expect(cache.ui.info).toHaveBeenCalledWith('Note discarded.');
   });
 
   it('Escape on an existing note restores the text it had', () => {
