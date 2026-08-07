@@ -597,6 +597,13 @@ function openNeo4jJoinPopup(cache, deps = {}) {
         : 'Fetch &amp; merge';
     };
     const showError = (message) => {
+      // Same detached-box problem as openNeo4jPopup: once popup.close() has
+      // run, the merge is past the point of no return and the inline box is
+      // gone, so the message has to reach the toast layer.
+      if (!errorBox.isConnected) {
+        cache.ui.error(message);
+        return;
+      }
       errorBox.textContent = message;
       errorBox.hidden = false;
     };
@@ -646,6 +653,9 @@ function openNeo4jJoinPopup(cache, deps = {}) {
         if (err?.name === 'AbortError') return; // the user closed the dialog
         setBusy(null);
         showError(`Neo4j: ${connectionHint(err)}`);
+        // The popup is already closed, so nothing will ever settle this
+        // promise — its caller would wait for a retry that cannot happen.
+        if (dataFetched) settle(false);
       }
     };
 

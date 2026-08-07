@@ -789,6 +789,13 @@ function openNeo4jPopup(cache) {
         : 'Fetch';
     };
     const showError = (message) => {
+      // Failures after onFetched closed the popup would write into detached
+      // DOM — and those are the worst ones, because applyGraph has already
+      // destroyed the old graph. Route them to the toast layer instead.
+      if (!errorBox.isConnected) {
+        cache.ui.error(message);
+        return;
+      }
       errorBox.textContent = message;
       errorBox.hidden = false;
     };

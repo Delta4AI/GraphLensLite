@@ -722,6 +722,26 @@ describe('openNeo4jJoinPopup', () => {
     expect(cache.ui.setDataSourceLabel).toHaveBeenCalledWith('Neo4j: movies', 'neo4j');
   });
 
+  it('toasts and settles when the merge fails after the popup closed', async () => {
+    // popup.close() runs before mergeAndApply, so the inline error box is
+    // detached by the time apply throws — and the old graph is already gone.
+    startNeo4jSession(CONFIG, [rawNode('1', 'Person')], [], NO_EXCLUSIONS);
+    const cache = makeCache([{ id: '1', style: { x: 1, y: 2 } }]);
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ results: [{ data: [{ row: [2] }] }], errors: [] }))
+      .mockResolvedValueOnce(graphResponse([rawNode('7', 'Gene')], []));
+    const apply = vi.fn().mockRejectedValue(new Error('render blew up'));
+    const promise = openNeo4jJoinPopup(cache, { fetchImpl, apply });
+
+    document.getElementById('neo4j-join-stitch').checked = false;
+    document.getElementById('neo4j-join-query').value = 'MATCH (g:Gene) RETURN g LIMIT 2';
+    document.getElementById('neo4j-join-fetch-btn').click();
+
+    expect(await promise).toBe(false);
+    expect(cache.ui.error).toHaveBeenCalledWith(expect.stringContaining('render blew up'));
+  });
+
   it('abandons the merge when the popup is dismissed mid-flight', async () => {
     // The × stays live while the fetch runs. Merging after it replaces the
     // user's graph (and resets filters and undo) from a dialog they dismissed.
