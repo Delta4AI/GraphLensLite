@@ -550,15 +550,7 @@ class UIManager {
     const enable = this.cache.CFG.DISABLE_HOVER_EFFECT;
     this.cache.CFG.DISABLE_HOVER_EFFECT = !enable;
 
-    if (enable) {
-      btn.classList.remove('red');
-      btn.classList.add('green', 'highlight');
-      btn.title = 'Disable hover highlight effect (H)';
-    } else {
-      btn.classList.remove('green', 'highlight');
-      btn.classList.add('red');
-      btn.title = 'Enable hover highlight effect (H)';
-    }
+    this.#paintHoverToggle(btn, enable);
 
     // Disabling also clears any lingering hover highlight/dim layer;
     // selection states are untouched (they live in elementStates).
@@ -631,16 +623,18 @@ class UIManager {
 
   updateHoverToggleButton() {
     const btn = document.getElementById('hoverToggleBtn');
-    if (!btn) return;
-    if (this.cache.CFG.DISABLE_HOVER_EFFECT) {
-      btn.classList.remove('green', 'highlight');
-      btn.classList.add('red');
-      btn.title = 'Enable hover highlight effect (H)';
-    } else {
-      btn.classList.remove('red');
-      btn.classList.add('green', 'highlight');
-      btn.title = 'Disable hover highlight effect (H)';
-    }
+    if (btn) this.#paintHoverToggle(btn, !this.cache.CFG.DISABLE_HOVER_EFFECT);
+  }
+
+  /**
+   * The on/off look for the rail's Hover button. Plain `.active`, like the
+   * lasso and note buttons beside it — the old green/red pair painted OFF in
+   * the app's loudest colour, so "off" shouted louder than "on".
+   */
+  #paintHoverToggle(btn, on) {
+    btn.classList.remove('green', 'red', 'highlight');
+    btn.classList.toggle('active', on);
+    btn.title = on ? 'Disable hover highlight effect (H)' : 'Enable hover highlight effect (H)';
   }
 
   buildUI() {
