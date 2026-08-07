@@ -356,17 +356,16 @@ class GraphBubbleSetManager {
     this.refreshBubbleStyleElements();
     // Every style write funnels through here, so this is the one place that
     // can keep the filter rows' chips in step. They render a group's fill and
-    // stroke, and used to hold the old colours until the row was rebuilt for
-    // some unrelated reason.
+    // stroke, so without this they hold stale colours until the row is rebuilt
+    // for some unrelated reason.
     this.cache.uiComponents?.refreshGroupChips?.();
   }
 
   /**
    * Mirror the selected group's stored style onto the ONE settings pane below
-   * the group list. There used to be a panel per group, built eagerly; with an
-   * unbounded number of groups that is N × 20 rows of DOM for a pane showing
-   * one group at a time, so the pane is built on demand for `selectedGroup`
-   * and this only has to sync that one.
+   * the group list. ONE pane, built on demand for `selectedGroup`, so this only
+   * has to sync that one: a panel per group would be N × 20 rows of DOM for a
+   * surface showing one group at a time.
    */
   refreshBubbleStyleElements() {
     const card = document.getElementById('groupStylePanel');
@@ -577,8 +576,8 @@ class GraphBubbleSetManager {
 
   /**
    * The choreography every membership change runs: repaint the group UI, then
-   * resync and redraw the outlines, then commit one undo step. Four call sites
-   * used to inline their own copy of it and drift.
+   * resync and redraw the outlines, then commit one undo step. Every membership
+   * change goes through here, so the four steps cannot drift apart.
    * @param {string} label undo-stack label
    */
   async afterMembershipChange(label) {

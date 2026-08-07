@@ -1,5 +1,5 @@
 /**
- * Node-safe bubble-set geometry helpers (MIGRATION.md Phase 4).
+ * Node-safe bubble-set geometry helpers.
  *
  * Pure math between the app's bubble groups and bubblesets-js: rect
  * building, outline computation/sampling, label anchoring and the cache

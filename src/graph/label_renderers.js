@@ -1,5 +1,5 @@
 /**
- * Canvas label renderers for the sigma renderer (MIGRATION.md Phase 2).
+ * Canvas label renderers for the sigma renderer.
  *
  * Replace sigma's built-in disc/straight label drawers to honour the
  * per-element label attrs emitted by graph_model.js (labelSize, labelColor,

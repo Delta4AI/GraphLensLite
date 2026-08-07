@@ -429,8 +429,8 @@ class UIManager {
 
   /**
    * Presentation mode (⇧F): strip the shell down to the stage for a screenshot
-   * or a demo. Replaces the old selection-HUD "✕ hide" — it hides all the
-   * chrome rather than one widget, and Escape always brings it back.
+   * or a demo. Hides all the chrome rather than one widget, and Escape always
+   * brings it back.
    */
   togglePresentationMode() {
     const on = document.body.classList.toggle('presentation');
@@ -876,7 +876,7 @@ class UIManager {
     col2.className = 'filter-row-col2';
     row.append(col1, col2);
 
-    // Mixed-type property (§6.2): rendered, but disabled with the reason —
+    // Mixed-type property: rendered, but disabled with the reason —
     // no widget, no per-row actions, checkbox inert via the row class.
     if (filterDefault.unusable) {
       row.classList.add('filter-row-unusable');
@@ -915,9 +915,9 @@ class UIManager {
     reason.title =
       'This column holds both numbers and text, so neither a range slider nor a ' +
       'category list fits it. Clean the column to a single type to filter by it.';
-    // ponytail: "jump to offending rows in the data table" (spec §6.2) needs
-    // data-editor search/filter support that does not exist yet; add the link
-    // here once the data editor can focus a row subset.
+    // ponytail: a "jump to the offending rows" link into the data table needs
+    // search/filter support the data editor does not have yet; add it here once
+    // the editor can focus a row subset.
     return reason;
   }
 
@@ -1249,8 +1249,7 @@ class UIManager {
   }
 
   // Pre-load, the landing page (a full-viewport overlay) covers the shell;
-  // post-load it is hidden. The old showOnLoad/hideOnLoad opacity juggling is
-  // retired with the duplicate sidebar launch block (Concept C decision 6).
+  // post-load it is hidden.
   showUI(show) {
     const landing = document.getElementById('landingPage');
     if (landing) {
@@ -1393,7 +1392,7 @@ class UIManager {
   // Every config card is built by one call to createStyleDiv and then
   // re-parented to its home in the shell. There is exactly one copy of each
   // card; the mount ids below are the whole of the "which panel owns what"
-  // mapping (Concept C §4).
+  // mapping.
   static CARD_MOUNTS = {
     'Select Elements': 'selectMenuMount',
     'Act on Selection': 'inspectorActMount',

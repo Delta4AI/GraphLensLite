@@ -1,5 +1,5 @@
 /**
- * Node-safe graph model for the Sigma.js renderer (MIGRATION.md Phases 1-2).
+ * Node-safe graph model for the Sigma.js renderer.
  *
  * Builds the graphology instance from the app cache and provides the
  * G6-style → sigma attribute mapping plus the node/edge reducer factories.

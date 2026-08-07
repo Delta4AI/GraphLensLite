@@ -177,7 +177,7 @@ class QueryAST {
     }
 
     // --- IS TRUE / IS FALSE ----------------------------------------------
-    // Boolean predicate (§6.1): matches every encoding of the wanted truth
+    // Boolean predicate: matches every encoding of the wanted truth
     // value (true/TRUE/1 vs false/FALSE/0, string or number) so it works on
     // raw D4Data regardless of how the source file spelled its booleans.
     if (op === 'IS TRUE' || op === 'IS FALSE') {
@@ -320,7 +320,7 @@ class QueryManager {
       () => `<span class='q-kw-isforeign' data-encoded>IS FOREIGN</span>`
     );
 
-    /* 5-5 Boolean predicates (§6.1): "IS TRUE" / "IS FALSE" ------------- */
+    /* 5-5 Boolean predicates: "IS TRUE" / "IS FALSE" -------------------- */
     asciiStr = asciiStr.replace(
       /\bIS\s+(TRUE|FALSE)\b/gi,
       (_m, word) =>

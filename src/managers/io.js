@@ -949,7 +949,7 @@ class IOManager {
       upperThreshold: -Infinity,
       isInverted: false,
       isCategory: false,
-      // Boolean classification (§6.1): boolCandidate stays true while every
+      // Boolean classification: boolCandidate stays true while every
       // observed value is a boolean encoding (true/TRUE/1 vs false/FALSE/0);
       // finalizeFilterClassification then promotes candidates to isBoolean.
       // Classification is purely data-driven — when the data changes (e.g. a
@@ -957,7 +957,7 @@ class IOManager {
       // reclassifies the column automatically.
       isBoolean: false,
       boolCandidate: true,
-      // Mixed-type accounting (§6.2): a column holding both numeric and text
+      // Mixed-type accounting: a column holding both numeric and text
       // values becomes an unusable (disabled) filter row instead of being
       // deleted; the counts feed the row's explanation.
       unusable: false,
@@ -1030,8 +1030,8 @@ class IOManager {
   }
 
   /**
-   * Resolve every property's final filter type once all values are collected
-   * (§6.1/§6.2). Runs after the node/edge preprocessing loops and before the
+   * Resolve every property's final filter type once all values are collected.
+   * Runs after the node/edge preprocessing loops and before the
    * per-layout filter rebuild, so cloned layout filters inherit the result.
    *
    * - Boolean: every value is a boolean encoding → isBoolean (a refined
@@ -1294,7 +1294,7 @@ class IOManager {
       parsedLayouts[key] = {
         // layoutType gates the initial layout run in core.js: a view with no
         // positions needs one so the force algorithm fires. Authored payloads
-        // (e.g. bubble groups, §7) omit it; without this default they'd render
+        // (e.g. bubble groups, API.md §7) omit it; without this default they'd render
         // every node stacked at the origin. Honour an explicit value when given.
         layoutType:
           layout.layoutType || (positions.size === 0 ? this.cache.DEFAULTS.LAYOUT : undefined),

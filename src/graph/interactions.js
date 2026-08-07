@@ -1,8 +1,7 @@
 /**
- * Browser-only interaction wiring for the sigma renderer (MIGRATION.md
- * Phase 3): node drag with position persistence, click/shift-select, hover
- * 1-degree highlight, freehand lasso overlay and the click tooltip. Replaces
- * the G6 behaviors/plugins; instantiated by SigmaAdapter.
+ * Browser-only interaction wiring for the sigma renderer: node drag with
+ * position persistence, click/shift-select, hover 1-degree highlight, freehand
+ * lasso overlay and the click tooltip. Instantiated by SigmaAdapter.
  *
  * Selection changes are routed through GraphSelectionManager so selection
  * memory (undo/redo), the data table and button states stay in sync.

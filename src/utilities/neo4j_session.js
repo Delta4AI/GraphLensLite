@@ -469,8 +469,9 @@ function expectedRelationshipCount(pairs, chosen) {
 }
 
 /**
- * Expand flow: preflight → checklist → fetch → merge. Entry point for the
- * selection-HUD button; no-ops without an active session or selection.
+ * Expand flow: preflight → checklist → fetch → merge. Driven by the inspector's
+ * 🛢️ Expand button (#neo4jExpandBtn) and by the command palette; no-ops without
+ * an active session, and says so without a selection.
  *
  * @param {object} cache
  * @param {{fetchImpl?: Function, checklist?: Function, apply?: Function}} [deps]

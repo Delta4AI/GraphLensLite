@@ -118,7 +118,7 @@ body {
     overflow: hidden;
 }
 
-/* ---------- the rail (Concept C phase 3) ---------- */
+/* ---------- the rail ---------- */
 #rail {
     flex: none;
     height: 52px;
@@ -697,7 +697,7 @@ body {
 }
 
 /* The workbench overlays the bottom of the stage — it covers the canvas and
-   never the inspector (Concept C §2). Height is driven by workbench.js. */
+   never the inspector. Height is driven by workbench.js. */
 #workbench {
     position: absolute;
     left: 0;
@@ -943,9 +943,7 @@ body {
 }
 
 /*************************
- The inspector (Concept C phase 4) — one context-driven column that replaced
- the left filter sidebar, the right styling sidebar and the floating
- selection HUD.
+ The inspector — one context-driven column: Filters, Overlays, Selection.
  **************************/
 #inspector {
     flex: none;
@@ -2376,15 +2374,15 @@ h5 {
 }
 
 /* The dark theme lightens --accent-text to #e0635b, and white on that is only
-   3.43:1. Flip the fill's foreground dark, as the Concept C mockups do for
-   every brand-filled pill in dark mode. */
+   3.43:1. Flip the fill's foreground dark, as every brand-filled pill does in
+   dark mode. */
 [data-theme="dark"] .filter-join-segment.active,
 [data-theme="dark"] .insp-pill.active,
 [data-theme="dark"] .rail-tab.highlight .rail-vb-t {
     color: #15131c;
 }
 
-/* Boolean filter rows (§6.1): the Any/True/False segment reuses the join
+/* Boolean filter rows: the Any/True/False segment reuses the join
    toggle's pill styling. col2 is a flex column whose default cross-axis
    stretch would pull the pill to full width — align-self, not justify-self,
    is what opts out of that in flex. */
@@ -2392,7 +2390,7 @@ h5 {
     align-self: flex-start;
 }
 
-/* Mixed-type rows (§6.2): visible but inert, with the reason inline. */
+/* Mixed-type rows: visible but inert, with the reason inline. */
 .filter-row-unusable .filter-row-col1 {
     opacity: 0.55;
     pointer-events: none;

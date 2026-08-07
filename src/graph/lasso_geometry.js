@@ -1,5 +1,5 @@
 /**
- * Node-safe lasso geometry (MIGRATION.md Phase 3).
+ * Node-safe lasso geometry.
  *
  * Pure point-in-polygon math for the freehand lasso overlay; the DOM/canvas
  * part lives in interactions.js. Points and polygon vertices are plain

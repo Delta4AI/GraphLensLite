@@ -23,10 +23,10 @@ import { StaticUtilities } from '../utilities/static.js';
 const layoutOf = (bs) => bs.cache.data?.layouts?.[bs.cache.data?.selectedLayout];
 
 /**
- * Mirror the live selection onto each group row's primary button. Runs from
+ * Mirror the live selection onto each group row's primary button. Must run from
  * selection.updateSelectedNodesAndEdges — the ONE point where
- * cache.selectedNodes is authoritative. An earlier hook (updateSelectedState)
- * reads a stale selection and the labels desync; that was a real bug once.
+ * cache.selectedNodes is authoritative. Called from an earlier hook
+ * (updateSelectedState) it reads a stale selection and the labels desync.
  */
 export function syncGroupRows(bs) {
   // selection.js always publishes an array (see its updateSelectedNodesAndEdges),
@@ -281,7 +281,7 @@ function buildChevron(bs, group, name, expanded) {
   return chevron;
 }
 
-/** The thing the old UI never admitted: a group can be fed by a live filter AND
+/** A group can be fed by a live filter AND
  * by a hand-picked node set at the same time. */
 function buildSourceLine(filters, manualCount) {
   const source = document.createElement('div');

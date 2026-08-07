@@ -1,6 +1,5 @@
 /**
- * Browser-only minimap for the sigma renderer (MIGRATION.md Phase 4,
- * replaces the G6 minimap plugin). Deliberately minimal: visible nodes as
+ * Browser-only minimap for the sigma renderer. Deliberately minimal: visible nodes as
  * dots over a graph-space bounding-box fit, the current viewport as a
  * rectangle, click/drag pans the camera. No edges, no labels.
  *

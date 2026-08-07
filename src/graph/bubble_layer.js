@@ -1,5 +1,5 @@
 /**
- * Browser-only bubble-set rendering layer (MIGRATION.md Phase 4).
+ * Browser-only bubble-set rendering layer.
  *
  * Two 2d canvases registered with sigma: the fill/outline canvas sits ABOVE
  * the node layer (createCanvasContext + afterLayer: "nodes") so the group
@@ -20,8 +20,6 @@
  *     a filter event can never leave a stale outline painted)
  *   - camera pan/zoom → cheap per-frame reprojection of the cached graph
  *     points; the camera is NOT in the identity key, so zoom never re-fits
- * This replaces the G6 plugin's recompute-per-draw churn (the patched
- * updateBubbleSetsPath path coalescing, issue #7195) with an owned cache.
  */
 import { DEFAULTS } from '../config.js';
 import {

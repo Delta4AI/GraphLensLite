@@ -1,5 +1,5 @@
 /**
- * Browser-only Sigma.js adapter (MIGRATION.md Phase 1).
+ * Browser-only Sigma.js adapter.
  *
  * The ONLY module in src/ that imports the sigma bundle (it references WebGL
  * globals at module scope and crashes under node). Wraps the Sigma instance,
@@ -51,7 +51,7 @@ import { Minimap } from './minimap.js';
 import { watchDevicePixelRatio } from './dpr_watch.js';
 
 // Rasterization resolution for the SVG shape textures. 512 px keeps shapes
-// crisp at the ~4x zoom the UI allows (risk #1 in MIGRATION.md).
+// crisp at the ~4x zoom the UI allows.
 const SHAPE_TEXTURE_RESOLUTION = 512;
 // @sigma/node-image defaults to 500 ms before regenerating the texture atlas
 // after a miss; style changes left nodes invisible (transparent base color)

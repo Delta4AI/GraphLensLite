@@ -1,5 +1,5 @@
 /**
- * Node-safe layout execution (MIGRATION.md Phase 5).
+ * Node-safe layout execution.
  *
  * Maps the app's layout vocabulary (config LAYOUT_INTERNALS: force, circular,
  * circlepack, radial, concentric, grid, random, mds, dagre) onto graphology

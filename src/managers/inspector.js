@@ -1,21 +1,14 @@
 /**
- * The inspector (Concept C, phase 4): the single context-driven column that
- * replaced the left filter sidebar, the right styling sidebar and the floating
- * selection HUD. Three contexts — Filters, Overlays (groups, density heatmap,
- * minimap) and Selection (act, arrange, appearance) — share one 356 px column
- * that is always present and never displaced.
+ * The inspector: the single context-driven 356 px column on the right, always
+ * present and never displaced. Three contexts — Filters, Overlays (groups,
+ * density heatmap, notes, minimap) and Selection (act, arrange, appearance) —
+ * share it, and each pill names exactly one job.
  *
- * Overlays used to sit below the filters inside a single "Workspace" panel,
- * where they were unreachable: the filter list is unbounded (855 px on a
- * 15-property template, more on a real one) and both overlay cards ship
- * collapsed at ~33 px, so they never appeared without scrolling past every
- * property. Splitting them out is what makes each pill name exactly one job.
- *
- * NOTHING switches context on its own. A panel that swaps itself out from
- * under the click that caused it costs the user the row they were working in
- * — the characteristic failure of context-driven inspectors (spec §9), and
- * just as true entering a context as leaving one. Changes elsewhere announce
- * themselves by flashing their pill; the move stays the user's.
+ * NOTHING switches context on its own. A panel that swaps itself out from under
+ * the click that caused it costs the user the row they were working in — the
+ * characteristic failure of context-driven inspectors, and just as true entering
+ * a context as leaving one. Changes elsewhere announce themselves by flashing
+ * their pill; the move stays the user's.
  */
 
 const CONTEXTS = ['filters', 'overlays', 'selection'];

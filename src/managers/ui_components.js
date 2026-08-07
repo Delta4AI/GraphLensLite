@@ -250,8 +250,8 @@ class DropdownChecklist {
 }
 
 /**
- * Three-state Any / True / False segment for boolean-classified properties
- * (§6.1). State lives in the layout filter's `categories` Set (mutated in
+ * Three-state Any / True / False segment for boolean-classified properties.
+ * State lives in the layout filter's `categories` Set (mutated in
  * place, like DropdownChecklist): Any = {'true','false'}, True = {'true'},
  * False = {'false'} — so query generation, narrowing checks, and JSON
  * persistence reuse the categorical machinery unchanged.

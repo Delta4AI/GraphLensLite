@@ -1,15 +1,13 @@
 /**
- * The workbench (Concept C, phase 5): the single bottom surface that replaced
- * the bottom bar's Query-or-Data exclusive slot and the docked assistant
- * sidebar. Four tabs — Data, Query, Metrics, Assistant — share one overlay
- * that rises from the bottom of the *stage*, so it occludes the canvas and
- * never the inspector. Switching tabs is non-destructive: no tab can close
- * another, and every tab remembers its own height.
+ * The workbench: the bottom surface over the stage. Four tabs — Data, Query,
+ * Metrics, Assistant — share one overlay that rises from the bottom of the
+ * *stage*, so it occludes the canvas and never the inspector. Switching tabs is
+ * non-destructive: no tab can close another, and every tab remembers its own
+ * height.
  */
 
-// Per-tab remembered height, keyed by tab name. Ergonomics, not workspace
-// content, so it lives in localStorage rather than the workspace JSON
-// (Concept C decision 5).
+// Per-tab remembered height, keyed by tab name. Ergonomics rather than workspace
+// content, so it lives in localStorage and not in the workspace JSON.
 const HEIGHT_KEY = 'gll.workbench.heights';
 const MIN_HEIGHT_PX = 120;
 const KEYBOARD_RESIZE_STEP_PX = 24;

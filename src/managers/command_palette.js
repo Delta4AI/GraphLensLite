@@ -1,13 +1,12 @@
 /**
- * The command palette (Concept C, phase 7): ⌘K over every control in the app.
+ * The command palette: ⌘K / Ctrl+K over every control in the app.
  *
  * **The index is derived from the live DOM on every open, never hand-written.**
- * The spec imagined a static registry of ~120 command descriptors; §9 calls
- * that "a permanent maintenance obligation" and asks for one source of truth so
- * coverage stays checkable. The DOM already is that source — rail buttons, rail
+ * A static registry of ~120 command descriptors would be a permanent
+ * maintenance obligation; the DOM already is the one source — rail buttons, rail
  * menu rows, inspector cards, workbench toolbars and filter rows each carry
- * their own label, tooltip and accelerator — so a control added by a later
- * phase is searchable the day it lands, with no registry entry to forget.
+ * their own label, tooltip and accelerator — so a control added later is
+ * searchable the day it lands, with no registry entry to forget.
  *
  * Three verbs:
  * - `run` clicks the real control, so the real handler fires with whatever

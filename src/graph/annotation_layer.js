@@ -470,9 +470,9 @@ class AnnotationLayer {
     const onKey = (event) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
-        // Escape used to blur straight into the commit path, so it SAVED — and
-        // on a freshly placed note it saved the untouched "Text" default, which
-        // is exactly what the placement toast promised Escape would not do.
+        // Flagged before the blur, because blurring runs the COMMIT path: the
+        // flag is what turns that into a discard, so Escape on a freshly placed
+        // note cannot save the untouched "Text" default.
         this.editingCancelled = true;
         el.blur();
       }

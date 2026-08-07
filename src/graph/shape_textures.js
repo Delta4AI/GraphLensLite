@@ -1,6 +1,5 @@
 /**
  * Node-safe SVG texture generation for non-circular node shapes
- * (MIGRATION.md Phase 2, risk #1).
  *
  * Sigma renders circles natively; every other G6 shape (and any shape that
  * needs a border or a state halo) is drawn from a crisp vector texture via

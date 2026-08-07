@@ -1,10 +1,8 @@
 /**
- * The rail (Concept C, phase 3): the single permanent 52 px control strip that
- * replaced the sidebar header, the app toolbar, the workspace bar and the
- * selection HUD's counts row. This module owns the rail's four dropdown menus
- * (◆ app, workspace chip, ↻ layout, ⤓ export) and the chip label sync; the
- * rail's plain buttons keep the same inline onclick wiring as the rest of the
- * app.
+ * The rail: the permanent 52 px control strip along the top of the app. This
+ * module owns its five dropdown menus (◆ app, workspace chip, ↻ layout, ◈
+ * select, ⤓ export) and the chip label sync; the rail's plain buttons keep the
+ * same inline onclick wiring as the rest of the app.
  */
 import { clampPopoverLeft, clampPopoverTop } from '../utilities/popover_position.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
