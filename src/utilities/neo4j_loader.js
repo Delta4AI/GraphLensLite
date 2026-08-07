@@ -16,6 +16,7 @@
  */
 
 import { Popup } from './popup.js';
+import { openFetchPopup } from './fetch_popup.js';
 import { buildChecklistSection, openChecklistPopup } from './checklist_popup.js';
 import { StaticUtilities } from './static.js';
 import { applyGraph } from '../managers/api_client.js';
@@ -865,78 +866,41 @@ function openNeo4jPopup(cache) {
   // would be describing a graph that does not exist.
   if (cache.initialized) form.querySelector('#neo4j-replace-note').hidden = false;
 
-  return new Promise((resolve) => {
-    // Popup.close() always fires onClose, so guard against double-settling
-    // and against the deliberate close after a successful fetch.
-    let settled = false;
-    let dataFetched = false;
-    // Live only while a fetch is in flight. Cancel and × both abort it: the
-    // query has a five-minute timeout, and a flow left running after dismissal
-    // used to surface later as a surprise property checklist.
-    let controller = null;
-    const settle = (value) => {
-      if (!settled) {
-        settled = true;
-        resolve(value);
+  const readConfig = () => ({
+    url: form.querySelector('#neo4j-url').value.trim(),
+    username: form.querySelector('#neo4j-username').value.trim(),
+    password: form.querySelector('#neo4j-password').value,
+    database: form.querySelector('#neo4j-database').value.trim() || DEFAULT_DATABASE,
+    query: form.querySelector('#neo4j-query').value.trim(),
+  });
+
+  // Enter submits from the single-line fields. Not from the query box: a Cypher
+  // query is multi-line and Enter belongs to the textarea. Routed through the
+  // button so it takes the same disabled check and the same handler.
+  for (const id of ['#neo4j-url', '#neo4j-username', '#neo4j-password', '#neo4j-database']) {
+    form.querySelector(id)?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !loadBtn.disabled) {
+        e.preventDefault();
+        loadBtn.click();
       }
-    };
-    const dismiss = () => {
-      controller?.abort();
-      popup.close();
-      settle(false);
-    };
-
-    const popup = new Popup(form, {
-      title: 'Load from Neo4j',
-      width: '480px',
-      showFullscreenButton: false,
-      closeOnClickOutside: false,
-      onClose: () => {
-        if (!dataFetched) {
-          controller?.abort();
-          settle(false);
-        }
-      },
     });
+  }
 
-    // The flow drops the spinner between the count and its gates (size confirm,
-    // property checklist), and those are separate modals with no focus trap —
-    // so the submit behind them has to stay dead for the WHOLE flow, not just
-    // while a label is showing. Otherwise a second concurrent fetch is one
-    // click away.
-    let submitLocked = false;
-    const setBusy = (message) => {
-      loadBtn.disabled = submitLocked || !!message;
-      loadBtn.innerHTML = message
-        ? `<span class="neo4j-btn-spinner"></span>${message}`
-        : 'Fetch';
-    };
-    const showError = (message) => {
-      // Failures after onFetched closed the popup would write into detached
-      // DOM — and those are the worst ones, because applyGraph has already
-      // destroyed the old graph. Route them to the toast layer instead.
-      if (!errorBox.isConnected) {
-        cache.ui.error(message);
-        return;
-      }
-      errorBox.textContent = message;
-      errorBox.hidden = false;
-    };
-
-    const readConfig = () => ({
-      url: form.querySelector('#neo4j-url').value.trim(),
-      username: form.querySelector('#neo4j-username').value.trim(),
-      password: form.querySelector('#neo4j-password').value,
-      database: form.querySelector('#neo4j-database').value.trim() || DEFAULT_DATABASE,
-      query: form.querySelector('#neo4j-query').value.trim(),
-    });
-
-    const handleLoad = async () => {
-      errorBox.hidden = true;
+  return openFetchPopup({
+    cache,
+    form,
+    title: 'Load from Neo4j',
+    submitBtn: loadBtn,
+    cancelBtn,
+    errorBox,
+    idleLabel: 'Fetch',
+    focusEl: form.querySelector('#neo4j-url'),
+    formatError: (err) => `Neo4j: ${connectionHint(err)}`,
+    onFetch: async ({ signal, setBusy, showError, close }) => {
       const config = readConfig();
       if (!config.url || !config.query) {
         showError('Server URL and Cypher query are required.');
-        return;
+        return false;
       }
       // "localhost:7474" parses cleanly — as scheme "localhost:" — so URL alone
       // waves through the most common mistake, which then resurfaces minutes
@@ -946,55 +910,34 @@ function openNeo4jPopup(cache) {
         parsed = new URL(config.url);
       } catch {
         showError(`Invalid server URL: ${config.url}`);
-        return;
+        return false;
       }
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
         showError('The server URL must start with http:// or https:// (e.g. http://localhost:7474).');
-        return;
+        return false;
       }
       // Credentials travel as base64 Basic auth, which is encoding, not
-      // encryption: over plain http: to anything but the local machine they
-      // are readable by everything on the path. A line of disclaimer text in
-      // the form is not consent.
-      if (needsPlaintextConfirm(parsed) && (await Popup.confirm(plaintextWarning(parsed), 'Connect anyway')) !== true) {
-        return;
+      // encryption: over plain http: to anything but the local machine they are
+      // readable by everything on the path. A line of disclaimer text in the
+      // form is not consent.
+      if (
+        needsPlaintextConfirm(parsed) &&
+        (await Popup.confirm(plaintextWarning(parsed), 'Connect anyway')) !== true
+      ) {
+        return false;
       }
 
       saveSettings(config);
-      submitLocked = true;
-      controller = new AbortController();
-      const rendered = await executeNeo4jImport(cache, config, {
-        signal: controller.signal,
+      return executeNeo4jImport(cache, config, {
+        signal,
         progress: (message) => setBusy(message),
         onError: showError,
         // Close the connection popup once data has arrived — the property
-        // checklist takes over from here. Failures before this point keep
-        // the popup open with an inline error so inputs are preserved.
-        onFetched: () => {
-          dataFetched = true;
-          popup.close();
-        },
+        // checklist takes over from here. Failures before this point keep the
+        // popup open with an inline error so the inputs are preserved.
+        onFetched: close,
       });
-
-      controller = null;
-      submitLocked = false;
-      if (dataFetched) settle(rendered);
-      else if (!settled) setBusy(null);
-    };
-
-    loadBtn.addEventListener('click', handleLoad);
-    // Enter submits from the single-line fields. Not from the query box: a
-    // Cypher query is multi-line and Enter belongs to the textarea.
-    for (const id of ['#neo4j-url', '#neo4j-username', '#neo4j-password', '#neo4j-database']) {
-      form.querySelector(id)?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !loadBtn.disabled) {
-          e.preventDefault();
-          handleLoad();
-        }
-      });
-    }
-    cancelBtn.addEventListener('click', dismiss);
-    setTimeout(() => form.querySelector('#neo4j-url').focus(), 100);
+    },
   });
 }
 

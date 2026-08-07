@@ -22,6 +22,7 @@
  */
 
 import { Popup } from './popup.js';
+import { openFetchPopup } from './fetch_popup.js';
 import { buildChecklistSection, openChecklistPopup } from './checklist_popup.js';
 import { applyGraph } from '../managers/api_client.js';
 import { settlePinnedForce } from '../graph/layout_algorithms.js';
@@ -640,116 +641,54 @@ function openNeo4jJoinPopup(cache, deps = {}) {
   const queryBox = form.querySelector('#neo4j-join-query');
   const stitchBox = form.querySelector('#neo4j-join-stitch');
 
-  return new Promise((resolve) => {
-    let settled = false;
-    let dataFetched = false;
-    // Cancel and × abort the in-flight query instead of leaving it to run out
-    // its timeout (see openNeo4jPopup).
-    let controller = null;
-    const settle = (value) => {
-      if (!settled) {
-        settled = true;
-        resolve(value);
-      }
-    };
-    const dismiss = () => {
-      controller?.abort();
-      popup.close();
-      settle(false);
-    };
-
-    const popup = new Popup(form, {
-      title: 'Add Neo4j Query',
-      width: '480px',
-      showFullscreenButton: false,
-      closeOnClickOutside: false,
-      onClose: () => {
-        if (!dataFetched) {
-          controller?.abort();
-          settle(false);
-        }
-      },
-    });
-
-    // Held across the size confirm and the property checklist too — see the
-    // same lock in openNeo4jPopup.
-    let submitLocked = false;
-    const setBusy = (message) => {
-      fetchBtn.disabled = submitLocked || !!message;
-      fetchBtn.innerHTML = message
-        ? `<span class="neo4j-btn-spinner"></span>${message}`
-        : 'Fetch &amp; merge';
-    };
-    const showError = (message) => {
-      // Same detached-box problem as openNeo4jPopup: once popup.close() has
-      // run, the merge is past the point of no return and the inline box is
-      // gone, so the message has to reach the toast layer.
-      if (!errorBox.isConnected) {
-        cache.ui.error(message);
-        return;
-      }
-      errorBox.textContent = message;
-      errorBox.hidden = false;
-    };
-
-    const handleFetch = async () => {
-      errorBox.hidden = true;
+  return openFetchPopup({
+    cache,
+    form,
+    title: 'Add Neo4j Query',
+    submitBtn: fetchBtn,
+    cancelBtn,
+    errorBox,
+    idleLabel: 'Fetch &amp; merge',
+    focusEl: queryBox,
+    formatError: (err) => `Neo4j: ${connectionHint(err)}`,
+    onFetch: async ({ signal, setBusy, showError, isSettled, close }) => {
       const query = queryBox.value.trim();
       if (!query) {
         showError('A Cypher query is required.');
-        return;
+        return false;
       }
       const confirm = deps.confirm ?? Popup.confirm;
-      controller = new AbortController();
-      const opts = { signal: controller.signal };
+      const opts = { signal };
       if (deps.fetchImpl) opts.fetchImpl = deps.fetchImpl;
 
-      submitLocked = true;
-      try {
-        const graph = await fetchGraphWithPreflight({
-          config: session.config,
-          query,
-          opts,
-          confirm,
-          // The labels go inside the Fetch button, so they stay short.
-          countingLabel: 'Counting …',
-          fetchingLabel: 'Fetching …',
-          busy: (message) => setBusy(message),
-          onError: showError,
-          // The × stays live while the query runs, and onClose settles the
-          // promise — so a dismissal mid-flight means the user is done. Merging
-          // anyway would replace their graph (and reset filters and undo) after
-          // the popup they cancelled had already gone.
-          shouldContinue: () => !settled,
-        });
-        if (!graph) return;
-        const { nodes, relationships } = graph;
+      const graph = await fetchGraphWithPreflight({
+        config: session.config,
+        query,
+        opts,
+        confirm,
+        // The labels go inside the Fetch button, so they stay short.
+        countingLabel: 'Counting …',
+        fetchingLabel: 'Fetching …',
+        busy: (message) => setBusy(message),
+        onError: showError,
+        // The × stays live while the query runs, and dismissing settles the
+        // dialog — so a dismissal mid-flight means the user is done. Merging
+        // anyway would replace their graph (and reset filters and undo) after
+        // the popup they cancelled had already gone.
+        shouldContinue: () => !isSettled(),
+      });
+      if (!graph) return false;
+      const { nodes, relationships } = graph;
 
-        if (stitchBox.checked) {
-          setBusy('Stitching …');
-          await stitchOrWarn(cache, session, nodes, relationships, opts);
-        }
-
-        if (settled) return;
-        dataFetched = true;
-        popup.close();
-        settle(await mergeAndApply(cache, nodes, relationships, deps));
-      } catch (err) {
-        if (err?.name === 'AbortError') return; // the user closed the dialog
-        console.error('[neo4j] join failed', err);
-        showError(`Neo4j: ${connectionHint(err)}`);
-        // The popup is already closed, so nothing will ever settle this
-        // promise — its caller would wait for a retry that cannot happen.
-        if (dataFetched) settle(false);
-      } finally {
-        submitLocked = false;
-        if (!dataFetched) setBusy(null);
+      if (stitchBox.checked) {
+        setBusy('Stitching …');
+        await stitchOrWarn(cache, session, nodes, relationships, opts);
       }
-    };
 
-    fetchBtn.addEventListener('click', handleFetch);
-    cancelBtn.addEventListener('click', dismiss);
-    setTimeout(() => queryBox.focus(), 100);
+      if (isSettled()) return false;
+      close();
+      return mergeAndApply(cache, nodes, relationships, deps);
+    },
   });
 }
 

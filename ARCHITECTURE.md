@@ -122,8 +122,11 @@ Business logic and UI:
 ### Utilities (`src/utilities/`)
 
 - `static.js` — validation, colour math, deep-merge helpers
-- `popup.js` / `popover_position.js` / `checklist_popup.js` — modal, popover
-  positioning (anchor clamping plus the dropdown flip-up maths), checklist dialogs
+- `popup.js` / `popover_position.js` / `checklist_popup.js` / `fetch_popup.js` —
+  modal, popover positioning (anchor clamping plus the dropdown flip-up maths),
+  checklist dialogs, and the shared lifecycle of a "fetch into the graph" dialog
+  (abort on dismiss, spinner, inline-or-toast errors, submit locked across the
+  gates) that both Neo4j popups run on
 - `ui_tooltip.js` — the delegated tooltip layer: strips native `title`s and
   renders them itself, and owns `splitShortcut`, the one parser for the trailing
   "(F)" accelerator the command palette also reads
