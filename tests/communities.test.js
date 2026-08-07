@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { detectCommunities } from '../src/graph/communities.js'
+import {
+  clampCommunityGroups,
+  MIN_COMMUNITY_GROUPS,
+  MAX_COMMUNITY_GROUPS,
+  DEFAULT_COMMUNITY_GROUPS,
+} from '../src/graph/bubble_sets.js'
 
 // ==========================================================================
 // Louvain community detection (pure, node-safe part of "Detect communities").
@@ -231,3 +237,24 @@ describe('detectCommunities — seeded determinism', () => {
     }
   })
 })
+
+describe('clampCommunityGroups', () => {
+  // The "Groups" box takes free text; NaN communities is not a request the
+  // detector can honour, and neither is 0 or 500.
+  it('rounds into [MIN, MAX]', () => {
+    expect(clampCommunityGroups(MIN_COMMUNITY_GROUPS - 1)).toBe(MIN_COMMUNITY_GROUPS);
+    expect(clampCommunityGroups(MAX_COMMUNITY_GROUPS + 1)).toBe(MAX_COMMUNITY_GROUPS);
+    expect(clampCommunityGroups(7.6)).toBe(8);
+  });
+
+  it('falls back to the default for a blank or unreadable entry', () => {
+    // Number('') is 0, so "no answer" must not read as a request for MIN.
+    for (const bad of ['', '  ', '0', 'abc', undefined, NaN, Infinity]) {
+      expect(clampCommunityGroups(bad), String(bad)).toBe(DEFAULT_COMMUNITY_GROUPS);
+    }
+  });
+
+  it('still clamps a negative entry up to MIN', () => {
+    expect(clampCommunityGroups(-5)).toBe(MIN_COMMUNITY_GROUPS);
+  });
+});

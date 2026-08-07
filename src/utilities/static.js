@@ -41,6 +41,33 @@ class StaticUtilities {
       .replace(/'/g, '&#39;');
   }
 
+  /**
+   * Bound a value to [min, max]. Hand-inlined as Math.max(min, Math.min(...))
+   * in roughly nineteen files; this is the established home for it.
+   *
+   * @param {number} value
+   * @param {number} min
+   * @param {number} max
+   * @returns {number}
+   */
+  static clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  /**
+   * Shorten to `max` characters, marking the cut with an ellipsis. The
+   * ellipsis counts toward the budget, so the result is never longer than
+   * asked for — the off-by-one the two hand-rolled copies disagreed about.
+   *
+   * @param {*} value
+   * @param {number} max
+   * @returns {string}
+   */
+  static truncate(value, max) {
+    const text = String(value ?? '');
+    return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1))}…`;
+  }
+
   static isNumber(value) {
     const parsed = parseFloat(value);
     return !isNaN(parsed) && isFinite(parsed);

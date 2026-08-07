@@ -477,3 +477,37 @@ describe('StaticUtilities.escapeHtml', () => {
     expect(StaticUtilities.escapeHtml(undefined)).toBe('')
   })
 })
+
+describe('StaticUtilities.clamp', () => {
+  it('bounds a value to [min, max] and passes the in-range case through', () => {
+    expect(StaticUtilities.clamp(5, 0, 10)).toBe(5);
+    expect(StaticUtilities.clamp(-1, 0, 10)).toBe(0);
+    expect(StaticUtilities.clamp(11, 0, 10)).toBe(10);
+  });
+
+  it('honours min over max when the two cross', () => {
+    // Math.min(max, Math.max(min, v)) — the order the ~19 hand-inlined copies
+    // use, so a degenerate range collapses to max, not to an exception.
+    expect(StaticUtilities.clamp(5, 10, 0)).toBe(0);
+  });
+});
+
+describe('StaticUtilities.truncate', () => {
+  it('leaves anything within the budget alone', () => {
+    expect(StaticUtilities.truncate('short', 10)).toBe('short');
+    expect(StaticUtilities.truncate('exactly10!', 10)).toBe('exactly10!');
+  });
+
+  it('never returns more characters than asked for', () => {
+    // The ellipsis counts toward the budget — the off-by-one the two
+    // hand-rolled copies disagreed about.
+    const out = StaticUtilities.truncate('abcdefghijkl', 5);
+    expect(out).toBe('abcd…');
+    expect(out).toHaveLength(5);
+  });
+
+  it('coerces non-strings and treats nullish as empty', () => {
+    expect(StaticUtilities.truncate(null, 5)).toBe('');
+    expect(StaticUtilities.truncate(123456, 4)).toBe('123…');
+  });
+});

@@ -12,6 +12,23 @@ const DEFAULT_COMMUNITY_GROUPS = 4;
 const MIN_COMMUNITY_GROUPS = 2;
 const MAX_COMMUNITY_GROUPS = 50;
 
+/**
+ * The "Groups" count the community detector will honour: rounded into
+ * [MIN, MAX], with a non-numeric entry falling back to the default rather
+ * than to NaN (which would ask for NaN communities).
+ *
+ * @param {*} value
+ * @returns {number}
+ */
+function clampCommunityGroups(value) {
+  const n = Math.round(Number(value));
+  // Blank, non-numeric and zero all mean "no answer" — the box is free text,
+  // and Number('') is 0, which would otherwise read as a request for MIN.
+  if (!Number.isFinite(n) || n === 0) return DEFAULT_COMMUNITY_GROUPS;
+  return Math.min(MAX_COMMUNITY_GROUPS, Math.max(MIN_COMMUNITY_GROUPS, n));
+}
+
+
 class GraphBubbleSetManager {
   constructor(cache) {
     this.cache = cache;
@@ -564,9 +581,8 @@ class GraphBubbleSetManager {
       : (this.communityOptions.weightProperty ?? null);
     const resolution = options.resolution ?? this.communityOptions.resolution ?? 1;
 
-    const wanted = Math.max(
-      MIN_COMMUNITY_GROUPS,
-      Math.round(options.groupCount ?? this.communityOptions.groupCount ?? DEFAULT_COMMUNITY_GROUPS)
+    const wanted = clampCommunityGroups(
+      options.groupCount ?? this.communityOptions.groupCount ?? DEFAULT_COMMUNITY_GROUPS
     );
 
     // Detection needs somewhere to put its results, and groups no longer
@@ -750,20 +766,14 @@ class GraphBubbleSetManager {
     countRow.textContent = "Groups";
     const countInput = document.createElement("input");
     countInput.type = "number";
-    countInput.min = "2";
-    countInput.max = "50";
+    countInput.min = String(MIN_COMMUNITY_GROUPS);
+    countInput.max = String(MAX_COMMUNITY_GROUPS);
     countInput.step = "1";
     countInput.className = "community-popover-count";
     countInput.value = String(this.communityOptions.groupCount ?? DEFAULT_COMMUNITY_GROUPS);
     countInput.title = "How many of the largest communities to turn into groups";
     countInput.addEventListener("change", () => {
-      const n = Math.min(
-        MAX_COMMUNITY_GROUPS,
-        Math.max(
-          MIN_COMMUNITY_GROUPS,
-          Math.round(Number(countInput.value) || DEFAULT_COMMUNITY_GROUPS)
-        )
-      );
+      const n = clampCommunityGroups(countInput.value);
       this.communityOptions.groupCount = n;
       countInput.value = String(n);
     });
@@ -878,4 +888,10 @@ const debounce = (func, wait) => {
   };
 };
 
-export { GraphBubbleSetManager };
+export {
+  GraphBubbleSetManager,
+  clampCommunityGroups,
+  MIN_COMMUNITY_GROUPS,
+  MAX_COMMUNITY_GROUPS,
+  DEFAULT_COMMUNITY_GROUPS,
+};

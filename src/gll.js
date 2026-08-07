@@ -520,7 +520,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let shadowBar = null;
 
   const clampInspectorWidth = (w) =>
-    Math.max(INSPECTOR_MIN_WIDTH, Math.min(INSPECTOR_MAX_WIDTH, w));
+    StaticUtilities.clamp(w, INSPECTOR_MIN_WIDTH, INSPECTOR_MAX_WIDTH);
 
   resizeHandle?.addEventListener('mousedown', (e) => {
     isResizing = true;
