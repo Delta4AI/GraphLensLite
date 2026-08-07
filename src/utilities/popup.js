@@ -555,13 +555,17 @@ static async prompt(message) {
     }
 
     // Escape is the only dismissal a keyboard user can reach without hunting
-    // for the × in the tab order. Topmost popup only, so a nested confirm does
-    // not take its parent down with it.
+    // for the × in the tab order; Tab is what aria-modal="true" promises and
+    // a plain div cannot deliver. Topmost popup only, so a nested confirm does
+    // not take its parent down with it — or steal its parent's Tab.
     this._escapeHandler = (e) => {
-      if (e.key !== 'Escape') return;
       if (openPopups[openPopups.length - 1] !== this) return;
-      e.stopPropagation();
-      this.close();
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        this.close();
+        return;
+      }
+      if (e.key === 'Tab') trapTab(e, this.popup);
     };
     document.addEventListener('keydown', this._escapeHandler, true);
   }
@@ -590,6 +594,39 @@ static async prompt(message) {
     // Only if it is still in the document — the popup may have replaced the very
     // control that opened it.
     if (this._invoker?.isConnected) this._invoker.focus?.();
+  }
+}
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
+  'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Keep Tab inside the dialog. `aria-modal="true"` tells assistive tech focus
+ * is trapped; nothing traps it, so Tab walked straight out into the page
+ * behind — which is still there, still clickable, and reads as if the dialog
+ * had closed.
+ */
+function trapTab(event, dialog) {
+  // `hidden` is how this codebase hides dialog sections (the Neo4j error box,
+  // the checklist's empty groups). Elements hidden by display:none instead are
+  // not focusable anyway, so focus simply stays where it is.
+  const items = [...dialog.querySelectorAll(FOCUSABLE)].filter((el) => !el.closest('[hidden]'));
+  if (items.length === 0) {
+    // Nothing to tab to: hold focus on the dialog rather than let it escape.
+    event.preventDefault();
+    dialog.focus();
+    return;
+  }
+  const first = items[0];
+  const last = items[items.length - 1];
+  const active = document.activeElement;
+  if (event.shiftKey && (active === first || !dialog.contains(active))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+    event.preventDefault();
+    first.focus();
   }
 }
 

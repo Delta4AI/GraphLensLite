@@ -13,6 +13,8 @@ import { Popup } from '../src/utilities/popup.js';
 const dialogs = () => [...document.querySelectorAll('.p-custom')];
 const escape = () =>
   document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+const tab = (init = {}) =>
+  document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, ...init }));
 
 beforeEach(() => {
   document.body.innerHTML = '';
@@ -83,6 +85,38 @@ describe('Popup dialog semantics', () => {
     escape();
     expect(outerClosed).toHaveBeenCalledOnce();
     expect(dialogs()).toHaveLength(0);
+  });
+
+  it('keeps Tab inside the dialog, in both directions', () => {
+    // aria-modal="true" promises focus is trapped; a plain div traps nothing,
+    // so Tab walked into the page behind — still there, still clickable.
+    const content = document.createElement('div');
+    content.innerHTML = '<button id="a">A</button><button id="b">B</button>';
+    const popup = new Popup(content, { title: 'Settings', showFullscreenButton: false });
+    const [first, ...rest] = [...popup.popup.querySelectorAll('button')];
+    const last = rest.at(-1);
+
+    last.focus();
+    tab();
+    expect(document.activeElement).toBe(first);
+
+    tab({ shiftKey: true });
+    expect(document.activeElement).toBe(last);
+
+    popup.close();
+  });
+
+  it('leaves Tab to the topmost dialog only', () => {
+    const outer = new Popup('<p>outer</p>', { title: 'Outer' });
+    const inner = new Popup('<p>inner</p>', { title: 'Inner' });
+
+    outer.popup.querySelector('button').focus();
+    tab();
+
+    // The inner dialog owns Tab, so focus lands in it and not on outer's next.
+    expect(inner.popup.contains(document.activeElement)).toBe(true);
+    inner.close();
+    outer.close();
   });
 
   it('stops listening for Escape once closed', () => {
