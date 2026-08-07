@@ -366,6 +366,14 @@ class PieChartPicker {
 
     const canApply = selectedProps.length > 0 && sources.length > 0;
     this.dom.applyButton.classList.toggle("disabled", !canApply);
+    this.dom.applyButton.setAttribute("aria-disabled", String(!canApply));
+    // `.disabled[title]` keeps pointer events so the delegated tooltip can be
+    // read: without a title the greyed Apply was a dead button with no reason.
+    this.dom.applyButton.title = canApply
+      ? "Apply the pie chart styling to the selected nodes"
+      : selectedProps.length === 0
+        ? "Pick at least one property to chart"
+        : "The selected properties carry no values to chart";
   }
 
   /**

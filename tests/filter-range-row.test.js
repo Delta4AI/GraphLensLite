@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fs from 'node:fs';
 import { InvertibleRangeSlider } from '../src/managers/ui_components.js';
 import { CFG, DEFAULTS } from '../src/config.js';
@@ -33,7 +33,7 @@ function createMockCache(filterDefaults, { locked = false } = {}) {
       layouts: [{ filters }],
     },
     propIDToInvertibleRangeSliders: new Map(),
-    ui: { error: () => {}, warning: () => {} },
+    ui: { error: vi.fn(), warning: vi.fn() },
   };
 }
 
@@ -186,6 +186,30 @@ describe('numeric filter row', () => {
     expect(low.value).toBe(String(slider.formatThreshold(before)));
     expect(low.value).not.toBe('NaN');
     expect(slider.currentMin).toBe(before);
+  });
+
+  it('says the typed text was not a number instead of reverting in silence', () => {
+    const { parent, slider } = mount();
+    const [low] = boxes(parent);
+
+    low.dispatchEvent(new Event('focus'));
+    low.value = 'oops';
+    low.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(slider.cache.ui.warning).toHaveBeenCalledWith(
+      expect.stringContaining('"oops" is not a number')
+    );
+  });
+
+  it('stays quiet when the box was merely left empty', () => {
+    const { parent, slider } = mount();
+    const [low] = boxes(parent);
+
+    low.dispatchEvent(new Event('focus'));
+    low.value = '';
+    low.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(slider.cache.ui.warning).not.toHaveBeenCalled();
   });
 
   it('applies nothing on blur while a manual query holds the filters', () => {

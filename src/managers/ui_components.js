@@ -478,9 +478,15 @@ class InvertibleRangeSlider {
     const applyTyped = () => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
       const typed = parseFloat(input.value);
-      // Non-numeric text has no value to apply — the caller restores the
-      // real one rather than rendering "NaN".
-      if (isNaN(typed)) return;
+      // Non-numeric text has no value to apply — the caller restores the real
+      // one rather than rendering "NaN". Silently, until now: the invalid text
+      // stayed on screen, the filter never moved, and only a blur put it back.
+      if (isNaN(typed)) {
+        if (input.value.trim() !== '') {
+          this.cache.ui.warning(`"${input.value.trim()}" is not a number — threshold unchanged.`);
+        }
+        return;
+      }
       // Equal once rounded means nothing changed at display precision. Skipping
       // keeps a plain focus-and-leave (and a blur right after Enter) from
       // re-firing the filter or rounding the exact value down behind the user.
@@ -840,7 +846,9 @@ class UIComponentManager {
         props.has(propID) ? props.delete(propID) : props.add(propID);
         this.refreshGroupChips();
         await this.cache.gcm.decideToRenderOrDraw();
-        this.cache.bs.afterMembershipChange(`Bubble group membership (${group})`);
+        // Awaited: unawaited, a rejection here was an unhandled promise with no
+        // error toast, and rapid toggles interleaved redraw and history.commit.
+        await this.cache.bs.afterMembershipChange(`Bubble group membership (${group})`);
       },
       onNew: async () => {
         const label = this.#groupNameForProp(propID);
@@ -849,7 +857,7 @@ class UIComponentManager {
         this.cache.bs.tuneGroupGeometry?.(group);
         this.refreshGroupChips();
         await this.cache.gcm.decideToRenderOrDraw();
-        this.cache.bs.afterMembershipChange(`New bubble group (${label})`);
+        await this.cache.bs.afterMembershipChange(`New bubble group (${label})`);
         const count = this.cache.bs.getEffectiveGroupMembers(group).size;
         this.cache.ui.info(
           `Created group "${label}" (${count} node${count === 1 ? '' : 's'}) — ` +

@@ -991,17 +991,30 @@ class GraphBubbleSetManager {
   }
 
   async clearAllManualGroups() {
+    // "Cleared all bubble groups" with nothing in any of them described work
+    // that never happened. Counted first, so the message can be true — and
+    // counted over what this button CLEARS (manual members and prop
+    // assignments), not over what currently draws: a property assignment whose
+    // nodes are all filtered out is still an assignment to clear.
+    const layout = this.#layout();
+    let emptied = 0;
+    for (const group of this.traverseBubbleSets()) {
+      const manual = layout?.[`${group}ManualMembers`]?.size ?? 0;
+      const props = layout?.[`${group}Props`]?.size ?? 0;
+      if (manual > 0 || props > 0) emptied += 1;
+    }
+    if (emptied === 0) {
+      this.cache.ui.info('No group has any members.');
+      return;
+    }
     // Clear every group's contribution from both sources (manual + props).
     for (let group of this.traverseBubbleSets()) {
-      const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`];
-      if (manualMembers) {
-        manualMembers.clear();
-      }
+      layout?.[`${group}ManualMembers`]?.clear();
       this.clearGroupPropAssignments(group);
     }
 
     await this.afterMembershipChange('Clear all bubble groups');
-    this.cache.ui.info('Cleared all bubble groups');
+    this.cache.ui.info(`Emptied ${emptied} group${emptied === 1 ? '' : 's'}`);
   }
 }
 

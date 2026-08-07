@@ -385,6 +385,12 @@ class NetworkMetrics {
       this.multiselect.selectedOptions,
       opt => opt.value
     );
+    // The two buttons are always live, so with nothing highlighted in the
+    // ranking list the click used to be a silent no-op.
+    if (!ids.length) {
+      this.cache.ui?.info?.('Highlight nodes in the ranking list first.');
+      return;
+    }
     if (ids.length) {
       const nodeData = await this.cache.graph.getNodeData(ids);
       await this.cache.sm.updateSelectedState(nodeData, add);

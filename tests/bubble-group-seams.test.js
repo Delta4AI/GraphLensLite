@@ -286,6 +286,19 @@ describe("clear actions span both membership sources", () => {
     expect(layout.groupOneProps.size).toBe(0);
     expect(layout.groupTwoManualMembers.size).toBe(0);
     expect(cache.uiComponents.refreshGroupChips).toHaveBeenCalledTimes(1);
+    expect(cache.ui.info).toHaveBeenCalledWith('Emptied 2 groups');
+  });
+
+  it("says nothing was there rather than claiming it cleared groups", async () => {
+    // "Cleared all bubble groups" over empty groups described work that never
+    // happened — the button is never disabled.
+    const cache = makeCache(makeLayout());
+    const bs = wireClear(cache);
+
+    await bs.clearAllManualGroups();
+
+    expect(cache.ui.info).toHaveBeenCalledWith('No group has any members.');
+    expect(cache.uiComponents.refreshGroupChips).not.toHaveBeenCalled();
   });
 });
 
