@@ -1,4 +1,5 @@
 import { Popup } from './popup.js';
+import { StaticUtilities } from './static.js';
 
 class ColorScalePicker {
   constructor(cache) {
@@ -246,12 +247,14 @@ class ColorScalePicker {
     }
 
     const elementTypeLabel = this.elementType === 'nodes' ? 'nodes' : 'edges';
-    const propertyDisplayName = metricSource
-      ? `${metricSource.label} (${metricSource.valueLabel})`
-      : property.includes('::')
-        ? property.split('::').pop()
-        : property;
-    const targetProperty = this.currentProperty || 'color';
+    const propertyDisplayName = StaticUtilities.escapeHtml(
+      metricSource
+        ? `${metricSource.label} (${metricSource.valueLabel})`
+        : property.includes('::')
+          ? property.split('::').pop()
+          : property
+    );
+    const targetProperty = StaticUtilities.escapeHtml(this.currentProperty || 'color');
 
     let infoHTML = `<div class="picker-info-summary">
       Coloring <strong>${targetProperty}</strong> for <strong>${elementsWithPropertyCount}</strong> of <strong>${totalElements}</strong> ${elementTypeLabel}`;

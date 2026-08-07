@@ -931,8 +931,10 @@ class UIComponentManager {
   buildToolTipText(nodeOrEdgeID, isEdge) {
     function initAndAddHeader() {
       const hasLabel = item.label && item.label !== item.id;
-      const title = hasLabel ? item.label : item.id;
-      const subtitle = hasLabel ? `<div class="tooltip-header-id">ID: ${item.id}</div>` : '';
+      const title = StaticUtilities.escapeHtml(hasLabel ? item.label : item.id);
+      const subtitle = hasLabel
+        ? `<div class="tooltip-header-id">ID: ${StaticUtilities.escapeHtml(item.id)}</div>`
+        : '';
 
       return `<div class="tooltip-header">
       <div class="tooltip-header-text">
@@ -954,7 +956,7 @@ class UIComponentManager {
 
     function addDescription() {
       if (item.description) {
-        tooltip += `<p class="tooltip-description">${item.description}</p>`;
+        tooltip += `<p class="tooltip-description">${StaticUtilities.escapeHtml(item.description)}</p>`;
       }
     }
 
@@ -1085,11 +1087,13 @@ class UIComponentManager {
               tooltip += `</ul>`;
               startedList = false;
             }
-            tooltip += `<h5 class="tooltip-sub-section">${block.text}</h5><ul>`;
+            tooltip += `<h5 class="tooltip-sub-section">${StaticUtilities.escapeHtml(block.text)}</h5><ul>`;
             startedList = true;
             // Properties for this subSection
             for (const propItem of block.props) {
-              tooltip += `<li>${propItem.key}: <span class="red"><b>${propItem.value}</b></span></li>`;
+              const key = StaticUtilities.escapeHtml(propItem.key);
+              const value = StaticUtilities.escapeHtml(propItem.value);
+              tooltip += `<li>${key}: <span class="red"><b>${value}</b></span></li>`;
             }
           }
         }
