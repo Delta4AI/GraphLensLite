@@ -532,9 +532,17 @@ class UIManager {
 
   /** @param {'groups'|'heatmap'|'notes'|'minimap'} name */
   toggleOverlay(name) {
-    const layer = UIManager.OVERLAYS[name]?.layer(this.cache);
+    const spec = UIManager.OVERLAYS[name];
+    const layer = spec?.layer(this.cache);
     if (!layer) {
       this.error('Load a graph first.');
+      return;
+    }
+    // The switch is class-disabled so its tooltip stays reachable (see
+    // syncOverlays), which means the click still arrives here. Say the hint
+    // rather than toggling a layer that would draw nothing.
+    if (spec.empty?.(this.cache)) {
+      this.info(spec.emptyHint);
       return;
     }
     this.setOverlayVisible(name, !layer.visible);
@@ -563,7 +571,12 @@ class UIManager {
       if (!btn) continue;
       btn.setAttribute('aria-checked', String(!!layer?.visible));
       const blank = !!layer && !!empty?.(this.cache);
-      btn.disabled = !layer || blank;
+      // Class, not the disabled ATTRIBUTE: an attribute-disabled control is out
+      // of the delegated tooltip layer's reach, so emptyHint — the only thing
+      // that explains why the switch is dead — was unreachable. group_list.js
+      // uses the class for exactly this reason; toggleOverlay guards the click.
+      btn.classList.toggle('disabled', !layer || blank);
+      btn.setAttribute('aria-disabled', String(!layer || blank));
       // The enabled title is authored once (markup or makeCollapsible); stash it
       // the first time so the hint can be swapped in and back out.
       // ui_tooltip.js stashes the title in data-tip while hovered; without the
@@ -1022,16 +1035,27 @@ class UIManager {
     const defaults = this.cache.data.filterDefaults;
     let constraining = 0;
     let total = 0;
+    // Per section, because only one section's rows are on screen at a time: an
+    // active filter in the hidden one empties the graph with nothing on screen
+    // saying so.
+    const perSection = new Map();
 
     for (const row of container.querySelectorAll('.filter-row')) {
       const fo = layout.filters.get(row.dataset.propId);
       if (!fo || fo.unusable) continue;
       total += 1;
+      const section = row.closest('.filter-section')?.dataset.section;
+      const tally = perSection.get(section) ?? { constraining: 0, total: 0 };
+      tally.total += 1;
+      perSection.set(section, tally);
       // Under OR every active filter contributes a disjunct; under AND it has
       // to be narrowed as well. Same rule the query derivation applies.
       const counts =
         !!fo.active && (!andMode || isFilterNarrowed(fo, defaults?.get(row.dataset.propId)));
-      if (counts) constraining += 1;
+      if (counts) {
+        constraining += 1;
+        tally.constraining += 1;
+      }
       const inert = andMode && !!fo.active && !counts;
       row.classList.toggle('filter-row-inert', inert);
       // The row is dimmed but its checkbox still offered to "hide elements".
@@ -1046,18 +1070,40 @@ class UIManager {
     }
 
     this.renderFilterConstraintCount(andMode, constraining, total);
+    UIManager.#renderScopeCounts(perSection);
   }
 
   renderFilterConstraintCount(andMode, constraining, total) {
     const el = document.getElementById('filterConstraintCount');
     if (!el) return;
-    // Only shown under AND: under OR the row checkbox already says everything,
-    // because active and constraining are the same thing there.
-    el.hidden = !andMode || !total;
+    // Shown in both join modes. Hiding it under OR left the panel silent about
+    // the one thing that explains an empty graph, and "active" and
+    // "constraining" being the same thing under OR does not make the count
+    // redundant — the active filter may be in the section that is not on screen.
+    el.hidden = !total;
     if (el.hidden) return;
     el.textContent = constraining
       ? `${constraining} of ${total} filters constrain the graph`
       : 'No filter constrains the graph — every filter is still at its loaded range';
+  }
+
+  /**
+   * Badge each scope segment with how many of ITS filters constrain, so the
+   * hidden section can still account for itself.
+   * @param {Map<string, {constraining: number, total: number}>} perSection
+   */
+  static #renderScopeCounts(perSection) {
+    for (const btn of document.querySelectorAll('.filter-scope-segment')) {
+      const { constraining = 0, total = 0 } = perSection.get(btn.dataset.section) ?? {};
+      const count = btn.querySelector('.filter-scope-count');
+      if (!count) continue;
+      count.textContent = constraining ? `${constraining}/${total}` : String(total);
+      count.classList.toggle('filter-scope-count-active', constraining > 0);
+      const name = btn.dataset.section?.toLowerCase() ?? 'filters';
+      btn.title = constraining
+        ? `Show the ${total} ${name} — ${constraining} of them constrain the graph`
+        : `Show the ${total} ${name}`;
+    }
   }
 
   // Builds the segmented OR/AND control that sets how multiple active filters

@@ -27,10 +27,10 @@ function stubLayer(visible = true) {
 
 function overlayDom() {
   document.body.innerHTML = `
-    <button id="overlaySwitchGroups" role="switch" aria-checked="false" disabled title="Show or hide groups"></button>
-    <button id="overlaySwitchHeatmap" role="switch" aria-checked="false" disabled></button>
-    <button id="overlaySwitchNotes" role="switch" aria-checked="false" disabled title="Show or hide every text note"></button>
-    <button id="overlaySwitchMinimap" role="switch" aria-checked="false" disabled></button>
+    <button id="overlaySwitchGroups" role="switch" aria-checked="false" class="disabled" title="Show or hide groups"></button>
+    <button id="overlaySwitchHeatmap" role="switch" aria-checked="false" class="disabled"></button>
+    <button id="overlaySwitchNotes" role="switch" aria-checked="false" class="disabled" title="Show or hide every text note"></button>
+    <button id="overlaySwitchMinimap" role="switch" aria-checked="false" class="disabled"></button>
     <span id="overlayCountGroups"></span>
   `;
 }
@@ -60,6 +60,10 @@ function makeUI({ groups = true, heatmap = false, notes = true, minimap = true, 
 }
 
 const sw = (name) => document.getElementById(`overlaySwitch${name}`);
+// Dead is a CLASS, not the disabled attribute: an attribute-disabled control is
+// out of the delegated tooltip layer's reach, and the tooltip is the only thing
+// that explains why the switch cannot act (see group_list.js).
+const isDead = (name) => sw(name).classList.contains('disabled');
 
 describe('UIManager overlay layer stack', () => {
   beforeEach(overlayDom);
@@ -94,13 +98,15 @@ describe('UIManager overlay layer stack', () => {
     const ui = new UIManager({ graph: null }, false);
     ui.syncOverlays();
     for (const name of ['Groups', 'Heatmap', 'Notes', 'Minimap']) {
-      expect(sw(name).disabled).toBe(true);
+      expect(isDead(name)).toBe(true);
+      expect(sw(name).getAttribute('aria-disabled')).toBe('true');
     }
 
     const [loaded] = makeUI();
     loaded.syncOverlays();
     for (const name of ['Groups', 'Heatmap', 'Notes', 'Minimap']) {
-      expect(sw(name).disabled).toBe(false);
+      expect(isDead(name)).toBe(false);
+      expect(sw(name).getAttribute('aria-disabled')).toBe('false');
     }
   });
 
@@ -114,12 +120,23 @@ describe('UIManager overlay layer stack', () => {
     const [ui] = makeUI({ populated: false });
     ui.syncOverlays();
 
-    expect(sw('Groups').disabled).toBe(true);
-    expect(sw('Notes').disabled).toBe(true);
+    expect(isDead('Groups')).toBe(true);
+    expect(isDead('Notes')).toBe(true);
     // The heatmap draws off the nodes themselves and the minimap off the
     // viewport, so neither can be empty while a graph exists.
-    expect(sw('Heatmap').disabled).toBe(false);
-    expect(sw('Minimap').disabled).toBe(false);
+    expect(isDead('Heatmap')).toBe(false);
+    expect(isDead('Minimap')).toBe(false);
+  });
+
+  it('answers a click on a dead switch with the reason instead of a no-op', () => {
+    const [ui, cache] = makeUI({ populated: false });
+    ui.info = vi.fn();
+    ui.syncOverlays();
+
+    ui.toggleOverlay('notes');
+
+    expect(ui.info).toHaveBeenCalledWith(UIManager.OVERLAYS.notes.emptyHint);
+    expect(cache.graph.annotationLayer.setVisible).not.toHaveBeenCalled();
   });
 
   it('swaps the title for the reason, and back again once there is content', () => {
@@ -129,7 +146,7 @@ describe('UIManager overlay layer stack', () => {
 
     cache.graph.annotationLayer.annotations = () => [{ id: 'a1' }];
     ui.syncOverlays();
-    expect(sw('Notes').disabled).toBe(false);
+    expect(isDead('Notes')).toBe(false);
     expect(sw('Notes').title).toBe('Show or hide every text note');
   });
 
@@ -140,7 +157,7 @@ describe('UIManager overlay layer stack', () => {
     cache.bs.getEffectiveGroupMembers = () => new Set();
     ui.syncOverlays();
 
-    expect(sw('Groups').disabled).toBe(true);
+    expect(isDead('Groups')).toBe(true);
     expect(document.getElementById('overlayCountGroups').textContent).toBe('');
   });
 

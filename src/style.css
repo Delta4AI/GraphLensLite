@@ -1545,6 +1545,19 @@ h5 {
     opacity: 0.75;
 }
 
+/* "2/14": this section holds filters that are narrowing the graph right now.
+   Full opacity and the accent, because it is the answer to "why is my graph
+   empty" when the section is the one NOT on screen. */
+.filter-scope-count-active {
+    opacity: 1;
+    font-weight: 600;
+    color: var(--accent-text);
+}
+
+.filter-scope-segment.active .filter-scope-count-active {
+    color: inherit;
+}
+
 /* Narrow panel: one section at a time, chosen by the segment above. */
 #filterContainer .filter-section:not(.filter-section-active) {
     display: none;
@@ -1895,11 +1908,14 @@ h5 {
     transform: translateX(12px);
 }
 
-.layer-switch:hover:not(:disabled) {
+.layer-switch:hover:not(:disabled):not(.disabled) {
     border-color: #fff;
 }
 
-.layer-switch:disabled {
+/* Dead by CLASS as well as by attribute: syncOverlays uses the class so the
+   delegated tooltip layer can still explain why the switch cannot act. */
+.layer-switch:disabled,
+.layer-switch.disabled {
     opacity: 0.45;
     cursor: not-allowed;
 }

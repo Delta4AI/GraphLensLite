@@ -502,7 +502,14 @@ class CommandPalette {
       return;
     }
     if (revealOnly || cmd.kind === 'reveal') reveal(this.cache, cmd);
-    else cmd.el.click();
+    else {
+      // A workbench toolbar control (＋ Node, ⤒ Import, ✔ Apply) acts on its
+      // own pane, so running it with the pane hidden lands the effect where the
+      // user cannot see it. `cmd.tab` used to be honoured on the reveal path
+      // only.
+      if (cmd.tab) this.cache.workbench?.show(cmd.tab);
+      cmd.el.click();
+    }
   }
 }
 

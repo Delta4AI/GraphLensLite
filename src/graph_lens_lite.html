@@ -205,7 +205,8 @@
             <button id="querySelectBtn" class="blue disabled" onclick="cache.qm.handleQuerySelectEvent()"
                     title="Apply the query to select nodes in the graph without filtering">🎯 Select</button>
             <button id="queryResetBtn" class="pink" onclick="cache.qm.resetQuery();" title="Reset query to match UI filters">⟳ Sync</button>
-            <button id="queryClearBtn" class="red" onclick="cache.qm.clearQuery();" title="Clear query">✗ Clear</button>
+            <button id="queryClearBtn" class="red" onclick="cache.qm.clearQuery();"
+                    title="Empty the query text. The graph stays as it is — use ⟳ Sync to hand it back to the filters">✗ Clear text</button>
           </div>
           <div class="data-buttons" style="display: none;">
             <button id="updateDataTableBtn" class="blue" onclick="cache.dataTable.update()"

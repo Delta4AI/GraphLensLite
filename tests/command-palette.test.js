@@ -493,6 +493,20 @@ describe('the palette dialog', () => {
     expect(palette.isOpen).toBe(false);
   });
 
+  it('opens a toolbar control\'s tab before running it', () => {
+    // Running ＋ Node / ⤒ Import / ✔ Apply with its pane hidden lands the effect
+    // where the user cannot see it. `cmd.tab` used to be honoured on the reveal
+    // path only.
+    const clicked = vi.fn();
+    document.getElementById('queryUpdateBtn').addEventListener('click', clicked);
+    palette.open();
+    type('Filter');
+    key('Enter');
+
+    expect(cache.workbench.show).toHaveBeenCalledWith('query');
+    expect(clicked).toHaveBeenCalled();
+  });
+
   it('Tab shows where a command lives instead of running it', () => {
     const clicked = vi.fn();
     document.getElementById('fitBtn').addEventListener('click', clicked);

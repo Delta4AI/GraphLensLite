@@ -54,6 +54,8 @@ function makeUI({ mode = 'AND', filters = [], defaults = [] } = {}) {
 }
 
 const census = () => document.getElementById('filterConstraintCount');
+const scopeCount = (section) =>
+  document.querySelector(`.filter-scope-segment[data-section="${section}"] .filter-scope-count`);
 const inertIds = () =>
   [...document.querySelectorAll('.filter-row-inert')].map((r) => r.dataset.propId);
 
@@ -115,11 +117,15 @@ describe('filter constraint census', () => {
     expect(inertIds()).toEqual(['N::g::type', 'N::g::zone']);
   });
 
-  it('stays out of the way under OR, where active already means constraining', () => {
+  it('counts under OR too, but dims nothing there', () => {
+    // Hidden under OR, the panel was silent about the one thing that explains an
+    // empty graph — and the active filter may sit in the section that is not on
+    // screen, so "active means constraining" does not make the count redundant.
     const { ui } = makeUI({ mode: 'OR', ...THREE });
     ui.updateFilterConstraintHints();
 
-    expect(census().hidden).toBe(true);
+    expect(census().hidden).toBe(false);
+    expect(census().textContent).toMatch(/filters constrain the graph/);
     expect(inertIds()).toEqual([]);
   });
 
@@ -131,7 +137,7 @@ describe('filter constraint census', () => {
     cache.data.layouts.L.filterJoinMode = 'OR';
     ui.updateFilterConstraintHints();
     expect(inertIds()).toEqual([]);
-    expect(census().hidden).toBe(true);
+    expect(census().hidden).toBe(false);
   });
 
   it('does not dim a switched-off filter — off is not the same as inert', () => {
@@ -195,5 +201,65 @@ describe('filter constraint census', () => {
     const { ui } = makeUI({ mode: 'AND', ...THREE });
     document.body.innerHTML = '';
     expect(() => ui.updateFilterConstraintHints()).not.toThrow();
+  });
+});
+
+// ==========================================================================
+// The scope segments. Only one section's rows are on screen at a time, so a
+// constraining filter in the other one used to empty the graph with nothing
+// anywhere saying why — the segments showed a plain row count.
+// ==========================================================================
+
+describe('scope segment badges', () => {
+  function twoSectionDom() {
+    document.body.innerHTML = `
+      <div id="filterContainer">
+        <div class="filter-toolbar">
+          <div class="filter-scope">
+            <button class="filter-scope-segment" data-section="Node filters">
+              Node<span class="filter-scope-count">1</span>
+            </button>
+            <button class="filter-scope-segment" data-section="Edge filters">
+              Edge<span class="filter-scope-count">1</span>
+            </button>
+          </div>
+        </div>
+        <div class="filter-section" data-section="Node filters">
+          <div class="filter-row" data-prop-id="N::g::type">
+            <div class="filter-row-col1"><label class="checkboxWrapper"></label></div>
+          </div>
+        </div>
+        <div class="filter-section" data-section="Edge filters">
+          <div class="filter-row" data-prop-id="E::g::kind">
+            <div class="filter-row-col1"><label class="checkboxWrapper"></label></div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('badges the section that is constraining, whether or not it is on screen', () => {
+    const { ui } = makeUI({
+      mode: 'OR',
+      defaults: [
+        ['N::g::type', CAT(['a', 'b'])],
+        ['E::g::kind', CAT(['x', 'y'])],
+      ],
+      filters: [
+        ['N::g::type', { active: false, ...CAT(['a', 'b']) }],
+        ['E::g::kind', { active: true, ...CAT(['x']) }],
+      ],
+    });
+    twoSectionDom();
+    ui.updateFilterConstraintHints();
+
+    expect(scopeCount('Node filters').textContent).toBe('1');
+    expect(scopeCount('Node filters').classList.contains('filter-scope-count-active')).toBe(false);
+    expect(scopeCount('Edge filters').textContent).toBe('1/1');
+    expect(scopeCount('Edge filters').classList.contains('filter-scope-count-active')).toBe(true);
+    expect(scopeCount('Edge filters').closest('button').title).toContain('constrain the graph');
   });
 });

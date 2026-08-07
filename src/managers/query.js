@@ -457,14 +457,17 @@ class QueryManager {
       })
       .join('');
 
-    const updateQueryBtn = document.getElementById('queryUpdateBtn');
-    const selectQueryBtn = document.getElementById('querySelectBtn');
-    if (this.cache.query.valid) {
-      updateQueryBtn.classList.remove('disabled');
-      selectQueryBtn.classList.remove('disabled');
-    } else {
-      updateQueryBtn.classList.add('disabled');
-      selectQueryBtn.classList.add('disabled');
+    // Both buttons keep their tooltip while dead — that is the only place the
+    // reason can go, and "Apply the query to filter the graph" on a greyed
+    // button describes something it will not do.
+    const INVALID_TT = 'Fix the highlighted syntax error first';
+    for (const id of ['queryUpdateBtn', 'querySelectBtn']) {
+      const btn = document.getElementById(id);
+      if (!btn) continue;
+      btn.dataset.baseTitle ??= btn.title || btn.dataset.tip || '';
+      btn.classList.toggle('disabled', !this.cache.query.valid);
+      btn.setAttribute('aria-disabled', String(!this.cache.query.valid));
+      btn.title = this.cache.query.valid ? btn.dataset.baseTitle : INVALID_TT;
     }
 
     return asciiStr;
@@ -548,8 +551,15 @@ class QueryManager {
     this.cache.ui?.updateFilterConstraintHints?.();
   }
 
+  /**
+   * Empty the query BOX. It deliberately does not re-apply: the graph keeps
+   * whatever the last applied query did to it, and ⟳ Sync (resetQuery) is the
+   * control that hands filtering back to the filter panel. The button says
+   * "Clear text" for that reason — as plain "Clear" it read as "un-filter".
+   */
   clearQuery() {
     this.cache.query.text.textContent = '';
+    this.cache.query.overlay.innerHTML = '';
     this.handleQueryValidationEvent(true);
     this.cache.query.caret.style.display = 'none';
   }
@@ -971,7 +981,7 @@ class QueryManager {
   <li><span class="tooltip-dummy-buttons green">🔍 Filter</span> - Apply the query to filter the graph</li>
   <li><span class="tooltip-dummy-buttons blue">🎯 Select</span> - Select all matching elements (without filtering)</li>
   <li><span class="tooltip-dummy-buttons pink">⟳ Sync</span> - Sync query with current UI panel settings</li>
-  <li><span class="tooltip-dummy-buttons red">✗ Clear</span> - Remove all query conditions</li>
+  <li><span class="tooltip-dummy-buttons red">✗ Clear text</span> - Empty the box; the graph keeps the last applied query until you press ⟳ Sync</li>
 </ul>
 <p><strong>Filtering panel:</strong></p>
 <ul>
