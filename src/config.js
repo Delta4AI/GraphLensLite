@@ -328,14 +328,22 @@ const CFG = {
 // renders hover fast enough that no automatic node/edge-count cutoff is needed).
   DISABLE_HOVER_EFFECT: false,
 
-// if network is greater than defined threshold, bubble groups may span across non-bubble group members.
-// Measured with the sigma renderer (bubblesets-js createOutline, virtualEdges on, viewport-scale
-// coordinates, 2026-06-10): 60 members + 1000 avoid rects ≈ 69 ms, +2000 ≈ 194 ms, 300 members +
-// 5700 avoid ≈ 12 s — virtual-edge routing around obstacles is O(members × avoid). 1000 keeps a
-// full per-group outline recompute under the ~100 ms interactivity budget; camera pan/zoom reuses
-// cached outlines and is unaffected (src/graph/bubble_layer.js).
-  MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS: 1000,
-  AVOID_MEMBERS_IN_BUBBLE_GROUPS: false,
+// Fitting a bubble group's hull around non-members costs O(members × avoid) —
+// bubblesets-js routes virtual edges around every obstacle. Measured against
+// computeOutlineGeometry (node, 2026-08-07):
+//
+//     5 members ×  2 000 avoid →    48 ms      100 ×  3 000 →    935 ms
+//    20 members × 10 000 avoid →   540 ms      200 ×  2 000 →  1 939 ms
+//    10 members × 50 000 avoid →  1 646 ms     300 ×  5 700 → 20 345 ms
+//
+// ≈ 6 µs per (member × avoid) pair, within ~2-3× across that whole range.
+// This used to be gated on TOTAL NODE COUNT (> 1000 → avoidance silently off),
+// which is the wrong variable: a 5-member group on a 10 000-node graph costs a
+// quarter of a second and was refused, while a 300-member group is the only
+// shape that ever needed refusing. Groups now estimate their own cost and ask
+// only when it exceeds this budget — the user is allowed to wait.
+// Camera pan/zoom reuses cached outlines and is unaffected (bubble_layer.js).
+  AVOID_FIT_CONFIRM_MS: 500,
 
 // Maximum capacity of selection memory
   MAX_SELECTION_MEMORY: 25,

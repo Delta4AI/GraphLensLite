@@ -18,7 +18,7 @@ function makeCache(layout = { bubbleSetStyle: {}, filters: new Map() }) {
   return {
     data: { selectedLayout: 'Default', layouts: { Default: layout } },
     DEFAULTS: { BUBBLE_GROUP_STYLE_TEMPLATE: {} },
-    CFG: { AVOID_MEMBERS_IN_BUBBLE_GROUPS: true },
+    CFG: { AVOID_FIT_CONFIRM_MS: 500 },
     INSTANCES: { BUBBLE_GROUPS: {} },
     lastBubbleSetMembers: new Map(),
     propIDsToNodeIDsToBeShown: new Map(),
@@ -191,7 +191,6 @@ describe('tuneGroupGeometry', () => {
   };
 
   function wire(cache) {
-    cache.CFG.AVOID_MEMBERS_IN_BUBBLE_GROUPS = false; // avoid rects flow again
     cache.nodeRef = new Map(Object.keys(nodes).map((id) => [id, {}]));
     cache.graph.bubbleLayer.referenceRects = (ids) => [...ids].map(rectFor);
     const bs = bsFor(cache);

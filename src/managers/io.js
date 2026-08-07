@@ -758,12 +758,10 @@ class IOManager {
   preProcessData(fileData) {
     this.cache.reset();
     normalizeD4DataBooleans(fileData);
+    this.cache.bs?.clearAvoidConsent?.();
 
     this.cache.CFG.HIDE_LABELS =
       fileData.nodes.length > this.cache.CFG.MAX_NODES_BEFORE_HIDING_LABELS;
-    this.cache.CFG.AVOID_MEMBERS_IN_BUBBLE_GROUPS =
-      fileData.nodes.length >
-      this.cache.CFG.MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS;
 
     this.cache.nodePositionsFromExcelImport = new Map();
 

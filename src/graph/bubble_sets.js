@@ -3,11 +3,41 @@ import {suggestGroupGeometry} from "./bubble_tuning.js";
 import {StaticUtilities} from "../utilities/static.js";
 import {detectCommunities as computeCommunityAssignments} from "./communities.js";
 import {clampPopoverLeft} from "../utilities/popover_position.js";
+import {Popup} from "../utilities/popup.js";
 import {renderGroupList, syncGroupRows} from "../managers/group_list.js";
 
 // Community detection asks for a target group count. Two is the smallest split
 // worth drawing; the upper bound keeps a typo ("500") from minting hundreds of
 // bubbles nobody asked for.
+// Cost of fitting a hull that routes around non-members: ~6 µs per
+// (member × avoid) pair, measured 2026-08-07 — see the table in config.js
+// beside AVOID_FIT_CONFIRM_MS. Rough on purpose: the price of being wrong is
+// one extra confirm, never a freeze the user did not agree to.
+const AVOID_FIT_MS_PER_PAIR = 0.006;
+
+// ponytail: the tuner only wants a nearest-bystander statistic, so it samples
+// rather than paying the full O(members × avoid). Take the nearest ones
+// instead if a suggestion ever looks wrong on a big graph.
+const TUNE_AVOID_SAMPLE = 2000;
+
+/**
+ * How long fitting `memberCount` members around `avoidCount` obstacles takes.
+ *
+ * @param {number} memberCount
+ * @param {number} avoidCount
+ * @returns {number} milliseconds
+ */
+function estimateAvoidFitMs(memberCount, avoidCount) {
+  return AVOID_FIT_MS_PER_PAIR * memberCount * avoidCount;
+}
+
+/** Coarse enough to stay honest about a ±2-3× estimate. */
+function describeDuration(ms) {
+  if (ms < 2000) return 'a moment';
+  if (ms < 60_000) return `about ${Math.round(ms / 1000)} seconds`;
+  return 'several minutes';
+}
+
 const DEFAULT_COMMUNITY_GROUPS = 4;
 const MIN_COMMUNITY_GROUPS = 2;
 const MAX_COMMUNITY_GROUPS = 50;
@@ -37,6 +67,9 @@ class GraphBubbleSetManager {
     // prop hash, or null for topology-only); resolution: Louvain γ.
     this.communityOptions = { weightProperty: undefined, resolution: 1 };
     this.communityPopover = null;
+    // group → did the user agree to pay for avoidance on it. Transient: a new
+    // graph means new costs, so io clears it (see clearAvoidConsent).
+    this.avoidConsent = new Map();
     this.redrawBubbleSets = debounce(async () => {
       if (!this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED) return;
       if (this.cache.EVENT_LOCKS.BUBBLE_GROUP_REDRAW_RUNNING) return;
@@ -183,7 +216,7 @@ class GraphBubbleSetManager {
     if (members.size < 2) return null;
     const suggestion = suggestGroupGeometry(
       layer.referenceRects(members),
-      layer.referenceRects(this.getAvoidMembers(members))
+      layer.referenceRects(this.getAvoidMembers(members).slice(0, TUNE_AVOID_SAMPLE))
     );
     if (suggestion) Object.assign(style, suggestion);
     return suggestion;
@@ -315,8 +348,27 @@ class GraphBubbleSetManager {
       default:
         break;
     }
-    await this.#groupInstance(group).update({ ...bStyle });
-    await this.cache.gcm.decideToRenderOrDraw(true);
+    // Turning avoidance ON has to hand the layer the obstacles as well: the
+    // list is otherwise only supplied on a membership change, so the switch
+    // had nothing to route around and appeared to do nothing.
+    const update = { ...bStyle };
+    let slowFit = false;
+    if (property.endsWith('Avoidance') && Number(value) > 0) {
+      const members = this.getEffectiveGroupMembers(group);
+      update.avoidMembers = await this.consentedAvoidMembers(group, members);
+      // Declining is an answer, not a no-op — leaving the switch on would
+      // promise routing that is not going to happen.
+      if (update.avoidMembers.length === 0 && members.size > 0) {
+        bStyle.avoidance = 0;
+        update.avoidance = 0;
+      } else {
+        slowFit = this.#avoidFitIsSlow(members.size, update.avoidMembers.length);
+      }
+    }
+    await this.#withFitOverlay(slowFit, this.groupName(group), async () => {
+      await this.#groupInstance(group).update(update);
+      await this.cache.gcm.decideToRenderOrDraw(true);
+    });
     this.refreshBubbleStyleElements();
     // Every style write funnels through here, so this is the one place that
     // can keep the filter rows' chips in step. They render a group's fill and
@@ -450,11 +502,79 @@ class GraphBubbleSetManager {
     return this.cache.INSTANCES.BUBBLE_GROUPS[group];
   }
 
+  /**
+   * The obstacles a group's hull should route around, once the cost of doing
+   * so has been accepted. A cheap fit just happens — which is most of them,
+   * including small groups on large graphs, where this used to be refused
+   * outright. An expensive one asks, naming the wait, and the answer is
+   * remembered for that group so a membership edit does not re-ask per change.
+   *
+   * @param {string} group
+   * @param {Set<string>|string[]} members
+   * @returns {Promise<string[]>} empty when the user would rather not wait
+   */
+  async consentedAvoidMembers(group, members) {
+    const candidates = this.getAvoidMembers(members);
+    if (candidates.length === 0) return candidates; // nothing to route around
+    const memberCount = members instanceof Set ? members.size : members.length;
+    const estimate = estimateAvoidFitMs(memberCount, candidates.length);
+    const budget = Number(this.cache.CFG?.AVOID_FIT_CONFIRM_MS);
+    if (!Number.isFinite(budget) || estimate < budget) return candidates;
+
+    const remembered = this.avoidConsent.get(group);
+    if (remembered !== undefined) return remembered ? candidates : [];
+
+    const name = this.groupName(group);
+    const accepted =
+      (await Popup.confirm(
+        `Routing "${name}" around the other ${candidates.length.toLocaleString()} nodes takes ` +
+          `${describeDuration(estimate)}, and the app cannot respond while it computes. ` +
+          'Compute it anyway?'
+      )) === true;
+    this.avoidConsent.set(group, accepted);
+    return accepted ? candidates : [];
+  }
+
+  /** Forget the per-group answers — a new graph is a new set of costs. */
+  clearAvoidConsent() {
+    this.avoidConsent.clear();
+  }
+
+  /** @returns {boolean} would fitting this many members around this many obstacles be slow */
+  #avoidFitIsSlow(memberCount, avoidCount) {
+    const budget = Number(this.cache.CFG?.AVOID_FIT_CONFIRM_MS);
+    return Number.isFinite(budget) && estimateAvoidFitMs(memberCount, avoidCount) >= budget;
+  }
+
+  /**
+   * Run `work` behind the loading overlay when it will trigger a fit the user
+   * agreed to wait for. Agreeing to wait is not agreeing to watch a dead app:
+   * the fit is synchronous inside the renderer's next frame, so the overlay
+   * has to be painted before we hand off, and released only once that frame
+   * has been through.
+   *
+   * @param {boolean} slow
+   * @param {string} name  the group's display name
+   * @param {() => Promise<void>} work
+   */
+  async #withFitOverlay(slow, name, work) {
+    if (!slow) return work();
+    const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+    await this.cache.ui?.showLoading?.('Fitting bubble group', `Routing "${name}" around the other nodes …`);
+    await frame();
+    try {
+      await work();
+      await frame();
+    } finally {
+      await this.cache.ui?.hideLoading?.();
+    }
+  }
+
   async updateBubbleSet(group, members) {
     let empty = !members || (members instanceof Set ? members.size === 0 : members.length === 0);
     const membersAsArray = members instanceof Set ? [...members] : members;
 
-    const avoidMembers = empty ? [] : this.getAvoidMembers(members);
+    const avoidMembers = empty ? [] : await this.consentedAvoidMembers(group, members);
 
     if (StaticUtilities.arraysAreEqual(membersAsArray, [...this.#groupInstance(group).members.keys()])) {
       this.cache.ui.debug("BUBBLE GROUPS IN SYNC - SKIPPING UPDATE");
@@ -474,14 +594,12 @@ class GraphBubbleSetManager {
     await this.#groupInstance(group).drawBubbleSets();
   }
 
+  /**
+   * Every node that is NOT in the group — the obstacles its hull would route
+   * around. Whether that is affordable is `consentedAvoidMembers`' question,
+   * not this one's.
+   */
   getAvoidMembers(members) {
-    // Flag is set by io.preProcessData when the network exceeds
-    // MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS: outlines
-    // then may span across non-members (bubblesets-js virtual-edge routing
-    // around obstacles is O(members × avoid) — see the threshold comment in
-    // config.js for the measured budget).
-    if (this.cache.CFG.AVOID_MEMBERS_IN_BUBBLE_GROUPS) return [];
-
     const checkMembership = members instanceof Set
       ? (nodeID) => members.has(nodeID)
       : (nodeID) => members.includes(nodeID);
@@ -902,6 +1020,7 @@ const debounce = (func, wait) => {
 export {
   GraphBubbleSetManager,
   clampCommunityGroups,
+  estimateAvoidFitMs,
   MIN_COMMUNITY_GROUPS,
   MAX_COMMUNITY_GROUPS,
   DEFAULT_COMMUNITY_GROUPS,
