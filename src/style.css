@@ -590,7 +590,10 @@ body {
     top: 12px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 900;
+    /* Above every overlay that can be on screen while a message fires — the
+       landing page (10000), popup overlays (10001/10002) and the tour. A
+       load error raised before the landing page clears is otherwise invisible. */
+    z-index: 10005;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -4073,6 +4076,18 @@ input:checked + .slider:before {
     flex: 0 0 clamp(220px, 28%, 340px);
     gap: 6px;
     overflow-y: auto;
+}
+
+/* Shown instead of a stale ranking when the visible graph is too small to
+   score — the panel used to keep the previous subgraph's numbers. */
+.nw-empty {
+    margin: 0;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
 }
 
 .nw-subheader {
