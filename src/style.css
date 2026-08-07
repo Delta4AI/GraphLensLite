@@ -6561,18 +6561,18 @@ input:checked + .slider:before {
     }
 }
 
-.neo4j-props-heading {
+.checklist-heading {
     margin: 12px 0 6px;
     font-weight: 600;
     font-size: 13px;
     color: var(--brand-text);
 }
 
-.neo4j-props-heading label {
+.checklist-heading label {
     cursor: pointer;
 }
 
-.neo4j-props-list {
+.checklist-list {
     max-height: 280px;
     overflow-y: auto;
     border: 1px solid var(--border-soft);
@@ -6580,7 +6580,7 @@ input:checked + .slider:before {
     background-color: var(--input-bg);
 }
 
-.neo4j-prop-row {
+.checklist-row {
     display: grid;
     grid-template-columns: auto 1fr auto;
     gap: 2px 8px;
@@ -6590,15 +6590,15 @@ input:checked + .slider:before {
     cursor: pointer;
 }
 
-.neo4j-prop-row:last-child {
+.checklist-row:last-child {
     border-bottom: none;
 }
 
-.neo4j-prop-row:hover {
+.checklist-row:hover {
     background-color: var(--row-hover);
 }
 
-.neo4j-prop-name {
+.checklist-name {
     font-size: 13px;
     font-weight: 600;
     color: var(--text-strong);
@@ -6607,7 +6607,7 @@ input:checked + .slider:before {
     white-space: nowrap;
 }
 
-.neo4j-prop-type {
+.checklist-type {
     font-size: 11px;
     padding: 1px 8px;
     border-radius: 10px;
@@ -6616,7 +6616,7 @@ input:checked + .slider:before {
     white-space: nowrap;
 }
 
-.neo4j-prop-examples {
+.checklist-examples {
     grid-column: 2 / -1;
     font-size: 12px;
     color: var(--text-faint);

@@ -29,7 +29,7 @@ function span(className, text) {
  */
 function buildChecklistSection({ title, rows, onChange }) {
   const heading = document.createElement('div');
-  heading.className = 'neo4j-props-heading';
+  heading.className = 'checklist-heading';
   const headingLabel = document.createElement('label');
   const toggleAll = document.createElement('input');
   toggleAll.type = 'checkbox';
@@ -38,22 +38,22 @@ function buildChecklistSection({ title, rows, onChange }) {
   heading.appendChild(headingLabel);
 
   const list = document.createElement('div');
-  list.className = 'neo4j-props-list';
+  list.className = 'checklist-list';
   const built = rows.map((spec) => {
     const row = document.createElement('label');
-    row.className = 'neo4j-prop-row';
+    row.className = 'checklist-row';
 
     const input = document.createElement('input');
     input.type = 'checkbox';
     input.checked = spec.checked !== false;
     row.appendChild(input);
-    row.appendChild(span('neo4j-prop-name', spec.label));
+    row.appendChild(span('checklist-name', spec.label));
     if (spec.meta) {
-      const meta = span('neo4j-prop-type', spec.meta);
+      const meta = span('checklist-type', spec.meta);
       if (spec.metaTitle) meta.title = spec.metaTitle;
       row.appendChild(meta);
     }
-    if (spec.note) row.appendChild(span('neo4j-prop-examples', spec.note));
+    if (spec.note) row.appendChild(span('checklist-examples', spec.note));
 
     list.appendChild(row);
     return { input, data: spec.data };

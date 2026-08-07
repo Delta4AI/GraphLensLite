@@ -196,8 +196,10 @@ describe('seedMergedPositions', () => {
 
   it('keeps captured positions for existing nodes', () => {
     const data = { nodes: [{ id: 'a', style: { fill: '#FF0000' } }], edges: [] };
-    seedMergedPositions(data, new Map([['a', { x: 10, y: -20 }]]));
-    expect(data.nodes[0].style).toEqual({ fill: '#FF0000', x: 10, y: -20 });
+    const seeded = seedMergedPositions(data, new Map([['a', { x: 10, y: -20 }]]));
+    expect(seeded.nodes[0].style).toEqual({ fill: '#FF0000', x: 10, y: -20 });
+    // A new payload: the one it was handed is untouched.
+    expect(data.nodes[0].style).toEqual({ fill: '#FF0000' });
   });
 
   it('seeds new nodes near a positioned neighbor', () => {
@@ -205,8 +207,7 @@ describe('seedMergedPositions', () => {
       nodes: [{ id: 'a' }, { id: 'b' }],
       edges: [{ source: 'a', target: 'b' }],
     };
-    seedMergedPositions(data, new Map([['a', { x: 100, y: 200 }]]));
-    const b = data.nodes[1].style;
+    const b = seedMergedPositions(data, new Map([['a', { x: 100, y: 200 }]])).nodes[1].style;
     expect(Math.hypot(b.x - 100, b.y - 200)).toBeLessThanOrEqual(maxSeedDistance);
     expect(Math.hypot(b.x - 100, b.y - 200)).toBeGreaterThan(0);
   });
@@ -217,14 +218,13 @@ describe('seedMergedPositions', () => {
       ['a', { x: 0, y: 0 }],
       ['b', { x: 200, y: 100 }],
     ]);
-    seedMergedPositions(data, positions);
-    const style = data.nodes[0].style;
+    const style = seedMergedPositions(data, positions).nodes[0].style;
     expect(Math.hypot(style.x - 100, style.y - 50)).toBeLessThanOrEqual(maxSeedDistance);
   });
 
   it('leaves the payload untouched when nothing was captured', () => {
     const data = { nodes: [{ id: 'a' }], edges: [] };
-    seedMergedPositions(data, new Map());
+    expect(seedMergedPositions(data, new Map())).toBe(data);
     expect(data.nodes[0].style).toBeUndefined();
   });
 });
@@ -695,10 +695,10 @@ describe('showExpandChecklist', () => {
 
   it('resolves the checked pairs and stitch flag (all preselected), labels blanks as Node', async () => {
     const promise = showExpandChecklist(pairs);
-    const names = [...document.querySelectorAll('.neo4j-prop-name')].map((el) => el.textContent);
+    const names = [...document.querySelectorAll('.checklist-name')].map((el) => el.textContent);
     expect(names).toEqual(['ACTED_IN → Movie', 'KNOWS → Node']);
 
-    const boxes = [...document.querySelectorAll('.p-custom .neo4j-prop-row input')];
+    const boxes = [...document.querySelectorAll('.p-custom .checklist-row input')];
     boxes[1].checked = false;
     boxes[1].dispatchEvent(new Event('change', { bubbles: true }));
 
@@ -713,7 +713,7 @@ describe('showExpandChecklist', () => {
 
   it('disables fetch at zero checked and toggle-all restores', async () => {
     const promise = showExpandChecklist(pairs);
-    const toggleAll = document.querySelector('.neo4j-props-heading input');
+    const toggleAll = document.querySelector('.checklist-heading input');
     const fetchBtn = [...document.querySelectorAll('.p-custom button')].find(
       (b) => b.textContent === 'Fetch & merge',
     );
@@ -754,7 +754,7 @@ describe('showExpandChecklist', () => {
     expect(warning.textContent).toContain('slow');
 
     // Unchecking drops the sum back under the threshold.
-    const boxes = [...document.querySelectorAll('.p-custom .neo4j-prop-row input')];
+    const boxes = [...document.querySelectorAll('.p-custom .checklist-row input')];
     boxes[0].checked = false;
     boxes[0].dispatchEvent(new Event('change', { bubbles: true }));
     expect(warning.hidden).toBe(true);

@@ -7,6 +7,7 @@ import {
   search,
   reveal,
 } from '../src/managers/command_palette.js';
+import { UIManager } from '../src/managers/ui.js';
 import { RailMenu, menuItem } from '../src/managers/rail.js';
 
 // ==========================================================================
@@ -138,7 +139,14 @@ function makeCache() {
       show: vi.fn(),
     },
     inspector: { setContext: vi.fn() },
-    ui: { expandStylingCard: vi.fn() },
+    ui: {
+      expandStylingCard: vi.fn(),
+      // The REAL method, not a copy of it: the collapsed class and the chevron
+      // glyph are two halves of one state, and reveal unfolds through its owner
+      // now. It touches no instance state, so the prototype method is usable
+      // as-is here.
+      setFilterGroupCollapsed: UIManager.prototype.setFilterGroupCollapsed,
+    },
     gcm: { focusElements: vi.fn() },
     nodeIDOrLabelToNodeIDs: new Map([
       ['TP53', new Set(['n1'])],

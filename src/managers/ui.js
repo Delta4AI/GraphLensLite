@@ -1243,9 +1243,26 @@ class UIManager {
     headerDiv.classList.add('collapsible-filter-header');
     headerDiv.addEventListener('click', (e) => {
       if (e.target.closest('button')) return;
-      const collapsed = wrapper.classList.toggle('collapsed');
-      chevron.textContent = collapsed ? '▸' : '▾';
+      this.setFilterGroupCollapsed(wrapper, !wrapper.classList.contains('collapsed'));
     });
+  }
+
+  /**
+   * Fold or unfold one filter group. The class and the chevron glyph are two
+   * halves of one state, so the palette's "reveal" (command_palette.js) unfolds
+   * through here rather than re-deriving the pair — and it no longer has to
+   * assume the chevron's position in the header.
+   *
+   * @param {HTMLElement} wrapper the .filter-group element
+   * @param {boolean} collapsed
+   */
+  setFilterGroupCollapsed(wrapper, collapsed) {
+    if (!wrapper) return;
+    wrapper.classList.toggle('collapsed', collapsed);
+    // The group's OWN chevron: it sits in the group header, a direct child of the
+    // wrapper, and a plain descendant query would find a nested group's instead.
+    const chevron = wrapper.querySelector(':scope > * > .filter-group-chevron');
+    if (chevron) chevron.textContent = collapsed ? '▸' : '▾';
   }
 
   // Pre-load, the landing page (a full-viewport overlay) covers the shell;

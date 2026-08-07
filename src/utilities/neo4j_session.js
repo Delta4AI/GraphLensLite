@@ -263,11 +263,16 @@ function buildStitchRow() {
  * inventing a new one. With nothing captured (no graph yet) the payload is
  * left untouched and the normal initial layout places everything.
  *
- * @param {{nodes: object[], edges: object[]}} data  app-format payload (mutated)
+ * Returns a NEW payload rather than stamping the one it is handed: the caller
+ * (and the tests) then use the return value, and nothing downstream depends on
+ * a mutation having happened.
+ *
+ * @param {{nodes: object[], edges: object[]}} data  app-format payload
  * @param {Map<string, {x: number, y: number}>} positions  app-model (y-down)
+ * @returns {{nodes: object[], edges: object[]}} the payload with every node positioned
  */
 function seedMergedPositions(data, positions) {
-  if (positions.size === 0) return;
+  if (positions.size === 0) return data;
 
   const neighbors = new Map();
   const link = (a, b) => {
@@ -297,7 +302,7 @@ function seedMergedPositions(data, positions) {
     };
   };
 
-  for (const node of data.nodes) {
+  const nodes = data.nodes.map((node) => {
     let pos = positions.get(node.id);
     if (!pos) {
       let anchor = null;
@@ -307,8 +312,9 @@ function seedMergedPositions(data, positions) {
       }
       pos = seedNear(anchor ?? { x: centroidX, y: centroidY });
     }
-    node.style = { ...node.style, x: pos.x, y: pos.y };
-  }
+    return { ...node, style: { ...node.style, x: pos.x, y: pos.y } };
+  });
+  return { ...data, nodes };
 }
 
 /**
@@ -325,6 +331,9 @@ function seedMergedPositions(data, positions) {
  */
 async function mergeAndApply(cache, newNodes, newRels, deps = {}) {
   const session = getNeo4jSession();
+  // Exported, so a caller can reach it without a session; every line below
+  // dereferences one.
+  if (!session) return false;
   const apply = deps.apply ?? applyGraph;
 
   // Capture the arrangement BEFORE anything else. getNodeData() syncs x/y
@@ -344,7 +353,7 @@ async function mergeAndApply(cache, newNodes, newRels, deps = {}) {
     [...session.rawRels.values()],
     session.exclusions,
   );
-  seedMergedPositions(data, positions);
+  const seeded = seedMergedPositions(data, positions);
 
   // Declare the (single, current) workspace in the payload so preProcessData
   // takes the JSON-import path: with a layout whose positions cover every
@@ -356,18 +365,18 @@ async function mergeAndApply(cache, newNodes, newRels, deps = {}) {
     // ponytail: a workspace the user literally named "custom" (the Excel
     // sentinel, DEFAULTS.CUSTOM_LAYOUT_NAME) still triggers that force pass.
     const layoutName = cache.data?.selectedLayout || 'Default';
-    data.selectedLayout = layoutName;
-    data.layouts = {
+    seeded.selectedLayout = layoutName;
+    seeded.layouts = {
       [layoutName]: {
         isCustom: true,
         positions: Object.fromEntries(
-          data.nodes.map((node) => [node.id, { style: { x: node.style.x, y: node.style.y } }]),
+          seeded.nodes.map((node) => [node.id, { style: { x: node.style.x, y: node.style.y } }]),
         ),
       },
     };
   }
 
-  const rendered = await apply(cache, data);
+  const rendered = await apply(cache, seeded);
   if (rendered) {
     // applyGraph stamps its own data-source label — restore the session's
     // (this also re-shows the expand/join buttons via the label hook).
@@ -377,7 +386,7 @@ async function mergeAndApply(cache, newNodes, newRels, deps = {}) {
     // graph with everything else pinned, then persist the settled positions
     // (graphology is the source of truth after the settle, so the
     // getNodeData-based persist reads the right direction).
-    const newIds = data.nodes.filter((node) => !positions.has(node.id)).map((node) => node.id);
+    const newIds = seeded.nodes.filter((node) => !positions.has(node.id)).map((node) => node.id);
     if (positions.size > 0 && newIds.length > 0 && cache.graphData) {
       const settle = deps.settle ?? settlePinnedForce;
       await settle(cache.graphData, newIds);

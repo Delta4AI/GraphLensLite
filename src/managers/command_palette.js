@@ -336,12 +336,15 @@ export function reveal(cache, cmd) {
     const entry = INSPECTOR_PANELS.find(([, id]) => id === panel.id);
     if (entry) cache.inspector?.setContext(entry[0].toLowerCase());
   }
+  // Unfold every collapsed ancestor, each through the owner of that state: a
+  // styling card via ui.expandStylingCard, a filter group via
+  // ui.setFilterGroupCollapsed (the class and the chevron glyph are two
+  // halves of one state, and re-deriving them here assumed the chevron's
+  // position in the header).
   for (let node = el.parentElement; node; node = node.parentElement) {
     if (!node.classList?.contains('collapsed')) continue;
     if (node.dataset?.label) cache.ui?.expandStylingCard(node.dataset.label);
-    else node.classList.remove('collapsed');
-    const chevron = node.querySelector(':scope > * > .filter-group-chevron');
-    if (chevron) chevron.textContent = '▾';
+    else cache.ui?.setFilterGroupCollapsed(node, false);
   }
 
   // A filter row is `display: contents` — it has no box, so scrolling to it

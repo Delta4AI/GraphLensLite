@@ -1027,10 +1027,10 @@ describe('showPropertyChecklist', () => {
     ]);
 
     // Rows are in listed order, nodes before relationships.
-    const rows = [...document.querySelectorAll('.p-custom .neo4j-prop-row')];
+    const rows = [...document.querySelectorAll('.p-custom .checklist-row')];
     expect(rows).toHaveLength(3);
     const boxFor = (key) =>
-      rows.find((row) => row.querySelector('.neo4j-prop-name').textContent === key)
+      rows.find((row) => row.querySelector('.checklist-name').textContent === key)
         .querySelector('input');
     expect(boxFor('embedding').checked).toBe(false);
 
@@ -1059,11 +1059,11 @@ describe('showPropertyChecklist', () => {
       { kind: 'node', key: 'name', type: 'text', examples: ['Keanu'], largeArray: false },
     ]);
 
-    const types = [...document.querySelectorAll('.neo4j-prop-type')].map((el) => el.textContent);
+    const types = [...document.querySelectorAll('.checklist-type')].map((el) => el.textContent);
     expect(types).toEqual(['number', 'text']);
-    expect(document.querySelector('.neo4j-prop-examples').textContent).toBe('e.g. 1964  ·  1791');
+    expect(document.querySelector('.checklist-examples').textContent).toBe('e.g. 1964  ·  1791');
 
-    const toggleAll = document.querySelector('.neo4j-props-heading input');
+    const toggleAll = document.querySelector('.checklist-heading input');
     expect(toggleAll.checked).toBe(true);
     toggleAll.checked = false;
     toggleAll.dispatchEvent(new Event('change'));

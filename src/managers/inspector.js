@@ -7,8 +7,11 @@
  * NOTHING switches context on its own. A panel that swaps itself out from under
  * the click that caused it costs the user the row they were working in — the
  * characteristic failure of context-driven inspectors, and just as true entering
- * a context as leaving one. Changes elsewhere announce themselves by flashing
- * their pill; the move stays the user's.
+ * a context as leaving one. A change the user did not make from the panel it
+ * belongs to announces itself by flashing that pill instead; the move stays
+ * theirs. Only the Selection pill does that today (syncToSelection) — filter and
+ * overlay changes are nearly always made from their own panel, where a flash
+ * would be noise.
  */
 
 const CONTEXTS = ['filters', 'overlays', 'selection'];
