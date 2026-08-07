@@ -12,13 +12,14 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // Controllable Popup stub (layout.js imports it eagerly at module load).
 const popup = vi.hoisted(() => ({ dialog: null, confirm: true }));
 vi.mock("../src/utilities/popup.js", () => ({
-  Popup: {
-    layoutCreationDialog: vi.fn(async () => popup.dialog),
-    confirm: vi.fn(async () => popup.confirm),
-  },
+  Popup: { confirm: vi.fn(async () => popup.confirm) },
+}));
+vi.mock("../src/graph/workspace_dialog.js", () => ({
+  openWorkspaceCreationDialog: vi.fn(async () => popup.dialog),
 }));
 
 import { Popup } from "../src/utilities/popup.js";
+import { openWorkspaceCreationDialog } from "../src/graph/workspace_dialog.js";
 import { GraphLayoutManager } from "../src/graph/layout.js";
 import { DEFAULTS } from "../src/config.js";
 
@@ -79,7 +80,7 @@ describe("addLayout — expensive-layout size guard", () => {
     document.body.innerHTML = "";
     mountSelect();
     Popup.confirm.mockClear();
-    Popup.layoutCreationDialog.mockClear();
+    openWorkspaceCreationDialog.mockClear();
     popup.confirm = true;
   });
 

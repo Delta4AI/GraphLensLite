@@ -33,7 +33,8 @@ The rendering and graph-operation core. Key modules:
 - `core.js` — `GraphCoreManager`: render/draw cycles, event locks, behaviour wiring
 - `interactions.js` — drag, zoom, lasso, click, hover handlers
 - `style.js` — per-element style resolution with defaults, per-layout persistence
-- `layout.js` / `layout_algorithms.js` — workspace management; headless layouts
+- `layout.js` / `layout_algorithms.js` / `workspace_dialog.js` — workspace
+  management, the "Create New Workspace" dialog, and headless layouts
   (force via graphology forceAtlas2; circular/grid geometric; radial/concentric/mds
   via `@antv/layout` v2)
 - `filter.js` — range-slider + dropdown filtering

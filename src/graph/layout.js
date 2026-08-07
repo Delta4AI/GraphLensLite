@@ -1,4 +1,5 @@
 import { Popup } from '../utilities/popup.js';
+import { openWorkspaceCreationDialog } from './workspace_dialog.js';
 import { applyNoverlap, layoutSelectionSubgraph } from './layout_algorithms.js';
 
 class GraphLayoutManager {
@@ -201,7 +202,7 @@ class GraphLayoutManager {
 
   async addLayout() {
     // Show dialog with clone vs template options
-    const result = await Popup.layoutCreationDialog(this.cache.DEFAULTS.LAYOUT_INTERNALS);
+    const result = await openWorkspaceCreationDialog(this.cache.DEFAULTS.LAYOUT_INTERNALS);
     if (!result) {
       this.cache.ui.info('Creating workspace canceled');
       return;

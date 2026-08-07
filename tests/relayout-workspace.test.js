@@ -14,7 +14,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const popup = vi.hoisted(() => ({ confirm: true }));
 vi.mock("../src/utilities/popup.js", () => ({
   Popup: {
-    layoutCreationDialog: vi.fn(async () => null),
     confirm: vi.fn(async () => popup.confirm),
   },
 }));
