@@ -634,7 +634,10 @@ class GraphBubbleSetManager {
    */
   selectionMembership(group) {
     const manualMembers = this.#layout()?.[`${group}ManualMembers`] ?? new Set();
-    const selected = [...(this.cache.selectedNodes ?? [])];
+    // Iterated in place: syncGroupRows calls this once per group on every
+    // selection change, and spreading the selection into a fresh array there
+    // was one copy of the whole selection per group.
+    const selected = this.cache.selectedNodes ?? [];
     if (selected.length === 0) return 'none';
     let inGroup = 0;
     for (const nodeId of selected) if (manualMembers.has(nodeId)) inGroup++;

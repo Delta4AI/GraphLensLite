@@ -45,6 +45,8 @@ function safePaint(color, fallback) {
 // would otherwise grow it monotonically. Regeneration is cheap string work,
 // so a flush beats LRU bookkeeping.
 const MAX_TEXTURE_CACHE = 4096;
+// Bake-size granularity in node px (see shapeTextureURI).
+const SIZE_QUANTUM = 0.5;
 
 const textureCache = new Map();
 
@@ -116,7 +118,15 @@ function shapeElement(shape, radius, paint) {
  */
 function shapeTextureURI({ shape, fill, stroke = null, lineWidth = 0, size = 10, state = null }) {
   const safeShape = SHAPE_NAMES.includes(shape) ? shape : "circle";
-  const safeSize = Number.isFinite(size) && size > 0 ? size : 10;
+  // QUANTIZED, and quantized before the key so the bake and the key agree.
+  // `size` only sets the px→viewBox scale for the stroke and halo widths, so a
+  // half-pixel step is imperceptible — while unquantized sizes (degree scaling
+  // yields floats) multiplied the keyspace by every distinct radius, on top of
+  // distinct colours × 20 fade steps, and the cache clears WHOLESALE at
+  // MAX_TEXTURE_CACHE (re-minting an SVG per shape node and rechurning the
+  // image atlas on the next reducer pass).
+  const rawSize = Number.isFinite(size) && size > 0 ? size : 10;
+  const safeSize = Math.max(SIZE_QUANTUM, Math.round(rawSize / SIZE_QUANTUM) * SIZE_QUANTUM);
   const safeFill = safePaint(fill, FALLBACK_FILL);
   const safeStroke = stroke == null ? null : safePaint(stroke, null);
   const key = `${safeShape}|${safeFill}|${safeStroke}|${lineWidth}|${safeSize}|${state}`;

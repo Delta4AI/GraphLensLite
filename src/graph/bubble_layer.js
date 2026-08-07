@@ -238,13 +238,22 @@ class BubbleSetLayer {
     // zoom with members always enclosed.
     let outlinesChanged = false;
     const active = [];
+    // Viewport cull: 1.17 made the group count unbounded (auto-group mints up to
+    // 50), and zoomed into one of them the other 49 were still building a
+    // Path2D, stroking and filling entirely off-canvas. The bbox is graph-space
+    // and cached with the rings, so the test is four comparisons per group.
+    const view = viewportTransform(sigma);
+    const cullRect = view ? visibleGraphRect(view, width, height, CULL_MARGIN_PX) : null;
     for (const [group, state] of this.groups) {
       if (state.members.size === 0) {
         if (this.outlines.delete(group)) outlinesChanged = true;
         continue;
       }
       outlinesChanged = this.#syncGroupOutline(group, state) || outlinesChanged;
-      if (this.outlines.get(group)?.graphPoints.length) active.push([group, state]);
+      const cached = this.outlines.get(group);
+      if (!cached?.graphPoints.length) continue;
+      if (cullRect && cached.bbox && !rectsIntersect(cached.bbox, cullRect)) continue;
+      active.push([group, state]);
     }
 
     // Hiding paints an empty frame rather than skipping the paint: a skip
@@ -261,7 +270,7 @@ class BubbleSetLayer {
 
     prepareOverlayCanvas(this.canvas, this.ctx, width, height, dpr);
     prepareOverlayCanvas(this.labelCanvas, this.labelCtx, width, height, dpr);
-    this.#drawOutlines(shown, sigma, dpr);
+    this.#drawOutlines(shown, sigma, dpr, view);
   }
 
   /**
@@ -274,8 +283,7 @@ class BubbleSetLayer {
    * space (their font size and standoff are screen quantities), so only their
    * one anchor point is projected.
    */
-  #drawOutlines(active, sigma, dpr) {
-    const view = viewportTransform(sigma);
+  #drawOutlines(active, sigma, dpr, view) {
     const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE_TEMPLATE;
     if (!view) return;
 
@@ -493,13 +501,20 @@ class BubbleSetLayer {
           identityKey,
           graphPoints: cached.graphPoints,
           graphHoles: cached.graphHoles ?? [],
+          bbox: cached.bbox ?? ringBBox(cached.graphPoints),
         });
         return true;
       }
       // No prior good outline yet: stay absent until a clean fit appears.
       return this.outlines.delete(group);
     }
-    this.outlines.set(group, { key, identityKey, graphPoints, graphHoles });
+    this.outlines.set(group, {
+      key,
+      identityKey,
+      graphPoints,
+      graphHoles,
+      bbox: ringBBox(graphPoints),
+    });
     return true;
   }
 
@@ -686,6 +701,43 @@ function viewportTransform(sigma) {
   const sy = unit.y - origin.y;
   if (!Number.isFinite(sx) || !Number.isFinite(sy) || sx === 0 || sy === 0) return null;
   return { sx, sy, tx: origin.x, ty: origin.y };
+}
+
+/** Screen-space slack on the cull rect: a stroke straddles the ring and a
+ * label sits a standoff outside it, so a group just off-canvas can still paint
+ * into it. Generous on purpose — the cull is about the 49 groups that are
+ * nowhere near, not about shaving the boundary. */
+const CULL_MARGIN_PX = 200;
+
+function rectsIntersect(a, b) {
+  return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
+}
+
+/** Graph-space bounds of a ring, for the viewport cull. */
+function ringBBox(points) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/**
+ * The visible canvas as a GRAPH-space rect, inflated by `marginPx` of screen
+ * space (a stroke straddles the ring, and a label sits a standoff outside it).
+ */
+function visibleGraphRect(view, width, height, marginPx) {
+  const toGraphX = (vx) => (vx - view.tx) / view.sx;
+  const toGraphY = (vy) => (vy - view.ty) / view.sy;
+  const xs = [toGraphX(-marginPx), toGraphX(width + marginPx)];
+  const ys = [toGraphY(-marginPx), toGraphY(height + marginPx)];
+  return {
+    minX: Math.min(...xs), maxX: Math.max(...xs),
+    minY: Math.min(...ys), maxY: Math.max(...ys),
+  };
 }
 
 /** @returns {{x: number, y: number, angle: number, nx: number, ny: number}|null} */
