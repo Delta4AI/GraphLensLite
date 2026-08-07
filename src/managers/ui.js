@@ -393,11 +393,15 @@ class UIManager {
     this.logMessage(message, 'green', false);
   }
 
+  /**
+   * Trace line, gated on the constructor's `debugEnabled` — production leaves it
+   * false, so 19 call sites used to spam the browser console for nobody while
+   * only the in-app log respected the flag.
+   */
   debug(message) {
+    if (!this.debugEnabled) return;
     console.log(`${StaticUtilities.getTimestamp(true)} | ${message}`);
-    if (this.debugEnabled) {
-      this.logMessage(message, 'grey', false);
-    }
+    this.logMessage(message, 'grey', false);
   }
 
   toggleQueryEditor() {

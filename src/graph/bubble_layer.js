@@ -29,10 +29,8 @@ import {
   computeOutlineGeometry,
   polygonSelfIntersects,
   outlineLabelAnchor,
-  idsKey,
-  positionsChecksum,
-  styleKey,
 } from './bubble_geometry.js';
+import { idsKey, positionsChecksum, styleKey } from './overlay_keys.js';
 import { smoothClosedPath } from './bubble_smoothing.js';
 import { prepareOverlayCanvas } from './dpr_watch.js';
 import { FrameCoalescer } from './overlay_frame.js';

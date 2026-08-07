@@ -47,22 +47,34 @@ The rendering and graph-operation core. Key modules:
   Membership has two sources unioned by `getEffectiveGroupMembers`:
   `${group}Props` (filters, resolved live) and `${group}ManualMembers` (node IDs,
   a snapshot)
+- `bubble_tuning.js` / `bubble_smoothing.js` — the layout-aware initial group
+  settings behind ✨ Re-tune, and the Catmull-Rom ring painter/resampler both the
+  canvas layer and the SVG export draw through
+- `annotation_layer.js` / `annotation_geometry.js` — text notes: a DOM overlay
+  over the stage (place/drag/edit/style popover) plus the node-safe box metrics
+  the layer, the PNG export and the SVG export all measure with
 - `heatmap_layer.js` / `heatmap_geometry.js` — node-density heatmap overlay (off by
   default; one row of the inspector's Overlays layer stack, which owns both its
   switch and its parameters — see `UIManager.OVERLAYS`)
 - `edge_programs.js` / `edge_flow_programs.js` / `edge_flow_glsl.js` /
   `flow_animator.js` — custom WebGL edge programs and the animated source→target
   flow overlay (dash/pulse/comet/chevron)
+- `overlay_frame.js` — the one rAF/signature/teardown coalescer the three
+  owned-canvas overlays (bubbles, heatmap, notes) render through
+- `overlay_keys.js` — the "has the cached fit gone stale?" keys those layers
+  compare (member-id key, position checksum, style key)
+- `shortest_path.js` — shortest-path selection between two picked nodes
 - `label_renderers.js`, `pie_slices.js`, `shape_textures.js`, `minimap.js`,
   `visible_graph.js`, `lasso_geometry.js`, `communities.js`, `export_svg.js`,
-  `webgl_support.js`
+  `webgl_support.js`, `dpr_watch.js`
 
 ### Functional managers (`src/managers/`, plus `assistant/`)
 
 Business logic and UI:
 
 - `io.js` — `IOManager`: Excel/JSON loading, export (JSON / PNG / SVG), data
-  preprocessing, Excel template generation
+  preprocessing; the Excel column schema lives in `excel_schema.js` and the
+  downloadable workbook in `excel_template.js`
 - `ui.js` — loading overlays, UI enable/disable, notifications, presentation mode,
   and the inspector's overlay layer stack (`OVERLAYS`: one table row per thing
   drawn over the graph, each layer answering `visible`/`setVisible`)
@@ -109,7 +121,11 @@ Business logic and UI:
 ### Utilities (`src/utilities/`)
 
 - `static.js` — validation, colour math, deep-merge helpers
-- `popup.js` / `popover_position.js` / `checklist_popup.js` — modal, popover positioning, checklist dialogs
+- `popup.js` / `popover_position.js` / `checklist_popup.js` — modal, popover
+  positioning (anchor clamping plus the dropdown flip-up maths), checklist dialogs
+- `ui_tooltip.js` — the delegated tooltip layer: strips native `title`s and
+  renders them itself, and owns `splitShortcut`, the one parser for the trailing
+  "(F)" accelerator the command palette also reads
 - `data_editor.js` — spreadsheet-like data editor (`DataTable`), incl. Excel export
 - `demo_loader.js` — STRING DB protein-interaction demo data
 - `neo4j_loader.js` — Neo4j connector (HTTP transactional Cypher API, no driver dependency)

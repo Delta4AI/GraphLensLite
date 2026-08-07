@@ -36,7 +36,7 @@
  */
 import { DEFAULTS } from '../config.js';
 import { currentTheme } from '../utilities/theme.js';
-import { positionsChecksum } from './bubble_geometry.js';
+import { positionsChecksum } from './overlay_keys.js';
 import { prepareOverlayCanvas } from './dpr_watch.js';
 import { FrameCoalescer } from './overlay_frame.js';
 import {
