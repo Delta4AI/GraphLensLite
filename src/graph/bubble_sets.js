@@ -398,7 +398,30 @@ class GraphBubbleSetManager {
     this.cache.ui?.syncOverlays?.();
   }
 
+  /**
+   * Drop every group the CURRENT workspace does not own. Renderer state and the
+   * change-detection baseline are global while groups are per-workspace, so a
+   * switch (or a fresh template workspace, which selects itself before clearing)
+   * otherwise leaves the outgoing workspace's outlines on the layer — refitted
+   * to the new positions, with nothing in the Groups panel to explain them.
+   * Dropping the baseline too, so switching back redraws them.
+   */
+  #evictForeignGroups() {
+    const own = new Set(this.traverseBubbleSets());
+    const known = new Set([
+      ...(this.cache.graph?.bubbleLayer?.groups?.keys() ?? []),
+      ...this.cache.lastBubbleSetMembers.keys(),
+    ]);
+    for (const group of known) {
+      if (own.has(group)) continue;
+      this.cache.graph?.bubbleLayer?.removeGroup(group);
+      delete this.cache.INSTANCES.BUBBLE_GROUPS[group];
+      this.cache.lastBubbleSetMembers.delete(group);
+    }
+  }
+
   async updateBubbleSetIfChanged() {
+    this.#evictForeignGroups();
     for (let group of this.traverseBubbleSets()) {
       // A group created at runtime has no baseline yet — the fixed four were
       // always pre-seeded here by layout creation, which is no longer true.
@@ -464,18 +487,6 @@ class GraphBubbleSetManager {
       : (nodeID) => members.includes(nodeID);
 
     return [...this.cache.nodeRef.keys()].filter(nodeID => !checkMembership(nodeID));
-  }
-
-  async clearBubbleSetInstanceMembers() {
-    for (const group of this.traverseBubbleSets()) {
-      await this.cache.INSTANCES.BUBBLE_GROUPS[group].update({
-        members: [],
-        fillOpacity: 0,
-        strokeOpacity: 0,
-        label: false,
-      });
-      await this.cache.INSTANCES.BUBBLE_GROUPS[group].drawBubbleSets();
-    }
   }
 
   /**

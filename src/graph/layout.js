@@ -356,13 +356,6 @@ class GraphLayoutManager {
       this.cache.ui.updateFilterLockState();
       this.cache.ui.clearActivePropsCacheOnLayoutChange();
 
-      // Clear bubble groups completely
-      await this.cache.bs.clearBubbleSetInstanceMembers();
-      this.cache.lastBubbleSetMembers.clear();
-      for (let group of this.cache.bs.traverseBubbleSets()) {
-        this.cache.lastBubbleSetMembers.set(group, new Set());
-      }
-
       // Process filters to determine which nodes should be visible
       await this.cache.gcm.preRenderEvent();
 

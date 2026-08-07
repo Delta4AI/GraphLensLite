@@ -288,3 +288,39 @@ describe("clear actions span both membership sources", () => {
     expect(cache.uiComponents.refreshGroupChips).toHaveBeenCalledTimes(1);
   });
 });
+
+// --------------------------------------------------------------------------
+// Groups are per-workspace, but the renderer's group state and the
+// change-detection baseline are global. Switching to (or creating) a workspace
+// that doesn't own a group must evict it, or the layer keeps painting outlines
+// the Groups panel doesn't list.
+// --------------------------------------------------------------------------
+describe("updateBubbleSetIfChanged eviction", () => {
+  it("drops layer + baseline state for groups the current workspace lacks", async () => {
+    const layout = { filters: new Map(), bubbleSetStyle: {} };
+    const cache = makeCache(layout);
+    cache.graph.bubbleLayer = { groups: new Map([["groupOne", {}]]), removeGroup: vi.fn() };
+    cache.INSTANCES.BUBBLE_GROUPS.groupOne = {};
+    cache.lastBubbleSetMembers.set("groupOne", new Set(["n1"]));
+
+    const bs = new GraphBubbleSetManager(cache);
+    await bs.updateBubbleSetIfChanged();
+
+    expect(cache.graph.bubbleLayer.removeGroup).toHaveBeenCalledWith("groupOne");
+    expect(cache.INSTANCES.BUBBLE_GROUPS.groupOne).toBeUndefined();
+    expect(cache.lastBubbleSetMembers.has("groupOne")).toBe(false);
+  });
+
+  it("keeps the groups the current workspace does own", async () => {
+    const layout = makeLayout();
+    const cache = makeCache(layout);
+    cache.graph.bubbleLayer = { groups: new Map([["groupOne", {}]]), removeGroup: vi.fn() };
+    cache.lastBubbleSetMembers.set("groupOne", new Set());
+
+    const bs = new GraphBubbleSetManager(cache);
+    await bs.updateBubbleSetIfChanged();
+
+    expect(cache.graph.bubbleLayer.removeGroup).not.toHaveBeenCalled();
+    expect(cache.lastBubbleSetMembers.has("groupOne")).toBe(true);
+  });
+});
