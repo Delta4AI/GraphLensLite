@@ -73,6 +73,7 @@ function makeCache(renderedNodes = [], selectedNodes = []) {
     ui: {
       showLoading: vi.fn().mockResolvedValue(undefined),
       hideLoading: vi.fn().mockResolvedValue(undefined),
+      setLoadingCancel: vi.fn(),
       setDataSourceLabel: vi.fn(),
       error: vi.fn(),
       info: vi.fn(),
@@ -463,6 +464,31 @@ describe('expandNeo4jSelection', () => {
     // The anchor kept its position; the new node was seeded near it.
     expect(merged.nodes.find((n) => n.id === '1').style.x).toBe(5);
     expect(merged.nodes.find((n) => n.id === '9').style.x).toBeDefined();
+  });
+
+  it('offers a cancel that aborts the in-flight preflight', async () => {
+    // Expand runs under the full-screen overlay: no signal meant a slow
+    // neighbourhood locked the UI until the five-minute timeout.
+    startNeo4jSession(CONFIG, [rawNode('1', 'Person', {}, { elementId: '4:abc:1' })], [], NO_EXCLUSIONS);
+    const cache = makeCache([{ id: '1', style: { x: 5, y: 5 } }], ['1']);
+    const fetchImpl = vi.fn().mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init.signal.addEventListener('abort', () => {
+            const err = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }),
+    );
+    const pending = expandNeo4jSelection(cache, { fetchImpl });
+
+    await vi.waitFor(() => expect(cache.ui.setLoadingCancel).toHaveBeenCalled());
+    cache.ui.setLoadingCancel.mock.calls.at(-1)[0]();
+
+    expect(await pending).toBe(false);
+    // Cancelling is not a failure to report back at the user.
+    expect(cache.ui.error).not.toHaveBeenCalled();
   });
 
   it('informs instead of merging when the selection has no neighbors', async () => {

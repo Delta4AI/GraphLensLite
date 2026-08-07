@@ -454,10 +454,19 @@ async function expandNeo4jSelection(cache, deps = {}) {
   }
 
   const checklist = deps.checklist ?? showExpandChecklist;
-  const opts = deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {};
+  // Import and join both hand their query a signal; expand ran under the
+  // full-screen overlay with none, so a slow neighbourhood locked the UI for
+  // up to the five-minute timeout with nothing to press.
+  const controller = new AbortController();
+  const opts = { signal: controller.signal };
+  if (deps.fetchImpl) opts.fetchImpl = deps.fetchImpl;
   const progress = async (message) => {
-    if (message) await cache.ui.showLoading('Neo4j', message);
-    else await cache.ui.hideLoading();
+    if (message) {
+      await cache.ui.showLoading('Neo4j', message);
+      cache.ui.setLoadingCancel?.(() => controller.abort());
+    } else {
+      await cache.ui.hideLoading();
+    }
   };
 
   try {
@@ -502,6 +511,9 @@ async function expandNeo4jSelection(cache, deps = {}) {
     return await mergeAndApply(cache, nodes, relationships, deps);
   } catch (err) {
     await progress(null);
+    // The user pressed Cancel — they know; reporting it back would be telling
+    // them off for cancelling.
+    if (err?.name === 'AbortError') return false;
     cache.ui.error(`Neo4j expand: ${connectionHint(err)}`);
     return false;
   }

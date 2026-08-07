@@ -128,10 +128,25 @@ class UIManager {
     return new Promise((resolve) => requestAnimationFrame(resolve));
   }
 
+  /**
+   * Offer a Cancel on the loading card for as long as an operation can be
+   * abandoned. The overlay blocks the whole UI, so a query with a five-minute
+   * timeout and no cancel is a five-minute lockout. Cleared by hideLoading.
+   *
+   * @param {(() => void)|null} onCancel
+   */
+  setLoadingCancel(onCancel) {
+    const btn = document.getElementById('loadingCancelBtn');
+    if (!btn) return;
+    btn.hidden = !onCancel;
+    btn.onclick = onCancel ?? null;
+  }
+
   async hideLoading() {
     // Pinned open by an in-progress orchestration — keep blocking until it
     // releases its hold and calls hideLoading() itself at the true end.
     if (this._loadingHolds > 0) return;
+    this.setLoadingCancel(null);
 
     const overlay = document.getElementById('loadingOverlay');
     // Idempotent: already hidden (e.g. a defensive second call in a finally) —
