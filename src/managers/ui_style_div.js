@@ -1,48 +1,140 @@
 import {StaticUtilities} from "../utilities/static.js";
 
+// ----------------------------------------------------------- DOM primitives
+// The style div's generic control builders. They only ever needed their
+// arguments, but lived as closures inside createStyleDiv — a 1556-line
+// function whose single export made none of it importable or testable.
+
+function createNewRow(parent) {
+  const row = document.createElement("div");
+  row.classList.add("card-row");
+  parent.appendChild(row);
+  return row;
+}
+
+function appendVerticalRule(parent, label = undefined, tooltip = undefined, id = undefined, customCSSClass = undefined) {
+  const verticalRule = document.createElement("div");
+  verticalRule.className = "vr";
+  if (customCSSClass) verticalRule.classList.add(customCSSClass);
+  parent.appendChild(verticalRule);
+  appendLabel(parent, label, tooltip, id, customCSSClass);
+}
+
+function appendHorizontalRule(parent, label = undefined, tooltip = undefined, id = undefined, customCSSClass = undefined) {
+  const horizontalRule = document.createElement("hr");
+  horizontalRule.className = "hr";
+  if (customCSSClass) horizontalRule.classList.add(customCSSClass);
+  parent.appendChild(horizontalRule);
+}
+
+function createLabel(labelText, tooltip = undefined) {
+  if (labelText) {
+    const label = document.createElement("label");
+    label.textContent = labelText;
+    label.className = "vr-label";
+    label.id = labelText;
+    if (tooltip) label.title = tooltip;
+    return label;
+  }
+  return null;
+}
+
+function appendLabel(parent, labelText, tooltip = undefined, id = undefined, customCSSClass = undefined) {
+  const label = createLabel(labelText, tooltip);
+  if (id) label.id = id;
+  if (customCSSClass) label.classList.add(customCSSClass);
+  if (label) parent.appendChild(label);
+}
+
+function createSwitch(callback = undefined, inputId = undefined, enabledByDefault = false) {
+  const label = document.createElement('label');
+  label.className = 'switch';
+
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = enabledByDefault;
+
+  const span = document.createElement('span');
+  span.className = 'slider round';
+
+  if (callback) {
+    input.addEventListener('change', callback);
+  }
+
+  if (inputId) {
+    input.id = inputId;
+    label.id = `${inputId}Label`;
+  }
+
+  label.append(input, span);
+
+  label.setChecked = (checked) => {
+    input.checked = checked;
+  };
+
+  label.toggle = () => {
+    input.checked = !input.checked;
+  };
+
+  label.isChecked = () => input.checked;
+
+  return label;
+}
+
+function createColorPicker(defaultColor, title) {
+  const colorPicker = document.createElement("input");
+  colorPicker.type = "color";
+  colorPicker.classList.add("style-inner-button");
+  colorPicker.style.width = "24px";
+  colorPicker.value = defaultColor;
+  colorPicker.title = title;
+  return colorPicker;
+}
+
+function createButton(label, tooltip, callback, id = undefined) {
+  const btn = document.createElement("button");
+  btn.textContent = label;
+  btn.title = tooltip;
+  btn.classList.add("style-inner-button");
+  if (label === "Clear") btn.classList.add("red");
+  if (id) {
+    btn.id = id;
+  } else {
+    btn.id = label;
+  }
+  btn.onclick = () => {
+    callback();
+  }
+  return btn;
+}
+
+function appendButton(parent, label, tooltip, callback) {
+  const btn = createButton(label, tooltip, callback);
+  parent.appendChild(btn);
+}
+
+function createInput(widthInPx = 80, placeholder = undefined, title = undefined,
+                     defaultValue = undefined, callback = undefined) {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = placeholder;
+  input.title = title;
+  input.classList.add("style-input");
+  input.style.width = `${widthInPx}px`;
+  input.value = defaultValue || "";
+  if (callback) {
+    input.addEventListener("keypress", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        callback(input.value.trim());
+      }
+    });
+  }
+  return input;
+}
+
 function createStyleDiv(cache) {
   const root = document.createElement("div");
-
-  function createNewRow(parent) {
-    const row = document.createElement("div");
-    row.classList.add("card-row");
-    parent.appendChild(row);
-    return row;
-  }
-
-  function appendVerticalRule(parent, label = undefined, tooltip = undefined, id = undefined, customCSSClass = undefined) {
-    const verticalRule = document.createElement("div");
-    verticalRule.className = "vr";
-    if (customCSSClass) verticalRule.classList.add(customCSSClass);
-    parent.appendChild(verticalRule);
-    appendLabel(parent, label, tooltip, id, customCSSClass);
-  }
-
-  function appendHorizontalRule(parent, label = undefined, tooltip = undefined, id = undefined, customCSSClass = undefined) {
-    const horizontalRule = document.createElement("hr");
-    horizontalRule.className = "hr";
-    if (customCSSClass) horizontalRule.classList.add(customCSSClass);
-    parent.appendChild(horizontalRule);
-  }
-
-  function createLabel(labelText, tooltip = undefined) {
-    if (labelText) {
-      const label = document.createElement("label");
-      label.textContent = labelText;
-      label.className = "vr-label";
-      label.id = labelText;
-      if (tooltip) label.title = tooltip;
-      return label;
-    }
-    return null;
-  }
-
-  function appendLabel(parent, labelText, tooltip = undefined, id = undefined, customCSSClass = undefined) {
-    const label = createLabel(labelText, tooltip);
-    if (id) label.id = id;
-    if (customCSSClass) label.classList.add(customCSSClass);
-    if (label) parent.appendChild(label);
-  }
 
   function createCard(label, parent = undefined, additionalCSSClass = undefined) {
     const card = document.createElement("div");
@@ -56,41 +148,6 @@ function createStyleDiv(cache) {
       root.appendChild(card);
     }
     return card;
-  }
-
-  function createSwitch(callback = undefined, inputId = undefined, enabledByDefault = false) {
-    const label = document.createElement('label');
-    label.className = 'switch';
-
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.checked = enabledByDefault;
-
-    const span = document.createElement('span');
-    span.className = 'slider round';
-
-    if (callback) {
-      input.addEventListener('change', callback);
-    }
-
-    if (inputId) {
-      input.id = inputId;
-      label.id = `${inputId}Label`;
-    }
-
-    label.append(input, span);
-
-    label.setChecked = (checked) => {
-      input.checked = checked;
-    };
-
-    label.toggle = () => {
-      input.checked = !input.checked;
-    };
-
-    label.isChecked = () => input.checked;
-
-    return label;
   }
 
   async function handleStyleChangeEvent(property, value) {
@@ -358,16 +415,6 @@ function createStyleDiv(cache) {
     parent.appendChild(container);
   }
 
-  function createColorPicker(defaultColor, title) {
-    const colorPicker = document.createElement("input");
-    colorPicker.type = "color";
-    colorPicker.classList.add("style-inner-button");
-    colorPicker.style.width = "24px";
-    colorPicker.value = defaultColor;
-    colorPicker.title = title;
-    return colorPicker;
-  }
-
   function createColorControls(parent, property, defaultColor, colors, continuousScaleBtn = true, customCSSClass = undefined) {
     const colorButtonDiv = document.createElement("div");
     colorButtonDiv.className = "style-color-button-container";
@@ -486,48 +533,6 @@ function createStyleDiv(cache) {
     parent.appendChild(setToIDButton);
     parent.appendChild(setToLabelButton);
     parent.appendChild(clearLabelButton);
-  }
-
-  function createButton(label, tooltip, callback, id = undefined) {
-    const btn = document.createElement("button");
-    btn.textContent = label;
-    btn.title = tooltip;
-    btn.classList.add("style-inner-button");
-    if (label === "Clear") btn.classList.add("red");
-    if (id) {
-      btn.id = id;
-    } else {
-      btn.id = label;
-    }
-    btn.onclick = () => {
-      callback();
-    }
-    return btn;
-  }
-
-  function appendButton(parent, label, tooltip, callback) {
-    const btn = createButton(label, tooltip, callback);
-    parent.appendChild(btn);
-  }
-
-  function createInput(widthInPx = 80, placeholder = undefined, title = undefined,
-                       defaultValue = undefined, callback = undefined) {
-    const input = document.createElement("input");
-    input.type = "text";
-    input.placeholder = placeholder;
-    input.title = title;
-    input.classList.add("style-input");
-    input.style.width = `${widthInPx}px`;
-    input.value = defaultValue || "";
-    if (callback) {
-      input.addEventListener("keypress", function (event) {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          callback(input.value.trim());
-        }
-      });
-    }
-    return input;
   }
 
   function createNodeShapeControls(parent) {
@@ -1557,4 +1562,13 @@ function createStyleDiv(cache) {
   return root;
 }
 
-export {createStyleDiv}
+export {
+  createStyleDiv,
+  createNewRow,
+  createLabel,
+  appendLabel,
+  createSwitch,
+  createButton,
+  createInput,
+  createColorPicker,
+}
