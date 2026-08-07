@@ -445,8 +445,12 @@ class GraphLayoutManager {
       return;
     }
 
-    const name = await Popup.prompt(`Rename workspace "${current}" to:`);
-    if (!name || name === current) return;
+    const name = await Popup.prompt(`Rename workspace "${current}" to:`, current);
+    if (name === null || name === current) return;
+    if (!name) {
+      this.cache.ui.error('A workspace name cannot be empty.');
+      return;
+    }
     if (Object.keys(this.cache.data.layouts).includes(name)) {
       this.cache.ui.error(`Workspace with name "${name}" already exists.`);
       return;
@@ -467,8 +471,14 @@ class GraphLayoutManager {
       return;
     }
 
+    // Deletion is permanent and it also strands every undo entry taken in that
+    // workspace (history.js drops entries whose workspace is gone), so the
+    // confirm has to name both — "are you sure" named neither.
     const confirmed = await Popup.confirm(
-      `Are you sure you want to delete workspace "${this.cache.data.selectedLayout}"?`
+      `Delete workspace "${this.cache.data.selectedLayout}" permanently? Its node positions, ` +
+        'styles, bubble groups and notes go with it, and its undo history becomes unusable. ' +
+        'This cannot be undone.',
+      'Delete workspace'
     );
     if (!confirmed) return false;
 

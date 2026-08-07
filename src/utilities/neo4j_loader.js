@@ -910,7 +910,7 @@ function openNeo4jPopup(cache) {
       // encryption: over plain http: to anything but the local machine they
       // are readable by everything on the path. A line of disclaimer text in
       // the form is not consent.
-      if (needsPlaintextConfirm(parsed) && (await Popup.confirm(plaintextWarning(parsed))) !== true) {
+      if (needsPlaintextConfirm(parsed) && (await Popup.confirm(plaintextWarning(parsed), 'Connect anyway')) !== true) {
         return;
       }
 

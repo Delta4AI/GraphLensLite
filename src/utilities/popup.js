@@ -44,11 +44,17 @@ class Popup {
     this.init(content);
   }
 
-static async prompt(message) {
+/**
+   * Single-line input modal. Resolves the trimmed value, '' on empty submit, or
+   * null when dismissed. `initialValue` pre-fills and pre-selects the box — a
+   * rename that starts empty makes the user retype what they are editing.
+   */
+  static async prompt(message, initialValue = '') {
     return new Promise((resolve) => {
       const inputField = document.createElement('input');
       inputField.type = 'text';
       inputField.className = "p-prompt";
+      inputField.value = initialValue;
 
       const content = document.createElement('div');
       const messageEl = document.createElement('div');
@@ -93,12 +99,23 @@ static async prompt(message) {
         }
       });
 
-      setTimeout(() => inputField.focus(), 0);
+      setTimeout(() => inputField.select(), 0);
     });
   }
 
 
-  static async confirm(message) {
+  /**
+   * Yes/no modal. Resolves true (confirmed), false (cancelled) or null (closed).
+   *
+   * Cancel takes the focus, so Enter on a confirm the user has not read yet is
+   * the SAFE answer — several callers here discard the loaded graph, a
+   * workspace or a conversation. `confirmLabel` names the action instead of
+   * saying "OK": the verb is the last thing between the user and the damage.
+   *
+   * @param {string} message
+   * @param {string} [confirmLabel]
+   */
+  static async confirm(message, confirmLabel = 'OK') {
     return new Promise((resolve) => {
       const content = document.createElement('div');
       const messageEl = document.createElement('div');
@@ -113,7 +130,7 @@ static async prompt(message) {
       cancelBtn.className = "p-button p-button-secondary";
 
       const confirmBtn = document.createElement('button');
-      confirmBtn.textContent = 'OK';
+      confirmBtn.textContent = confirmLabel;
       confirmBtn.className = "p-button p-button-primary";
 
       buttonContainer.appendChild(cancelBtn);
@@ -146,7 +163,7 @@ static async prompt(message) {
         resolve(false);
       });
 
-      setTimeout(() => confirmBtn.focus(), 0);
+      setTimeout(() => cancelBtn.focus(), 0);
     });
   }
 

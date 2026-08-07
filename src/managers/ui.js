@@ -336,7 +336,15 @@ class UIManager {
     toast.appendChild(dismiss);
 
     host.appendChild(toast);
-    while (host.childElementCount > MAX_TOASTS) host.firstElementChild.remove();
+    // Evict the oldest NON-error first: four routine info toasts used to push a
+    // red one off screen, and the error is the only one the user has to read.
+    // Errors still go when they are all there is.
+    while (host.childElementCount > MAX_TOASTS) {
+      const victim =
+        host.querySelector(`:scope > :not(.toast-red):not(.toast-dark-orange)`) ??
+        host.firstElementChild;
+      victim.remove();
+    }
     setTimeout(() => toast.remove(), TOAST_MS[colorClass] ?? TOAST_DEFAULT_MS);
 
     return toast;
@@ -406,7 +414,10 @@ class UIManager {
   async reloadApp() {
     if (!this.cache.initialized) return;
 
-    const confirmed = await Popup.confirm('Reload the application and start from scratch?');
+    const confirmed = await Popup.confirm(
+      'Reload the application and start from scratch? Everything loaded is discarded.',
+      'Reload'
+    );
     if (confirmed) {
       location.reload();
     }

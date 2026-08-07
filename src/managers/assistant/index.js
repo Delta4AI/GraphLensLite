@@ -720,7 +720,7 @@ class AssistantManager {
     // One click would otherwise drop a whole conversation with no undo. An
     // empty one has nothing to lose, so it clears without the interruption.
     if (this._history.length) {
-      const confirmed = await Popup.confirm('Clear the conversation? This cannot be undone.')
+      const confirmed = await Popup.confirm('Clear the conversation? This cannot be undone.', 'Clear')
       if (!confirmed) return
     }
     // Clearing is an explicit "stop and reset" signal — kill any in-flight

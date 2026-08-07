@@ -529,7 +529,8 @@ class GraphBubbleSetManager {
       (await Popup.confirm(
         `Routing "${name}" around the other ${candidates.length.toLocaleString()} nodes takes ` +
           `${describeDuration(estimate)}, and the app cannot respond while it computes. ` +
-          'Compute it anyway?'
+          'Compute it anyway?',
+        'Compute'
       )) === true;
     this.avoidConsent.set(group, accepted);
     return accepted ? candidates : [];

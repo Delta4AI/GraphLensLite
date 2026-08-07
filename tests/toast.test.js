@@ -131,6 +131,23 @@ describe("UIManager toasts", () => {
     expect(toasts()[3].textContent).toContain("message 8");
   });
 
+  it("evicts routine toasts before an error", () => {
+    ui.error("boom");
+    for (let i = 0; i < 6; i++) ui.info(`message ${i}`);
+
+    const texts = toasts().map((t) => t.textContent);
+    expect(toasts()).toHaveLength(4);
+    expect(texts[0]).toContain("boom");
+    expect(texts.slice(1).join(" ")).toContain("message 5");
+  });
+
+  it("evicts an error only when errors are all there is", () => {
+    for (let i = 0; i < 6; i++) ui.error(`boom ${i}`);
+
+    expect(toasts()).toHaveLength(4);
+    expect(toasts()[0].textContent).toContain("boom 2");
+  });
+
   it("survives a missing toast host (headless harnesses, tests)", () => {
     document.getElementById("toasts").remove();
     expect(() => ui.info("hello")).not.toThrow();

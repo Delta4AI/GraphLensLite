@@ -243,7 +243,8 @@ class Rail {
   async #replacingGraph(lead, action) {
     if (!this.cache.initialized) return action();
     const confirmed = await Popup.confirm(
-      `${lead} replaces the loaded graph, discarding every workspace, style and group in it. Continue?`
+      `${lead} replaces the loaded graph, discarding every workspace, style and group in it. Continue?`,
+      'Discard and continue'
     );
     if (confirmed) action();
   }

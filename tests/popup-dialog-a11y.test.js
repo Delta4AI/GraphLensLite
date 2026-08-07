@@ -129,14 +129,25 @@ describe('Popup dialog semantics', () => {
     expect(onClose).toHaveBeenCalledOnce(); // not twice
   });
 
-  it('lets the static helpers keep focusing their own control', async () => {
+  // Cancel, not OK: several callers discard the loaded graph or a workspace, so
+  // Enter on an unread confirm has to be the harmless answer.
+  it('focuses Cancel, not the confirming action', async () => {
     const pending = Popup.confirm('Sure?');
     await vi.waitFor(() =>
-      expect(document.activeElement.className).toContain('p-button-primary')
+      expect(document.activeElement.className).toContain('p-button-secondary')
     );
 
     document.querySelector('.p-button-secondary').click();
     expect(await pending).toBe(false);
+  });
+
+  it('labels the confirming button with the caller\'s verb', async () => {
+    const pending = Popup.confirm('Delete it?', 'Delete workspace');
+    await vi.waitFor(() => expect(document.querySelector('.p-button-primary')).toBeTruthy());
+    expect(document.querySelector('.p-button-primary').textContent).toBe('Delete workspace');
+
+    document.querySelector('.p-button-primary').click();
+    expect(await pending).toBe(true);
   });
 
   it('resolves a confirm as dismissed when Escape takes it', async () => {
