@@ -26,17 +26,28 @@ const VIEWPORT_MARGIN_PX = 8;
 const SHORTCUT_RE = /^(.*?)\s*\((\?|[A-Za-z]|(?:Ctrl|Alt|Shift|⇧|⌘)\+?\S{1,3})\)$/;
 
 /**
+ * Split a trailing keyboard accelerator off a title. ONE parser for the whole
+ * app: the tooltip layer renders it as a kbd chip and the command palette shows
+ * it as a row accelerator, and while each had its own regex they disagreed —
+ * "(⇧F)" got a chip in the tooltip and no accelerator in the palette.
+ *
+ * @param {string} text
+ * @returns {{text: string, shortcut: string|null}}
+ */
+export function splitShortcut(text) {
+  const m = String(text ?? '').match(SHORTCUT_RE);
+  return m ? { text: m[1], shortcut: m[2] } : { text: String(text ?? ''), shortcut: null };
+}
+
+/**
  * Split a title string into renderable parts.
  * @param {string} text
  * @returns {{lead: string|null, body: string, shortcut: string|null}}
  */
 function parseTip(text) {
-  let shortcut = null;
-  const m = text.match(SHORTCUT_RE);
-  if (m) {
-    text = m[1];
-    shortcut = m[2];
-  }
+  const split = splitShortcut(text);
+  const shortcut = split.shortcut;
+  text = split.text;
   const dash = text.indexOf(' — ');
   if (dash > 0) {
     return { lead: text.slice(0, dash), body: text.slice(dash + 3), shortcut };

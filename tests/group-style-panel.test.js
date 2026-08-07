@@ -109,6 +109,50 @@ describe('buildGroupStylePanel', () => {
     );
   });
 
+  // ------------------------------------------------------------------------
+  // One label → field map (GROUP_STYLE_FIELDS in bubble_sets.js) drives BOTH
+  // readers: the write path and the pane's read-back. The strings used to be
+  // listed three times, so a knob could be built, written and still read back
+  // stale after a load or a ✨ Re-tune.
+  // ------------------------------------------------------------------------
+  it('writes and reads back every knob the pane builds', async () => {
+    const { cache, panel } = mountPanelFor(GROUP_STYLE);
+    const { GraphBubbleSetManager } = await import('../src/graph/bubble_sets.js');
+
+    // A real manager over the same cache: the pane is already mounted, so
+    // refreshBubbleStyleElements has to find and fill every control.
+    const bs = new GraphBubbleSetManager(cache);
+    bs.selectedGroup = 'g1';
+    cache.bs = bs;
+    bs.traverseBubbleSets = () => ['g1'];
+    bs.getEffectiveGroupMembers = () => new Set(['n1']);
+    cache.ui.syncOverlays = vi.fn();
+
+    const style = cache.data.layouts.Default.bubbleSetStyle.g1;
+    // Values a load or a re-tune would install behind the pane's back.
+    Object.assign(style, {
+      padding: 0.4,
+      corridor: 0.7,
+      fillOpacity: 0.55,
+      labelText: 'Renamed',
+      labelFontSize: 9,
+      labelPlacement: 'bottom',
+      avoidance: 0,
+    });
+
+    bs.refreshBubbleStyleElements();
+
+    const slider = (p) => control(panel, p).querySelector('input[type="range"]').value;
+    expect(slider('Bubble Set g1 Padding')).toBe('0.4');
+    expect(slider('Bubble Set g1 Corridor Width')).toBe('0.7');
+    // Fill opacity was NOT synced before the map: nothing read it back.
+    expect(slider('Bubble Set g1 Fill Opacity')).toBe('0.55');
+    expect(slider('Bubble Set g1 Label Font Size')).toBe('9');
+    expect(control(panel, 'Bubble Set g1 Label Text').value).toBe('Renamed');
+    expect(control(panel, 'Bubble Set g1 Label Placement').value).toBe('bottom');
+    expect(control(panel, 'Bubble Set g1 Avoidance').querySelector('input').checked).toBe(false);
+  });
+
   it('empties the pane for an unknown or cleared group', () => {
     const { cache, panel } = mountPanelFor(GROUP_STYLE);
     expect(panel.children.length).toBeGreaterThan(0);

@@ -157,6 +157,14 @@ describe('the index is derived from the DOM', () => {
     cache = makeCache();
   });
 
+  it('reads the accelerator with the same parser the tooltip chip uses', () => {
+    // Two regexes disagreed: "(⇧F)" rendered a kbd chip in the tooltip and gave
+    // no accelerator here.
+    const btn = document.getElementById('fitBtn');
+    btn.title = 'Fit the graph in the viewport (⇧F)';
+    expect(named(collectCommands(cache), 'Fit')).toMatchObject({ accel: '⇧F' });
+  });
+
   it('indexes rail buttons by label, accessible name and tooltip accelerator', () => {
     const cmds = collectCommands(cache);
     expect(named(cmds, 'Fit')).toMatchObject({ trail: 'Rail', accel: 'F', kind: 'run' });

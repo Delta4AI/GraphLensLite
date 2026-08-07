@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { clampPopoverLeft, clampPopoverTop } from "../src/utilities/popover_position.js";
+import {
+  clampPopoverLeft,
+  clampPopoverTop,
+  computeDropdownPlacement,
+} from "../src/utilities/popover_position.js";
 
 // ==========================================================================
 // Popover left-edge placement. The bug: when the anchor sits near the right
@@ -62,3 +66,48 @@ describe("clampPopoverTop", () => {
     expect(clampPopoverTop(100, HEIGHT, 200)).toBe(8);
   });
 });
+
+// ==========================================================================
+// Dropdown placement — flips a filter dropdown upward when it would be cut off
+// at the bottom of the window, scrolling only when even the larger side is too
+// small (regression: bottom-of-panel dropdowns were unusable). Lived in
+// StaticUtilities until the two placement homes were merged into this one.
+// ==========================================================================
+
+describe('computeDropdownPlacement', () => {
+  const rect = (top, bottom, left = 100) => ({ top, bottom, left })
+
+  it('opens below the anchor when there is room', () => {
+    const p = computeDropdownPlacement({
+      anchorRect: rect(100, 120),
+      dropdownHeight: 200,
+      viewportHeight: 800,
+    })
+    expect(p.openUp).toBe(false)
+    expect(p.top).toBe(120) // anchor bottom
+    expect(p.left).toBe(97) // anchor left - 3
+    expect(p.maxHeight).toBeNull() // fits, no scroll
+  })
+
+  it('flips upward when the anchor sits near the bottom edge', () => {
+    const p = computeDropdownPlacement({
+      anchorRect: rect(560, 580),
+      dropdownHeight: 200,
+      viewportHeight: 600, // only 16px below, 556px above
+    })
+    expect(p.openUp).toBe(true)
+    expect(p.top).toBe(360) // anchorTop(560) - height(200)
+    expect(p.maxHeight).toBeNull() // fits above without scroll
+  })
+
+  it('caps height and scrolls when even the larger side is too small', () => {
+    const p = computeDropdownPlacement({
+      anchorRect: rect(300, 320),
+      dropdownHeight: 400,
+      viewportHeight: 600, // below: 276, above: 296 -> flip up, still < 400
+    })
+    expect(p.openUp).toBe(true)
+    expect(p.maxHeight).toBe(296) // spaceAbove - margin
+    expect(p.top).toBe(4) // anchorTop(300) - height(296)
+  })
+})

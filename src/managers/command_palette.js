@@ -18,6 +18,7 @@
  * - `focus` centres a node or edge matched by ID or label. This absorbs the old
  *   "Focus Elements" card, which was two datalists behind a section title.
  */
+import { splitShortcut } from '../utilities/ui_tooltip.js';
 
 const MAX_RESULTS = 60;
 const MAX_ELEMENTS = 8;
@@ -27,11 +28,9 @@ const FLASH_MS = 1200;
 const ENTER_HINTS = { run: 'run', reveal: 'show', focus: 'go to' };
 // Rail and menu tooltips already end in "(F)", "(L)", "(D)" … — free
 // accelerators, and they cannot drift from the hotkey they document because
-// they ARE the tooltip the user reads on hover.
-// A trailing accelerator in a title: one bare key, a ⌘ chord, or a spelled-out
-// modifier chord. Deliberately not "any short parenthetical" — that would read
-// "(beta)" as a keystroke.
-const ACCEL_RE = /\((⌘\S{1,2}|(?:Ctrl|Alt|Shift)\+\S{1,2}|[^()\s])\)\s*$/;
+// they ARE the tooltip the user reads on hover. The parser is ui_tooltip's
+// (splitShortcut): two copies disagreed, so "(⇧F)" rendered a kbd chip in the
+// tooltip and yielded no accelerator here.
 
 const hasWords = (text) => /[a-z]{2}/i.test(text || '');
 const clean = (text) =>
@@ -63,7 +62,7 @@ function controlName(el) {
 }
 
 function accelerator(el) {
-  return (el.getAttribute?.('title') ?? el.dataset?.tip)?.match(ACCEL_RE)?.[1] ?? '';
+  return splitShortcut(el.getAttribute?.('title') ?? el.dataset?.tip).shortcut ?? '';
 }
 
 /** Hidden by an attribute or an inline style anywhere below `root`. */

@@ -15,6 +15,44 @@ import {renderGroupList, syncGroupRows} from "../managers/group_list.js";
 // one extra confirm, never a freeze the user did not agree to.
 const AVOID_FIT_MS_PER_PAIR = 0.006;
 
+/**
+ * The per-group style controls, keyed by the human-readable label that travels
+ * in `data-property` ("Bubble Set <group> <label>").
+ *
+ * ONE map: the label strings used to be re-listed three times — a 20-case
+ * switch in updateBubbleSetStyle, a second run of sync calls in
+ * refreshBubbleStyleElements, and again in ui_style_div's builders — so adding
+ * a knob meant three edits and a knob that read back stale was the failure.
+ * ui_style_div still authors the DOM (each row has its own min/max/step), but
+ * both READERS derive from here.
+ *
+ * `kind` says which control renders it: color/slider/switch/text/select.
+ * `also` is a second field the same value writes (fill drives the label
+ * background so a recoloured group's label follows it).
+ * `read` maps the stored value to the control's state where they differ.
+ */
+const GROUP_STYLE_FIELDS = Object.freeze({
+  'Fill Color': { field: 'fill', kind: 'color', also: 'labelBackgroundFill' },
+  'Fill Opacity': { field: 'fillOpacity', kind: 'slider' },
+  'Stroke Color': { field: 'stroke', kind: 'color' },
+  'Stroke Opacity': { field: 'strokeOpacity', kind: 'slider' },
+  'Padding': { field: 'padding', kind: 'slider' },
+  'Corridor Width': { field: 'corridor', kind: 'slider' },
+  // Numeric 0/1 for JSON back-compat; any legacy value > 0 reads as ON.
+  'Avoidance': { field: 'avoidance', kind: 'switch', read: (v) => (v ?? 1) > 0 },
+  'Label': { field: 'label', kind: 'switch' },
+  'Label Text': { field: 'labelText', kind: 'text' },
+  'Label Background': { field: 'labelBackground', kind: 'switch' },
+  'Label Background Color': { field: 'labelBackgroundFill', kind: 'color' },
+  'Label Fill Color': { field: 'labelFill', kind: 'color' },
+  'Label Font Size': { field: 'labelFontSize', kind: 'slider' },
+  'Label Close To Path': { field: 'labelCloseToPath', kind: 'switch' },
+  'Label Auto Rotate': { field: 'labelAutoRotate', kind: 'switch' },
+  'Label Offset X': { field: 'labelOffsetX', kind: 'slider' },
+  'Label Offset Y': { field: 'labelOffsetY', kind: 'slider' },
+  'Label Placement': { field: 'labelPlacement', kind: 'select' },
+});
+
 // ponytail: the tuner only wants a nearest-bystander statistic, so it samples
 // rather than paying the full O(members × avoid). Take the nearest ones
 // instead if a suggestion ever looks wrong on a big graph.
@@ -289,64 +327,10 @@ class GraphBubbleSetManager {
 
     const bStyle = this.cache.data.layouts[this.cache.data.selectedLayout].bubbleSetStyle[group];
 
-    switch (propertyLabel) {
-      case "Fill Color":
-        bStyle.fill = value;
-        bStyle.labelBackgroundFill = value;
-        break;
-      case "Fill Opacity":
-        bStyle.fillOpacity = value;
-        break;
-      case "Stroke Color":
-        bStyle.stroke = value;
-        break;
-      case "Stroke Opacity":
-        bStyle.strokeOpacity = value;
-        break;
-      case "Padding":
-        bStyle.padding = value;
-        break;
-      case "Corridor Width":
-        bStyle.corridor = value;
-        break;
-      case "Avoidance":
-        bStyle.avoidance = value;
-        break;
-      case "Label":
-        bStyle.label = value;
-        break;
-      case "Label Text":
-        bStyle.labelText = value;
-        break;
-      case "Label Background Color":
-        bStyle.labelBackgroundFill = value;
-        break;
-      case "Label Background":
-        bStyle.labelBackground = value;
-        break;
-      case "Label Fill Color":
-        bStyle.labelFill = value;
-        break;
-      case "Label Font Size":
-        bStyle.labelFontSize = value;
-        break;
-      case "Label Close To Path":
-        bStyle.labelCloseToPath = value;
-        break;
-      case "Label Auto Rotate":
-        bStyle.labelAutoRotate = value;
-        break;
-      case "Label Offset X":
-        bStyle.labelOffsetX = value;
-        break;
-      case "Label Offset Y":
-        bStyle.labelOffsetY = value;
-        break;
-      case "Label Placement":
-        bStyle.labelPlacement = value;
-        break;
-      default:
-        break;
+    const spec = GROUP_STYLE_FIELDS[propertyLabel];
+    if (spec) {
+      bStyle[spec.field] = value;
+      if (spec.also) bStyle[spec.also] = value;
     }
     // Turning avoidance ON has to hand the layer the obstacles as well: the
     // list is otherwise only supplied on a membership change, so the switch
@@ -397,49 +381,32 @@ class GraphBubbleSetManager {
     const hasActiveMembers = this.getEffectiveGroupMembers(group).size > 0;
     hasActiveMembers ? card.classList.remove("disabled") : card.classList.add("disabled");
 
-    const labelInput = card.querySelector(`input[data-property="Bubble Set ${group} Label Text"]`);
-    if (labelInput && bubbleStyle.labelText !== undefined) labelInput.value = bubbleStyle.labelText;
-
-    // Sync color inputs by data-property attribute
-    const syncColorInput = (prop, val) => {
-      const el = card.querySelector(`input[data-property="Bubble Set ${group} ${prop}"]`);
-      if (el && val != null) el.value = val;
-    };
-    syncColorInput("Fill Color", bubbleStyle.fill);
-    syncColorInput("Stroke Color", bubbleStyle.stroke);
-    syncColorInput("Label Background Color", bubbleStyle.labelBackgroundFill);
-    syncColorInput("Label Fill Color", bubbleStyle.labelFill);
-
-    // Sync slider inputs by data-property attribute
-    const syncSliderInput = (prop, val) => {
-      const container = card.querySelector(`[data-property="Bubble Set ${group} ${prop}"]`);
-      if (!container || val === undefined) return;
-      const slider = container.querySelector('input[type="range"]');
-      const numInput = container.querySelector('input[type="number"]');
-      if (slider) slider.value = val;
-      if (numInput) numInput.value = val;
-    };
-    syncSliderInput("Padding", bubbleStyle.padding);
-    syncSliderInput("Corridor Width", bubbleStyle.corridor);
-    syncSliderInput("Label Font Size", bubbleStyle.labelFontSize);
-    syncSliderInput("Label Offset X", bubbleStyle.labelOffsetX);
-    syncSliderInput("Label Offset Y", bubbleStyle.labelOffsetY);
-
-    // Sync switch inputs by data-property attribute
-    const syncSwitch = (prop, val) => {
-      const el = card.querySelector(`[data-property="Bubble Set ${group} ${prop}"]`);
-      if (el && el.setChecked) el.setChecked(!!val);
-    };
-    syncSwitch("Label", bubbleStyle.label);
-    syncSwitch("Label Background", bubbleStyle.labelBackground);
-    syncSwitch("Label Close To Path", bubbleStyle.labelCloseToPath);
-    syncSwitch("Label Auto Rotate", bubbleStyle.labelAutoRotate);
-    // Numeric 0/1 (legacy values > 0 read as ON) → checked state.
-    syncSwitch("Avoidance", (bubbleStyle.avoidance ?? 1) > 0);
-
-    // Sync dropdown by data-property attribute
-    const placementDropdown = card.querySelector(`[data-property="Bubble Set ${group} Label Placement"]`);
-    if (placementDropdown && bubbleStyle.labelPlacement) placementDropdown.value = bubbleStyle.labelPlacement;
+    // Every control derives from GROUP_STYLE_FIELDS, so a knob cannot be added
+    // to the pane and forgotten here (the failure this replaced: a control that
+    // read back stale after a load or a ✨ Re-tune).
+    for (const [label, spec] of Object.entries(GROUP_STYLE_FIELDS)) {
+      const stored = bubbleStyle[spec.field];
+      if (stored === undefined && spec.read === undefined) continue;
+      const value = spec.read ? spec.read(stored) : stored;
+      const el = card.querySelector(`[data-property="Bubble Set ${group} ${label}"]`);
+      if (!el) continue;
+      switch (spec.kind) {
+        case 'switch':
+          el.setChecked?.(!!value);
+          break;
+        case 'slider': {
+          // The slider row is a container holding the track and the number box.
+          const slider = el.querySelector('input[type="range"]');
+          const numInput = el.querySelector('input[type="number"]');
+          if (slider) slider.value = value;
+          if (numInput) numInput.value = value;
+          break;
+        }
+        default:
+          // color, text and select are all plain valued inputs.
+          if (value != null) el.value = value;
+      }
+    }
 
     // toggle label-related properties
     for (const elem of card.querySelectorAll(".bubbleSetOptionalLabelConfig")) {

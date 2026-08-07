@@ -1,5 +1,6 @@
 import { attachGroupMenu } from './group_menu.js';
 import { StaticUtilities } from '../utilities/static.js';
+import { computeDropdownPlacement } from '../utilities/popover_position.js';
 
 class DropdownChecklist {
   constructor(propID, cache) {
@@ -142,7 +143,7 @@ class DropdownChecklist {
       this.itemsList.style.display = '';
       this.itemsList.style.visibility = '';
 
-      const { left, top, maxHeight } = StaticUtilities.computeDropdownPlacement({
+      const { left, top, maxHeight } = computeDropdownPlacement({
         anchorRect: this.anchor.getBoundingClientRect(),
         dropdownHeight,
         viewportHeight: window.innerHeight,
