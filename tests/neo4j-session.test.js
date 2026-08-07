@@ -451,6 +451,15 @@ describe('expandNeo4jSelection', () => {
     expect(await expandNeo4jSelection(makeCache([], []))).toBe(false);
   });
 
+  it('says why an empty selection did nothing', async () => {
+    // The Expand button is only class-disabled and `.disabled[title]` keeps
+    // pointer events (so its tooltip works), so the click DOES arrive here.
+    startNeo4jSession(CONFIG, [], [], NO_EXCLUSIONS);
+    const cache = makeCache([], []);
+    expect(await expandNeo4jSelection(cache)).toBe(false);
+    expect(cache.ui.info).toHaveBeenCalledWith(expect.stringContaining('Select nodes first'));
+  });
+
   it('preflights, filters by the checked pairs, fetches, and merges', async () => {
     startNeo4jSession(
       CONFIG,
@@ -631,13 +640,28 @@ describe('expandNeo4jSelection', () => {
   it('surfaces errors and clears the busy overlay', async () => {
     startNeo4jSession(CONFIG, [rawNode('1')], [], NO_EXCLUSIONS);
     const cache = makeCache([], ['1']);
+    // A server-side failure arrives as an errors[] payload; fetch itself only
+    // rejects when the transport failed, which reads as the CORS/URL hint.
     const rendered = await expandNeo4jSelection(cache, {
-      fetchImpl: vi.fn().mockRejectedValue(new Error('boom')),
+      fetchImpl: vi.fn().mockResolvedValue(
+        jsonResponse({ results: [], errors: [{ code: 'Neo.ClientError.X', message: 'boom' }] }),
+      ),
     });
 
     expect(rendered).toBe(false);
     expect(cache.ui.error).toHaveBeenCalledWith(expect.stringContaining('boom'));
     expect(cache.ui.hideLoading).toHaveBeenCalled();
+  });
+
+  it('names the transport, not the query, when the server is unreachable', async () => {
+    startNeo4jSession(CONFIG, [rawNode('1')], [], NO_EXCLUSIONS);
+    const cache = makeCache([], ['1']);
+    const rendered = await expandNeo4jSelection(cache, {
+      fetchImpl: vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+    });
+
+    expect(rendered).toBe(false);
+    expect(cache.ui.error).toHaveBeenCalledWith(expect.stringContaining('Could not reach'));
   });
 
   it('refuses on a server whose results carry no elementId (Neo4j 4.x)', async () => {
@@ -896,7 +920,12 @@ describe('openNeo4jJoinPopup', () => {
     const fetchImpl = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ results: [{ data: [{ row: [1] }] }], errors: [] }))
-      .mockRejectedValueOnce(new Error('Neo.ClientError.Statement.SyntaxError: bad'));
+      .mockResolvedValueOnce(
+        jsonResponse({
+          results: [],
+          errors: [{ code: 'Neo.ClientError.Statement.SyntaxError', message: 'bad syntax near oops' }],
+        }),
+      );
     const promise = openNeo4jJoinPopup(makeCache(), { fetchImpl });
 
     document.getElementById('neo4j-join-query').value = 'MATCH oops';
@@ -906,7 +935,8 @@ describe('openNeo4jJoinPopup', () => {
     await vi.waitFor(() => {
       expect(document.getElementById('neo4j-join-error').hidden).toBe(false);
     });
-    expect(document.getElementById('neo4j-join-error').textContent).toContain('SyntaxError');
+    // The server's sentence, not the driver constant in front of it.
+    expect(document.getElementById('neo4j-join-error').textContent).toContain('bad syntax near oops');
     expect(fetchBtn.disabled).toBe(false);
 
     document.getElementById('neo4j-join-cancel-btn').click();
@@ -1035,7 +1065,14 @@ describe('stitch scope', () => {
         return jsonResponse({ results: [{ data: [{ row: [1] }] }], errors: [] });
       }
       if (st.includes('USING JOIN')) {
-        if (stitchFails) throw new Error('Cannot use USING JOIN with this plan');
+        if (stitchFails) {
+          return jsonResponse({
+            results: [],
+            errors: [
+              { code: 'Neo.ClientError.Statement.SemanticError', message: 'Cannot use USING JOIN with this plan' },
+            ],
+          });
+        }
         return graphResponse([], []);
       }
       seq += 1;

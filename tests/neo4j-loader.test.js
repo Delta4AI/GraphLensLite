@@ -103,9 +103,11 @@ describe('runCypher', () => {
         errors: [{ code: 'Neo.ClientError.Statement.SyntaxError', message: 'bad query' }],
       }),
     );
-    await expect(runCypher(CONFIG, [], { fetchImpl })).rejects.toThrow(
-      /SyntaxError: bad query/,
-    );
+    // The message, not the driver constant — the code travels as data.
+    await expect(runCypher(CONFIG, [], { fetchImpl })).rejects.toThrow(/^bad query$/);
+    await runCypher(CONFIG, [], { fetchImpl }).catch((err) => {
+      expect(err.neo4jCode).toBe('Neo.ClientError.Statement.SyntaxError');
+    });
   });
 
   it('logs each executed statement to the status log, collapsed and truncated', async () => {
@@ -677,7 +679,9 @@ describe('executeNeo4jImport', () => {
     const rendered = await executeNeo4jImport(cache, importConfig, { fetchImpl });
 
     expect(rendered).toBe(false);
-    expect(cache.ui.error).toHaveBeenCalledWith(expect.stringContaining('Neo.X: nope'));
+    // The server's sentence, not its error constant.
+    expect(cache.ui.error).toHaveBeenCalledWith(expect.stringContaining('nope'));
+    expect(cache.ui.error.mock.calls[0][0]).not.toContain('Neo.X');
   });
 });
 
@@ -876,6 +880,44 @@ describe('openNeo4jPopup', () => {
     }
   });
 
+  it('keeps the submit dead while the size confirm is up', async () => {
+    // busy(null) after the count used to re-enable Fetch while the size confirm
+    // and the property checklist were still open — and nested popups share a
+    // z-index with no focus trap, so a second concurrent fetch was one click
+    // away.
+    let disabledDuringConfirm = null;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({ results: [{ data: [{ row: [LARGE_RESULT_ROW_THRESHOLD + 1] }] }], errors: [] }),
+      ),
+    );
+    try {
+      const promise = openNeo4jPopup({ ui: {} });
+      document.getElementById('neo4j-url').value = 'http://localhost:7474';
+      // No trailing LIMIT, or the preflight answers from the query itself.
+      document.getElementById('neo4j-query').value = 'MATCH (n)-[r]->(m) RETURN n, r, m';
+      document.getElementById('neo4j-load-btn').click();
+
+      // The size confirm is a second Popup; its buttons are the ones without an id.
+      const confirmButton = (label) =>
+        [...document.querySelectorAll('.p-button')].find(
+          (b) => !b.id && b.textContent === label,
+        );
+      await vi.waitFor(() => expect(confirmButton('OK')).toBeTruthy());
+      disabledDuringConfirm = document.getElementById('neo4j-load-btn').disabled;
+      expect(disabledDuringConfirm).toBe(true);
+
+      confirmButton('Cancel').click(); // decline the size warning
+      await vi.waitFor(() => expect(document.getElementById('neo4j-load-btn').disabled).toBe(false));
+
+      document.getElementById('neo4j-cancel-btn').click();
+      expect(await promise).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('offers to forget a remembered connection, and only then', async () => {
     // The saved query often carries literal identifiers from the user's data
     // and persisted indefinitely with no UI to clear it.
@@ -1044,13 +1086,24 @@ describe('connectionHint', () => {
     expect(connectionHint(err)).toContain('timed out');
   });
 
-  it('recognises an unreachable server by type, not by Chromium wording', () => {
-    // Firefox and Safari word this differently, so the message match alone
-    // left them without the URL/CORS guidance.
-    expect(connectionHint(new TypeError('NetworkError when attempting to fetch'))).toContain(
-      'Could not reach the server',
-    );
-    expect(connectionHint(new TypeError('Failed to fetch'))).toContain('Could not reach the server');
+  it('recognises an unreachable server by the tag runCypher attaches', async () => {
+    // Not by JS type and not by Chromium's wording: the callers' try blocks wrap
+    // the whole import, so an ordinary TypeError in the merge path used to be
+    // reported to the user as a network problem.
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    const transportErr = await runCypher(CONFIG, [], { fetchImpl }).catch((e) => e);
+    expect(transportErr.transport).toBe(true);
+    expect(connectionHint(transportErr)).toContain('Could not reach the server');
+
+    expect(connectionHint(new TypeError('x.map is not a function'))).toBe('x.map is not a function');
+  });
+
+  it('names the likely cause of a 404, including the database', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}, 404));
+    const err = await runCypher(CONFIG, [], { fetchImpl }).catch((e) => e);
+    expect(err.message).toContain('HTTP 404');
+    expect(err.message).toContain(CONFIG.database);
+    expect(err.message).toMatch(/Bolt/);
   });
 
   it('passes a Cypher error through untouched', () => {

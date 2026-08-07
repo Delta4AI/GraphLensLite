@@ -28,7 +28,7 @@ function dom() {
               aria-label="Center and zoom to the selection">🔍</button>
       <button id="neo4jJoinBtn" class="rail-vb" style="display: none;"
               title="Add a Neo4j query">
-        <span class="rail-vb-t">Join</span>
+        <span class="rail-vb-t">Add</span>
       </button>
       <button id="layoutMenuBtn" class="rail-vb" title="Layout — re-layout the workspace">
         <span class="rail-vb-t">Layout ⌄</span>
@@ -165,7 +165,7 @@ describe('the index is derived from the DOM', () => {
   });
 
   it('skips controls that are hidden right now', () => {
-    expect(named(collectCommands(cache), 'Join')).toBeUndefined();
+    expect(named(collectCommands(cache), 'Add')).toBeUndefined();
   });
 
   it('indexes a menu row once, not again as the button inside it', () => {

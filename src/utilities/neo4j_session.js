@@ -226,6 +226,7 @@ async function stitchOrWarn(cache, session, nodes, relationships, opts) {
   try {
     await appendStitch(session, nodes, relationships, opts);
   } catch (err) {
+    console.warn('[neo4j] stitch failed', err);
     cache.ui.warning(
       `Neo4j: the data arrived but linking it to the loaded graph failed (${connectionHint(err)}). ` +
         'Merging without those extra links.',
@@ -478,7 +479,15 @@ function expectedRelationshipCount(pairs, chosen) {
 async function expandNeo4jSelection(cache, deps = {}) {
   const session = getNeo4jSession();
   const selected = cache.selectedNodes ?? [];
-  if (!session || selected.length === 0) return false;
+  if (!session) return false;
+  // The button is class-disabled, and `.disabled[title]` keeps pointer events so
+  // its tooltip can explain itself — so a click on the greyed control DOES reach
+  // here, and used to return in silence. Said once, here, for every route in
+  // (button, command palette, keyboard).
+  if (selected.length === 0) {
+    cache.ui.info('Select nodes first — Expand fetches the neighbors of the selection.');
+    return false;
+  }
 
   if (session.hasElementIds === false) {
     // Every expand statement matches on elementId(n); on a 4.x server the ids
@@ -562,6 +571,8 @@ async function expandNeo4jSelection(cache, deps = {}) {
     // The user pressed Cancel — they know; reporting it back would be telling
     // them off for cancelling.
     if (err?.name === 'AbortError') return false;
+    // The sentence for the user, the object for whoever has to debug it.
+    console.error('[neo4j] expand failed', err);
     cache.ui.error(`Neo4j expand: ${connectionHint(err)}`);
     return false;
   }
@@ -650,8 +661,11 @@ function openNeo4jJoinPopup(cache, deps = {}) {
       },
     });
 
+    // Held across the size confirm and the property checklist too — see the
+    // same lock in openNeo4jPopup.
+    let submitLocked = false;
     const setBusy = (message) => {
-      fetchBtn.disabled = !!message;
+      fetchBtn.disabled = submitLocked || !!message;
       fetchBtn.innerHTML = message
         ? `<span class="neo4j-btn-spinner"></span>${message}`
         : 'Fetch &amp; merge';
@@ -680,6 +694,7 @@ function openNeo4jJoinPopup(cache, deps = {}) {
       const opts = { signal: controller.signal };
       if (deps.fetchImpl) opts.fetchImpl = deps.fetchImpl;
 
+      submitLocked = true;
       try {
         const graph = await fetchGraphWithPreflight({
           config: session.config,
@@ -711,11 +726,14 @@ function openNeo4jJoinPopup(cache, deps = {}) {
         settle(await mergeAndApply(cache, nodes, relationships, deps));
       } catch (err) {
         if (err?.name === 'AbortError') return; // the user closed the dialog
-        setBusy(null);
+        console.error('[neo4j] join failed', err);
         showError(`Neo4j: ${connectionHint(err)}`);
         // The popup is already closed, so nothing will ever settle this
         // promise — its caller would wait for a retry that cannot happen.
         if (dataFetched) settle(false);
+      } finally {
+        submitLocked = false;
+        if (!dataFetched) setBusy(null);
       }
     };
 

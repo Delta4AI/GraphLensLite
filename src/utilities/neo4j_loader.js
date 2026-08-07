@@ -96,35 +96,59 @@ async function runCypher(config, statements, opts = {}) {
   // fires first ends the request.
   const timeout = AbortSignal.timeout(opts.timeoutMs ?? QUERY_TIMEOUT_MS);
   const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
-  const response = await fetchImpl(buildTxUrl(config.url, config.database), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      Authorization: basicAuth(config.username, config.password),
-    },
-    body: JSON.stringify({ statements }),
-    signal,
-  });
+  let response;
+  try {
+    response = await fetchImpl(buildTxUrl(config.url, config.database), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: basicAuth(config.username, config.password),
+      },
+      body: JSON.stringify({ statements }),
+      signal,
+    });
+  } catch (err) {
+    // Tagged HERE, where the transport is the only thing that can have failed.
+    // connectionHint used to infer this from the JS type, and the callers' try
+    // blocks wrap the whole import — so an ordinary TypeError in the merge path
+    // was reported to the user as a network problem.
+    if (err) err.transport = true;
+    throw err;
+  }
 
   if (response.status === 401) {
     throw new Error('Authentication failed — check username and password.');
   }
   if (!response.ok) {
-    throw new Error(`Neo4j returned HTTP ${response.status}.`);
+    // "Neo4j returned HTTP 404." named none of the causes, and the database is
+    // the usual one — the tx endpoint carries its name in the path.
+    throw new Error(`Neo4j returned HTTP ${response.status}. ${statusHint(response.status, config)}`);
   }
 
   const payload = await response.json();
   if (payload.errors?.length) {
     const first = payload.errors[0];
-    const err = new Error(`${first.code}: ${first.message}`);
-    // The code as data, so callers can tell "the server rejected this Cypher"
-    // from "the server never answered" without re-parsing the message they
-    // are about to show the user.
+    // The message alone: "Neo.ClientError.Statement.SyntaxError: …" makes the
+    // user read a driver constant before the sentence that tells them what to
+    // fix. The code stays on the error as data (and in the activity log).
+    const err = new Error(first.message || first.code);
     err.neo4jCode = first.code;
     throw err;
   }
   return payload.results ?? [];
+}
+
+/** What a non-2xx status usually means here, in the user's terms. */
+function statusHint(status, config) {
+  const db = config.database || DEFAULT_DATABASE;
+  if (status === 404) {
+    return `Either the database "${db}" does not exist, or the URL is not the HTTP/HTTPS endpoint (default port 7474/7473, not the Bolt 7687).`;
+  }
+  if (status === 403) return 'The user is authenticated but not allowed to read this database.';
+  if (status === 503) return 'The database is starting up or unavailable — try again shortly.';
+  if (status >= 500) return 'The server failed while handling the query; its logs will say why.';
+  return 'Check the URL and that it points at the HTTP connector, not Bolt.';
 }
 
 /** Write clauses that make a query unsafe to run twice (count preflight + fetch). */
@@ -150,8 +174,13 @@ const TRAILING_LIMIT_RE = /\bLIMIT\s+(\d+)\s*;?\s*$/i;
  * without the URL/CORS guidance.
  */
 function connectionHint(err) {
-  if (err?.name === 'TimeoutError') return 'The request timed out.';
-  if (err instanceof TypeError || err?.message === 'Failed to fetch') {
+  if (err?.name === 'TimeoutError') {
+    return (
+      'The request timed out. Add a LIMIT, narrow the pattern, or run it in the Neo4j ' +
+      'browser first to see how long it really takes.'
+    );
+  }
+  if (err?.transport) {
     return 'Could not reach the server — check the URL, that the HTTP connector is enabled, and CORS settings.';
   }
   return err?.message ?? String(err);
@@ -654,7 +683,7 @@ function buildConnectionForm(saved) {
   const form = document.createElement('div');
   form.innerHTML = `
     <div class="neo4j-field">
-      <label for="neo4j-url">Server URL</label>
+      <label for="neo4j-url">Server URL <span class="neo4j-hint">(required)</span></label>
       <input type="text" id="neo4j-url" class="p-prompt" placeholder="http://localhost:7474">
     </div>
     <div class="neo4j-field-row">
@@ -672,7 +701,7 @@ function buildConnectionForm(saved) {
       <input type="text" id="neo4j-database" class="p-prompt" placeholder="${DEFAULT_DATABASE}">
     </div>
     <div class="neo4j-field">
-      <label for="neo4j-query">Cypher query</label>
+      <label for="neo4j-query">Cypher query <span class="neo4j-hint">(required)</span></label>
       <textarea id="neo4j-query" rows="4" class="p-prompt neo4j-query">MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 500</textarea>
       <span class="neo4j-hint">Must return nodes, relationships, or paths. The prefilled query
         matches every node in the database — its LIMIT is what keeps it small, so add a label
@@ -771,17 +800,26 @@ async function executeNeo4jImport(cache, config, deps = {}) {
     if (!exclusions) return false;
     deps.onFetched?.();
 
-    const rendered = await apply(cache, toAppFormat(nodes, relationships, exclusions));
-    if (rendered) {
+    let rendered = false;
+    try {
+      rendered = await apply(cache, toAppFormat(nodes, relationships, exclusions));
+    } finally {
+      // applyGraph stamps its own "Live (API)" label before it starts, so a
+      // failed apply used to leave THAT describing a Neo4j graph — and by then
+      // the old graph is already destroyed. Stamp either way; the expand/join
+      // buttons stay hidden because no session was started.
       cache.ui.setDataSourceLabel(`Neo4j: ${config.database}`, NEO4J_DATA_SOURCE);
-      startNeo4jSession(config, nodes, relationships, exclusions);
     }
+    if (rendered) startNeo4jSession(config, nodes, relationships, exclusions);
     return rendered;
   } catch (err) {
     await progress(null);
     // The user aborted (closed the dialog) — they know; reporting it back would
     // be telling them off for cancelling.
     if (err?.name === 'AbortError') return false;
+    // The user gets the sentence; the console keeps the object. Stringifying and
+    // dropping the Error left a misdiagnosed failure with nothing to debug.
+    console.error('[neo4j] import failed', err);
     onError(`Neo4j: ${connectionHint(err)}`);
     return false;
   }
@@ -859,8 +897,14 @@ function openNeo4jPopup(cache) {
       },
     });
 
+    // The flow drops the spinner between the count and its gates (size confirm,
+    // property checklist), and those are separate modals with no focus trap —
+    // so the submit behind them has to stay dead for the WHOLE flow, not just
+    // while a label is showing. Otherwise a second concurrent fetch is one
+    // click away.
+    let submitLocked = false;
     const setBusy = (message) => {
-      loadBtn.disabled = !!message;
+      loadBtn.disabled = submitLocked || !!message;
       loadBtn.innerHTML = message
         ? `<span class="neo4j-btn-spinner"></span>${message}`
         : 'Fetch';
@@ -915,6 +959,7 @@ function openNeo4jPopup(cache) {
       }
 
       saveSettings(config);
+      submitLocked = true;
       controller = new AbortController();
       const rendered = await executeNeo4jImport(cache, config, {
         signal: controller.signal,
@@ -930,6 +975,7 @@ function openNeo4jPopup(cache) {
       });
 
       controller = null;
+      submitLocked = false;
       if (dataFetched) settle(rendered);
       else if (!settled) setBusy(null);
     };
