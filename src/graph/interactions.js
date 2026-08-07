@@ -380,6 +380,10 @@ class InteractionManager {
     // strips inline onclick attrs; the expand/close buttons are driven by
     // the delegated listener in #ensureTooltipEl instead.
     el.innerHTML = DOMPurify.sanitize(content);
+    // The metric line lives in a side map, not in the stored HTML: composing it
+    // here costs one querySelector on an element we just built, instead of an
+    // innerHTML round trip per node every time the metric changes.
+    if (!isEdge) this.cache.metrics?.applyTooltipMetricText?.(el, id);
     el.style.visibility = "visible";
     this.#positionTooltip(el, id, isEdge);
     this.#syncExpandButton(el);

@@ -220,14 +220,16 @@ describe('NetworkMetrics lazy panel gate', () => {
 
 describe('NetworkMetrics.invalidateMetricValues tooltip blanking', () => {
   const TOOLTIP_WITH_METRIC =
-    '<div class="tooltip-metric-wrapper visible">' +
-    '<span class="tooltip-metric-header">Degree Centrality</span>' +
-    '<p class="tooltip-metric-content">Degree 2</p></div>'
+    '<div class="tooltip-metric-wrapper">' +
+    '<span class="tooltip-metric-header"></span>' +
+    '<p class="tooltip-metric-content"></p></div>'
 
-  function metricContentOf(tooltipHtml) {
-    const div = document.createElement('div')
-    div.innerHTML = tooltipHtml
-    return div.querySelector('.tooltip-metric-content')?.textContent
+  /** What a hover would render for `nodeId`, metric line included. */
+  function renderTooltip(metrics, cache, nodeId) {
+    const el = document.createElement('div')
+    el.innerHTML = cache.toolTips.get(nodeId)
+    metrics.applyTooltipMetricText(el, nodeId)
+    return el
   }
 
   it('blanks stale tooltip metric text when metrics were displayed', () => {
@@ -236,15 +238,34 @@ describe('NetworkMetrics.invalidateMetricValues tooltip blanking', () => {
     cache.toolTips = new Map([['A', TOOLTIP_WITH_METRIC]])
     const metrics = makeMetrics(cache)
     metrics.metricValueCache.set('centrality', { values: new Map([['A', 2]]) })
+    metrics.updateNodeToolTipMetricText('A', 'Degree Centrality', 'Degree 2')
     metrics.metricTooltipsActive = true
+    expect(renderTooltip(metrics, cache, 'A').querySelector('.tooltip-metric-content').textContent)
+      .toBe('Degree 2')
 
     // Act
     metrics.invalidateMetricValues()
 
-    // Assert: cache cleared, tooltip metric text blanked, flag reset
+    // Assert: cache cleared, metric line gone, flag reset
     expect(metrics.metricValueCache.size).toBe(0)
-    expect(metricContentOf(cache.toolTips.get('A'))).toBe('')
+    const el = renderTooltip(metrics, cache, 'A')
+    expect(el.querySelector('.tooltip-metric-content').textContent).toBe('')
+    expect(el.querySelector('.tooltip-metric-wrapper').classList.contains('visible')).toBe(false)
     expect(metrics.metricTooltipsActive).toBe(false)
+  })
+
+  it('never rewrites the stored tooltip HTML', () => {
+    // The metric line is composed onto the live element at hover time, so a
+    // metric switch is Map writes — not an innerHTML parse and serialize per
+    // node, twice (reset + repopulate).
+    const cache = makeCache()
+    cache.toolTips = new Map([['A', TOOLTIP_WITH_METRIC]])
+    const metrics = makeMetrics(cache)
+
+    metrics.updateNodeToolTipMetricText('A', 'Degree Centrality', 'Degree 2')
+    metrics.resetNodeToolTipMetricTexts()
+
+    expect(cache.toolTips.get('A')).toBe(TOOLTIP_WITH_METRIC)
   })
 
   it('leaves tooltips untouched when no metric text is active', () => {

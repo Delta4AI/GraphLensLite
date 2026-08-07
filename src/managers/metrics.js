@@ -66,9 +66,16 @@ class NetworkMetrics {
     // (what the dropdown says) so a repaint can be skipped when they agree.
     this.renderedMetric = null;
     // Tracks whether any node tooltip currently carries metric text, so
-    // invalidation can blank stale values without parsing every tooltip when
+    // invalidation can blank stale values without touching the map when
     // metrics were never shown.
     this.metricTooltipsActive = false;
+    /**
+     * nodeId → {header, text}: the metric line the tooltip shows, kept OUT of
+     * the stored tooltip HTML so painting a metric is Map writes rather than an
+     * innerHTML parse-and-serialize per node.
+     * @type {Map<string, {header: string, text: string}>}
+     */
+    this.nodeMetricText = new Map();
 
     this.selectBtns = {
       'Add to Selection': async () => this.updateSelectedNodes(true),
@@ -256,39 +263,47 @@ class NetworkMetrics {
     return this.metricValueCache.get(metricId) || null;
   }
 
+  /**
+   * Drop every node's metric line. A plain Map clear: this used to be an
+   * innerHTML parse-and-serialize of every cached tooltip, so a return visit to
+   * an already-computed metric cost 2N HTML round trips.
+   */
   resetNodeToolTipMetricTexts() {
-    for (const nodeID of this.cache.toolTips.keys()) {
-      this.updateNodeToolTipMetricText(nodeID, undefined, undefined, true);
-    }
+    this.nodeMetricText.clear();
   }
 
-  updateNodeToolTipMetricText(nodeId = undefined, header = undefined, text = undefined, reset = false) {
-    const tooltip = this.cache.toolTips.get(nodeId);
-    if (!tooltip) return;
+  /** Remember one node's metric line; the tooltip picks it up at hover time. */
+  updateNodeToolTipMetricText(nodeId, header, text) {
+    if (nodeId == null) return;
+    this.nodeMetricText.set(nodeId, { header, text });
+  }
 
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = tooltip;
+  /**
+   * Fill (or blank) the metric line inside a tooltip element that has just been
+   * rendered. Called from interactions.showTooltip — the metric text is NOT
+   * baked into the stored tooltip HTML, so it stays out of the sanitize/serialize
+   * path and a metric switch touches no strings at all.
+   *
+   * @param {HTMLElement} el  the live tooltip element
+   * @param {string} nodeId
+   */
+  applyTooltipMetricText(el, nodeId) {
+    const wrapper = el?.querySelector?.('.tooltip-metric-wrapper');
+    if (!wrapper) return;
+    const content = wrapper.querySelector('.tooltip-metric-content');
+    const header = wrapper.querySelector('.tooltip-metric-header');
+    if (!content || !header) return;
 
-    const metricWrapper = tempDiv.querySelector('.tooltip-metric-wrapper');
-    if (!metricWrapper) return;
-
-    const metricContent = metricWrapper.querySelector('.tooltip-metric-content');
-    if (!metricContent) return;
-
-    const metricHeader = metricWrapper.querySelector('.tooltip-metric-header');
-    if (!metricHeader) return;
-
-    if (reset) {
-      metricWrapper.classList.remove('visible');
-      metricContent.textContent = '';
-      metricHeader.textContent = '';
-    } else {
-      metricWrapper.classList.add('visible');
-      metricContent.textContent = text;
-      metricHeader.textContent = header;
+    const entry = this.nodeMetricText.get(nodeId);
+    if (!entry) {
+      wrapper.classList.remove('visible');
+      content.textContent = '';
+      header.textContent = '';
+      return;
     }
-
-    this.cache.toolTips.set(nodeId, tempDiv.innerHTML);
+    wrapper.classList.add('visible');
+    header.textContent = entry.header;
+    content.textContent = entry.text;
   }
 
   /**
