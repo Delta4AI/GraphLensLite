@@ -280,7 +280,7 @@ describe("visibility", () => {
       return null;
     };
     const frame = () => {
-      layer.rafHandle = null;
+      layer.frame.handle = null;
       layer.scheduleRedraw();
     };
 

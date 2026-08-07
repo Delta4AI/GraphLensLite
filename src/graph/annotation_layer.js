@@ -35,6 +35,7 @@ import {
   annotationLayout,
 } from './annotation_geometry.js';
 import { clampPopoverLeft, clampPopoverTop } from '../utilities/popover_position.js';
+import { FrameCoalescer } from './overlay_frame.js';
 
 // A press that travels less than this many screen px is a click (open the
 // style popover), not a drag.
@@ -138,7 +139,9 @@ class AnnotationLayer {
     this.popover = null;
     this.popoverId = null;
     this.placementOverlay = null;
-    this.rafHandle = null;
+    this.frame = new FrameCoalescer(() => {
+      if (this.#stale()) this.sync();
+    });
 
     this.root = document.createElement('div');
     this.root.className = 'annotation-layer';
@@ -174,7 +177,7 @@ class AnnotationLayer {
   destroy() {
     if (this.killed) return;
     this.killed = true;
-    if (this.rafHandle !== null) cancelAnimationFrame(this.rafHandle);
+    this.frame.kill();
     this.adapter.sigma.off('afterRender', this.renderHandler);
     this.cancelPlacement();
     this.#closePopover();
@@ -271,11 +274,7 @@ class AnnotationLayer {
   // ------------------------------------------------------------------- sync
 
   scheduleSync() {
-    if (this.killed || this.rafHandle !== null) return;
-    this.rafHandle = requestAnimationFrame(() => {
-      this.rafHandle = null;
-      if (this.#stale()) this.sync();
-    });
+    this.frame.schedule();
   }
 
   /**

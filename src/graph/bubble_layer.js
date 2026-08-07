@@ -35,6 +35,7 @@ import {
 } from './bubble_geometry.js';
 import { smoothClosedPath } from './bubble_smoothing.js';
 import { prepareOverlayCanvas } from './dpr_watch.js';
+import { FrameCoalescer } from './overlay_frame.js';
 
 const LAYER_NAME = 'bubbleSets';
 const LABEL_LAYER_NAME = 'bubbleSetsLabels';
@@ -78,7 +79,7 @@ class BubbleSetLayer {
     /** @type {Map<string, {key: string, graphPoints: Array<{x,y}>, graphHoles: Array<Array<{x,y}>>}>} */
     this.outlines = new Map();
 
-    this.rafHandle = null;
+    this.frame = new FrameCoalescer(() => this.#paint());
     this.lastPaintSignature = null;
     /** Last fit duration per group, in ms — drives refit deferral. */
     this.fitDurations = new Map();
@@ -148,7 +149,7 @@ class BubbleSetLayer {
   destroy() {
     if (this.killed) return;
     this.killed = true;
-    if (this.rafHandle !== null) cancelAnimationFrame(this.rafHandle);
+    this.frame.kill();
     clearTimeout(this.settleHandle);
     this.adapter.sigma.off('afterRender', this.renderHandler);
     // sigma.kill() may or may not remove custom layer canvases; remove() on
@@ -165,11 +166,7 @@ class BubbleSetLayer {
   }
 
   scheduleRedraw() {
-    if (this.killed || this.rafHandle !== null) return;
-    this.rafHandle = requestAnimationFrame(() => {
-      this.rafHandle = null;
-      this.#paint();
-    });
+    this.frame.schedule();
   }
 
   /** Did this group's last fit blow the frame budget? */

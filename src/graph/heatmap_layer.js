@@ -38,6 +38,7 @@ import { DEFAULTS } from '../config.js';
 import { currentTheme } from '../utilities/theme.js';
 import { positionsChecksum } from './bubble_geometry.js';
 import { prepareOverlayCanvas } from './dpr_watch.js';
+import { FrameCoalescer } from './overlay_frame.js';
 import {
   graphBBox,
   splatTransform,
@@ -80,7 +81,7 @@ class HeatmapLayer {
     this.heatmapEnabled = DEFAULTS.HEATMAP.ENABLED;
     this.settings = defaultSettings();
 
-    this.rafHandle = null;
+    this.frame = new FrameCoalescer(() => this.#paint());
     this.lastPaintSignature = null;
     // Blank-canvas tracker: lets scheduleRedraw skip the rAF entirely while
     // the pass is off (the canvas starts blank).
@@ -170,7 +171,7 @@ class HeatmapLayer {
   destroy() {
     if (this.killed) return;
     this.killed = true;
-    if (this.rafHandle !== null) cancelAnimationFrame(this.rafHandle);
+    this.frame.kill();
     this.adapter.sigma.off('afterRender', this.renderHandler);
     // sigma.kill() may or may not remove custom layer canvases; remove() on
     // an already-detached node is a no-op, so drop ours defensively.
@@ -192,14 +193,10 @@ class HeatmapLayer {
   }
 
   scheduleRedraw() {
-    if (this.killed || this.rafHandle !== null) return;
     // Pass off and the canvas already blank: the afterRender handler must
     // stay free — don't even take a rAF.
     if (!this.heatmapEnabled && this.cleared) return;
-    this.rafHandle = requestAnimationFrame(() => {
-      this.rafHandle = null;
-      this.#paint();
-    });
+    this.frame.schedule();
   }
 
   // ----------------------------------------------------------------- paint

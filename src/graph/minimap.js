@@ -8,6 +8,8 @@
  * style.css always overrode it to bottom-right, so that is the shipped
  * position this port preserves (CSS class .gll-minimap).
  */
+import { FrameCoalescer } from './overlay_frame.js';
+
 const MINIMAP_WIDTH = 200;
 const MINIMAP_HEIGHT = 120;
 const MINIMAP_PADDING = 8;
@@ -24,7 +26,7 @@ class Minimap {
   constructor(adapter, container) {
     this.adapter = adapter;
     this.killed = false;
-    this.rafHandle = null;
+    this.frame = new FrameCoalescer(() => this.#draw());
     this.dragging = false;
     // Graph-space fit of the last draw; #panTo inverts it for clicks.
     this.fit = null;
@@ -61,17 +63,13 @@ class Minimap {
   destroy() {
     if (this.killed) return;
     this.killed = true;
-    if (this.rafHandle !== null) cancelAnimationFrame(this.rafHandle);
+    this.frame.kill();
     this.adapter.sigma.off("afterRender", this.renderHandler);
     this.canvas.remove();
   }
 
   scheduleRedraw() {
-    if (this.killed || this.rafHandle !== null) return;
-    this.rafHandle = requestAnimationFrame(() => {
-      this.rafHandle = null;
-      this.#draw();
-    });
+    this.frame.schedule();
   }
 
   // ------------------------------------------------------------------ draw
