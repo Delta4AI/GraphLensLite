@@ -73,6 +73,36 @@ describe('group list rows', () => {
     expect(rows[1].querySelector('.group-count').textContent).toBe('0 nodes');
   });
 
+  it('keeps focus and caret on the control that triggered the rebuild', () => {
+    // Every group edit rebuilds the whole list, so without a restore the user
+    // is dropped back at the top of the document mid-rename.
+    mount();
+    const cache = makeCache({ g1: 'Kinases', g2: 'Hubs' });
+    const bs = new GraphBubbleSetManager(cache);
+    bs.renderGroupList();
+
+    const input = document.querySelector('.group-row[data-group="g2"] .group-name');
+    input.focus();
+    input.setSelectionRange(2, 2);
+
+    bs.renderGroupList();
+
+    const rebuilt = document.querySelector('.group-row[data-group="g2"] .group-name');
+    expect(document.activeElement).toBe(rebuilt);
+    expect(rebuilt.selectionStart).toBe(2);
+  });
+
+  it('leaves focus alone when it is outside the list', () => {
+    mount();
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    outside.focus();
+
+    new GraphBubbleSetManager(makeCache()).renderGroupList();
+
+    expect(document.activeElement).toBe(outside);
+  });
+
   it('singularises a one-node count', () => {
     mount();
     const cache = makeCache();

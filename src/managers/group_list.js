@@ -91,6 +91,12 @@ export function renderGroupList(bs) {
   const paneHome = document.getElementById('groupStylePanelHome');
   pane?.remove();
 
+  // Every group edit rebuilds the list, so without this the control the user
+  // is working in is destroyed under them and focus falls back to the top of
+  // the document. Rows are rebuilt identically, so (group, control class) is
+  // enough to find the replacement.
+  const focused = captureRowFocus(list);
+
   list.replaceChildren();
   list.classList.toggle('is-empty', groups.length === 0);
 
@@ -125,6 +131,31 @@ export function renderGroupList(bs) {
   if (pane) (openRow ?? paneHome)?.appendChild(pane);
   bs.cache.ui?.buildGroupStylePanel?.(bs.selectedGroup);
   syncGroupRows(bs);
+  restoreRowFocus(list, focused);
+}
+
+/**
+ * @returns {{group: string, cls: string, caret: number|null}|null} the focused
+ *   row control, or null when focus is outside the list.
+ */
+function captureRowFocus(list) {
+  const active = document.activeElement;
+  if (!active || !list.contains(active)) return null;
+  const group = active.closest('.group-row')?.dataset.group;
+  const cls = active.classList[0];
+  if (!group || !cls) return null;
+  return { group, cls, caret: typeof active.selectionStart === 'number' ? active.selectionStart : null };
+}
+
+function restoreRowFocus(list, focused) {
+  if (!focused) return;
+  const el = list.querySelector(`.group-row[data-group="${focused.group}"] .${focused.cls}`);
+  if (!el) return;
+  el.focus();
+  // A rename input rebuilt mid-typing would otherwise drop the caret to the end.
+  if (focused.caret !== null && typeof el.setSelectionRange === 'function') {
+    el.setSelectionRange(focused.caret, focused.caret);
+  }
 }
 
 function buildGroupRow(bs, group, layout) {
