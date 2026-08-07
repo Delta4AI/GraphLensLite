@@ -264,22 +264,53 @@ class BubbleSetLayer {
 
     prepareOverlayCanvas(this.canvas, this.ctx, width, height, dpr);
     prepareOverlayCanvas(this.labelCanvas, this.labelCtx, width, height, dpr);
-    this.#drawOutlines(shown, sigma);
+    this.#drawOutlines(shown, sigma, dpr);
   }
 
-  /** Reproject each cached graph-space outline to viewport px and paint it. */
-  #drawOutlines(active, sigma) {
+  /**
+   * Paint each cached graph-space outline under the camera transform.
+   *
+   * The path itself is built once per fit, in graph space, and every camera
+   * move is then a `setTransform` rather than a fresh projection and bezier
+   * path per point per frame — which is what made 50 groups over 62k points
+   * cost twelve milliseconds of paint JS per frame. Labels stay in viewport
+   * space (their font size and standoff are screen quantities), so only their
+   * one anchor point is projected.
+   */
+  #drawOutlines(active, sigma, dpr) {
+    const view = viewportTransform(sigma);
+    const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE_TEMPLATE;
+    if (!view) return;
+
+    this.ctx.save();
+    try {
+      this.ctx.setTransform(
+        dpr * view.sx, 0, 0, dpr * view.sy,
+        dpr * view.tx, dpr * view.ty
+      );
+      for (const [group, state] of active) {
+        const cached = this.outlines.get(group);
+        cached.path ??= ringsPath(cached.graphPoints, cached.graphHoles ?? []);
+        // A stroke under a scaled transform would thicken with the zoom.
+        this.#drawGroup(this.ctx, cached.path, state, defaults, Math.abs(view.sx));
+      }
+    } finally {
+      this.ctx.restore();
+    }
+
     for (const [group, state] of active) {
-      // Reprojection assumes camera.angle === 0 (the app never rotates the camera).
+      if (!state.opts.label) continue;
       const cached = this.outlines.get(group);
-      const points = cached.graphPoints.map((p) => sigma.graphToViewport(p));
-      const holes = (cached.graphHoles ?? []).map((h) => h.map((p) => sigma.graphToViewport(p)));
-      const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE_TEMPLATE;
-      const drawn = this.#drawGroup(this.ctx, points, state, defaults, holes);
-      // Labels paint on the top canvas (afterLayer: "labels") so they read
-      // over member-node labels; the body/outline stayed on the bottom one.
-      if (drawn && state.opts.label) {
-        this.#drawLabel(this.labelCtx, points, state.opts, defaults);
+      const placement = state.opts.labelPlacement ?? defaults.labelPlacement ?? 'bottom';
+      if (cached.anchorPlacement !== placement) {
+        // Sigma's map is a uniform scale plus a y flip, so the extreme vertex,
+        // the tangent angle and the outward normal all survive it — only the
+        // anchor's position needs projecting, once per frame.
+        cached.anchor = outlineLabelAnchor(cached.graphPoints, placement);
+        cached.anchorPlacement = placement;
+      }
+      if (cached.anchor) {
+        this.#drawLabel(this.labelCtx, projectAnchor(cached.anchor, view), state.opts, defaults);
       }
     }
   }
@@ -343,7 +374,7 @@ class BubbleSetLayer {
     try {
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
       for (const { points, holes, opts, defaults } of groups) {
-        this.#drawGroup(ctx, points, { opts }, defaults, holes ?? []);
+        this.#drawGroup(ctx, ringsPath(points, holes ?? []), { opts }, defaults);
       }
     } finally {
       ctx.restore();
@@ -363,7 +394,9 @@ class BubbleSetLayer {
     try {
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
       for (const { points, opts, defaults } of groups) {
-        if (opts.label) this.#drawLabel(ctx, points, opts, defaults);
+        if (!opts.label) continue;
+        const placement = opts.labelPlacement ?? defaults.labelPlacement ?? 'bottom';
+        this.#drawLabel(ctx, outlineLabelAnchor(points, placement), opts, defaults);
       }
     } finally {
       ctx.restore();
@@ -565,27 +598,8 @@ class BubbleSetLayer {
    * when something was painted (false when the outline is too small), so the
    * caller knows whether a label belongs on the top canvas.
    */
-  #drawGroup(ctx, points, { opts }, defaults, holes = []) {
-    if (!points || points.length < 2) return false;
-
-    const path = new Path2D();
-    // Rings paint as Catmull-Rom curves (smoothClosedPath — same control
-    // points the SVG export emits); rings too small to smooth fall back to
-    // the polyline. The polygon stays the geometric source of truth.
-    const addRing = (ring) => {
-      const segments = smoothClosedPath(ring);
-      if (!segments) {
-        path.moveTo(ring[0].x, ring[0].y);
-        for (let i = 1; i < ring.length; i++) path.lineTo(ring[i].x, ring[i].y);
-        path.closePath();
-        return;
-      }
-      path.moveTo(segments[0].x0, segments[0].y0);
-      for (const s of segments) path.bezierCurveTo(s.c1x, s.c1y, s.c2x, s.c2y, s.x, s.y);
-      path.closePath();
-    };
-    addRing(points);
-    for (const hole of holes) if (hole.length >= 3) addRing(hole);
+  #drawGroup(ctx, path, { opts }, defaults, strokeScale = 1) {
+    if (!path) return false;
 
     ctx.save();
     try {
@@ -594,7 +608,9 @@ class BubbleSetLayer {
       ctx.fill(path, 'evenodd');
       ctx.globalAlpha = opts.strokeOpacity ?? defaults.strokeOpacity ?? 1;
       ctx.strokeStyle = opts.stroke ?? defaults.stroke ?? '#403C53';
-      ctx.lineWidth = OUTLINE_STROKE_WIDTH;
+      // The stroke is a screen quantity, so it has to survive the transform
+      // the path is painted under.
+      ctx.lineWidth = OUTLINE_STROKE_WIDTH / strokeScale;
       ctx.stroke(path);
       ctx.globalAlpha = 1;
     } finally {
@@ -609,14 +625,12 @@ class BubbleSetLayer {
    * the outward normal; labelAutoRotate aligns on-path labels with the
    * outline tangent. labelOffsetX/Y stay additive in screen space.
    */
-  #drawLabel(ctx, points, opts, defaults) {
+  #drawLabel(ctx, anchor, opts, defaults) {
     const text = opts.labelText ?? defaults.labelText ?? '';
-    if (!text) return;
+    if (!text || !anchor) return;
     const placement = opts.labelPlacement ?? defaults.labelPlacement ?? 'bottom';
     const closeToPath = opts.labelCloseToPath ?? defaults.labelCloseToPath ?? true;
     const autoRotate = opts.labelAutoRotate ?? defaults.labelAutoRotate ?? true;
-    const anchor = outlineLabelAnchor(points, placement);
-    if (!anchor) return;
 
     const fontSize = opts.labelFontSize ?? defaults.labelFontSize ?? 12;
     const padding = opts.labelPadding ?? defaults.labelPadding ?? 2;
@@ -658,6 +672,64 @@ class BubbleSetLayer {
     ctx.fillText(text, lx, ly);
     if (rotated) ctx.restore();
   }
+}
+
+/**
+ * Sigma's graph→viewport map as a canvas transform. It composes a uniform
+ * normalization with a uniform camera scale and a vertical flip — the app
+ * never rotates the camera, which the reprojection has always assumed — so
+ * two probes pin it exactly.
+ *
+ * @returns {{sx: number, sy: number, tx: number, ty: number}|null} null when
+ *   the camera is degenerate (a zero or non-finite scale)
+ */
+function viewportTransform(sigma) {
+  const origin = sigma.graphToViewport({ x: 0, y: 0 });
+  const unit = sigma.graphToViewport({ x: 1, y: 1 });
+  const sx = unit.x - origin.x;
+  const sy = unit.y - origin.y;
+  if (!Number.isFinite(sx) || !Number.isFinite(sy) || sx === 0 || sy === 0) return null;
+  return { sx, sy, tx: origin.x, ty: origin.y };
+}
+
+/** @returns {{x: number, y: number, angle: number, nx: number, ny: number}|null} */
+function projectAnchor(anchor, view) {
+  return {
+    ...anchor,
+    x: anchor.x * view.sx + view.tx,
+    y: anchor.y * view.sy + view.ty,
+    // The flip mirrors the tangent and the normal along y.
+    angle: view.sy < 0 ? -anchor.angle : anchor.angle,
+    ny: view.sy < 0 ? -anchor.ny : anchor.ny,
+  };
+}
+
+/**
+ * One Path2D over an outer ring and its holes (filled even-odd). Rings paint
+ * as Catmull-Rom curves (smoothClosedPath — the same control points the SVG
+ * export emits); rings too small to smooth fall back to the polyline. The
+ * polygon stays the geometric source of truth.
+ *
+ * @returns {Path2D|null} null for a ring too short to be a shape
+ */
+function ringsPath(outer, holes = []) {
+  if (!outer || outer.length < 2) return null;
+  const path = new Path2D();
+  const addRing = (ring) => {
+    const segments = smoothClosedPath(ring);
+    if (!segments) {
+      path.moveTo(ring[0].x, ring[0].y);
+      for (let i = 1; i < ring.length; i++) path.lineTo(ring[i].x, ring[i].y);
+      path.closePath();
+      return;
+    }
+    path.moveTo(segments[0].x0, segments[0].y0);
+    for (const s of segments) path.bezierCurveTo(s.c1x, s.c1y, s.c2x, s.c2y, s.x, s.y);
+    path.closePath();
+  };
+  addRing(outer);
+  for (const hole of holes) if (hole.length >= 3) addRing(hole);
+  return path;
 }
 
 export { BubbleSetLayer };

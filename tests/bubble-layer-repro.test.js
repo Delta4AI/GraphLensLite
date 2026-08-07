@@ -23,8 +23,9 @@ function makeSigma(camera, dims) {
   const strokedPaths = [];
   const bodyTexts = [];
 
+  const transforms = [];
   const ctx = {
-    setTransform: () => {},
+    setTransform: (a, b, c, d, e, f) => transforms.push({ a, b, c, d, e, f }),
     clearRect: () => ctxOps.push(["clear"]),
     save: () => {},
     restore: () => {},
@@ -78,7 +79,7 @@ function makeSigma(camera, dims) {
     off: () => {},
     emit: (ev) => handlers.get(ev)?.(),
   };
-  return { sigma, canvas, ctx, labelCanvas, labelCtx, labelTexts, bodyTexts, filledPaths, strokedPaths };
+  return { sigma, canvas, ctx, labelCanvas, labelCtx, labelTexts, bodyTexts, filledPaths, strokedPaths, transforms };
 }
 
 function makeGraph(nodes) {
@@ -136,10 +137,26 @@ const TRI = [
 
 const STYLE = { fill: "#e74c3c", stroke: "#e74c3c", fillOpacity: 0.25, strokeOpacity: 1, label: false };
 
+/**
+ * The hull is painted in graph space under a camera transform, so the paint
+ * is only correct if that transform IS sigma's projection. dpr is 1 in these
+ * fixtures, so the recorded matrix is the projection itself.
+ */
+function expectTransformProjects(matrix, graphPoints, sigma) {
+  expect(matrix).toBeTruthy();
+  expect(matrix.b).toBe(0); // no rotation or skew: the app never rotates
+  expect(matrix.c).toBe(0);
+  for (const g of graphPoints) {
+    const expected = sigma.graphToViewport(g);
+    expect(matrix.a * g.x + matrix.e).toBeCloseTo(expected.x, 5);
+    expect(matrix.d * g.y + matrix.f).toBeCloseTo(expected.y, 5);
+  }
+}
+
 describe("BubbleSetLayer — zoom reprojection (symptoms 1-3)", () => {
   it("reprojects the cached hull when the camera ratio changes", () => {
     const camera = { x: 1, y: 1, ratio: 1, angle: 0 };
-    const { sigma, filledPaths } = makeSigma(camera, { width: 800, height: 600 });
+    const { sigma, filledPaths, transforms } = makeSigma(camera, { width: 800, height: 600 });
     const layer = new BubbleSetLayer({ sigma, graph: makeGraph(TRI) }, makeCache());
 
     layer.getGroupHandle("groupOne").update({ members: ["a", "b", "c"], ...STYLE });
@@ -150,7 +167,13 @@ describe("BubbleSetLayer — zoom reprojection (symptoms 1-3)", () => {
     expect(cached.graphPoints.length).toBeGreaterThan(2);
     expect(filledPaths.length, "a hull should be filled at ratio 1").toBeGreaterThan(0);
 
-    const pointsAt1 = filledPaths.at(-1);
+    // The path is graph-space now, so "how big does it land on screen" is a
+    // question about the painted result: path points under the transform.
+    const onScreen = () => {
+      const m = transforms.at(-1);
+      return filledPaths.at(-1).map((p) => ({ x: m.a * p.x + m.e, y: m.d * p.y + m.f }));
+    };
+    const pointsAt1 = onScreen();
     const centroid = (pts) => pts.reduce((a, p) => ({ x: a.x + p.x / pts.length, y: a.y + p.y / pts.length }), { x: 0, y: 0 });
     const c1 = centroid(pointsAt1);
 
@@ -161,7 +184,7 @@ describe("BubbleSetLayer — zoom reprojection (symptoms 1-3)", () => {
     camera.ratio = 0.4;
     sigma.emit("afterRender");
     flushRaf();
-    const pointsAt04 = filledPaths.at(-1);
+    const pointsAt04 = onScreen();
 
     // The hull must grow away from the viewport center as we zoom in (the
     // reprojection scales the cached graph points by 1/ratio) ...
@@ -169,21 +192,24 @@ describe("BubbleSetLayer — zoom reprojection (symptoms 1-3)", () => {
     const spread = (pts, c) => Math.max(...pts.map((p) => Math.hypot(p.x - c.x, p.y - c.y)));
     expect(spread(pointsAt04, c04)).toBeGreaterThan(spread(pointsAt1, c1) * 1.5);
 
-    // ... and the drawn points must equal the cached graph points reprojected
-    // at the new camera (same cache, just reprojected — never re-fitted).
-    // The curve painter records moveTo(start) + one endpoint per segment, so
-    // the ring closes back onto its first vertex (length + 1).
-    const expected = layer.outlines.get("groupOne").graphPoints.map((g) => sigma.graphToViewport(g));
-    expect(pointsAt04.length).toBe(expected.length + 1);
-    pointsAt04.slice(0, -1).forEach((p, i) => {
-      expect(p.x).toBeCloseTo(expected[i].x, 5);
-      expect(p.y).toBeCloseTo(expected[i].y, 5);
+    // ... and the path is the cached GRAPH points, painted under a camera
+    // transform — so applying that transform must reproduce sigma's own
+    // projection exactly, at every vertex. The curve painter records
+    // moveTo(start) + one endpoint per segment, so the ring closes back onto
+    // its first vertex (length + 1).
+    const graphPoints = layer.outlines.get("groupOne").graphPoints;
+    const drawn = filledPaths.at(-1);
+    expect(drawn.length).toBe(graphPoints.length + 1);
+    drawn.slice(0, -1).forEach((p, i) => {
+      expect(p.x).toBeCloseTo(graphPoints[i].x, 5);
+      expect(p.y).toBeCloseTo(graphPoints[i].y, 5);
     });
+    expectTransformProjects(transforms.at(-1), graphPoints, sigma);
   });
 
   it("keeps the hull visible (reprojected) during a pan (ratio unchanged)", () => {
     const camera = { x: 1, y: 1, ratio: 1, angle: 0 };
-    const { sigma, filledPaths } = makeSigma(camera, { width: 800, height: 600 });
+    const { sigma, filledPaths, transforms } = makeSigma(camera, { width: 800, height: 600 });
     const layer = new BubbleSetLayer({ sigma, graph: makeGraph(TRI) }, makeCache());
 
     layer.getGroupHandle("groupOne").update({ members: ["a", "b", "c"], ...STYLE });
@@ -197,13 +223,14 @@ describe("BubbleSetLayer — zoom reprojection (symptoms 1-3)", () => {
     flushRaf();
     expect(filledPaths.length, "hull stays drawn during a pan").toBeGreaterThan(before);
     const drawn = filledPaths.at(-1);
-    const expected = layer.outlines.get("groupOne").graphPoints.map((g) => sigma.graphToViewport(g));
+    const graphPoints = layer.outlines.get("groupOne").graphPoints;
     // moveTo(start) + per-segment endpoints: the last point closes the ring.
-    expect(drawn.length).toBe(expected.length + 1);
+    expect(drawn.length).toBe(graphPoints.length + 1);
     drawn.slice(0, -1).forEach((p, i) => {
-      expect(p.x).toBeCloseTo(expected[i].x, 5);
-      expect(p.y).toBeCloseTo(expected[i].y, 5);
+      expect(p.x).toBeCloseTo(graphPoints[i].x, 5);
+      expect(p.y).toBeCloseTo(graphPoints[i].y, 5);
     });
+    expectTransformProjects(transforms.at(-1), graphPoints, sigma);
   });
 });
 
