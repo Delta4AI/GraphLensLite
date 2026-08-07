@@ -187,32 +187,32 @@ const TOUR_STEPS = [
   {
     title: 'Filtering Panel',
     text: `Every property from your data becomes a <strong>filter</strong>.
-           <div style="margin:8px 0;padding:8px 10px;background:#f8f7fb;border-radius:6px;border:1px solid #dddbe2;">
+           <div style="margin:8px 0;padding:8px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border-soft);">
              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">
-               <span style="display:inline-block;width:14px;height:14px;border:1px solid #015C0C;border-radius:3px;box-sizing:border-box;text-align:center;line-height:12px;font-size:12px;color:#015C0C;flex-shrink:0;margin-top:2px;">✔</span>
-               <span style="font-size:12px;color:#403C53;font-weight:600;padding-top:2px;">Expression Level</span>
+               <span style="display:inline-block;width:14px;height:14px;border:1px solid var(--success-text);border-radius:3px;box-sizing:border-box;text-align:center;line-height:12px;font-size:12px;color:var(--success-text);flex-shrink:0;margin-top:2px;">✔</span>
+               <span style="font-size:12px;color:var(--brand-text);font-weight:600;padding-top:2px;">Expression Level</span>
                <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
-                 <div style="position:relative;height:8px;border-radius:10px;background:#CCC;margin-top:4px;">
-                   <div style="position:absolute;left:20%;right:30%;height:100%;border-radius:10px;background:#403C53;"></div>
-                   <div style="position:absolute;left:calc(20% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:#EEE;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
-                   <div style="position:absolute;left:calc(70% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:#EEE;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
+                 <div style="position:relative;height:8px;border-radius:10px;background:var(--border);margin-top:4px;">
+                   <div style="position:absolute;left:20%;right:30%;height:100%;border-radius:10px;background:var(--brand-text);"></div>
+                   <div style="position:absolute;left:calc(20% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:var(--surface-3);box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
+                   <div style="position:absolute;left:calc(70% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:var(--surface-3);box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
                  </div>
                  <div style="display:flex;gap:6px;">
-                   <input disabled value="20" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid #aaa;border-radius:3px;background:white;color:#403C53;box-sizing:border-box;">
-                   <input disabled value="70" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid #aaa;border-radius:3px;background:white;color:#403C53;box-sizing:border-box;">
+                   <input disabled value="20" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--input-bg);color:var(--brand-text);box-sizing:border-box;">
+                   <input disabled value="70" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--input-bg);color:var(--brand-text);box-sizing:border-box;">
                  </div>
                </div>
-               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:2px solid #403C53;background:#403C53;flex-shrink:0;margin-top:2px;"></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;background:#E4E3EA;flex-shrink:0;margin-top:2px;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
+               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:2px solid var(--brand-text);background:var(--brand-text);flex-shrink:0;margin-top:2px;"></span>
+               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;background:var(--surface-3);flex-shrink:0;margin-top:2px;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid var(--brand-text);">−</span></span>
              </div>
              <div style="display:flex;align-items:center;gap:8px;">
-               <span style="display:inline-block;width:14px;height:14px;border:1px solid #C33D35;border-radius:3px;box-sizing:border-box;flex-shrink:0;"></span>
-               <span style="font-size:12px;color:#403C53;font-weight:600;">Type</span>
-               <select disabled style="flex:1;font-size:11px;padding:1px 4px;border:1px solid #aaa;border-radius:3px;background:white;">
+               <span style="display:inline-block;width:14px;height:14px;border:1px solid var(--accent-text);border-radius:3px;box-sizing:border-box;flex-shrink:0;"></span>
+               <span style="font-size:12px;color:var(--brand-text);font-weight:600;">Type</span>
+               <select disabled style="flex:1;font-size:11px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--input-bg);">
                  <option>Enzyme ✓, Receptor ✓, ...</option>
                </select>
-               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:1.5px dashed #9a97a8;background:transparent;flex-shrink:0;"></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;background:#E4E3EA;flex-shrink:0;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
+               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:1.5px dashed var(--text-faint);background:transparent;flex-shrink:0;"></span>
+               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;background:var(--surface-3);flex-shrink:0;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid var(--brand-text);">−</span></span>
              </div>
            </div>
            • <strong>Numeric properties</strong> get two-thumbed range sliders — drag the left thumb to set
@@ -221,9 +221,9 @@ const TOUR_STEPS = [
            <br>• The <strong>checkbox</strong> toggles whether that filter is active.
            Active filters are combined with <strong>OR</strong> logic by default — nodes/edges matching <em>any</em> active filter are shown.
            The
-           <span style="display:inline-flex;align-items:stretch;border:1px solid #dddbe2;border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:#E4E3EA;color:#403C53;">OR</span><span style="padding:2px 9px;background:#C33D35;color:#fff;border-left:1px solid #dddbe2;">AND</span></span>
+           <span style="display:inline-flex;align-items:stretch;border:1px solid var(--border-soft);border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:var(--surface-3);color:var(--brand-text);">OR</span><span style="padding:2px 9px;background:#C33D35;color:#fff;border-left:1px solid var(--border-soft);">AND</span></span>
            toggle at the top of the panel switches to requiring <em>all</em> the filters you've narrowed (AND); its <strong>Complete cases only</strong> option additionally hides elements missing any of those filters.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <span style="display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:middle;background:var(--brand-text);"></span>
            <strong>Bubble group chip</strong> — click it to put that filter's matching nodes into a
            <strong>group</strong>, or to make a new group from the filter. The dot is hollow when the
@@ -231,12 +231,12 @@ const TOUR_STEPS = [
            it is in several (hover it to read the names). Groups fed this way are <em>filter-driven</em>:
            they update as the filter changes. Manage them all under <strong>Overlays › Groups</strong>.
            <br><br>
-           <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;vertical-align:middle;background:#E4E3EA;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
+           <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;vertical-align:middle;background:var(--surface-3);"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid var(--brand-text);">−</span></span>
            <strong>Selection button</strong> — <strong>+</strong> add or <strong>−</strong> remove all nodes matching that filter property to/from the current selection.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Every numeric property also carries <strong>exact min/max input boxes</strong> under its slider, so you can type a threshold instead of dragging for it. When the list gets long, fold a whole property group — <em>Classification</em>, <em>Annotation</em>, whatever your spreadsheet calls them — away with the <strong>▾</strong> chevron on its heading.
            <br><br>
-           <span style="display:inline-flex;align-items:stretch;border:1px solid #dddbe2;border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:#C33D35;color:#fff;">Node&nbsp;5</span><span style="padding:2px 9px;background:#E4E3EA;color:#403C53;border-left:1px solid #dddbe2;">Edge&nbsp;2</span></span>
+           <span style="display:inline-flex;align-items:stretch;border:1px solid var(--border-soft);border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:#C33D35;color:#fff;">Node&nbsp;5</span><span style="padding:2px 9px;background:var(--surface-3);color:var(--brand-text);border-left:1px solid var(--border-soft);">Edge&nbsp;2</span></span>
            The <strong>Node / Edge</strong> segment in the section header picks which half of your filters
            the panel shows — one at a time, each labelled with how many filters it holds.
            <br><br>
@@ -266,13 +266,13 @@ const TOUR_STEPS = [
            <strong class="tour-red">×</strong> (clear it) and <strong>↶</strong> / <strong>↷</strong>
            (undo / redo selection changes, up to 25 states). It also warns when active filters are hiding
            part of what you have selected.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Three ways to build one:
            <br>• <strong>Click</strong> an element on the canvas, <strong>Shift+click</strong> to add more
            <br>• <strong>➰ Lasso</strong> (L) — drag a freeform area around what you want
            <br>• <strong>◈ Select ⌄</strong> — all/no nodes, all/no edges, or select by
            <strong>Node/Edge IDs</strong> or <strong>Labels</strong> with an include/exclude switch
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            The <strong>query editor</strong> can also turn any predicate into a selection with 🎯 Select.`,
     targets: [{ selector: '#selectionChip' }, { selector: '#selectMenuBtn' }],
     position: 'below',
@@ -283,7 +283,7 @@ const TOUR_STEPS = [
            <strong>Filters</strong> / <strong>Overlays</strong> / <strong>Selection</strong> pills switch
            what it shows. Nothing switches on its own — when a selection changes while you are in
            another context, the Selection pill flashes and waits for you.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Act on selection</strong>
            <br>• <strong>＋ Add to group</strong> — opens a list of your bubble groups and drops the
            selected nodes into one (or takes them out again); the same menu makes a new group from the
@@ -291,7 +291,7 @@ const TOUR_STEPS = [
            <br>• <strong>⟳ Reset style</strong> — revert the selection's styles to defaults
            <br>• <strong>Expand/Reduce Edges</strong> and <strong>Expand/Reduce Neighbors</strong> — grow or shrink the selection by one hop
            <br>• <strong>Shortest Path</strong> — with exactly two nodes selected, add the path between them
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Arrange Selection</strong> — <strong>Shrink/Expand</strong> pull nodes together or apart;
            <strong>Circle/Force/Grid/Random</strong> apply a sub-layout to the selection only.`,
     targets: [{ selector: '#inspectorSelection' }, { selector: '#inspectorPillSelection' }],
@@ -303,26 +303,26 @@ const TOUR_STEPS = [
     text: `Appearance lives at the bottom of the inspector's <strong>Selection</strong> context
            (<strong>Y</strong> jumps straight to it). Styles apply <strong>only to selected elements</strong> —
            select nodes/edges first, then adjust. All styles are <strong>per-workspace</strong>.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Node Configuration</strong>
            <br>• Shape, size, fill color, border size &amp; color
            <br>• Label text, font size, placement, color &amp; background
            <br>• <strong>Badges</strong> — small text markers at any corner of a node
            <br>• <strong>Pie-chart nodes</strong> — render a node as a multi-slice pie driven by category data
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Edge Configuration</strong>
            <br>• Type (line/quadratic/cubic), width, dash pattern, color
            <br>• Label text, font size, placement, rotation, offset &amp; color
            <br>• <strong>Arrows</strong> — start/end arrows with configurable size and type
            <br>• <strong>Halos</strong> — colored glow around edges with adjustable width
            <br>• <strong>Edge flow</strong> — animated directional motion along edges (comet or chevron), with adjustable opacity and density
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Scale tools</strong> — map any data property or computed network metric to a visual property:
-           <br>• <span style="display:inline-block;width:20px;height:16px;border:1px solid black;border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> <strong>Numeric scale</strong> — e.g. scale node size by PageRank
-           <br>• <span style="display:inline-block;width:24px;height:16px;border:1px solid black;border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> <strong>Color scale</strong> — continuous gradient or discrete colors per category
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <br>• <span style="display:inline-block;width:20px;height:16px;border:1px solid var(--border-strong);border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> <strong>Numeric scale</strong> — e.g. scale node size by PageRank
+           <br>• <span style="display:inline-block;width:24px;height:16px;border:1px solid var(--border-strong);border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> <strong>Color scale</strong> — continuous gradient or discrete colors per category
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            💡 Color inputs accept any hex code — type it in the text field and press <strong>Enter</strong> to apply.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Anything drawn over the whole graph rather than over your selection — groups, the density
            heatmap, notes, the minimap — lives in the <strong>Overlays</strong> context instead. That is
            the next step.`,
@@ -336,7 +336,7 @@ const TOUR_STEPS = [
     text: `<strong>Overlays</strong> is the stack of everything drawn <em>over</em> the graph. Every row
            owns its own switch, a row with nothing to draw is greyed out, and the two rows with
            settings open onto them. These are <strong>workspace-level</strong>, not per-selection.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Groups</strong> — one row per bubble group: its colour, its name, how many nodes it
            holds, and a <strong>＋</strong> that drops the current selection into it
            (<strong>－</strong> takes it back out). Build them with <strong>＋ New group</strong>,
@@ -348,18 +348,18 @@ const TOUR_STEPS = [
            A group fed from a filter row is marked <strong>⚙</strong> and follows that filter as it
            changes. The two sources add up, so a row can read <em>⚙ Type · +8 manual</em>: eight nodes
            you put there by hand, on top of everything the filter matches.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Density heatmap</strong> — a continuous density field under the graph, showing where
            nodes crowd together whatever their styling. <strong>Fade graph</strong> dims nodes, labels
            and edges so the field reads through; <strong>Intensity</strong>, <strong>Opacity</strong>,
            <strong>Radius</strong>, <strong>Contrast</strong> and <strong>Threshold</strong> shape it.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Notes</strong> — free text pinned to graph coordinates, so it pans and zooms with the
            network. Place one with <strong>✎ Note</strong> on the rail, then click the canvas. Drag to
            move it, double-click (or <strong>Enter</strong>) to edit the text, single-click for its style
            popover — font size and colour, border, background, shadow, and <strong>✗ Delete note</strong>.
            Notes are per workspace and come along in PNG and SVG exports.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Minimap</strong> — the overview thumbnail in the bottom-right corner.`,
     targets: [{ selector: '#inspectorOverlays' }, { selector: '#inspectorPillOverlays' }],
     position: 'left',
@@ -375,16 +375,16 @@ const TOUR_STEPS = [
            <br>• <strong>Closeness Centrality</strong> — average distance to all other nodes
            <br>• <strong>Eigenvector Centrality</strong> — influence based on neighbor importance
            <br>• <strong>PageRank</strong> — iterative ranking algorithm
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Results appear as a <strong>ranked node list</strong> — select entries and use
            <strong>Add to Selection</strong> / <strong>Remove from Selection</strong> to update the graph selection.
            <br><br>
            Below the list, <strong>graph-level metrics</strong> (density, avg degree, etc.) are shown in a summary table.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Computed metrics become available as mapping sources in the styling panel's
-           <span style="display:inline-block;width:20px;height:16px;border:1px solid black;border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> numeric scale and
-           <span style="display:inline-block;width:24px;height:16px;border:1px solid black;border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> color scale tools.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <span style="display:inline-block;width:20px;height:16px;border:1px solid var(--border-strong);border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> numeric scale and
+           <span style="display:inline-block;width:24px;height:16px;border:1px solid var(--border-strong);border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> color scale tools.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button next to the metric dropdown for a detailed explanation of the selected metric.`,
     targets: [{ selector: '#metricsContainer' }, { selector: '#metricsToggleBtn' }],
     position: 'left',
@@ -394,11 +394,11 @@ const TOUR_STEPS = [
     title: 'Data Editor 🔢',
     text: `The data editor is a <strong>spreadsheet view</strong> of all nodes and edges.
            You can edit property values directly in cells, add new elements, or export the data.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">✔ Apply</span> — push all changes to the graph
            <br>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#EFB0AA;border:1px solid rgba(0,0,0,0.3);">⟳ Reset</span> — discard changes and revert to current graph state
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Node</span>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Edge</span>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Column</span> — add new nodes, edges, or property columns to the table
@@ -406,7 +406,7 @@ const TOUR_STEPS = [
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">⤒ Import</span> — merge a second Excel file into the current graph. You get a preview of what would change first, and you choose whether new nodes and edges are added or only the existing ones extended
            <br>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">⤓ Export</span> — export the data table and styling properties as Excel
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the header for usage details.`,
     targets: [{ selector: '#workbench' }, { selector: '#dataToggleBtn' }],
     position: 'above-lower-left',
@@ -431,7 +431,7 @@ const TOUR_STEPS = [
            </div>
            The query <strong>syncs with the filter panel</strong> — changing filters updates the query text, and vice versa.
            When you manually edit the query, filters get <strong>locked</strong> (🔒) to prevent conflicts.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">🔍 Filter</span> — apply the query to filter the graph (hide non-matching elements)
            <br>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">🎯 Select</span> — apply the query to select matching elements without filtering
@@ -439,9 +439,9 @@ const TOUR_STEPS = [
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#EFB0AA;border:1px solid rgba(0,0,0,0.3);">⟳ Sync</span> — reset the query to match the current filter panel state
            <br>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#C33D35;border:1px solid rgba(0,0,0,0.3);">✗ Clear</span> — clear the query entirely
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            When the query editor is open, a <span class="add-to-query-button show tt">📝</span> button appears next to each filter checkbox in the filtering panel. Click it to <strong>append</strong> that filter's current range or category selection as a query fragment — a quick way to build complex queries from existing filters.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the query editor header for a full syntax reference.`,
     targets: [{ selector: '#workbench' }, { selector: '#queryToggleBtn' }],
     position: 'above-center-left',
@@ -452,10 +452,10 @@ const TOUR_STEPS = [
     text: `Ask natural-language questions about your graph and get answers grounded in the current workspace. The assistant can also suggest queries you run with one click:
            <br>• <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">🎯 Select</span> applies the query immediately
            <br>• <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">📝 Open in query editor</span> drops it into the editor for review
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Setup &amp; privacy</strong>
            <br>The assistant talks to an <strong>Ollama</strong> server you control, local by default. Every message ships a snapshot of the current graph state, so use a local endpoint for sensitive data. Click <strong>⚙ Settings</strong> in the workbench toolbar to configure the endpoint and pick a model. Results vary by model. Tested with <code>qwen3.5:9b</code>.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            The <strong>budget pill</strong> at the bottom shows how much of the model's context window the next request will consume. Click it for a per-section breakdown.`,
     targets: [{ selector: '#workbench' }, { selector: '#assistantToggleBtn' }],
     position: 'left',
