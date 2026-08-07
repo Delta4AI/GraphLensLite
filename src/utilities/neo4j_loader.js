@@ -674,7 +674,9 @@ function buildConnectionForm(saved) {
     <div class="neo4j-field">
       <label for="neo4j-query">Cypher query</label>
       <textarea id="neo4j-query" rows="4" class="p-prompt neo4j-query">MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 500</textarea>
-      <span class="neo4j-hint">Must return nodes, relationships, or paths.</span>
+      <span class="neo4j-hint">Must return nodes, relationships, or paths. The prefilled query
+        matches every node in the database — its LIMIT is what keeps it small, so add a label
+        (<code>MATCH (n:Gene)…</code>) before raising it.</span>
     </div>
     <div id="neo4j-replace-note" class="neo4j-warning" hidden>
       Importing replaces the loaded graph — its positions, filters, groups and undo history go with it.

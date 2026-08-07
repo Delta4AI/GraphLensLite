@@ -77,7 +77,10 @@ function buildExpandPreflight(elementIds) {
       'MATCH (n) WHERE elementId(n) IN $ids ' +
       'MATCH (n)-[r]-(m) ' +
       "RETURN type(r) AS relType, coalesce(labels(m)[-1], '') AS neighborLabel, " +
-      'count(*) AS cnt ORDER BY cnt DESC',
+      // DISTINCT: an undirected match sees a relationship once per endpoint,
+      // so anything internal to the selection was counted twice (self-loops
+      // likewise), and the checklist over-reported it.
+      'count(DISTINCT r) AS cnt ORDER BY cnt DESC',
     parameters: { ids: elementIds },
     resultDataContents: ['row'],
   };
@@ -92,10 +95,17 @@ function buildExpandPreflight(elementIds) {
  * @param {Array<{relType: string, neighborLabel: string}>} pairs
  */
 function buildExpandFetch(elementIds, pairs) {
+  // The WHERE alone made the server expand EVERY relationship of every
+  // selected node and only then discard the unchecked ones — keeping 1 of 20
+  // neighbour groups still traversed all 20. Relationship types cannot be
+  // parameterised, so the chosen ones go into the pattern as escaped
+  // literals; the WHERE stays, because it is what matches exact PAIRS.
+  const types = [...new Set(pairs.map((pair) => pair.relType))].filter(Boolean);
+  const typeFilter = types.length ? `:${types.map(escapeRelType).join('|')}` : '';
   return {
     statement:
       'MATCH (n) WHERE elementId(n) IN $ids ' +
-      'MATCH (n)-[r]-(m) ' +
+      `MATCH (n)-[r${typeFilter}]-(m) ` +
       "WHERE [type(r), coalesce(labels(m)[-1], '')] IN $pairs " +
       'RETURN n, r, m',
     parameters: {
@@ -104,6 +114,16 @@ function buildExpandFetch(elementIds, pairs) {
     },
     resultDataContents: ['graph'],
   };
+}
+
+/**
+ * Backtick-quote a relationship type for use in a pattern. Types come from the
+ * server's own preflight, not from user text, but quoting is what makes a type
+ * containing a space, a hyphen or a backtick legal Cypher rather than a syntax
+ * error — and it is what keeps the interpolation inert.
+ */
+function escapeRelType(type) {
+  return `\`${String(type).replace(/`/g, '``')}\``;
 }
 
 /**
@@ -172,13 +192,14 @@ async function appendStitch(session, nodes, relationships, opts) {
   // missing are the ones touching this batch. A merge the user chose not to
   // stitch leaves ids uncovered, and tracking that as a plain "have we ever
   // stitched" flag silently skipped them forever; hence the covered set.
+  // Pairs where BOTH ends are already covered were examined by an earlier
+  // stitch, so the uncovered ids — this batch plus anything merged without
+  // stitching — are the only endpoints that can still be missing a link.
+  // Falling back to the full sweep instead meant one unstitched merge made
+  // every later stitch re-examine the whole accumulated graph, forever.
   const covered = session.stitchedIds;
-  const allCovered =
-    covered != null &&
-    [...session.rawNodes.values()].every((node) =>
-      covered.has(node.elementId ?? String(node.id)),
-    );
-  const query = allCovered ? buildStitchQuery(allIds, newIds) : buildStitchQuery(allIds);
+  const uncovered = covered == null ? null : [...new Set([...allIds.filter((id) => !covered.has(id)), ...newIds])];
+  const query = uncovered ? buildStitchQuery(allIds, uncovered) : buildStitchQuery(allIds);
 
   const results = await runCypher(session.config, [query], opts);
   // allIds is everything loaded plus this batch, so it IS the new covered set.
@@ -432,6 +453,21 @@ function showExpandChecklist(pairs) {
 }
 
 /**
+ * Relationships the checked pairs will bring back, from the preflight's own
+ * per-pair counts.
+ *
+ * @param {Array<{relType: string, neighborLabel: string, count: number}>} pairs
+ * @param {Array<{relType: string, neighborLabel: string}>} chosen
+ * @returns {number}
+ */
+function expectedRelationshipCount(pairs, chosen) {
+  const wanted = new Set(chosen.map((p) => `${p.relType}\u0000${p.neighborLabel}`));
+  return pairs
+    .filter((p) => wanted.has(`${p.relType}\u0000${p.neighborLabel}`))
+    .reduce((sum, p) => sum + (Number(p.count) || 0), 0);
+}
+
+/**
  * Expand flow: preflight → checklist → fetch → merge. Entry point for the
  * selection-HUD button; no-ops without an active session or selection.
  *
@@ -491,6 +527,18 @@ async function expandNeo4jSelection(cache, deps = {}) {
 
     const chosen = await checklist(pairs);
     if (!chosen || chosen.pairs.length === 0) return false;
+
+    // The import path blocks on a confirm above this threshold; expand showed
+    // the counts as passive text, so a 500k-relationship expansion was one
+    // click away with nothing in the way.
+    const expected = expectedRelationshipCount(pairs, chosen.pairs);
+    if (expected > LARGE_RESULT_ROW_THRESHOLD) {
+      const proceed = await (deps.confirm ?? Popup.confirm)(
+        `Expanding will fetch about ${expected.toLocaleString()} relationships, which may be ` +
+          'slow to fetch and render. Continue anyway? (Tip: uncheck the larger groups.)',
+      );
+      if (proceed !== true) return false;
+    }
 
     await progress('Fetching neighbors …');
     const results = await runCypher(session.config, [buildExpandFetch(ids, chosen.pairs)], opts);
@@ -686,6 +734,7 @@ export {
   buildExpandPreflight,
   buildExpandFetch,
   buildStitchQuery,
+  escapeRelType,
   elementIdsFor,
   SEED_RADIUS,
   SEED_JITTER,

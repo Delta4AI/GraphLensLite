@@ -9,6 +9,7 @@ import {
   buildExpandPreflight,
   buildExpandFetch,
   buildStitchQuery,
+  escapeRelType,
   elementIdsFor,
   SEED_RADIUS,
   SEED_JITTER,
@@ -116,7 +117,31 @@ describe('expand query builders', () => {
     const built = buildExpandPreflight(ids);
     expect(built.resultDataContents).toEqual(['row']);
     expect(built.statement).toContain("coalesce(labels(m)[-1], '')");
-    expect(built.statement).toContain('count(*)');
+    // DISTINCT: an undirected match sees a relationship internal to the
+    // selection once per endpoint, so count(*) over-reported it.
+    expect(built.statement).toContain('count(DISTINCT r)');
+  });
+
+  it('puts the chosen types in the pattern, escaped, not only in the WHERE', () => {
+    // The WHERE alone made the server expand every relationship of every
+    // selected node before discarding the unchecked ones.
+    const built = buildExpandFetch(ids, [
+      { relType: 'ACTED_IN', neighborLabel: 'Movie' },
+      { relType: 'ACTED_IN', neighborLabel: 'Show' },
+      { relType: 'WORKS WITH', neighborLabel: '' },
+    ]);
+    expect(built.statement).toContain('MATCH (n)-[r:`ACTED_IN`|`WORKS WITH`]-(m)');
+    // Still filtered by exact pairs: checking (A→X) and (B→Y) must not also
+    // fetch (A→Y).
+    expect(built.statement).toContain("[type(r), coalesce(labels(m)[-1], '')] IN $pairs");
+  });
+
+  it('leaves the pattern open when no types were chosen', () => {
+    expect(buildExpandFetch(ids, []).statement).toContain('MATCH (n)-[r]-(m)');
+  });
+
+  it('escapes a backtick in a relationship type', () => {
+    expect(escapeRelType('od`d')).toBe('`od``d`');
   });
 
   it('fetch filters by exact (type, label) pairs and returns graph data', () => {
@@ -464,6 +489,38 @@ describe('expandNeo4jSelection', () => {
     // The anchor kept its position; the new node was seeded near it.
     expect(merged.nodes.find((n) => n.id === '1').style.x).toBe(5);
     expect(merged.nodes.find((n) => n.id === '9').style.x).toBeDefined();
+  });
+
+  it('blocks on a confirm above the size threshold, and honours a decline', async () => {
+    // The import path confirms; expand showed the counts as passive text, so a
+    // half-million-relationship expansion was one click away.
+    startNeo4jSession(CONFIG, [rawNode('1', 'Person', {}, { elementId: '4:abc:1' })], [], NO_EXCLUSIONS);
+    const cache = makeCache([{ id: '1', style: { x: 5, y: 5 } }], ['1']);
+    const huge = jsonResponse({
+      results: [{ data: [{ row: ['ACTED_IN', 'Movie', LARGE_RESULT_ROW_THRESHOLD + 1] }] }],
+      errors: [],
+    });
+    const fetchImpl = vi.fn().mockResolvedValueOnce(huge);
+    const checklist = vi.fn(async (pairs) => ({ pairs: [pairs[0]], stitch: false }));
+    const confirm = vi.fn().mockResolvedValue(false);
+
+    expect(await expandNeo4jSelection(cache, { fetchImpl, checklist, confirm })).toBe(false);
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(fetchImpl).toHaveBeenCalledTimes(1); // preflight only — never fetched
+  });
+
+  it('does not confirm a small expansion', async () => {
+    startNeo4jSession(CONFIG, [rawNode('1', 'Person', {}, { elementId: '4:abc:1' })], [], NO_EXCLUSIONS);
+    const cache = makeCache([{ id: '1', style: { x: 5, y: 5 } }], ['1']);
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(preflightResponse)
+      .mockResolvedValueOnce(graphResponse([rawNode('9', 'Movie')], []));
+    const checklist = vi.fn(async (pairs) => ({ pairs: [pairs[0]], stitch: false }));
+    const confirm = vi.fn();
+
+    await expandNeo4jSelection(cache, { fetchImpl, checklist, confirm, apply: async () => true });
+    expect(confirm).not.toHaveBeenCalled();
   });
 
   it('offers a cancel that aborts the in-flight preflight', async () => {
@@ -1016,7 +1073,7 @@ describe('stitch scope', () => {
     expect(stitches[1].parameters.ids.length).toBeGreaterThan(1);
   });
 
-  it('sweeps again after a merge the user chose not to stitch', async () => {
+  it('picks up a skipped batch without re-sweeping the whole graph', async () => {
     startNeo4jSession(CONFIG, [rawNode('1', 'Person', {}, { elementId: 'e0' })], [], NO_EXCLUSIONS);
     const cache = makeCache([{ id: '1', style: { x: 0, y: 0 } }]);
     const fetchImpl = makeFetchImpl();
@@ -1027,10 +1084,14 @@ describe('stitch scope', () => {
 
     const stitches = stitchStatements(fetchImpl);
     expect(stitches).toHaveLength(2);
-    // Back to the full form: the unstitched batch was never covered, and a
-    // batch-scoped query would never revisit it.
-    expect(stitches[1].statement).toContain('elementId(n) IN $ids AND elementId(m) IN $ids');
-    expect(stitches[1].parameters.ids).toContain('e2'); // the skipped batch is in scope
+    // Still incremental — pairs inside the covered set were already examined.
+    // The skipped batch simply joins this one as an uncovered endpoint, which
+    // is what makes its links get found; falling back to the full form meant
+    // one unstitched merge cost a whole-graph sweep on every later stitch.
+    expect(stitches[1].statement).toContain('elementId(n) IN $newIds AND elementId(m) IN $ids');
+    expect(stitches[1].parameters.newIds).toEqual(expect.arrayContaining(['e2', 'e3']));
+    expect(stitches[1].parameters.newIds).not.toContain('e0');
+    expect(stitches[1].parameters.ids).toContain('e0');
   });
 
   it('merges unstitched with a warning when the stitch query fails', async () => {
