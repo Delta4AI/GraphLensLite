@@ -875,6 +875,67 @@ describe('openNeo4jPopup', () => {
     }
   });
 
+  it('offers to forget a remembered connection, and only then', async () => {
+    // The saved query often carries literal identifiers from the user's data
+    // and persisted indefinitely with no UI to clear it.
+    openNeo4jPopup({ ui: {} });
+    expect(document.getElementById('neo4j-forget-btn').hidden).toBe(true);
+
+    saveSettings({ ...CONFIG, query: 'MATCH (p:Patient {mrn: "12345"}) RETURN p' });
+    document.body.innerHTML = '';
+    openNeo4jPopup({ ui: {} });
+
+    const forget = document.getElementById('neo4j-forget-btn');
+    expect(forget.hidden).toBe(false);
+    forget.click();
+
+    expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).toBeNull();
+    expect(document.getElementById('neo4j-url').value).toBe('');
+    expect(forget.hidden).toBe(true);
+  });
+
+  it('asks before sending credentials in the clear to a remote host', async () => {
+    // Basic auth is base64, not encryption: over http: to anything but this
+    // machine, everything on the path can read the password.
+    const fetchImpl = vi.fn();
+    vi.stubGlobal('fetch', fetchImpl);
+    try {
+      openNeo4jPopup({ ui: {} });
+      document.getElementById('neo4j-url').value = 'http://graph.example.com:7474';
+      document.getElementById('neo4j-load-btn').click();
+
+      await vi.waitFor(() => {
+        expect(document.body.textContent).toContain('Connect anyway?');
+      });
+      // Two popups are open; the confirm is the topmost.
+      const confirm = [...document.querySelectorAll('.p-custom')].at(-1);
+      [...confirm.querySelectorAll('button')].find((b) => b.textContent === 'Cancel').click();
+
+      await vi.waitFor(() => expect(document.getElementById('neo4j-load-btn').disabled).toBe(false));
+      expect(fetchImpl).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('does not ask for a local server', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    try {
+      openNeo4jPopup({ ui: {} });
+      document.getElementById('neo4j-url').value = 'http://127.0.0.1:7474';
+      document.getElementById('neo4j-load-btn').click();
+
+      await vi.waitFor(() => {
+        expect(document.getElementById('neo4j-error').hidden).toBe(false);
+      });
+      // The form's own disclaimer mentions http:// — the confirm is what must
+      // not appear, so assert on its wording.
+      expect(document.body.textContent).not.toContain('Connect anyway?');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('shows fetch failures inline and re-enables the buttons', async () => {
     vi.stubGlobal(
       'fetch',

@@ -75,7 +75,8 @@ function logStatements(statements) {
     const oneLine = statement.replace(/\s+/g, ' ').trim();
     const text =
       oneLine.length > QUERY_LOG_MAX_LENGTH ? `${oneLine.slice(0, QUERY_LOG_MAX_LENGTH)}…` : oneLine;
-    ui.logMessage(text, 'grey', false, '🛢️');
+    // Marked sensitive: the statement carries the user's literal values.
+    ui.logMessage(text, 'grey', false, '🛢️', { sensitive: true });
   }
 }
 
@@ -569,6 +570,19 @@ function readSavedSettings(storage = globalThis.localStorage) {
   }
 }
 
+/**
+ * Drop the remembered connection. The saved query often carries literal
+ * identifiers from the user's data, and it persisted indefinitely with no way
+ * to get rid of it short of clearing site data.
+ */
+function forgetSavedSettings(storage = globalThis.localStorage) {
+  try {
+    storage?.removeItem(SETTINGS_STORAGE_KEY);
+  } catch {
+    /* storage unavailable — nothing was remembered anyway */
+  }
+}
+
 function saveSettings(settings, storage = globalThis.localStorage) {
   try {
     const { url, username, database, query } = settings;
@@ -681,6 +695,8 @@ function buildConnectionForm(saved) {
       over http:// is unencrypted. Neo4j Aura (Bolt-only) is not supported.
     </div>
     <div class="p-footer">
+      <button id="neo4j-forget-btn" class="p-button p-button-secondary" hidden
+              title="Remove the remembered URL, username, database and query from this browser">Forget saved connection</button>
       <button id="neo4j-cancel-btn" class="p-button p-button-secondary">Cancel</button>
       <button id="neo4j-load-btn" class="p-button p-button-primary">Fetch</button>
     </div>
@@ -689,6 +705,16 @@ function buildConnectionForm(saved) {
   form.querySelector('#neo4j-username').value = saved.username ?? '';
   form.querySelector('#neo4j-database').value = saved.database ?? '';
   if (saved.query) form.querySelector('#neo4j-query').value = saved.query;
+  // Only offered when there is something to forget.
+  const forgetBtn = form.querySelector('#neo4j-forget-btn');
+  forgetBtn.hidden = Object.keys(saved).length === 0;
+  forgetBtn.addEventListener('click', () => {
+    forgetSavedSettings();
+    for (const field of ['url', 'username', 'database']) {
+      form.querySelector(`#neo4j-${field}`).value = '';
+    }
+    forgetBtn.hidden = true;
+  });
   form.querySelector('#neo4j-demo-link').addEventListener('click', (event) => {
     event.preventDefault();
     for (const [field, value] of Object.entries(DEMO_SETTINGS)) {
@@ -757,6 +783,26 @@ async function executeNeo4jImport(cache, config, deps = {}) {
     onError(`Neo4j: ${connectionHint(err)}`);
     return false;
   }
+}
+
+/** Hosts where plain http: keeps the credentials on this machine. */
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+/**
+ * @param {URL} parsed  the server URL
+ * @returns {boolean} true when the credentials would leave this machine in the clear
+ */
+function needsPlaintextConfirm(parsed) {
+  return parsed.protocol === 'http:' && !LOCAL_HOSTNAMES.has(parsed.hostname.toLowerCase());
+}
+
+/** @param {URL} parsed */
+function plaintextWarning(parsed) {
+  return (
+    `The connection to ${parsed.host} is unencrypted (http://), so the username and ` +
+    'password are sent in a form anything on the network path can read. ' +
+    'Use https:// if the server offers it. Connect anyway?'
+  );
 }
 
 /**
@@ -858,6 +904,13 @@ function openNeo4jPopup(cache) {
         showError('The server URL must start with http:// or https:// (e.g. http://localhost:7474).');
         return;
       }
+      // Credentials travel as base64 Basic auth, which is encoding, not
+      // encryption: over plain http: to anything but the local machine they
+      // are readable by everything on the path. A line of disclaimer text in
+      // the form is not consent.
+      if (needsPlaintextConfirm(parsed) && (await Popup.confirm(plaintextWarning(parsed))) !== true) {
+        return;
+      }
 
       saveSettings(config);
       controller = new AbortController();
@@ -921,6 +974,7 @@ export {
   startNeo4jSession,
   getNeo4jSession,
   clearNeo4jSession,
+  forgetSavedSettings,
   refreshNeo4jSessionUI,
   DEFAULT_DATABASE,
   DEMO_SETTINGS,
