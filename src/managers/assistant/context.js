@@ -88,7 +88,10 @@ function readRecentActions(maxLines) {
     ? document.getElementById('sidebarStatusContainer')
     : null
   if (!container) return []
-  return [...container.querySelectorAll('p')]
+  // Lines marked sensitive are excluded: the Neo4j query log reproduces the
+  // user's Cypher verbatim, literal identifiers and all, and this goes to the
+  // configured LLM endpoint.
+  return [...container.querySelectorAll('p:not([data-sensitive])')]
     .slice(-maxLines)
     .map(p => p.textContent.trim())
 }

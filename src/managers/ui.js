@@ -260,13 +260,20 @@ class UIManager {
     }
   }
 
-  logMessage(text, colorClass, bold = false, iconPrefix = '') {
+  /**
+   * @param {{sensitive?: boolean}} [options]  `sensitive` marks a line that
+   *   carries user data verbatim — executed Cypher, with its literals — so the
+   *   assistant's context builder can leave it out of what it sends to the
+   *   configured LLM endpoint.
+   */
+  logMessage(text, colorClass, bold = false, iconPrefix = '', options = {}) {
     const timestamp = StaticUtilities.getTimestamp();
 
     const container = document.getElementById('sidebarStatusContainer');
 
     const p = document.createElement('p');
     p.style.margin = '0 0 1px 0';
+    if (options.sensitive) p.dataset.sensitive = 'true';
 
     const spanTime = document.createElement('span');
     spanTime.textContent = `${timestamp} | `;
