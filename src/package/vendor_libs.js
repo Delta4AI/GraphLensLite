@@ -41,7 +41,10 @@ for (const {from, to, pkg} of copies) {
     console.error('[vendor-libs] Run `npm install` first.');
     process.exit(1);
   }
-  fs.copyFileSync(from, to);
+  // Strip the sourceMappingURL: the .map files are not copied, so leaving the
+  // comment makes vite log a "Failed to load source map" stack on every test
+  // run and dev serve.
+  fs.writeFileSync(to, fs.readFileSync(from, 'utf8').replace(/\n\/\/# sourceMappingURL=.*\n?$/, '\n'));
   const hash = sha256(to);
   const ver = pkgVersion(pkg);
   console.log(`[vendor-libs] ${path.relative(root, from)} -> ${path.relative(root, to)} (${pkg}@${ver} sha256:${hash.slice(0, 16)}…)`);

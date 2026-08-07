@@ -1145,18 +1145,6 @@ body {
     outline-offset: 2px;
 }
 
-/* Inline lasso glyph reused by the guided tour (empty span + --size/--color). */
-.lasso-icon {
-    display: inline-block;
-    vertical-align: middle;
-}
-
-.lasso-icon::before {
-    content: "➰";
-    font-size: var(--size, 14px);
-    line-height: 1;
-}
-
 /* --- Selection context: empty state vs live state --- */
 .insp-empty {
     margin-top: 14px;
@@ -1303,24 +1291,8 @@ h5 {
     margin: 0.5rem;
 }
 
-.ml-0 {
-    margin-left: 0;
-}
-
 .ml-1 {
     margin-left: 0.2em;
-}
-
-.ml-2 {
-    margin-left: 0.4em;
-}
-
-.mt-1 {
-    margin-top: 0.2em;
-}
-
-.mt-2 {
-    margin-top: 0.4em;
 }
 
 .q-space {
@@ -1433,9 +1405,6 @@ h5 {
 .q-connector-opening-bracket {
 }
 
-.q-connector-closing-bracket {
-}
-
 .q-connector-or,
 .q-connector-and,
 .q-connector-not {
@@ -1458,14 +1427,6 @@ h5 {
 }
 
 .q-error-unrecognized {
-    color: red;
-    font-weight: bold;
-    text-decoration-color: red;
-    text-decoration-line: underline;
-    text-decoration-style: wavy;
-}
-
-.q-error-empty-query {
     color: red;
     font-weight: bold;
     text-decoration-color: red;
@@ -2092,11 +2053,6 @@ h5 {
     align-items: center;
 }
 
-.container-vertical-aligned {
-    display: flex;
-    align-items: center;
-}
-
 #filterContainer {
     position: relative;
     margin-right: 6px;
@@ -2484,15 +2440,11 @@ h5 {
 /* Locked filter state - disable all interactive elements */
 #filterContainer.locked .header-card button,
 #filterContainer.locked .sub-header-card button,
-#filterContainer.locked .checkbox-container,
-#filterContainer.locked .dropdown-checklist,
 #filterContainer.locked .filter-row-col1 label,
 #filterContainer.locked .filter-row-col2,
 #filterContainer.locked .slider-container,
 #filterContainer.locked input[type="number"],
 #filterContainer.locked .filter-range-row,
-#filterContainer.locked .range-slider-thumb,
-#filterContainer.locked .range-slider,
 #filterContainer.locked .header-card,
 #filterContainer.locked .sub-header-card,
 /* The join toggle and its "complete cases only" modifier are filter controls
@@ -2769,10 +2721,6 @@ hr {
     flex: 1;
 }
 
-.tooltip-section {
-
-}
-
 .tooltip-sub-section {
     background-color: #403C53;
     border: 1px solid var(--border-strong);
@@ -2819,11 +2767,6 @@ hr {
     color: var(--text);
 }
 
-.brown {
-    color: #773901;
-    border: 1px solid #773901;
-}
-
 .green {
     color: var(--success-text);
 }
@@ -2852,43 +2795,12 @@ hr {
     color: white;
 }
 
-.red-border {
-    border: 1px solid #C33D35 !important;
-    border-radius: 3px;
-}
-
 .purple {
     color: var(--brand-text);
 }
 
-.purple-border {
-    border: 1px solid var(--brand-border) !important;
-    border-radius: 3px;
-}
-
 .round-border {
     border-radius: 3px;
-}
-
-.no-border {
-    border: none !important;
-}
-
-.no-background {
-    background: none;
-}
-
-.tiny-btn {
-    width: 14px;
-    height: 14px;
-    text-align: center;
-    line-height: 14px;
-    font-size: 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: 3px;
-    cursor: pointer;
-    padding: 0;
-    vertical-align: middle;
 }
 
 .small-btn {
@@ -2921,24 +2833,6 @@ hr {
     display: none;
 }
 
-.button-group {
-    display: inline-flex;
-    background: #403C5320;
-    outline: 1px solid var(--brand-border);
-    border-radius: 6px;
-    margin-right: 6px;
-    gap: 1px;
-}
-
-.button-separator {
-    display: inline-block;
-    width: 1px;
-    height: 1.2rem;
-    background-color: #403C53;
-    margin: 0 0.1em;
-    vertical-align: middle;
-}
-
 .info-btn {
     height: 18px;
     width: 18px;
@@ -2966,11 +2860,6 @@ hr {
 
 .small-btn.red:hover {
     border: 1px solid var(--brand-border) !important;
-}
-
-.small-text {
-    font-size: 12px;
-    line-height: 19px;
 }
 
 .extra-small {
@@ -3119,14 +3008,12 @@ hr {
 }
 
 
-.checkbox-red,
 .checkbox-green {
     color: var(--accent-text);
     border: 1px solid #C33D35;
     border-radius: 3px;
 }
 
-.checkbox-red:hover,
 .checkbox-green:hover {
     border-color: var(--text);
 }
@@ -3153,26 +3040,9 @@ input:checked + .checkbox-green::after {
     transform: translate(-50%, -50%);
 }
 
-/*************************
- edit button and related
- **************************/
-
-.edit-btn {
-    box-shadow: none;
-    transition: box-shadow 0.2s ease-in-out;
-}
-
-.edit-btn.active {
-    box-shadow: 0 0 5px #C33D35;
-}
-
 .highlight {
     box-shadow: 0 0 5px #C33D35;
     border-radius: 6px;
-}
-
-.edit-container {
-    height: auto !important;
 }
 
 /*************************
@@ -3262,59 +3132,6 @@ input:checked + .checkbox-green::after {
  style button and row
  **************************/
 
-.style-container {
-    border: 1px solid #c33d35;
-    border-radius: 3px;
-    display: grid;
-    grid-template-columns: 1fr 3fr;
-    gap: 10px;
-    margin-top: 6px;
-    margin-bottom: 6px;
-    padding: 4px;
-}
-
-.style-icon-button {
-    width: 17px;
-    height: 17px;
-    border: 1px solid transparent;
-    border-radius: 3px;
-}
-
-.style-icon-button:hover {
-    border: 1px solid var(--brand-border);
-    cursor: pointer;
-}
-
-.style-row-bottom-border {
-    border-bottom: 1px solid #403C5380;
-    padding-bottom: 4px;
-}
-
-.style-row {
-    display: none;
-    width: 0;
-    height: 0;
-    overflow: hidden;
-    transition: width 0.2s ease-in-out, height 0.2s ease-in-out;
-}
-
-.style-row.show {
-    display: block;
-    width: auto;
-    height: auto;
-}
-
-.style-col1-heading {
-    text-align: start;
-    font-size: 14px;
-}
-
-.style-col2-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-}
-
 .style-inner-button {
     display: flex;
     justify-content: center;
@@ -3367,29 +3184,6 @@ input:checked + .checkbox-green::after {
     height: 18px;
     box-sizing: border-box;
     font-size: 12px;
-}
-
-.style-separator {
-    grid-column: 1 / -1;
-    height: 0.02em;
-    background-color: #c33d35;
-}
-
-.style-line-break {
-    display: block;
-    width: 100%;
-    height: 0;
-}
-
-.style-vr {
-    background-color: #C33D35;
-}
-
-.style-vr-label {
-    color: #E4E3EA;
-    background-color: #403C53;
-    border-radius: 3px;
-
 }
 
 .style-slider-container {
@@ -4763,14 +4557,6 @@ input:checked + .slider:before {
     }
 }
 
-.editor-help-icon {
-    display: flex;
-    flex-direction: column;
-    flex: 0 0 2%;
-    align-items: center;
-}
-
-
 .editor-panel {
     position: relative;
     flex: 1;
@@ -4780,19 +4566,6 @@ input:checked + .slider:before {
     border-radius: 3px;
     box-sizing: border-box;
     background: var(--input-bg);
-}
-
-#dataTextArea {
-    width: 100%;
-    height: 100%;
-    font-family: "Courier New", monospace;
-    font-size: 12px;
-    line-height: 1.5;
-    border: none;
-    outline: none;
-    resize: none;
-    padding: 4px;
-    box-sizing: border-box;
 }
 
 .panel-header-center-buttons .data-buttons,
@@ -5098,10 +4871,6 @@ input:checked + .slider:before {
   font-size: 12px;
 }
 
-.data-table-header-property.size-xl {
-  font-size: 12px;
-}
-
 .data-table-sort-indicator {
   position: absolute;
   top: 2px;
@@ -5164,10 +4933,6 @@ input:checked + .slider:before {
 
 .data-table-delete-row-btn.tt {
     display: inline-flex;
-}
-
-.data-table-apply-button {
-
 }
 
 .data-table-tabs {

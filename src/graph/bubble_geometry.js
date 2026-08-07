@@ -189,7 +189,10 @@ function meanMemberRadius(memberRects) {
 }
 
 /**
- * Compute one group's outline polygon from member/avoid rects.
+ * Compute one group's geometry from member/avoid rects: the outer hull ring
+ * plus interior HOLES carved around non-members the hull swallowed (see
+ * carveAvoidHoles — the field alone can only fjord the boundary). Render with
+ * even-odd fill.
  *
  * The influence field is sized from the group's MEAN MEMBER RADIUS (see the
  * ratio constants above), so hulls stay visually proportional whatever node
@@ -198,34 +201,12 @@ function meanMemberRadius(memberRects) {
  *
  * @param {Array<{x,y,width,height}>} memberRects
  * @param {Array<{x,y,width,height}>} avoidRects
- * @param {{virtualEdges?: boolean, padding?: number, corridor?: number,
- *   avoidance?: number}} [opts]
- *   virtualEdges routes connecting corridors around avoid rects (the
- *   per-group style enables it); its cost is O(members × avoid) — see
- *   MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS in config.js
- *   for the measured budget.
+ * @param {{padding?: number, corridor?: number, avoidance?: number}} [opts]
  *   padding multiplies the node influence radii (body extent past members);
  *   corridor multiplies the edge influence radii (arm thickness). Both are
  *   user style knobs, clamped to [0.05, 4]; 1 = one mean-radius of margin.
  *   avoidance is a switch (numeric for JSON back-compat): 0 lets the hull
  *   cover non-members, anything > 0 steers around them and carves holes.
- * @returns {Array<{x: number, y: number}>} closed polygon (empty only when
- *   there are no members — a lost field reconstructs geometrically)
- */
-function computeOutlinePoints(memberRects, avoidRects = [], opts = {}) {
-  return computeOutlineGeometry(memberRects, avoidRects, opts).outer;
-}
-
-/**
- * Full group geometry: the outer hull ring plus interior HOLES carved around
- * non-members the hull swallowed (see carveAvoidHoles — the field alone can
- * only fjord the boundary). Render with even-odd fill. Same options as
- * computeOutlinePoints.
- *
- * @param {Array<{x,y,width,height}>} memberRects
- * @param {Array<{x,y,width,height}>} avoidRects
- * @param {{virtualEdges?: boolean, padding?: number, corridor?: number,
- *   avoidance?: number}} [opts]
  * @returns {{outer: Array<{x: number, y: number}>,
  *   holes: Array<Array<{x: number, y: number}>>}}
  */
@@ -270,7 +251,7 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
   let outline = [];
   if (nodeFieldVisible || edgeFieldVisible) {
     const path = bubblesets.createOutline(memberRects, effectiveAvoidRects, [], {
-      virtualEdges: opts.virtualEdges !== false && edgeFieldVisible,
+      virtualEdges: edgeFieldVisible,
       nodeR0: nodeR0px,
       nodeR1: nodeR1px,
       edgeR0: edgeR0px,
@@ -576,7 +557,7 @@ function unionPolygons(...geoms) {
   try {
     return polygonClipping.union(geoms[0], ...geoms.slice(1));
   } catch (e) {
-    if (globalThis.__BUBBLE_DEBUG) console.error('union failed:', e.message);
+    console.warn('bubble union failed:', e.message);
     return null;
   }
 }
@@ -932,7 +913,6 @@ const STYLE_KEY_FIELDS = [
   "fillOpacity",
   "stroke",
   "strokeOpacity",
-  "virtualEdges",
   "padding",
   "corridor",
   "avoidance",
@@ -966,7 +946,6 @@ function styleKey(opts = {}) {
 
 export {
   nodeViewportRect,
-  computeOutlinePoints,
   computeOutlineGeometry,
   polygonSelfIntersects,
   outlineLabelAnchor,

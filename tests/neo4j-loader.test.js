@@ -15,7 +15,6 @@ import {
   edgeCategoryColor,
   buildCategoryColors,
   primaryLabel,
-  sanitizeForAST,
   buildTxUrl,
   basicAuth,
   nodeDisplayLabel,
@@ -28,6 +27,8 @@ import {
   SETTINGS_STORAGE_KEY,
   LARGE_RESULT_ROW_THRESHOLD,
 } from '../src/utilities/neo4j_loader.js';
+import { StaticUtilities } from '../src/utilities/static.js';
+const sanitizeForAST = StaticUtilities.sanitizeForAST;
 
 const CONFIG = {
   url: 'http://localhost:7474',

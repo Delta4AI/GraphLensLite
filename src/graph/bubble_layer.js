@@ -523,7 +523,6 @@ class BubbleSetLayer {
     const avoidRects = this.referenceRects(state.avoidMembers);
 
     const outlineOpts = {
-      virtualEdges: state.opts.virtualEdges,
       padding: state.opts.padding,
       corridor: state.opts.corridor,
       avoidance: state.opts.avoidance,

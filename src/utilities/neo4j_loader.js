@@ -560,9 +560,9 @@ function refreshNeo4jSessionUI() {
 }
 
 /** Persisted connection settings — everything except the password. */
-function readSavedSettings(storage = globalThis.localStorage) {
+function readSavedSettings() {
   try {
-    const raw = storage?.getItem(SETTINGS_STORAGE_KEY);
+    const raw = globalThis.localStorage?.getItem(SETTINGS_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
@@ -575,18 +575,18 @@ function readSavedSettings(storage = globalThis.localStorage) {
  * identifiers from the user's data, and it persisted indefinitely with no way
  * to get rid of it short of clearing site data.
  */
-function forgetSavedSettings(storage = globalThis.localStorage) {
+function forgetSavedSettings() {
   try {
-    storage?.removeItem(SETTINGS_STORAGE_KEY);
+    globalThis.localStorage?.removeItem(SETTINGS_STORAGE_KEY);
   } catch {
     /* storage unavailable — nothing was remembered anyway */
   }
 }
 
-function saveSettings(settings, storage = globalThis.localStorage) {
+function saveSettings(settings) {
   try {
     const { url, username, database, query } = settings;
-    storage?.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ url, username, database, query }));
+    globalThis.localStorage?.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ url, username, database, query }));
   } catch {
     // Storage unavailable (private mode, file://) — settings just aren't remembered.
   }
@@ -954,7 +954,6 @@ export {
   openNeo4jPopup,
   executeNeo4jImport,
   buildConnectionForm,
-  sanitizeForAST,
   runCypher,
   connectionHint,
   countQueryRows,

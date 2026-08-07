@@ -614,7 +614,6 @@ class GraphBubbleSetManager {
    * @param {string} label undo-stack label
    */
   async afterMembershipChange(label) {
-    this.syncGroupRows();
     this.renderGroupList();
     this.refreshBubbleStyleElements();
     this.cache.uiComponents?.refreshGroupChips?.();

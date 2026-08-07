@@ -249,7 +249,6 @@ class Rail {
   }
 
   #buildAppMenu(el) {
-    el.classList.add('rail-menu-app');
     el.append(
       menuItem({
         icon: '📂',
@@ -428,7 +427,6 @@ class Rail {
   }
 
   #buildSelectMenu(el) {
-    el.classList.add('rail-menu-wide');
     // The card re-parented in here carries its own "Select Elements" title, so
     // the menu adds no header of its own — just the mount and the tooltip that
     // names the split against the inspector's "Act on selection".

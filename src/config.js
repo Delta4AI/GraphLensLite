@@ -211,7 +211,6 @@ const DEFAULTS = {
   BUBBLE_GROUP_STYLE_TEMPLATE: {
     fillOpacity: 0.25,
     strokeOpacity: 1,
-    virtualEdges: true,
     padding: 0.1,
     corridor: 0.25,
     avoidance: 1,

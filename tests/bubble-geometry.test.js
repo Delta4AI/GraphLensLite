@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   nodeViewportRect,
-  computeOutlinePoints,
   computeOutlineGeometry,
   polygonSelfIntersects,
   outlineLabelAnchor,
@@ -18,6 +17,8 @@ import { pointInPolygon } from "../src/graph/lasso_geometry.js";
 // ==========================================================================
 
 const rectAt = (x, y, r = 10) => nodeViewportRect(x, y, r);
+const outlinePoints = (members, avoid = [], opts = {}) =>
+  computeOutlineGeometry(members, avoid, opts).outer;
 
 describe("nodeViewportRect", () => {
   it("centers a square of side 2*radius on the node position", () => {
@@ -61,21 +62,21 @@ describe("polygonSelfIntersects (phantom-outline detector)", () => {
   });
 });
 
-describe("computeOutlinePoints", () => {
+describe("computeOutlineGeometry", () => {
   it("returns an empty array for no members", () => {
-    expect(computeOutlinePoints([], [])).toEqual([]);
-    expect(computeOutlinePoints(null, [])).toEqual([]);
+    expect(outlinePoints([], [])).toEqual([]);
+    expect(outlinePoints(null, [])).toEqual([]);
   });
 
   it("encloses a single member", () => {
-    const outline = computeOutlinePoints([rectAt(100, 100)], []);
+    const outline = outlinePoints([rectAt(100, 100)], []);
     expect(outline.length).toBeGreaterThan(3);
     expect(pointInPolygon({ x: 100, y: 100 }, outline)).toBe(true);
   });
 
   it("encloses all members of a spread group (virtual edges connect them)", () => {
     const members = [rectAt(50, 50), rectAt(250, 80), rectAt(150, 220)];
-    const outline = computeOutlinePoints(members, []);
+    const outline = outlinePoints(members, []);
     for (const m of members) {
       const center = { x: m.x + m.width / 2, y: m.y + m.height / 2 };
       expect(pointInPolygon(center, outline)).toBe(true);
@@ -85,7 +86,7 @@ describe("computeOutlinePoints", () => {
   it("excludes avoid members from the outline", () => {
     const members = [rectAt(50, 100), rectAt(250, 100)];
     const avoid = [rectAt(150, 100)];
-    const outline = computeOutlinePoints(members, avoid);
+    const outline = outlinePoints(members, avoid);
     expect(pointInPolygon({ x: 50, y: 100 }, outline)).toBe(true);
     expect(pointInPolygon({ x: 250, y: 100 }, outline)).toBe(true);
     expect(pointInPolygon({ x: 150, y: 100 }, outline)).toBe(false);
@@ -93,15 +94,7 @@ describe("computeOutlinePoints", () => {
 
   it("is deterministic for identical input", () => {
     const members = [rectAt(10, 10), rectAt(90, 60)];
-    expect(computeOutlinePoints(members, [])).toEqual(computeOutlinePoints(members, []));
-  });
-
-  it("honors virtualEdges: false", () => {
-    // Two adjacent members still produce an outline without routing edges.
-    const members = [rectAt(50, 50), rectAt(75, 50)];
-    const outline = computeOutlinePoints(members, [], { virtualEdges: false });
-    expect(pointInPolygon({ x: 50, y: 50 }, outline)).toBe(true);
-    expect(pointInPolygon({ x: 75, y: 50 }, outline)).toBe(true);
+    expect(outlinePoints(members, [])).toEqual(outlinePoints(members, []));
   });
 
   // Regression (the "solid wedge"): bubblesets-js maps pixels to marching
@@ -129,12 +122,12 @@ describe("computeOutlinePoints", () => {
     const WEDGING_RADII = [7, 8, 9, 11, 11.5, 12.5, 13, 13.5, 14.5];
 
     it.each(WEDGING_RADII)("leaves the space between two corridors empty at radius %s", (r) => {
-      const outline = computeOutlinePoints(members(r), avoid(r), SHIPPED);
+      const outline = outlinePoints(members(r), avoid(r), SHIPPED);
       expect(pointInPolygon(BETWEEN_THE_ARMS, outline)).toBe(false);
     });
 
     it("still encloses every member while doing so", () => {
-      const outline = computeOutlinePoints(members(12.5), avoid(12.5), SHIPPED);
+      const outline = outlinePoints(members(12.5), avoid(12.5), SHIPPED);
       for (const [x, y] of [[170, 30], [322, 30], [176, 661]]) {
         expect(pointInPolygon({ x, y }, outline)).toBe(true);
       }
@@ -144,7 +137,7 @@ describe("computeOutlinePoints", () => {
       // Measured: ~7.6k px² for two thin arms, ~39k once the wedge fills —
       // the triangle those three members span is ~48k. Catches a fill the
       // single probe point above happens to miss.
-      const outline = computeOutlinePoints(members(12.5), avoid(12.5), SHIPPED);
+      const outline = outlinePoints(members(12.5), avoid(12.5), SHIPPED);
       const area = Math.abs(
         outline.reduce((sum, p, i) => {
           const q = outline[(i + 1) % outline.length];
@@ -174,7 +167,7 @@ describe("computeOutlinePoints", () => {
     // Every padding here crossed before the damping; the band the report
     // named ("0.01 up to about 0.3") is exactly where the arms stay thin.
     it.each([0.01, 0.1, 0.3])("does not cross itself at padding %s", (padding) => {
-      const outline = computeOutlinePoints(members, [], { padding, corridor: 0.25 });
+      const outline = outlinePoints(members, [], { padding, corridor: 0.25 });
       // The polygon was never the problem — only what was painted from it.
       expect(polygonSelfIntersects(outline)).toBe(false);
       expect(polygonSelfIntersects(sampleSmoothedRing(outline))).toBe(false);
@@ -217,7 +210,7 @@ describe("computeOutlinePoints", () => {
     it.each([1, 0.25])("preserves member/avoid geometry rescaled by %f", (s) => {
       const members = [rectAt(50 * s, 100 * s, 10 * s), rectAt(250 * s, 100 * s, 10 * s)];
       const avoid = [rectAt(150 * s, 100 * s, 10 * s)];
-      const outline = computeOutlinePoints(members, avoid);
+      const outline = outlinePoints(members, avoid);
       expect(outline.length).toBeGreaterThan(3);
       expect(pointInPolygon({ x: 50 * s, y: 100 * s }, outline)).toBe(true);
       expect(pointInPolygon({ x: 250 * s, y: 100 * s }, outline)).toBe(true);
@@ -227,8 +220,8 @@ describe("computeOutlinePoints", () => {
     // The legacy opts.scale hint is gone; passing it must not change the fit.
     it("ignores a legacy scale option (field self-scales from the rects)", () => {
       const members = [rectAt(10, 10, 5), rectAt(60, 30, 5)];
-      expect(computeOutlinePoints(members, [], { scale: 0.1 }))
-        .toEqual(computeOutlinePoints(members, []));
+      expect(outlinePoints(members, [], { scale: 0.1 }))
+        .toEqual(outlinePoints(members, []));
     });
 
     // Regression: bubblesets-js sample(step) uses `step` as an array index
@@ -241,7 +234,7 @@ describe("computeOutlinePoints", () => {
       (s) => {
         const members = [rectAt(0, 0, 20 * s), rectAt(20 * s, 0, 20 * s), rectAt(10 * s, 20 * s, 20 * s)];
         let outline;
-        expect(() => { outline = computeOutlinePoints(members, []); }).not.toThrow();
+        expect(() => { outline = outlinePoints(members, []); }).not.toThrow();
         expect(outline.length).toBeGreaterThan(3);
         expect(outline.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))).toBe(true);
       },
@@ -258,7 +251,7 @@ describe("computeOutlinePoints", () => {
       const s = 0.3;
       const members = [rectAt(0, 0, 12 * s), rectAt(300 * s, 0, 12 * s), rectAt(600 * s, 0, 12 * s)];
       const avoid = [rectAt(150 * s, 40 * s, 12 * s), rectAt(450 * s, -40 * s, 12 * s)];
-      const outline = computeOutlinePoints(members, avoid);
+      const outline = outlinePoints(members, avoid);
       expect(outline.length).toBeGreaterThan(3);
       expect(polygonSelfIntersects(outline)).toBe(false);
       for (const m of members) {
@@ -281,7 +274,7 @@ describe("computeOutlinePoints", () => {
         }
       }
 
-      const outline = computeOutlinePoints(members, avoid);
+      const outline = outlinePoints(members, avoid);
       expect(outline.length).toBeGreaterThan(3);
       expect(pointInPolygon({ x: 0, y: 0 }, outline)).toBe(true);
       expect(pointInPolygon({ x: 6, y: 0 }, outline)).toBe(true);
@@ -491,9 +484,9 @@ describe("computeOutlinePoints padding/corridor knobs", () => {
   const pair = [rectAt(100, 100), rectAt(140, 100)];
 
   it("padding < 1 shrinks the outline, > 1 grows it (still enclosing members)", () => {
-    const tight = computeOutlinePoints(pair, [], { padding: 0.5 });
-    const base = computeOutlinePoints(pair, [], {});
-    const loose = computeOutlinePoints(pair, [], { padding: 2 });
+    const tight = outlinePoints(pair, [], { padding: 0.5 });
+    const base = outlinePoints(pair, [], {});
+    const loose = outlinePoints(pair, [], { padding: 2 });
     expect(polygonArea(tight)).toBeLessThan(polygonArea(base));
     expect(polygonArea(base)).toBeLessThan(polygonArea(loose));
     for (const outline of [tight, base, loose]) {
@@ -505,8 +498,8 @@ describe("computeOutlinePoints padding/corridor knobs", () => {
 
   it("corridor width scales the arm to an outlying member", () => {
     const spread = [rectAt(50, 50), rectAt(400, 60)];
-    const thin = computeOutlinePoints(spread, [], { corridor: 0.5 });
-    const thick = computeOutlinePoints(spread, [], { corridor: 2.5 });
+    const thin = outlinePoints(spread, [], { corridor: 0.5 });
+    const thick = outlinePoints(spread, [], { corridor: 2.5 });
     expect(polygonArea(thin)).toBeLessThan(polygonArea(thick));
     for (const outline of [thin, thick]) {
       for (const m of spread) {
@@ -516,12 +509,12 @@ describe("computeOutlinePoints padding/corridor knobs", () => {
   });
 
   it("clamps out-of-range multipliers instead of collapsing the outline", () => {
-    expect(computeOutlinePoints(pair, [], { padding: 100 }))
-      .toEqual(computeOutlinePoints(pair, [], { padding: 4 }));
-    expect(computeOutlinePoints(pair, [], { padding: 0 }))
-      .toEqual(computeOutlinePoints(pair, [], {}));
-    expect(computeOutlinePoints(pair, [], { corridor: NaN }))
-      .toEqual(computeOutlinePoints(pair, [], {}));
+    expect(outlinePoints(pair, [], { padding: 100 }))
+      .toEqual(outlinePoints(pair, [], { padding: 4 }));
+    expect(outlinePoints(pair, [], { padding: 0 }))
+      .toEqual(outlinePoints(pair, [], {}));
+    expect(outlinePoints(pair, [], { corridor: NaN }))
+      .toEqual(outlinePoints(pair, [], {}));
   });
 
   it("styleKey invalidates on padding/corridor/avoidance changes", () => {
@@ -543,7 +536,7 @@ describe("field-ring conditioning (resample + Taubin)", () => {
     .map(([x, y]) => rectAt(x, y, 15));
   const avoid = [[370, 200], [460, 210], [560, 210], [250, 300], [560, 480], [420, 520]]
     .map(([x, y]) => rectAt(x, y, 15));
-  const ring = computeOutlinePoints(members, avoid, { padding: 1, corridor: 1, avoidance: 1 });
+  const ring = outlinePoints(members, avoid, { padding: 1, corridor: 1, avoidance: 1 });
   const n = ring.length;
 
   it("keeps vertex spacing near-uniform (no long angular chords)", () => {
@@ -639,7 +632,7 @@ describe("computeOutlineGeometry avoid holes", () => {
 
   it("computeOutlinePoints returns the same outer ring (holes dropped)", () => {
     const geometry = computeOutlineGeometry(ringMembers, interiorAvoid, {});
-    expect(computeOutlinePoints(ringMembers, interiorAvoid, {})).toEqual(geometry.outer);
+    expect(outlinePoints(ringMembers, interiorAvoid, {})).toEqual(geometry.outer);
   });
 });
 
@@ -651,17 +644,17 @@ describe("computeOutlinePoints avoidance switch", () => {
   const avoid = [rectAt(150, 100)];
 
   it("avoidance 0 disables the negative field (hull covers the non-member)", () => {
-    const outline = computeOutlinePoints(members, avoid, { avoidance: 0 });
+    const outline = outlinePoints(members, avoid, { avoidance: 0 });
     expect(pointInPolygon({ x: 50, y: 100 }, outline)).toBe(true);
     expect(pointInPolygon({ x: 250, y: 100 }, outline)).toBe(true);
     expect(pointInPolygon({ x: 150, y: 100 }, outline)).toBe(true);
     // With the field off, ignoring avoid rects entirely gives the same hull.
-    expect(outline).toEqual(computeOutlinePoints(members, [], { avoidance: 0 }));
+    expect(outline).toEqual(outlinePoints(members, [], { avoidance: 0 }));
   });
 
   it("avoidance ON (default or any legacy value > 0) keeps the non-member excluded", () => {
     for (const avoidance of [undefined, 1, 3]) {
-      const outline = computeOutlinePoints(members, avoid, { avoidance });
+      const outline = outlinePoints(members, avoid, { avoidance });
       expect(pointInPolygon({ x: 50, y: 100 }, outline)).toBe(true);
       expect(pointInPolygon({ x: 250, y: 100 }, outline)).toBe(true);
       expect(pointInPolygon({ x: 150, y: 100 }, outline)).toBe(false);
@@ -669,12 +662,12 @@ describe("computeOutlinePoints avoidance switch", () => {
   });
 
   it("normalizes every non-zero/invalid value to plain ON (boolean semantics)", () => {
-    const on = computeOutlinePoints(members, avoid, { avoidance: 1 });
-    expect(computeOutlinePoints(members, avoid, { avoidance: 3 })).toEqual(on);
-    expect(computeOutlinePoints(members, avoid, { avoidance: 100 })).toEqual(on);
-    expect(computeOutlinePoints(members, avoid, { avoidance: NaN })).toEqual(on);
-    expect(computeOutlinePoints(members, avoid, { avoidance: -5 }))
-      .toEqual(computeOutlinePoints(members, avoid, { avoidance: 0 }));
+    const on = outlinePoints(members, avoid, { avoidance: 1 });
+    expect(outlinePoints(members, avoid, { avoidance: 3 })).toEqual(on);
+    expect(outlinePoints(members, avoid, { avoidance: 100 })).toEqual(on);
+    expect(outlinePoints(members, avoid, { avoidance: NaN })).toEqual(on);
+    expect(outlinePoints(members, avoid, { avoidance: -5 }))
+      .toEqual(outlinePoints(members, avoid, { avoidance: 0 }));
   });
 });
 
@@ -708,7 +701,7 @@ describe("computeOutlinePoints member-enclosure guarantee", () => {
     // its center stays inside (the only thing bubblesets-js checks).
     const members = [rectAt(100, 100, 25), rectAt(160, 120, 25), rectAt(380, 110, 25)];
     const avoid = [rectAt(430, 60, 25), rectAt(440, 160, 25), rectAt(330, 170, 25), rectAt(330, 50, 25)];
-    const outline = computeOutlinePoints(members, avoid);
+    const outline = outlinePoints(members, avoid);
     for (const [x, y] of [[100, 100], [160, 120], [380, 110]]) {
       expect(circleClearance(x, y, 25, outline)).toBeGreaterThanOrEqual(0);
     }
@@ -720,7 +713,7 @@ describe("computeOutlinePoints member-enclosure guarantee", () => {
       rectAt(200, 80, 20), rectAt(240, 140, 20), rectAt(360, 90, 20), rectAt(350, 180, 20),
       rectAt(460, 140, 20), rectAt(120, 180, 20), rectAt(470, 260, 20),
     ];
-    const outline = computeOutlinePoints(members, avoid);
+    const outline = outlinePoints(members, avoid);
     for (const m of members) {
       const r = m.width / 2;
       expect(circleClearance(m.x + r, m.y + r, r, outline)).toBeGreaterThanOrEqual(0);
@@ -730,7 +723,7 @@ describe("computeOutlinePoints member-enclosure guarantee", () => {
   it("repaired outlines stay simple polygons (no self-intersections)", () => {
     const members = [rectAt(100, 100, 25), rectAt(160, 120, 25), rectAt(380, 110, 25)];
     const avoid = [rectAt(430, 60, 25), rectAt(440, 160, 25), rectAt(330, 170, 25), rectAt(330, 50, 25)];
-    const outline = computeOutlinePoints(members, avoid);
+    const outline = outlinePoints(members, avoid);
     expect(outline.length).toBeGreaterThan(3);
     expect(polygonSelfIntersects(outline)).toBe(false);
   });
@@ -747,7 +740,7 @@ describe("computeOutlinePoints member-enclosure guarantee", () => {
       [310, 300], [260, 340], [370, 170], [200, 210], [230, 620],
     ];
     const members = spots.map(([x, y]) => rectAt(x, y, 9));
-    const outline = computeOutlinePoints(members, [], { padding: 0.1, corridor: 0.25 });
+    const outline = outlinePoints(members, [], { padding: 0.1, corridor: 0.25 });
     expect(outline.length).toBeGreaterThan(3);
     expect(polygonSelfIntersects(outline)).toBe(false);
     const curve = sampleSmoothedRing(outline);
@@ -760,7 +753,7 @@ describe("computeOutlinePoints member-enclosure guarantee", () => {
     const s = 0.25;
     const members = [rectAt(100 * s, 100 * s, 25 * s), rectAt(160 * s, 120 * s, 25 * s), rectAt(380 * s, 110 * s, 25 * s)];
     const avoid = [rectAt(430 * s, 60 * s, 25 * s), rectAt(440 * s, 160 * s, 25 * s), rectAt(330 * s, 170 * s, 25 * s), rectAt(330 * s, 50 * s, 25 * s)];
-    const outline = computeOutlinePoints(members, avoid);
+    const outline = outlinePoints(members, avoid);
     for (const m of members) {
       const r = m.width / 2;
       expect(circleClearance(m.x + r, m.y + r, r, outline)).toBeGreaterThanOrEqual(0);

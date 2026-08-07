@@ -435,20 +435,7 @@ class QueryManager {
       .join('');
 
     // ------------------------------------------------------------------
-    // 9. Check for instructions without filters (no "IN|BETWEEN|LOWER THAN after property)
-    // TODO: not working
-    // ------------------------------------------------------------------
-
-    // asciiStr = asciiStr.replace(
-    //   /\(([^)]+?::[^)]+?::[^)]+?)(?=\s*\))/g,
-    //   (match, prop) => {
-    //     this.cache.query.valid = false;
-    //     return `<span class="q-error-missing-filter" data-encoded>${match}</span>`;
-    //   }
-    // );
-
-    // ------------------------------------------------------------------
-    // 10. wrap everything not already in a <span class='q-…'>…</span> as an error
+    // 9. wrap everything not already in a <span class='q-…'>…</span> as an error
     // ------------------------------------------------------------------
     asciiStr = asciiStr
       // split out only the already-encoded chunks vs everything else

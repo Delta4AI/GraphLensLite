@@ -15,11 +15,6 @@ const MIN_HEIGHT_PX = 120;
 const KEYBOARD_RESIZE_STEP_PX = 24;
 const KEYBOARD_RESIZE_COARSE = 4; // Shift+arrow, for crossing the stage quickly
 const DEFAULT_HEIGHT_FRACTION = 0.35;
-// ⤢ takes the whole stage. The mockup argued for leaving a sliver of canvas
-// showing, but a ~76px strip of a dense graph reads as a rendering artefact
-// rather than reassurance — and the rail and inspector still frame the app,
-// so nobody is lost. The drag handle remains the way to get a partial view.
-const EXPANDED_HEIGHT_FRACTION = 1;
 
 /**
  * Static per-tab wiring. `pane` and `toolbar` are shown/hidden together; the
@@ -194,9 +189,8 @@ class Workbench {
    */
   #currentHeight() {
     const stage = this.#stageHeight();
-    return this.expanded
-      ? stage * EXPANDED_HEIGHT_FRACTION
-      : (this.heights[this.tab] ?? stage * DEFAULT_HEIGHT_FRACTION);
+    // ⤢ takes the whole stage; the drag handle is the way to a partial view.
+    return this.expanded ? stage : (this.heights[this.tab] ?? stage * DEFAULT_HEIGHT_FRACTION);
   }
 
   #applyHeight() {

@@ -973,7 +973,6 @@ class DataTable {
 
       await this.rebuildGraph(updatedFileData);
 
-      console.log('DATA TABLE UPDATE DONE!');
     } catch (err) {
       this.cache.ui.error(`Error updating graph: ${err}`);
     } finally {
@@ -1533,10 +1532,5 @@ function buildDataTable(fileData) {
   const resetBtn = document.getElementById('resetDataTableBtn');
   if (applyBtn) applyBtn.disabled = true;
   if (resetBtn) resetBtn.disabled = true;
-
-  // this.cache.dataTable.onChange((rowIndex, colIndex, newValue) => {
-  //   console.log(`Data changed at row ${rowIndex}, column ${colIndex}:`, newValue);
-  //   // add logic, trigger graph refresh, ..
-  // });
 }
 export { DataTable, buildDataTable };

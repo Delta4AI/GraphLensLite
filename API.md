@@ -372,7 +372,7 @@ To group by data instead of by id, use `groupOneProps` — e.g.
 (handy with §6 categorical values).
 
 Useful `bubbleSetStyle.<group>` fields: `fill`, `fillOpacity`, `stroke`,
-`strokeOpacity`, `virtualEdges` (boolean), `label` (boolean), `labelText`,
+`strokeOpacity`, `padding`, `corridor`, `avoidance`, `label` (boolean), `labelText`,
 `labelFill`, `labelFontSize`, `labelBackground`, `labelBackgroundFill`,
 `labelBackgroundRadius`, `labelPlacement`.
 
