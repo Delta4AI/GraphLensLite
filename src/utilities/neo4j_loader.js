@@ -73,8 +73,7 @@ function logStatements(statements) {
   if (!ui) return;
   for (const { statement } of statements) {
     const oneLine = statement.replace(/\s+/g, ' ').trim();
-    const text =
-      oneLine.length > QUERY_LOG_MAX_LENGTH ? `${oneLine.slice(0, QUERY_LOG_MAX_LENGTH)}…` : oneLine;
+    const text = StaticUtilities.truncate(oneLine, QUERY_LOG_MAX_LENGTH);
     // Marked sensitive: the statement carries the user's literal values.
     ui.logMessage(text, 'grey', false, '🛢️', { sensitive: true });
   }
@@ -359,9 +358,7 @@ function collectPropertyKeys(nodes, relationships) {
           entry.largeArray = true;
         }
         if (entry.examples.length < 2) {
-          const text = String(coerceValue(value));
-          const short =
-            text.length > EXAMPLE_MAX_LENGTH ? `${text.slice(0, EXAMPLE_MAX_LENGTH - 1)}…` : text;
+          const short = StaticUtilities.truncate(coerceValue(value), EXAMPLE_MAX_LENGTH);
           if (short !== '' && !entry.examples.includes(short)) entry.examples.push(short);
         }
       }
@@ -576,9 +573,10 @@ function neo4jSessionActive() {
 }
 
 /**
- * Show/hide the expand and join-query buttons. Called after a Neo4j import
- * and from ui.setDataSourceLabel — the single choke point every import flow
- * goes through.
+ * Show/hide the expand and join-query buttons. Called after a Neo4j import, and
+ * on every `gll:datasourcechange` — ui.setDataSourceLabel announces that event
+ * from the single choke point every import flow goes through, so this connector
+ * subscribes instead of ui.js importing it.
  */
 function refreshNeo4jSessionUI() {
   const active = neo4jSessionActive();
@@ -587,6 +585,10 @@ function refreshNeo4jSessionUI() {
     if (btn) btn.style.display = active ? '' : 'none';
   }
 }
+
+// Module load is the subscription point: this module is only in the bundle
+// because something imports the connector, and the listener is idempotent.
+document.addEventListener('gll:datasourcechange', refreshNeo4jSessionUI);
 
 /** Persisted connection settings — everything except the password. */
 function readSavedSettings() {

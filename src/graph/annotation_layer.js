@@ -139,6 +139,17 @@ class AnnotationLayer {
     this.popover = null;
     this.popoverId = null;
     this.placementOverlay = null;
+    // Every other piece of mutable state, declared rather than materialising
+    // mid-method: what the open editor started from and how it ends (a cancel
+    // discards, and a cancel on a note that only existed for this edit deletes
+    // it), whether the popover changed anything worth an undo entry, and the
+    // handlers/fingerprints the teardown and the per-frame gate compare.
+    this.editingIsNew = false;
+    this.editingOriginal = null;
+    this.editingCancelled = false;
+    this.popoverDirty = false;
+    this.placementEscape = null;
+    this.lastAnns = null;
     this.frame = new FrameCoalescer(() => {
       if (this.#stale()) this.sync();
     });

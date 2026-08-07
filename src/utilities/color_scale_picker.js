@@ -368,7 +368,7 @@ class ColorScalePicker {
       const onMove = (moveEvent) => {
         const rect = container.getBoundingClientRect();
         let pos = ((moveEvent.clientX - rect.left) / rect.width) * 100;
-        pos = Math.max(0, Math.min(100, pos));
+        pos = StaticUtilities.clamp(pos, 0, 100);
         this.updateHandlePosition(handleObj, pos);
       };
 
@@ -556,7 +556,7 @@ class ColorScalePicker {
   }
 
   interpolateColor(color1, color2, t) {
-    t = Math.max(0, Math.min(1, isNaN(t) ? 0 : t));
+    t = StaticUtilities.clamp(isNaN(t) ? 0 : t, 0, 1);
 
     const r1 = parseInt(color1.slice(1, 3), 16);
     const g1 = parseInt(color1.slice(3, 5), 16);

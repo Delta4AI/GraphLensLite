@@ -494,7 +494,7 @@ class InvertibleRangeSlider {
       if (this.formatThreshold(typed) === this.formatThreshold(readExact())) return;
       // Out of range is corrected rather than silently reverted, matching what
       // setTo() does for the same value arriving from a query.
-      const clamped = Math.min(Math.max(typed, this.sliderMin), this.sliderMax);
+      const clamped = StaticUtilities.clamp(typed, this.sliderMin, this.sliderMax);
       if (clamped !== typed) {
         this.cache.ui.warning(
           `Threshold for ${this.propID} corrected to ${this.formatThreshold(clamped)} (from ${typed})`
@@ -726,8 +726,8 @@ class InvertibleRangeSlider {
   }
 
   setTo(min, max, inverted) {
-    const clampedMin = Math.min(Math.max(min, this.sliderMin), this.sliderMax);
-    const clampedMax = Math.min(Math.max(max, this.sliderMin), this.sliderMax);
+    const clampedMin = StaticUtilities.clamp(min, this.sliderMin, this.sliderMax);
+    const clampedMax = StaticUtilities.clamp(max, this.sliderMin, this.sliderMax);
 
     if (!inverted && min > max) {
       this.cache.ui.error(

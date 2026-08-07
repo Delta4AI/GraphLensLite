@@ -577,7 +577,7 @@ class QueryManager {
 
   setCursorPosition(charIndex) {
     const root = this.cache.query.text;
-    charIndex = Math.max(0, Math.min(charIndex, root.textContent.length));
+    charIndex = StaticUtilities.clamp(charIndex, 0, root.textContent.length);
 
     const range = document.createRange();
     const sel = window.getSelection();

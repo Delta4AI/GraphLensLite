@@ -392,6 +392,21 @@ describe('session lifecycle and UI gating', () => {
     expect(document.getElementById('neo4jJoinBtn').style.display).toBe('none');
   });
 
+  it('resyncs on the data-source event, without ui.js importing the connector', () => {
+    // ui.setDataSourceLabel announces; this module subscribed at import. The old
+    // direct call pulled neo4j_loader — and api_client behind it — into every
+    // consumer of ui.js.
+    mountButtons('Neo4j: movies');
+    startNeo4jSession(CONFIG, [], [], NO_EXCLUSIONS);
+    const label = document.getElementById('dataSourceLabel');
+    label.textContent = 'Live (API)';
+    label.dataset.source = '';
+
+    document.dispatchEvent(new CustomEvent('gll:datasourcechange'));
+
+    expect(document.getElementById('neo4jExpandBtn').style.display).toBe('none');
+  });
+
   it('hides the buttons without a session', () => {
     mountButtons('Neo4j: movies');
     refreshNeo4jSessionUI();

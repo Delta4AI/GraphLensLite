@@ -121,7 +121,10 @@ describe('runCypher', () => {
       expect(logMessage).toHaveBeenCalledTimes(2);
       expect(logMessage.mock.calls[0][0]).toBe('RETURN 1');
       const truncated = logMessage.mock.calls[1][0];
-      expect(truncated).toHaveLength(161); // 160 chars + ellipsis
+      // StaticUtilities.truncate counts the ellipsis toward the budget, so the
+      // line is never longer than asked for — the hand-rolled copy here was one
+      // character over its own constant.
+      expect(truncated).toHaveLength(160);
       expect(truncated.endsWith('…')).toBe(true);
       expect(truncated).not.toContain('\n');
     } finally {

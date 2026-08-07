@@ -4,7 +4,6 @@ import { createStyleDiv } from './ui_style_div.js';
 import { attachGroupMenu } from './group_menu.js';
 import { Popup } from '../utilities/popup.js';
 import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
-import { refreshNeo4jSessionUI } from '../utilities/neo4j_loader.js';
 import { isFilterNarrowed } from './query.js';
 import { hotkeyLabel, paletteAccelerator } from './command_palette.js';
 
@@ -74,8 +73,10 @@ class UIManager {
       label.dataset.source = source;
     }
     // Every loader stamps the label, so this is the one seam where "another
-    // source replaced the graph" is visible — sync the Neo4j session buttons.
-    refreshNeo4jSessionUI();
+    // source replaced the graph" is visible. Announced rather than called:
+    // importing a data-source connector here pulled neo4j_loader (and through it
+    // api_client) into every consumer of ui.js, to reach one function.
+    document.dispatchEvent(new CustomEvent('gll:datasourcechange', { detail: { text, source } }));
   }
 
   /**
