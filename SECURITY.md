@@ -7,8 +7,8 @@ applied to the latest minor release line; please upgrade before reporting.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.15.x  | :white_check_mark: |
-| < 1.15  | :x:                |
+| 1.17.x  | :white_check_mark: |
+| < 1.17  | :x:                |
 
 ## Reporting a vulnerability
 

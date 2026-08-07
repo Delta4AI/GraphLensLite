@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Mirrors CONTENT_SECURITY_POLICY in server/static.js, which only applies
+       when the app is served by server/index.js — the packaged Electron build
+       and the single-file inline build shipped with no policy at all.
+       frame-ancestors is header-only and is omitted here by spec. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src *; worker-src 'self' blob:; object-src 'none'; base-uri 'none'">
   <title>Delta4 | Graph Lens Lite</title>
   <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='4' y='24' font-size='24'>🔍</text></svg>"
