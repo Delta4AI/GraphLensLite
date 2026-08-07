@@ -116,17 +116,27 @@ async function runCypher(config, statements, opts = {}) {
   const payload = await response.json();
   if (payload.errors?.length) {
     const first = payload.errors[0];
-    throw new Error(`${first.code}: ${first.message}`);
+    const err = new Error(`${first.code}: ${first.message}`);
+    // The code as data, so callers can tell "the server rejected this Cypher"
+    // from "the server never answered" without re-parsing the message they
+    // are about to show the user.
+    err.neo4jCode = first.code;
+    throw err;
   }
   return payload.results ?? [];
 }
 
-// Server-side Cypher failures arrive as "<code>: <message>" from runCypher, and
-// every code is dotted and Neo-prefixed (Neo.ClientError.Statement.SyntaxError).
-const CYPHER_ERROR_RE = /^Neo\.\w+\./;
-
 /** Write clauses that make a query unsafe to run twice (count preflight + fetch). */
 const WRITE_CLAUSE_RE = /\b(CREATE|MERGE|SET|DELETE|REMOVE|DROP|FOREACH)\b/i;
+
+// A procedure call can write without naming a write clause (apoc.refactor.*,
+// apoc.atomic.*, custom procedures), and LOAD CSV can feed one. Neither is
+// worth trying to enumerate, so anything carrying them skips the preflight.
+const OPAQUE_CALL_RE = /\bCALL\s+[a-zA-Z_][\w.]*\s*\(|\bLOAD\s+CSV\b/i;
+
+// A trailing LIMIT the query already carries answers the only question the
+// preflight asks — "is this bigger than the threshold?" — for free.
+const TRAILING_LIMIT_RE = /\bLIMIT\s+(\d+)\s*;?\s*$/i;
 
 /**
  * Turn a transport failure into something the user can act on. Every flow —
@@ -157,23 +167,42 @@ function connectionHint(err) {
  * @returns {Promise<number|null>}
  */
 async function countQueryRows(config, query, opts = {}) {
-  if (WRITE_CLAUSE_RE.test(query)) return null;
+  if (WRITE_CLAUSE_RE.test(query) || OPAQUE_CALL_RE.test(query)) return null;
+  // A query already bounded below the threshold cannot trip the warning, so
+  // the preflight would only buy a second full execution of the user's query.
+  const limit = Number(TRAILING_LIMIT_RE.exec(query)?.[1]);
+  if (limit && limit <= LARGE_RESULT_ROW_THRESHOLD) return limit;
   try {
     const results = await runCypher(
       config,
-      [{ statement: `CALL { ${query} } RETURN count(*) AS rowCount` }],
+      // Newlines, because a query may end in a // comment; the trailing
+      // semicolon a copy-paste brings along is not legal mid-subquery. The
+      // count stops one row past the threshold — the exact number above it
+      // buys nothing, and counting it all is what made every import cost 2x.
+      [{ statement: countStatement(query) }],
       { ...opts, timeoutMs: opts.timeoutMs ?? COUNT_TIMEOUT_MS },
     );
     const value = results[0]?.data?.[0]?.row?.[0];
     return typeof value === 'number' ? value : null;
   } catch (err) {
     // A Cypher error means the CALL wrapper cannot take this query's shape —
-    // that is what returning null is for. A wrong password or an unreachable
-    // server is not: swallowing those cost a second doomed roundtrip and
-    // delayed the real message by up to COUNT_TIMEOUT_MS.
-    if (CYPHER_ERROR_RE.test(err?.message ?? '')) return null;
+    // that is what returning null is for, and so is a preflight that outruns
+    // its own budget: the fetch has ten times the timeout and deserves its
+    // chance. A wrong password or an unreachable server is neither, and
+    // swallowing those cost a second doomed roundtrip.
+    if (err?.neo4jCode || err?.name === 'TimeoutError') return null;
     throw err;
   }
+}
+
+/** The counting wrapper: capped one row past the threshold, comment-safe. */
+function countStatement(query) {
+  const body = query.replace(/\s*;\s*$/, '');
+  return (
+    `CALL {\n${body}\n}\n` +
+    `WITH * LIMIT ${LARGE_RESULT_ROW_THRESHOLD + 1}\n` +
+    `RETURN count(*) AS rowCount`
+  );
 }
 
 /**
@@ -205,7 +234,7 @@ async function fetchGraphWithPreflight({
 
   if (rowCount !== null && rowCount > LARGE_RESULT_ROW_THRESHOLD) {
     const proceed = await confirm(
-      `The query matches ${rowCount.toLocaleString()} rows, which may be slow to fetch and render. Continue anyway? (Tip: add a LIMIT clause.)`,
+      `The query matches more than ${LARGE_RESULT_ROW_THRESHOLD.toLocaleString()} rows, which may be slow to fetch and render. Continue anyway? (Tip: add a LIMIT clause.)`,
     );
     if (proceed !== true) return null;
   }

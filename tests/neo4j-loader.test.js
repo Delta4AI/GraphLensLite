@@ -135,10 +135,58 @@ describe('countQueryRows', () => {
     const count = await countQueryRows(CONFIG, 'MATCH (n) RETURN n', { fetchImpl });
 
     expect(count).toBe(42);
-    const body = JSON.parse(fetchImpl.mock.calls[0][1].body);
-    expect(body.statements[0].statement).toBe(
-      'CALL { MATCH (n) RETURN n } RETURN count(*) AS rowCount',
+    const statement = JSON.parse(fetchImpl.mock.calls[0][1].body).statements[0].statement;
+    // Newline-delimited so a trailing // comment cannot swallow the wrapper,
+    // and capped one row past the threshold — counting the whole result set
+    // is what made every import and join cost two full executions.
+    expect(statement).toBe(
+      'CALL {\nMATCH (n) RETURN n\n}\nWITH * LIMIT 2001\nRETURN count(*) AS rowCount',
     );
+  });
+
+  it('answers from a trailing LIMIT instead of running the query twice', async () => {
+    const fetchImpl = vi.fn();
+    expect(await countQueryRows(CONFIG, 'MATCH (n) RETURN n LIMIT 500', { fetchImpl })).toBe(500);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('still counts when the trailing LIMIT is above the threshold', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ results: [{ data: [{ row: [2001] }] }], errors: [] }));
+    expect(await countQueryRows(CONFIG, 'MATCH (n) RETURN n LIMIT 999999', { fetchImpl })).toBe(2001);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('strips a trailing semicolon the wrapper cannot take', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ results: [{ data: [{ row: [1] }] }], errors: [] }));
+    await countQueryRows(CONFIG, 'MATCH (n) RETURN n;', { fetchImpl });
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).statements[0].statement).toContain(
+      'CALL {\nMATCH (n) RETURN n\n}',
+    );
+  });
+
+  it('skips procedure calls, which can write without a write clause', async () => {
+    const fetchImpl = vi.fn();
+    for (const query of [
+      'CALL apoc.refactor.mergeNodes([n])',
+      "LOAD CSV FROM 'file:///x.csv' AS row RETURN row",
+    ]) {
+      expect(await countQueryRows(CONFIG, query, { fetchImpl })).toBeNull();
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('gives up rather than killing the import when the count times out', async () => {
+    // The fetch has ten times the count's budget, so a query too slow to
+    // count may still be well within reach of the query the user asked for.
+    const timeout = new Error('timed out');
+    timeout.name = 'TimeoutError';
+    const fetchImpl = vi.fn().mockRejectedValue(timeout);
+
+    expect(await countQueryRows(CONFIG, 'MATCH (n) RETURN n', { fetchImpl })).toBeNull();
   });
 
   it('returns null when the CALL wrapper cannot take the query shape', async () => {
@@ -742,28 +790,27 @@ describe('openNeo4jPopup', () => {
   it('keeps the form (and the typed password) when the checklist is cancelled', async () => {
     // The popup used to close as soon as data arrived, so cancelling the
     // property checklist meant retyping the password to try again.
+    // The prefilled query carries its own LIMIT, so the count preflight is
+    // skipped and the graph fetch is the only roundtrip.
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValueOnce(jsonResponse({ results: [{ data: [{ row: [1] }] }], errors: [] }))
-        .mockResolvedValueOnce(
-          jsonResponse({
-            results: [
-              {
-                data: [
-                  {
-                    graph: {
-                      nodes: [{ id: '1', labels: ['Person'], properties: { name: 'Ada' } }],
-                      relationships: [],
-                    },
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          results: [
+            {
+              data: [
+                {
+                  graph: {
+                    nodes: [{ id: '1', labels: ['Person'], properties: { name: 'Ada' } }],
+                    relationships: [],
                   },
-                ],
-              },
-            ],
-            errors: [],
-          }),
-        ),
+                },
+              ],
+            },
+          ],
+          errors: [],
+        }),
+      ),
     );
     try {
       openNeo4jPopup({ ui: {} });

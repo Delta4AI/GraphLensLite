@@ -703,9 +703,10 @@ describe('openNeo4jJoinPopup', () => {
   it('fetches, merges, and resolves the render result', async () => {
     startNeo4jSession(CONFIG, [rawNode('1', 'Person')], [], NO_EXCLUSIONS);
     const cache = makeCache([{ id: '1', style: { x: 1, y: 2 } }]);
+    // No count mock: the query's own `LIMIT 2` already bounds it, so the
+    // preflight is skipped and the fetch is the only roundtrip.
     const fetchImpl = vi
       .fn()
-      .mockResolvedValueOnce(jsonResponse({ results: [{ data: [{ row: [2] }] }], errors: [] }))
       .mockResolvedValueOnce(graphResponse([rawNode('7', 'Gene', { symbol: 'TP53' })], []));
     const apply = vi.fn().mockResolvedValue(true);
     const promise = openNeo4jJoinPopup(cache, { fetchImpl, apply });
@@ -727,10 +728,7 @@ describe('openNeo4jJoinPopup', () => {
     // detached by the time apply throws — and the old graph is already gone.
     startNeo4jSession(CONFIG, [rawNode('1', 'Person')], [], NO_EXCLUSIONS);
     const cache = makeCache([{ id: '1', style: { x: 1, y: 2 } }]);
-    const fetchImpl = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse({ results: [{ data: [{ row: [2] }] }], errors: [] }))
-      .mockResolvedValueOnce(graphResponse([rawNode('7', 'Gene')], []));
+    const fetchImpl = vi.fn().mockResolvedValueOnce(graphResponse([rawNode('7', 'Gene')], []));
     const apply = vi.fn().mockRejectedValue(new Error('render blew up'));
     const promise = openNeo4jJoinPopup(cache, { fetchImpl, apply });
 
