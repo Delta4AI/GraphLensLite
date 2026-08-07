@@ -154,6 +154,65 @@ describe('annotationLayout', () => {
     expect(layout.contentH).toBe(3 * 14 * 1.25);
   });
 
+  // The three shapes a repaint needs. Both export sinks (canvas drawExport, SVG
+  // annotationPrimitives) had their own copy of the border inset, the corner
+  // shrink and the line origins; they read them from here now.
+  it('gives the fill box the whole border-box at the note radius', () => {
+    const ann = normalizeAnnotation({
+      x: 0, y: 0, text: 'abcd', fontSize: 10, borderWidth: 2, borderRadius: 6,
+    });
+    const layout = annotationLayout(ann, measure);
+
+    expect(layout.fillBox).toEqual({
+      x: 0, y: 0, width: layout.boxW, height: layout.boxH, radius: 6,
+    });
+  });
+
+  it('insets the stroke box by half the border, shrinking the corner with it', () => {
+    const ann = normalizeAnnotation({
+      x: 0, y: 0, text: 'abcd', fontSize: 10, borderWidth: 4, borderRadius: 6,
+    });
+    const layout = annotationLayout(ann, measure);
+
+    // Centred stroke: the OUTER edge lands on the border-box outline, so the
+    // outer curve still reads as radius 6.
+    expect(layout.strokeBox).toEqual({
+      x: 2,
+      y: 2,
+      width: layout.boxW - 4,
+      height: layout.boxH - 4,
+      radius: 4,
+      strokeWidth: 4,
+    });
+  });
+
+  it('has no stroke box without a border, and never a negative radius', () => {
+    const bare = annotationLayout(
+      normalizeAnnotation({ x: 0, y: 0, text: 'x', borderWidth: 0 }),
+      measure
+    );
+    expect(bare.strokeBox).toBeNull();
+
+    const thick = annotationLayout(
+      normalizeAnnotation({ x: 0, y: 0, text: 'x', borderWidth: 8, borderRadius: 1 }),
+      measure
+    );
+    expect(thick.strokeBox.radius).toBe(0);
+  });
+
+  it('centres each line inside the padded content box', () => {
+    const ann = normalizeAnnotation({
+      x: 0, y: 0, text: 'ab\ncd', fontSize: 10, borderWidth: 2,
+    });
+    const layout = annotationLayout(ann, measure);
+    const origin = 2 + layout.pad;
+
+    expect(layout.textLines).toEqual([
+      { text: 'ab', x: origin, y: origin + 0.5 * layout.lineHeight },
+      { text: 'cd', x: origin, y: origin + 1.5 * layout.lineHeight },
+    ]);
+  });
+
   it('passes the font string to the measurer', () => {
     const fonts = [];
     const ann = normalizeAnnotation({ x: 0, y: 0, text: 'x', fontSize: 18 });

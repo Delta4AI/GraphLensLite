@@ -722,7 +722,10 @@ class AnnotationLayer {
         ctx.save();
         ctx.translate(x, y);
         ctx.scale(k, k);
-        const radius = ann.borderRadius ?? 0;
+        // Every rectangle and origin below comes from annotationLayout, so this
+        // and the SVG export cannot disagree about the border inset, the corner
+        // shrink or where a line sits.
+        const { fillBox, strokeBox } = layout;
         if (ann.bgColor) {
           if (ann.shadow) {
             // Canvas shadows live in DEVICE px (the transform does not apply
@@ -733,25 +736,22 @@ class AnnotationLayer {
           }
           ctx.fillStyle = ann.bgColor;
           ctx.beginPath();
-          ctx.roundRect(0, 0, layout.boxW, layout.boxH, radius);
+          ctx.roundRect(fillBox.x, fillBox.y, fillBox.width, fillBox.height, fillBox.radius);
           ctx.fill();
           ctx.shadowColor = 'transparent';
           ctx.shadowOffsetY = 0;
           ctx.shadowBlur = 0;
         }
-        if (ann.borderWidth > 0) {
+        if (strokeBox) {
           ctx.strokeStyle = ann.borderColor;
-          ctx.lineWidth = ann.borderWidth;
+          ctx.lineWidth = strokeBox.strokeWidth;
           ctx.beginPath();
-          // Stroke centered on the border band so the outer edge lands on
-          // the border-box outline, exactly like the CSS border; the corner
-          // radius shrinks with the inset to keep the OUTER curve at radius.
           ctx.roundRect(
-            ann.borderWidth / 2,
-            ann.borderWidth / 2,
-            layout.boxW - ann.borderWidth,
-            layout.boxH - ann.borderWidth,
-            Math.max(0, radius - ann.borderWidth / 2)
+            strokeBox.x,
+            strokeBox.y,
+            strokeBox.width,
+            strokeBox.height,
+            strokeBox.radius
           );
           ctx.stroke();
         }
@@ -759,11 +759,7 @@ class AnnotationLayer {
         ctx.font = layout.font;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        const originX = ann.borderWidth + layout.pad;
-        const originY = ann.borderWidth + layout.pad;
-        layout.lines.forEach((line, i) => {
-          ctx.fillText(line, originX, originY + (i + 0.5) * layout.lineHeight);
-        });
+        for (const line of layout.textLines) ctx.fillText(line.text, line.x, line.y);
         ctx.restore();
       }
     } finally {

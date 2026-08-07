@@ -129,14 +129,24 @@ function sanitizeAnnotations(list) {
 }
 
 /**
- * Box metrics for an annotation at camera ratio 1 (multiply by the zoom
- * factor for on-screen sizes). boxW/boxH are the OUTER border-box — the same
- * rectangle the DOM element occupies (content + 2×padding + 2×border).
+ * Box metrics for an annotation at camera ratio 1 (multiply by the zoom factor
+ * for on-screen sizes). boxW/boxH are the OUTER border-box — the same rectangle
+ * the DOM element occupies (content + 2×padding + 2×border).
+ *
+ * It also hands back the three shapes a repaint needs — the fill box, the
+ * border-inset stroke box, and each line's baseline origin — because BOTH export
+ * sinks (canvas drawExport, SVG annotationPrimitives) needed them and each had
+ * its own copy of the inset and corner-shrink maths.
  *
  * @param {object} ann  normalized annotation
  * @param {(text: string, font: string) => number} measureText
  * @returns {{lines: string[], lineHeight: number, pad: number, font: string,
- *   contentW: number, contentH: number, boxW: number, boxH: number}}
+ *   contentW: number, contentH: number, boxW: number, boxH: number,
+ *   radius: number,
+ *   fillBox: {x: number, y: number, width: number, height: number, radius: number},
+ *   strokeBox: null|{x: number, y: number, width: number, height: number,
+ *     radius: number, strokeWidth: number},
+ *   textLines: Array<{text: string, x: number, y: number}>}}
  */
 function annotationLayout(ann, measureText) {
   const font = `${ann.fontSize}px ${ANNOTATION_FONT_FAMILY}`;
@@ -146,6 +156,12 @@ function annotationLayout(ann, measureText) {
   for (const line of lines) contentW = Math.max(contentW, measureText(line, font));
   const contentH = lines.length * lineHeight;
   const pad = ANNOTATION_PADDING_PX;
+  const boxW = contentW + 2 * pad + 2 * ann.borderWidth;
+  const boxH = contentH + 2 * pad + 2 * ann.borderWidth;
+  const radius = Number.isFinite(ann.borderRadius) ? Math.max(0, ann.borderRadius) : 0;
+  const originX = ann.borderWidth + pad;
+  const originY = ann.borderWidth + pad;
+
   return {
     lines,
     lineHeight,
@@ -153,8 +169,31 @@ function annotationLayout(ann, measureText) {
     font,
     contentW,
     contentH,
-    boxW: contentW + 2 * pad + 2 * ann.borderWidth,
-    boxH: contentH + 2 * pad + 2 * ann.borderWidth,
+    boxW,
+    boxH,
+    radius,
+    fillBox: { x: 0, y: 0, width: boxW, height: boxH, radius },
+    // Stroke CENTRED on the border band, so its outer edge lands on the
+    // border-box outline exactly like the CSS border; the corner radius shrinks
+    // with the inset to keep the OUTER curve at `radius`.
+    strokeBox:
+      ann.borderWidth > 0
+        ? {
+            x: ann.borderWidth / 2,
+            y: ann.borderWidth / 2,
+            width: boxW - ann.borderWidth,
+            height: boxH - ann.borderWidth,
+            radius: Math.max(0, radius - ann.borderWidth / 2),
+            strokeWidth: ann.borderWidth,
+          }
+        : null,
+    // y is the line's CENTRE (canvas paints with textBaseline "middle"); the SVG
+    // sink adds its own alphabetic-baseline shift.
+    textLines: lines.map((text, i) => ({
+      text,
+      x: originX,
+      y: originY + (i + 0.5) * lineHeight,
+    })),
   };
 }
 

@@ -710,17 +710,20 @@ function usesNoteShadow(primitives) {
  * @returns {Array<object>}
  */
 function annotationPrimitives({ ann, x, y, k }, measureText) {
+  // Every rectangle and origin comes from annotationLayout, the same source the
+  // canvas repaint measures with — the border inset, the corner shrink and the
+  // line origins used to exist twice.
   const layout = annotationLayout(ann, measureText);
-  const radius = Number.isFinite(ann.borderRadius) ? Math.max(0, ann.borderRadius) : 0;
+  const { fillBox, strokeBox } = layout;
   const children = [];
   if (ann.bgColor) {
     children.push({
       kind: "rect",
-      x: 0,
-      y: 0,
-      width: layout.boxW,
-      height: layout.boxH,
-      rx: radius,
+      x: fillBox.x,
+      y: fillBox.y,
+      width: fillBox.width,
+      height: fillBox.height,
+      rx: fillBox.radius,
       fill: safeColor(ann.bgColor),
       // The filter id is authored here, never user data; the group is scaled
       // by k, so the filter's user-space offsets zoom with the note like the
@@ -728,33 +731,28 @@ function annotationPrimitives({ ann, x, y, k }, measureText) {
       ...(ann.shadow ? { filter: NOTE_SHADOW_FILTER_ID } : {}),
     });
   }
-  if (ann.borderWidth > 0) {
+  if (strokeBox) {
     children.push({
       kind: "rect",
-      x: ann.borderWidth / 2,
-      y: ann.borderWidth / 2,
-      width: layout.boxW - ann.borderWidth,
-      height: layout.boxH - ann.borderWidth,
-      // Centered stroke: shrink the corner radius with the inset so the
-      // OUTER curve matches the CSS border-radius.
-      rx: Math.max(0, radius - ann.borderWidth / 2),
+      x: strokeBox.x,
+      y: strokeBox.y,
+      width: strokeBox.width,
+      height: strokeBox.height,
+      rx: strokeBox.radius,
       fill: "none",
       stroke: safeColor(ann.borderColor),
-      strokeWidth: ann.borderWidth,
+      strokeWidth: strokeBox.strokeWidth,
     });
   }
-  const originX = ann.borderWidth + layout.pad;
-  const originY = ann.borderWidth + layout.pad;
-  layout.lines.forEach((line, i) => {
-    if (line === "") return; // an empty row still advances the line stack
+  for (const line of layout.textLines) {
+    if (line.text === "") continue; // an empty row still advances the line stack
     children.push({
       ...textPrimitive(
-        originX,
-        // canvas paints with textBaseline "middle" at the line center; the
-        // 0.35 em drop is the same alphabetic-baseline approximation the
-        // bubble labels use.
-        originY + (i + 0.5) * layout.lineHeight + ann.fontSize * ALPHABETIC_BASELINE_SHIFT,
-        line,
+        line.x,
+        // canvas paints with textBaseline "middle" at the line centre; SVG sits
+        // on the alphabetic baseline, hence the shift.
+        line.y + ann.fontSize * ALPHABETIC_BASELINE_SHIFT,
+        line.text,
         safeColor(ann.fontColor),
         ann.fontSize,
         ANNOTATION_FONT_FAMILY,
@@ -762,7 +760,7 @@ function annotationPrimitives({ ann, x, y, k }, measureText) {
       ),
       textAnchor: "start",
     });
-  });
+  }
   if (children.length === 0) return [];
   return [
     {
