@@ -103,6 +103,32 @@ describe("POST /api/graph body handling", () => {
   });
 });
 
+describe("Host header allowlist", () => {
+  // fetch() refuses to forge a Host header, so these go over raw http.
+  const getWithHost = (pathname, host) =>
+    new Promise((resolve, reject) => {
+      const req = http.request(
+        { host: "127.0.0.1", port: server.address().port, path: pathname, headers: { Host: host } },
+        (res) => resolve(res.statusCode),
+      );
+      req.on("error", reject);
+      req.end();
+    });
+
+  // DNS rebinding: the service is loopback-bound, but a page on any site can
+  // point a name it controls at 127.0.0.1 and read the graph, since the GET
+  // endpoints need no token. The browser sends that name in Host.
+  it("refuses a request arriving under an attacker's hostname", async () => {
+    expect(await getWithHost("/api/graph", "evil.example.com")).toBe(403);
+  });
+
+  it("allows the loopback aliases regardless of port", async () => {
+    for (const host of ["127.0.0.1", "localhost:1234", "[::1]:7637"]) {
+      expect(await getWithHost("/health", host), host).toBe(200);
+    }
+  });
+});
+
 describe("GET /api/graph", () => {
   it("returns 204 when no graph has been ingested", async () => {
     const freshStore = new GraphStore();
