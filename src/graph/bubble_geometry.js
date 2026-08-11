@@ -1,5 +1,5 @@
 /**
- * Node-safe bubble-set geometry helpers (MIGRATION.md Phase 4).
+ * Node-safe bubble-set geometry helpers.
  *
  * Pure math between the app's bubble groups and bubblesets-js: rect
  * building, outline computation/sampling, label anchoring and the cache
@@ -39,6 +39,24 @@ const OUTLINE_SIMPLIFY_TOLERANCE_RATIO = 1;
 // Snap grid (px⁻¹) for rings handed to polygon-clipping — collapses the
 // float-noise duplicate/degenerate vertices that trip its sweep line.
 const CLIP_SNAP = 32;
+
+// Refit-time conditioning of the FIELD ring (marching-squares outline only —
+// geometric reconstructions are exact shapes already). Simplification alone
+// cannot remove field wobble: Douglas-Peucker keeps the EXTREME points of the
+// grid-scale ripple, so the painted curve still weaves through its peaks, and
+// the sharp survivors stay sharp because the painter's turn-falloff damping
+// deliberately refuses to round them (the wedge fix). Averaging is what
+// removes noise — the ring is resampled to uniform spacing and smoothed with
+// Taubin's shrink-compensated λ|μ Laplacian, once per refit, never per frame.
+// A conditioned ring also has evenly spaced, gently turning vertices, which
+// is exactly the input the Catmull-Rom painter renders smoothest. The result
+// is guarded: if smoothing pinches a thin corridor into a self-intersection,
+// the unconditioned ring is kept, and the enclosure guarantee downstream
+// repairs any member the smoothing shaved.
+const RING_RESAMPLE_SPACING_CELLS = 1.5;
+const RING_SMOOTH_PASSES = 8;
+const RING_SMOOTH_LAMBDA = 0.5;
+const RING_SMOOTH_MU = -0.53;
 
 // bubblesets-js' influence-field defaults (nodeR0 15, nodeR1 50, edgeR0 10,
 // edgeR1 20, morphBuffer 10, pixelGroup 4) are ABSOLUTE pixel radii tuned
@@ -106,6 +124,24 @@ const HOLE_GAP_RADIUS_RATIO = 0.25;
 // 4 px default — a coarser grid visibly wobbles the outline around large
 // nodes (jaggies/spline hooks at pinch points), it only ever gets finer for
 // small nodes.
+//
+// It must also be a WHOLE number of pixels, for the same reason the sample
+// stride above must be. bubblesets-js maps pixels to marching cells with
+// PotentialArea.scaleX = floor((x - originX) / pixelGroup) but maps cells
+// back with invertScaleX = round(i * pixelGroup + originX). That round trip
+// only agrees when the cell is an integer; at a fractional cell adjacent
+// contour cells can invert onto the same pixel and the traced ring
+// short-circuits across its own interior — painting the empty space between
+// two corridors as one solid wedge. No downstream repair can catch it: the
+// resulting ring is simple and does not self-intersect.
+//
+// Measured on the reported layout, sweeping the node radius 4→40 px: 15 of
+// 145 radii wedged with a fractional cell, 0 with a rounded one. Over 400
+// random layouts a fractional cell inflated the hull past 1.5× the rounded
+// one 43 times (worst 10.4×) versus 15 the other way (worst 2.2×, and those
+// are honest corridor-thickness differences, not fills). The ratio below
+// lands off a whole number for mean member radii of 3.75–15 px, which is
+// squarely where ordinary graphs sit — hence "weird at times".
 const FIELD_PIXEL_GROUP_MIN = 1;
 const FIELD_PIXEL_GROUP_MAX = 4;
 // Capsule links are gently ARCED tubes (quadratic, deterministic bulge), so
@@ -153,7 +189,10 @@ function meanMemberRadius(memberRects) {
 }
 
 /**
- * Compute one group's outline polygon from member/avoid rects.
+ * Compute one group's geometry from member/avoid rects: the outer hull ring
+ * plus interior HOLES carved around non-members the hull swallowed (see
+ * carveAvoidHoles — the field alone can only fjord the boundary). Render with
+ * even-odd fill.
  *
  * The influence field is sized from the group's MEAN MEMBER RADIUS (see the
  * ratio constants above), so hulls stay visually proportional whatever node
@@ -162,34 +201,12 @@ function meanMemberRadius(memberRects) {
  *
  * @param {Array<{x,y,width,height}>} memberRects
  * @param {Array<{x,y,width,height}>} avoidRects
- * @param {{virtualEdges?: boolean, padding?: number, corridor?: number,
- *   avoidance?: number}} [opts]
- *   virtualEdges routes connecting corridors around avoid rects (the
- *   per-group style enables it); its cost is O(members × avoid) — see
- *   MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS in config.js
- *   for the measured budget.
+ * @param {{padding?: number, corridor?: number, avoidance?: number}} [opts]
  *   padding multiplies the node influence radii (body extent past members);
  *   corridor multiplies the edge influence radii (arm thickness). Both are
  *   user style knobs, clamped to [0.05, 4]; 1 = one mean-radius of margin.
  *   avoidance is a switch (numeric for JSON back-compat): 0 lets the hull
  *   cover non-members, anything > 0 steers around them and carves holes.
- * @returns {Array<{x: number, y: number}>} closed polygon (empty only when
- *   there are no members — a lost field reconstructs geometrically)
- */
-function computeOutlinePoints(memberRects, avoidRects = [], opts = {}) {
-  return computeOutlineGeometry(memberRects, avoidRects, opts).outer;
-}
-
-/**
- * Full group geometry: the outer hull ring plus interior HOLES carved around
- * non-members the hull swallowed (see carveAvoidHoles — the field alone can
- * only fjord the boundary). Render with even-odd fill. Same options as
- * computeOutlinePoints.
- *
- * @param {Array<{x,y,width,height}>} memberRects
- * @param {Array<{x,y,width,height}>} avoidRects
- * @param {{virtualEdges?: boolean, padding?: number, corridor?: number,
- *   avoidance?: number}} [opts]
  * @returns {{outer: Array<{x: number, y: number}>,
  *   holes: Array<Array<{x: number, y: number}>>}}
  */
@@ -204,9 +221,10 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
   const avoidRaw = Number(opts.avoidance ?? 1);
   const avoidance = Number.isFinite(avoidRaw) && avoidRaw <= 0 ? 0 : 1;
   const unit = meanMemberRadius(memberRects);
-  const pixelGroupPx = Math.min(
-    FIELD_PIXEL_GROUP_MAX,
-    Math.max(FIELD_PIXEL_GROUP_MIN, FIELD_PIXEL_GROUP_RATIO * unit)
+  // Rounded LAST, so the whole-pixel cell the library needs is also inside
+  // the [MIN, MAX] range (both bounds are already whole numbers).
+  const pixelGroupPx = Math.round(
+    Math.min(FIELD_PIXEL_GROUP_MAX, Math.max(FIELD_PIXEL_GROUP_MIN, FIELD_PIXEL_GROUP_RATIO * unit))
   );
   // Field radii track the knobs all the way down — NO grid floor. A field
   // thinner than a marching cell simply registers nothing, and the enclosure
@@ -233,7 +251,7 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
   let outline = [];
   if (nodeFieldVisible || edgeFieldVisible) {
     const path = bubblesets.createOutline(memberRects, effectiveAvoidRects, [], {
-      virtualEdges: opts.virtualEdges !== false && edgeFieldVisible,
+      virtualEdges: edgeFieldVisible,
       nodeR0: nodeR0px,
       nodeR1: nodeR1px,
       edgeR0: edgeR0px,
@@ -274,11 +292,92 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
       const repaired = repairSelfIntersections(outline);
       if (repaired.length >= 3) outline = repaired;
     }
+    outline = conditionFieldRing(outline, pixelGroupPx);
   }
   outline = ensureMembersEnclosed(outline, memberRects, nodeR0px, linkRPx);
   // Hole breathing room = the padding radius (per-node proportional floor
   // applied inside): carved non-members get the same visual gap members do.
   return carveAvoidHoles(outline, memberRects, effectiveAvoidRects, nodeR0px, nodeR0px);
+}
+
+/**
+ * Resample a closed ring to (near-)uniform vertex spacing by walking its
+ * perimeter. Spacing grows as needed to respect the point cap.
+ *
+ * @param {Array<{x: number, y: number}>} ring  closed ring, open form
+ * @param {number} spacing  target vertex spacing (px)
+ * @returns {Array<{x: number, y: number}>}
+ */
+function resampleRing(ring, spacing) {
+  const n = ring.length;
+  let perimeter = 0;
+  for (let i = 0; i < n; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % n];
+    perimeter += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  if (perimeter === 0) return ring;
+  const count = Math.max(8, Math.min(OUTLINE_MAX_SAMPLED_POINTS, Math.round(perimeter / spacing)));
+  const step = perimeter / count;
+  const out = [];
+  let next = 0; // arc length of the next emitted point
+  let walked = 0;
+  for (let i = 0; i < n && out.length < count; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % n];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    while (next <= walked + len && out.length < count) {
+      const t = len === 0 ? 0 : (next - walked) / len;
+      out.push({ x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+      next += step;
+    }
+    walked += len;
+  }
+  return out.length >= 3 ? out : ring;
+}
+
+/**
+ * Taubin λ|μ smoothing of a closed ring: alternating Laplacian steps with a
+ * positive (shrink) and slightly larger negative (re-inflate) factor, so
+ * noise damps without the curve-shortening collapse plain Laplacian has.
+ *
+ * @param {Array<{x: number, y: number}>} ring  closed ring, open form
+ * @returns {Array<{x: number, y: number}>}
+ */
+function taubinSmoothRing(ring) {
+  const n = ring.length;
+  let pts = ring;
+  for (let pass = 0; pass < 2 * RING_SMOOTH_PASSES; pass++) {
+    const factor = pass % 2 === 0 ? RING_SMOOTH_LAMBDA : RING_SMOOTH_MU;
+    const out = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const prev = pts[(i - 1 + n) % n];
+      const cur = pts[i];
+      const nxt = pts[(i + 1) % n];
+      out[i] = {
+        x: cur.x + factor * ((prev.x + nxt.x) / 2 - cur.x),
+        y: cur.y + factor * ((prev.y + nxt.y) / 2 - cur.y),
+      };
+    }
+    pts = out;
+  }
+  return pts;
+}
+
+/**
+ * Condition the field ring for painting (see the RING_SMOOTH_* note):
+ * uniform resample + Taubin smoothing, reverted wholesale if the smoothed
+ * ring self-intersects (a pinched-shut thin corridor).
+ *
+ * @param {Array<{x: number, y: number}>} ring
+ * @param {number} pixelGroupPx  marching-grid cell size (px)
+ * @returns {Array<{x: number, y: number}>}
+ */
+function conditionFieldRing(ring, pixelGroupPx) {
+  if (ring.length < 8) return ring;
+  const spacing = RING_RESAMPLE_SPACING_CELLS * pixelGroupPx;
+  const smoothed = taubinSmoothRing(resampleRing(ring, spacing));
+  return polygonSelfIntersects(smoothed) ? ring : smoothed;
 }
 
 /**
@@ -458,7 +557,7 @@ function unionPolygons(...geoms) {
   try {
     return polygonClipping.union(geoms[0], ...geoms.slice(1));
   } catch (e) {
-    if (globalThis.__BUBBLE_DEBUG) console.error('union failed:', e.message);
+    console.warn('bubble union failed:', e.message);
     return null;
   }
 }
@@ -769,90 +868,90 @@ function outlineLabelAnchor(points, placement = "top") {
   return { x: anchor.x, y: anchor.y, angle, nx, ny };
 }
 
-/**
- * Order-insensitive identity key for a member id set. Sorting keeps the key
- * stable across the manager's Set→Array conversions; NUL-joined so ids
- * containing spaces cannot make distinct sets collide.
- *
- * @param {Iterable<string>} ids
- * @returns {string}
- */
-function idsKey(ids) {
-  return [...ids].sort().join("\u0000");
-}
+// --- group label + outline paint constants -------------------------------
+// Node-safe, and the ONE definition: the canvas layer and the SVG export both
+// draw a group's label, and export_svg carried its own literals annotated
+// "// bubble_layer.js" — a comment is not a dependency, so the two drifted.
+const OUTLINE_STROKE_WIDTH = 2;
+// Off-path labels clear the outline by half the padded font box plus this gap.
+const LABEL_STANDOFF_PX = 8;
+const BUBBLE_LABEL_FONT_FAMILY = "Arial, sans-serif";
 
 /**
- * Checksum over member positions so a node drag invalidates the cached
- * outline. 32-bit FNV-style integer fold (Math.imul) over coordinates
- * quantized to 1/8 px plus the index: exact integer arithmetic is immune to
- * IEEE754 accumulation loss at large coordinate magnitudes and member
- * counts, and folding the index in keeps it order-sensitive (transpositions
- * hash differently). An optional per-point `s` (on-screen node radius) folds
- * in too, so a node-size change invalidates the cached outline — the fit
- * consumes radii, not just positions.
+ * Resolve a group label to pure geometry: where the text goes, whether it is
+ * rotated onto the path, and the background box behind it. Both sinks then only
+ * PAINT — bubble_layer #drawLabel and export_svg bubbleLabelPrimitives used to
+ * re-implement the standoff maths, the rotation predicate and the background
+ * rect line for line.
  *
- * @param {Array<{x: number, y: number, s?: number}>} points
- * @returns {string}
- */
-function positionsChecksum(points) {
-  let hash = 0x811c9dc5;
-  let i = 0;
-  for (const p of points) {
-    hash = Math.imul(hash ^ Math.round(p.x * 8), 0x01000193);
-    hash = Math.imul(hash ^ Math.round(p.y * 8), 0x01000193);
-    hash = Math.imul(hash ^ Math.round((p.s ?? 0) * 8), 0x01000193);
-    hash = Math.imul(hash ^ i, 0x01000193);
-    i++;
-  }
-  return `${points.length}:${hash >>> 0}`;
-}
-
-// Style fields that change the painted result; everything else the manager
-// passes (members, avoidMembers) is keyed elsewhere by the layer.
-const STYLE_KEY_FIELDS = [
-  "fill",
-  "fillOpacity",
-  "stroke",
-  "strokeOpacity",
-  "virtualEdges",
-  "padding",
-  "corridor",
-  "avoidance",
-  "label",
-  "labelText",
-  "labelFill",
-  "labelFontSize",
-  "labelPadding",
-  "labelBackground",
-  "labelBackgroundFill",
-  "labelBackgroundRadius",
-  "labelOffsetX",
-  "labelOffsetY",
-  "labelPlacement",
-  "labelCloseToPath",
-  "labelAutoRotate",
-];
-
-/**
- * Stable key over the style options that affect painting. JSON-serialized
- * per field so a literal "undefined" string can never collide with a
- * missing field; null and missing collide on purpose (both paint via the
- * group defaults).
+ * The `label` on/off gate stays with the callers: the live layer reads it from
+ * manager-merged opts, the export resolves it through opts ?? defaults.
  *
- * @param {object} opts  group style options (manager-passed)
- * @returns {string}
+ * @param {{x: number, y: number, angle: number, nx: number, ny: number}|null} anchor
+ * @param {object} opts per-group style
+ * @param {object} defaults BUBBLE_GROUP_STYLE_TEMPLATE
+ * @param {(text: string, font: string) => number} measureText
+ * @returns {null|{text: string, font: string, fontSize: number, x: number,
+ *   y: number, lx: number, ly: number, rotated: boolean, angle: number,
+ *   fill: string, background: null|{x: number, y: number, width: number,
+ *   height: number, radius: number, fill: string}}}
  */
-function styleKey(opts = {}) {
-  return STYLE_KEY_FIELDS.map((field) => JSON.stringify(opts[field] ?? null)).join("|");
+function resolveBubbleLabel(anchor, opts = {}, defaults = {}, measureText) {
+  const text = String(opts.labelText ?? defaults.labelText ?? "");
+  if (!text || !anchor) return null;
+
+  const placement = opts.labelPlacement ?? defaults.labelPlacement ?? "bottom";
+  const closeToPath = opts.labelCloseToPath ?? defaults.labelCloseToPath ?? true;
+  const autoRotate = opts.labelAutoRotate ?? defaults.labelAutoRotate ?? true;
+  const fontSize = opts.labelFontSize ?? defaults.labelFontSize ?? 12;
+  const padding = opts.labelPadding ?? defaults.labelPadding ?? 2;
+
+  const standoff = closeToPath ? 0 : fontSize / 2 + padding + LABEL_STANDOFF_PX;
+  const x = anchor.x + anchor.nx * standoff + (opts.labelOffsetX ?? 0);
+  const y = anchor.y + anchor.ny * standoff + (opts.labelOffsetY ?? 0);
+  const font = `${fontSize}px ${BUBBLE_LABEL_FONT_FAMILY}`;
+  const textWidth = measureText(text, font);
+
+  // Rotation only makes sense hugging the path; "center" has no tangent.
+  const rotated = autoRotate && closeToPath && placement !== "center";
+  // Rotated labels paint inside a translate(x,y) rotate(angle) frame, so their
+  // own coordinates are relative to it.
+  const lx = rotated ? 0 : x;
+  const ly = rotated ? 0 : y;
+
+  const background = (opts.labelBackground ?? defaults.labelBackground)
+    ? {
+        x: lx - textWidth / 2 - padding,
+        y: ly - fontSize / 2 - padding,
+        width: textWidth + 2 * padding,
+        height: fontSize + 2 * padding,
+        radius: opts.labelBackgroundRadius ?? defaults.labelBackgroundRadius ?? 5,
+        fill: opts.labelBackgroundFill ?? defaults.labelBackgroundFill ?? "#403C53",
+      }
+    : null;
+
+  return {
+    text,
+    font,
+    fontSize,
+    x,
+    y,
+    lx,
+    ly,
+    rotated,
+    angle: anchor.angle,
+    fill: opts.labelFill ?? defaults.labelFill ?? "#fff",
+    background,
+  };
 }
 
 export {
   nodeViewportRect,
-  computeOutlinePoints,
   computeOutlineGeometry,
   polygonSelfIntersects,
   outlineLabelAnchor,
-  idsKey,
-  positionsChecksum,
-  styleKey,
+  resolveBubbleLabel,
+  OUTLINE_STROKE_WIDTH,
+  LABEL_STANDOFF_PX,
+  BUBBLE_LABEL_FONT_FAMILY,
 };

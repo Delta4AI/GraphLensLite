@@ -1,5 +1,5 @@
 /**
- * Browser-only Sigma.js adapter (MIGRATION.md Phase 1).
+ * Browser-only Sigma.js adapter.
  *
  * The ONLY module in src/ that imports the sigma bundle (it references WebGL
  * globals at module scope and crashes under node). Wraps the Sigma instance,
@@ -46,11 +46,12 @@ import { drawNodeLabel, drawEdgeLabel, BAKED_DEFAULT_LABEL_COLOR } from './label
 import { InteractionManager } from './interactions.js';
 import { BubbleSetLayer } from './bubble_layer.js';
 import { HeatmapLayer } from './heatmap_layer.js';
+import { AnnotationLayer } from './annotation_layer.js';
 import { Minimap } from './minimap.js';
 import { watchDevicePixelRatio } from './dpr_watch.js';
 
 // Rasterization resolution for the SVG shape textures. 512 px keeps shapes
-// crisp at the ~4x zoom the UI allows (risk #1 in MIGRATION.md).
+// crisp at the ~4x zoom the UI allows.
 const SHAPE_TEXTURE_RESOLUTION = 512;
 // @sigma/node-image defaults to 500 ms before regenerating the texture atlas
 // after a miss; style changes left nodes invisible (transparent base color)
@@ -394,6 +395,7 @@ class SigmaAdapter {
     // atmospheric field under the bubble bodies.
     this.heatmapLayer = new HeatmapLayer(this);
     this.bubbleLayer = new BubbleSetLayer(this, cache);
+    this.annotationLayer = new AnnotationLayer(this, cache, containerEl);
     this.minimap = new Minimap(this, containerEl);
     this.flowAnimator = new FlowAnimator(this);
     this.#syncLabelVisibility();
@@ -471,6 +473,7 @@ class SigmaAdapter {
     this.flowAnimator.destroy();
     this.heatmapLayer.destroy();
     this.bubbleLayer.destroy();
+    this.annotationLayer.destroy();
     this.minimap.destroy();
     this.interactions.destroy();
     this.sigma.kill();
@@ -882,7 +885,7 @@ class SigmaAdapter {
   /**
    * Per-group bubble-set handle backed by the shared BubbleSetLayer (the
    * old G6 plugin-instance surface: `members` Map + update/drawBubbleSets).
-   * core.registerPluginStates caches one per group in INSTANCES.BUBBLE_GROUPS,
+   * bubble_sets caches one per group in INSTANCES.BUBBLE_GROUPS on first use,
    * which destroyGraphAndRollBackUI resets together with this adapter.
    *
    * @param {string} key  legacy plugin key ("bubbleSetPlugin-<group>") or
@@ -970,6 +973,8 @@ class SigmaAdapter {
       // Group labels sit above sigma's node labels on screen (their own canvas
       // at afterLayer "labels"); composite them last to keep that z-order.
       this.bubbleLayer.drawExportLabels(ctx, bubbleGroups, dpr * appliedScale);
+      // Text notes live in the DOM above every canvas — repaint them topmost.
+      this.annotationLayer.drawExport(ctx, dpr * appliedScale);
       return { url: out.toDataURL('image/png'), requestedScale: scale, appliedScale };
     } catch (error) {
       throw new Error(`Graph image export failed: ${error?.message ?? error}`);
@@ -1027,6 +1032,7 @@ class SigmaAdapter {
       dims,
       background: this.#stageBackgroundColor(),
       bubbleGroups: this.bubbleLayer.exportOutlines(),
+      annotations: this.annotationLayer.exportPlacements(),
       measureText,
     });
     return { svg, width: dims.width, height: dims.height };

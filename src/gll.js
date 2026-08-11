@@ -20,12 +20,25 @@ import {NumericScalePicker} from './utilities/numeric_scale_picker.js';
 import {PieChartPicker} from './utilities/pie_chart_picker.js';
 import {DataTable, buildDataTable} from "./utilities/data_editor.js";
 import {StringDemoDataLoader} from "./utilities/demo_loader.js";
+import {openNeo4jPopup} from "./utilities/neo4j_loader.js";
+import {expandNeo4jSelection, openNeo4jJoinPopup} from "./utilities/neo4j_session.js";
 import {Popup} from "./utilities/popup.js";
 import {StaticUtilities} from "./utilities/static.js";
 import {generateTourData, GuidedTour} from "./utilities/tour.js";
 import {initApiClient} from "./managers/api_client.js";
+import {initRail} from "./managers/rail.js";
 import {initTheme} from "./utilities/theme.js";
-import {initSelectionHud} from "./utilities/selection_hud.js";
+import {initUiTooltips} from "./utilities/ui_tooltip.js";
+import {initInspector} from "./managers/inspector.js";
+import {initWorkbench} from "./managers/workbench.js";
+import {initFilterSearch} from "./managers/filter_search.js";
+import {initCommandPalette} from "./managers/command_palette.js";
+import {initHistory} from "./managers/history.js";
+import {
+  isWebGL2Available,
+  renderWebGLUnavailableMessage,
+  WEBGL2_ERROR_MESSAGE,
+} from "./graph/webgl_support.js";
 
 
 // Stores all reference objects
@@ -95,6 +108,7 @@ class Cache {
     this.dataTable = new DataTable(this);
     this.metrics = new NetworkMetrics(this);
     this.assistant = new AssistantManager(this);
+    this.history = initHistory(this);
     this.buildDataTable = buildDataTable;
   }
 
@@ -137,6 +151,7 @@ class Cache {
 
     this.propIDToDropdownChecklists = new Map();
     this.propIDToInvertibleRangeSliders = new Map();
+    this.propIDToBooleanToggles = new Map();
 
     this.lastBubbleSetMembers = new Map();
     this.bubbleSetChanged = false;
@@ -452,25 +467,24 @@ async function startTour() {
 }
 
 window.loadDemoData = loadDemoData;
+window.loadNeo4jData = () => openNeo4jPopup(cache);
+window.expandNeo4jSelection = () => expandNeo4jSelection(cache);
+window.openNeo4jJoinPopup = () => openNeo4jJoinPopup(cache);
 window.startTour = startTour;
 window.cache = cache;
 
-
-window.addEventListener('resize', () => {
-  if (window.graph !== undefined && window.graph !== null && window.cache.initialized) {
-    const sidebar = document.getElementById("sidebar");
-    const status = document.getElementById("sidebarStatusContainer");
-
-    status.style.maxWidth = `${sidebar.offsetWidth}px`;
-  }
-})
 
 window.addEventListener("DOMContentLoaded", () => {
   // Stored preference wins; prefers-color-scheme is only the first-run default.
   initTheme(document, window);
   cache.reset();
+  cache.rail = initRail(cache);
+  cache.inspector = initInspector();
+  cache.workbench = initWorkbench(cache);
+  initFilterSearch();
+  cache.palette = initCommandPalette(cache);
+  initUiTooltips(document);
   cache.ui.updateDarkModeButton();
-  initSelectionHud();
   // cache.initialize();
 
   // Display version info
@@ -483,23 +497,37 @@ window.addEventListener("DOMContentLoaded", () => {
     landingVersion.textContent = `v${VERSION}`;
   }
 
-  // Setup sidebar resize functionality
-  const sidebar = document.getElementById('sidebar');
-  const resizeHandle = document.querySelector('.sidebar-resize-handle');
+  // Warn on the landing page too: without WebGL2 every load path ends in a
+  // graph-less stage, so say it before the user picks a data source — and
+  // disable the actions that would land there (template download still works).
+  const webglWarning = document.getElementById('landingWebglWarning');
+  if (webglWarning && !isWebGL2Available()) {
+    renderWebGLUnavailableMessage(webglWarning);
+    webglWarning.hidden = false;
+    document.querySelectorAll('#landingPage [data-needs-webgl]').forEach((btn) => {
+      btn.disabled = true;
+      btn.title = WEBGL2_ERROR_MESSAGE;
+    });
+  }
+
+  // Inspector resize — drags from its left edge (right-docked panel). Same
+  // shadow-bar gesture as the workbench's top edge (workbench.js).
+  const inspector = document.getElementById('inspector');
+  const resizeHandle = document.querySelector('.inspector-resize-handle');
+  const INSPECTOR_MIN_WIDTH = 300;
+  const INSPECTOR_MAX_WIDTH = 900;
   let isResizing = false;
-  let startX = 0;
-  let startWidth = 0;
   let shadowBar = null;
 
-  resizeHandle.addEventListener('mousedown', (e) => {
-    isResizing = true;
-    startX = e.clientX;
-    startWidth = sidebar.offsetWidth;
+  const clampInspectorWidth = (w) =>
+    StaticUtilities.clamp(w, INSPECTOR_MIN_WIDTH, INSPECTOR_MAX_WIDTH);
 
-    // Create shadow bar
+  resizeHandle?.addEventListener('mousedown', (e) => {
+    isResizing = true;
+
     shadowBar = document.createElement('div');
     shadowBar.className = 'sidebar-resize-shadow';
-    shadowBar.style.left = `${startWidth}px`;
+    shadowBar.style.left = `${window.innerWidth - inspector.offsetWidth}px`;
     shadowBar.style.width = '4px';
     shadowBar.style.display = 'block';
     document.body.appendChild(shadowBar);
@@ -511,93 +539,21 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   document.addEventListener('mousemove', (e) => {
-    if (!isResizing) return;
-
-    const deltaX = e.clientX - startX;
-    const newWidth = Math.max(200, startWidth + deltaX);
-
-    if (shadowBar) {
-      shadowBar.style.left = `${newWidth}px`;
-    }
-  });
-
-  document.addEventListener('mouseup', (e) => {
-    if (!isResizing) return;
-
-    const deltaX = e.clientX - startX;
-    const newWidth = Math.max(200, startWidth + deltaX);
-
-    sidebar.style.width = `${newWidth}px`;
-
-    // Update status container max-width to match the new sidebar width
-    const status = document.getElementById("sidebarStatusContainer");
-    if (status) {
-      status.style.maxWidth = `${newWidth}px`;
-    }
-
-    isResizing = false;
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-
-    if (shadowBar) {
-      shadowBar.remove();
-      shadowBar = null;
-    }
-  });
-
-  // Setup assistant sidebar resize functionality (mirrors the left sidebar but
-  // drags from the left edge of the right-docked panel).
-  const assistantSidebar = document.getElementById('assistantSidebar');
-  const assistantResizeHandle = assistantSidebar?.querySelector('.assistant-resize-handle');
-  const ASSISTANT_MIN_WIDTH = 300;
-  const ASSISTANT_MAX_WIDTH = 900;
-  let isAssistantResizing = false;
-  let assistantStartX = 0;
-  let assistantStartWidth = 0;
-  let assistantShadowBar = null;
-
-  const clampAssistantWidth = (w) => Math.max(ASSISTANT_MIN_WIDTH, Math.min(ASSISTANT_MAX_WIDTH, w));
-
-  assistantResizeHandle?.addEventListener('mousedown', (e) => {
-    if (!assistantSidebar.classList.contains('active')) return;
-    isAssistantResizing = true;
-    assistantStartX = e.clientX;
-    assistantStartWidth = assistantSidebar.offsetWidth;
-
-    assistantShadowBar = document.createElement('div');
-    assistantShadowBar.className = 'sidebar-resize-shadow';
-    assistantShadowBar.style.left = `${window.innerWidth - assistantStartWidth}px`;
-    assistantShadowBar.style.width = '4px';
-    assistantShadowBar.style.display = 'block';
-    document.body.appendChild(assistantShadowBar);
-
-    document.body.style.cursor = 'ew-resize';
-    document.body.style.userSelect = 'none';
-
-    e.preventDefault();
-  });
-
-  document.addEventListener('mousemove', (e) => {
-    if (!isAssistantResizing) return;
-    const deltaX = e.clientX - assistantStartX;
-    const newWidth = clampAssistantWidth(assistantStartWidth - deltaX);
-    if (assistantShadowBar) {
-      assistantShadowBar.style.left = `${window.innerWidth - newWidth}px`;
-    }
+    if (!isResizing || !shadowBar) return;
+    shadowBar.style.left = `${window.innerWidth - clampInspectorWidth(window.innerWidth - e.clientX)}px`;
   });
 
   document.addEventListener('mouseup', () => {
-    if (!isAssistantResizing) return;
+    if (!isResizing) return;
 
-    if (assistantShadowBar) {
-      const rect = assistantShadowBar.getBoundingClientRect();
-      const newWidth = clampAssistantWidth(window.innerWidth - rect.left);
-      assistantSidebar.style.setProperty('--assistant-width', `${newWidth}px`);
-      assistantShadowBar.remove();
-      assistantShadowBar = null;
+    if (shadowBar) {
+      const rect = shadowBar.getBoundingClientRect();
+      inspector.style.width = `${clampInspectorWidth(window.innerWidth - rect.left)}px`;
+      shadowBar.remove();
+      shadowBar = null;
     }
 
-    isAssistantResizing = false;
+    isResizing = false;
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
 

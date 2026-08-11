@@ -1,7 +1,7 @@
 /**
  * Defaults for the graph, layouts and UI
  */
-const VERSION = "1.16.0";
+const VERSION = "1.17.0";
 
 const DEFAULTS = {
   NODE: {
@@ -69,16 +69,19 @@ const DEFAULTS = {
   },
   // Atmospheric canvas layer (heatmap_layer.js): node-density heatmap below
   // the bubble-set canvas. Off by default; toggled from the workspace toolbar.
-  // OPACITY/INTENSITY/GAMMA/BANDWIDTH_SCALE/DIM_GRAPH are the runtime knobs
+  // OPACITY/INTENSITY/GAMMA/BANDWIDTH_SCALE/FADE_GRAPH are the runtime knobs
   // exposed in the toolbar settings popover — these are the initial values.
   HEATMAP: {
     ENABLED: false,
     MAX_RESOLUTION: 1024,  // offscreen splat canvas long-side px cap
     BANDWIDTH: 0,          // splat radius in graph units; 0 → auto (heatBandwidth)
     BANDWIDTH_SCALE: 1,    // multiplier on the (auto or explicit) bandwidth
-    OPACITY: 0.55,         // layer alpha — keeps the field atmospheric
-    INTENSITY: 0.18,       // per-splat center alpha; densities saturate at ~1/INTENSITY overlaps
-    GAMMA: 0.7,            // density exponent before the ramp; < 1 boosts low-density haze
+    // Tuned against the airport template with FADE_GRAPH on: the previous
+    // 0.55/0.18/0.7 read as a smudge rather than a density gradient once the
+    // graph stopped occluding it.
+    OPACITY: 0.7,          // layer alpha — keeps the field atmospheric
+    INTENSITY: 0.25,       // per-splat center alpha; densities saturate at ~1/INTENSITY overlaps
+    GAMMA: 0.85,           // density exponent before the ramp; < 1 boosts low-density haze
     // Density floor: pixels below this density clear entirely, the rest
     // renormalizes over the ramp. A lone node peaks at exactly INTENSITY, so
     // a value just above it shows only overlapping nodes (clusters).
@@ -161,9 +164,12 @@ const DEFAULTS = {
         ],
       },
     },
-    // Dim every non-emphasized node/edge while the heatmap is on, so the
+    // Fade every non-emphasized node/edge while the heatmap is on, so the
     // density field reads through the graph (the layer sits below everything).
-    DIM_GRAPH: false,
+    // 0 leaves the graph alone, 1 fades it out entirely; labels cut out past
+    // 0.4 because they are the largest occluder. Off by default so switching
+    // the heatmap on never silently restyles the graph.
+    FADE_GRAPH: 0,
   },
   LAYOUT: "force",
   // Keys define the layout template vocabulary (workspace-creation dropdown).
@@ -195,103 +201,35 @@ const DEFAULTS = {
   EXPENSIVE_LAYOUTS: ["dagre", "mds"],
   LAYOUT_NODE_WARNING_THRESHOLD: 2000,
   CUSTOM_LAYOUT_NAME: "custom",
-  BUBBLE_GROUP_STYLE: {
-    "groupOne": {
-      fill: '#403C53',
-      fillOpacity: 0.25,
-      stroke: '#C33D35',
-      strokeOpacity: 1,
-      virtualEdges: true,
-      padding: 0.1,
-      corridor: 0.25,
-      avoidance: 1,
-      label: true,
-      labelText: 'group one',
-      labelFill: '#fff',
-      labelFontSize: 12,
-      labelPadding: 2,
-      labelBackground: true,
-      labelBackgroundFill: '#403C53',
-      labelBackgroundRadius: 5,
-      labelCloseToPath: true,
-      labelAutoRotate: true,
-      labelOffsetX: 0,
-      labelOffsetY: 0,
-      labelPlacement: 'bottom',
-    },
-    "groupTwo": {
-      fill: '#c33d35',
-      fillOpacity: 0.25,
-      stroke: '#403c53',
-      strokeOpacity: 1,
-      virtualEdges: true,
-      padding: 0.1,
-      corridor: 0.25,
-      avoidance: 1,
-      label: true,
-      labelText: 'group two',
-      labelFill: '#fff',
-      labelFontSize: 12,
-      labelPadding: 2,
-      labelBackground: true,
-      labelBackgroundFill: '#c33d35',
-      labelBackgroundRadius: 5,
-      labelCloseToPath: true,
-      labelAutoRotate: true,
-      labelOffsetX: 0,
-      labelOffsetY: 0,
-      labelPlacement: 'bottom',
-    },
-    "groupThree": {
-      fill: '#EFB0AA',
-      fillOpacity: 0.4,
-      stroke: '#8CA6D9',
-      strokeOpacity: 1,
-      virtualEdges: true,
-      padding: 0.1,
-      corridor: 0.25,
-      avoidance: 1,
-      label: true,
-      labelText: 'group three',
-      labelFill: '#fff',
-      labelFontSize: 12,
-      labelPadding: 2,
-      labelBackground: true,
-      labelBackgroundFill: '#EFB0AA',
-      labelBackgroundRadius: 5,
-      labelCloseToPath: true,
-      labelAutoRotate: true,
-      labelOffsetX: 0,
-      labelOffsetY: 0,
-      labelPlacement: 'bottom',
-    },
-    "groupFour": {
-      fill: '#8CA6D9',
-      fillOpacity: 0.4,
-      stroke: '#EFB0AA',
-      strokeOpacity: 1,
-      virtualEdges: true,
-      padding: 0.1,
-      corridor: 0.25,
-      avoidance: 1,
-      label: true,
-      labelText: 'group four',
-      labelFill: '#fff',
-      labelFontSize: 12,
-      labelPadding: 2,
-      labelBackground: true,
-      labelBackgroundFill: '#8CA6D9',
-      labelBackgroundRadius: 5,
-      labelCloseToPath: true,
-      labelAutoRotate: true,
-      labelOffsetX: 0,
-      labelOffsetY: 0,
-      labelPlacement: 'bottom',
-    },
+  // Everything a bubble group's style holds that does NOT depend on which group
+  // it is. There is no per-group literal any more: a workspace owns its own
+  // `bubbleSetStyle` map and may hold any number of groups, so the only thing
+  // config can supply is one template plus a colour cycle
+  // (see bubbleGroupStyle). Geometry defaults 0.1 / 0.25 / avoidance-on are the
+  // values tuned in 1.16.0; changing them here changes only NEW groups, because
+  // a saved workspace stores its own resolved values.
+  BUBBLE_GROUP_STYLE_TEMPLATE: {
+    fillOpacity: 0.25,
+    strokeOpacity: 1,
+    padding: 0.1,
+    corridor: 0.25,
+    avoidance: 1,
+    label: true,
+    labelFill: '#fff',
+    labelFontSize: 12,
+    labelPadding: 2,
+    labelBackground: true,
+    labelBackgroundRadius: 5,
+    labelCloseToPath: true,
+    labelAutoRotate: true,
+    labelOffsetX: 0,
+    labelOffsetY: 0,
+    labelPlacement: 'bottom',
   },
-  BUBBLE_GROUP_QUADRANT_POSITIONS: {
-    groupOne: "top-left", groupTwo: "top-right", groupThree: "bottom-left", groupFour: "bottom-right"
-  },
+  // The brand colours the original four groups used, in their original order,
+  // so the first four groups a user creates look exactly as they always have.
+  // Past the end, bubbleGroupColor walks the hue circle by the golden angle.
+  BUBBLE_GROUP_PALETTE: ['#403C53', '#C33D35', '#EFB0AA', '#8CA6D9'],
   STYLES: {
     NODE_FORM: {"●": "circle", "◆": "diamond", "⬢": "hexagon", "■": "rect", "▲": "triangle", "★": "star"},
     NODE_COLORS: {red: "#C33D35", purple: "#403C53", blue: "#8CA6D9", pink: "#EFB0AA", grey: "#ABACBD"},
@@ -389,14 +327,22 @@ const CFG = {
 // renders hover fast enough that no automatic node/edge-count cutoff is needed).
   DISABLE_HOVER_EFFECT: false,
 
-// if network is greater than defined threshold, bubble groups may span across non-bubble group members.
-// Measured with the sigma renderer (bubblesets-js createOutline, virtualEdges on, viewport-scale
-// coordinates, 2026-06-10): 60 members + 1000 avoid rects ≈ 69 ms, +2000 ≈ 194 ms, 300 members +
-// 5700 avoid ≈ 12 s — virtual-edge routing around obstacles is O(members × avoid). 1000 keeps a
-// full per-group outline recompute under the ~100 ms interactivity budget; camera pan/zoom reuses
-// cached outlines and is unaffected (src/graph/bubble_layer.js).
-  MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS: 1000,
-  AVOID_MEMBERS_IN_BUBBLE_GROUPS: false,
+// Fitting a bubble group's hull around non-members costs O(members × avoid) —
+// bubblesets-js routes virtual edges around every obstacle. Measured against
+// computeOutlineGeometry (node, 2026-08-07):
+//
+//     5 members ×  2 000 avoid →    48 ms      100 ×  3 000 →    935 ms
+//    20 members × 10 000 avoid →   540 ms      200 ×  2 000 →  1 939 ms
+//    10 members × 50 000 avoid →  1 646 ms     300 ×  5 700 → 20 345 ms
+//
+// ≈ 6 µs per (member × avoid) pair, within ~2-3× across that whole range.
+// This used to be gated on TOTAL NODE COUNT (> 1000 → avoidance silently off),
+// which is the wrong variable: a 5-member group on a 10 000-node graph costs a
+// quarter of a second and was refused, while a 300-member group is the only
+// shape that ever needed refusing. Groups now estimate their own cost and ask
+// only when it exceeds this budget — the user is allowed to wait.
+// Camera pan/zoom reuses cached outlines and is unaffected (bubble_layer.js).
+  AVOID_FIT_CONFIRM_MS: 500,
 
 // Maximum capacity of selection memory
   MAX_SELECTION_MEMORY: 25,
@@ -422,4 +368,61 @@ const CFG = {
   // setup/settings modal — nothing to keep in sync here.
 }
 
-export {VERSION, DEFAULTS, CFG}
+// Successive multiples of the golden angle land far apart on the hue circle,
+// which is what keeps an unbounded number of generated colours separable.
+const GOLDEN_ANGLE_DEG = 137.508;
+
+// Names that reach an object's prototype through plain assignment, so they are
+// refused wherever imported text becomes a live object key (Excel headers,
+// merged property groups). Same set as the JSON reviver in server/validate.js.
+const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** HSL (h 0-360, s/l 0-1) to `#rrggbb`. */
+function hslToHex(h, s, l) {
+  const a = s * Math.min(l, 1 - l);
+  const channel = (n) => {
+    const k = (n + h / 30) % 12;
+    const v = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(255 * v).toString(16).padStart(2, '0');
+  };
+  return `#${channel(0)}${channel(8)}${channel(4)}`;
+}
+
+/**
+ * Fill colour for the group at `index`. The palette covers the first four, then
+ * the hue circle is walked by the golden angle so any number of groups stays
+ * visually separable without a hand-authored list.
+ *
+ * Always `#rrggbb`: `<input type="color">` (the group row's swatch) accepts
+ * nothing else, so an `hsl()` string here silently collapsed every group past
+ * the fourth onto the swatch's fallback colour.
+ *
+ * @param {number} index zero-based creation order
+ * @returns {string} hex colour
+ */
+function bubbleGroupColor(index) {
+  const palette = DEFAULTS.BUBBLE_GROUP_PALETTE;
+  if (index < palette.length) return palette[index];
+  return hslToHex((index * GOLDEN_ANGLE_DEG) % 360, 0.55, 0.55);
+}
+
+/**
+ * A complete style object for a new bubble group: the shared template plus the
+ * three values that identify one group from another. The stroke is the NEXT
+ * palette entry, which is what the original four did (contrast, not a tint of
+ * the fill).
+ * @param {number} index zero-based creation order
+ * @param {string} [name] label text; defaults to "Group <n>"
+ */
+function bubbleGroupStyle(index, name) {
+  const fill = bubbleGroupColor(index);
+  return {
+    ...DEFAULTS.BUBBLE_GROUP_STYLE_TEMPLATE,
+    fill,
+    stroke: bubbleGroupColor(index + 1),
+    labelText: name ?? `Group ${index + 1}`,
+    labelBackgroundFill: fill,
+  };
+}
+
+export {VERSION, DEFAULTS, CFG, bubbleGroupColor, bubbleGroupStyle, hslToHex, GOLDEN_ANGLE_DEG, UNSAFE_OBJECT_KEYS}

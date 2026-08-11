@@ -20,9 +20,9 @@
  * gamma and threshold shape the density field, bandwidthScale the splat
  * radius, ramp picks the color preset (config RAMPS) — all five ride the
  * heat key so a tweak rebuilds the offscreen. opacity only affects the
- * per-frame composite (signature, not key). dimGraph is consumed by the
- * reducers (graph_model.js heatmapDimActive), not painted here — enabled/
- * dimGraph flips refresh sigma so the reducers re-run.
+ * per-frame composite (signature, not key). fadeGraph is consumed by the
+ * reducers (graph_model.js heatmapFade), not painted here — enabled/fadeGraph
+ * changes refresh sigma so the reducers re-run.
  *
  * Redraw plumbing mirrors bubble_layer.js: afterRender → scheduleRedraw rAF
  * coalescing, paint-signature skip, destroy() discipline. With the pass off
@@ -36,7 +36,9 @@
  */
 import { DEFAULTS } from '../config.js';
 import { currentTheme } from '../utilities/theme.js';
-import { positionsChecksum } from './bubble_geometry.js';
+import { positionsChecksum } from './overlay_keys.js';
+import { prepareOverlayCanvas } from './dpr_watch.js';
+import { FrameCoalescer } from './overlay_frame.js';
 import {
   graphBBox,
   splatTransform,
@@ -47,6 +49,9 @@ import {
 
 const LAYER_NAME = 'heatmap';
 
+/** What the retired `dimGraph: true` becomes when an older workspace loads. */
+const LEGACY_DIM_AS_FADE = 0.7;
+
 /** Initial runtime settings, copied from config (see header comment). */
 function defaultSettings() {
   return {
@@ -56,7 +61,7 @@ function defaultSettings() {
     threshold: DEFAULTS.HEATMAP.THRESHOLD,
     bandwidthScale: DEFAULTS.HEATMAP.BANDWIDTH_SCALE,
     ramp: DEFAULTS.HEATMAP.RAMP,
-    dimGraph: DEFAULTS.HEATMAP.DIM_GRAPH,
+    fadeGraph: DEFAULTS.HEATMAP.FADE_GRAPH,
   };
 }
 
@@ -76,7 +81,7 @@ class HeatmapLayer {
     this.heatmapEnabled = DEFAULTS.HEATMAP.ENABLED;
     this.settings = defaultSettings();
 
-    this.rafHandle = null;
+    this.frame = new FrameCoalescer(() => this.#paint());
     this.lastPaintSignature = null;
     // Blank-canvas tracker: lets scheduleRedraw skip the rAF entirely while
     // the pass is off (the canvas starts blank).
@@ -98,15 +103,31 @@ class HeatmapLayer {
     sigma.on('afterRender', this.renderHandler);
   }
 
+  /**
+   * The layer-stack contract every overlay answers to (UIManager.OVERLAYS).
+   * `heatmapEnabled` keeps its name because it is the persisted JSON field.
+   */
+  setVisible(visible) {
+    this.setHeatmapEnabled(visible);
+  }
+
+  get visible() {
+    return this.heatmapEnabled;
+  }
+
   /** @param {boolean} enabled */
   setHeatmapEnabled(enabled) {
     if (this.heatmapEnabled === !!enabled) return;
     this.heatmapEnabled = !!enabled;
     this.lastPaintSignature = null;
-    // The reducers consult heatmapEnabled for the dim-graph companion; a
-    // refresh re-runs them and its afterRender drives our repaint too.
-    if (this.settings.dimGraph) this.adapter.sigma.refresh();
+    // The reducers consult heatmapEnabled for the graph fade; a refresh
+    // re-runs them and its afterRender drives our repaint too.
+    if (this.settings.fadeGraph) this.adapter.sigma.refresh();
     this.scheduleRedraw();
+    // A JSON load flips this without going through the row, so the switch is
+    // re-read here rather than set by the caller (bare adapters in unit tests
+    // have no ui — optional chaining covers them).
+    this.adapter.cache?.ui?.syncOverlays?.();
   }
 
   /**
@@ -118,18 +139,25 @@ class HeatmapLayer {
    * @param {Partial<ReturnType<typeof defaultSettings>>} partial
    */
   updateSettings(partial) {
-    const dimWas = this.settings.dimGraph;
+    const fadeWas = this.settings.fadeGraph;
     const next = { ...this.settings };
     for (const [key, value] of Object.entries(partial)) {
+      // Workspaces saved before the fade slider carry the old boolean. Unknown
+      // keys are dropped, so without this alias their setting would vanish on
+      // load rather than fail loudly.
+      if (key === 'dimGraph') {
+        next.fadeGraph = value ? LEGACY_DIM_AS_FADE : 0;
+        continue;
+      }
       if (!(key in next)) continue;
-      if (key === 'dimGraph') next.dimGraph = !!value;
-      else if (key === 'ramp') {
+      if (key === 'ramp') {
         if (typeof value === 'string' && value in DEFAULTS.HEATMAP.RAMPS) next.ramp = value;
       } else if (Number.isFinite(value)) next[key] = value;
     }
+    next.fadeGraph = Math.min(Math.max(next.fadeGraph, 0), 1);
     this.settings = next;
     this.lastPaintSignature = null;
-    if (this.settings.dimGraph !== dimWas && this.heatmapEnabled) {
+    if (this.settings.fadeGraph !== fadeWas && this.heatmapEnabled) {
       this.adapter.sigma.refresh();
     }
     this.scheduleRedraw();
@@ -143,7 +171,7 @@ class HeatmapLayer {
   destroy() {
     if (this.killed) return;
     this.killed = true;
-    if (this.rafHandle !== null) cancelAnimationFrame(this.rafHandle);
+    this.frame.kill();
     this.adapter.sigma.off('afterRender', this.renderHandler);
     // sigma.kill() may or may not remove custom layer canvases; remove() on
     // an already-detached node is a no-op, so drop ours defensively.
@@ -165,14 +193,10 @@ class HeatmapLayer {
   }
 
   scheduleRedraw() {
-    if (this.killed || this.rafHandle !== null) return;
     // Pass off and the canvas already blank: the afterRender handler must
     // stay free — don't even take a rAF.
     if (!this.heatmapEnabled && this.cleared) return;
-    this.rafHandle = requestAnimationFrame(() => {
-      this.rafHandle = null;
-      this.#paint();
-    });
+    this.frame.schedule();
   }
 
   // ----------------------------------------------------------------- paint
@@ -186,7 +210,7 @@ class HeatmapLayer {
     // Disabled: clear once, then scheduleRedraw stays a no-op (early return
     // BEFORE any signature computation).
     if (!this.heatmapEnabled) {
-      this.#prepareCanvas(width, height, dpr);
+      prepareOverlayCanvas(this.canvas, this.ctx, width, height, dpr);
       this.cleared = true;
       this.lastPaintSignature = null;
       return;
@@ -218,26 +242,9 @@ class HeatmapLayer {
     if (signature === this.lastPaintSignature) return;
     this.lastPaintSignature = signature;
 
-    this.#prepareCanvas(width, height, dpr);
+    prepareOverlayCanvas(this.canvas, this.ctx, width, height, dpr);
     this.#syncHeatmap(positions, heatKey, rampStops);
     this.#drawHeatmap();
-  }
-
-  /** Resize (if needed) and clear the layer canvas, scaled to the device ratio. */
-  #prepareCanvas(width, height, dpr) {
-    if (this.canvas.width !== width * dpr || this.canvas.height !== height * dpr) {
-      this.canvas.width = width * dpr;
-      this.canvas.height = height * dpr;
-    }
-    // Own the CSS display size too (see bubble_layer.js #prepareCanvas): sigma
-    // never sets element.style width/height on a custom canvas created after its
-    // construction-time resize, so without this the field displays at its
-    // backing-store size (dpr* too large on a >1 DPR monitor) until a panel
-    // toggle forces a real sigma resize.
-    if (this.canvas.style.width !== `${width}px`) this.canvas.style.width = `${width}px`;
-    if (this.canvas.style.height !== `${height}px`) this.canvas.style.height = `${height}px`;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.ctx.clearRect(0, 0, width, height);
   }
 
   /** @returns {Array<{x: number, y: number}>} positions of non-hidden nodes */

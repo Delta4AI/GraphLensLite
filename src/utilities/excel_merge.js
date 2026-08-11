@@ -1,4 +1,4 @@
-import { CFG } from '../config.js';
+import { CFG, UNSAFE_OBJECT_KEYS } from '../config.js';
 import { Popup } from './popup.js';
 
 // Cap the id lists rendered in the preview modal; full counts are always shown.
@@ -41,7 +41,13 @@ function snapshot(element) {
 function mergeD4Data(existing, incoming) {
   const merged = structuredClone(existing || {});
   for (const [group, subGroups] of Object.entries(incoming || {})) {
+    // The group/subGroup pair is used as a live key below, and `merged.__proto__`
+    // resolves to a shared prototype rather than a slot of its own. Excel input
+    // is already filtered at parse time (io.js decodeKey); this keeps the sink
+    // itself safe for any other caller.
+    if (UNSAFE_OBJECT_KEYS.has(group)) continue;
     for (const [subGroup, props] of Object.entries(subGroups || {})) {
+      if (UNSAFE_OBJECT_KEYS.has(subGroup)) continue;
       if (Object.keys(props).length === 0) continue;
       if (!merged[group]) merged[group] = {};
       merged[group][subGroup] = { ...merged[group][subGroup], ...props };

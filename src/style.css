@@ -2,12 +2,20 @@
    Theme tokens — light defaults in :root, dark overrides via
    <html data-theme="dark"> (src/utilities/theme.js). Brand backgrounds
    (#403C53 purple, #C33D35 red) stay fixed; surfaces/text/borders flip.
+
+   So a raw brand hex on `color` or `border-color` is a bug — it stays light
+   while everything around it flips, which is what produced this release's
+   repeated one-off dark-mode fixes. The exception is a border that traces its
+   OWN same-coloured background (`.p-button:hover`, `.p-button-primary`,
+   `.tour-btn-next`, `.panel-header-btn:hover`): the fill is deliberately fixed,
+   so a tokenized border would slide off it in dark.
    ========================================================================== */
 :root {
     --bg: #ffffff;
     --surface: #f4f4f4;
     --surface-2: #f0eff4;
     --surface-3: #e4e3ea;
+    --card-wash: #E4E3EA80;
     --row-hover: #e6f3ff;
     --surface-translucent: rgba(244, 244, 244, 0.85);
     --input-bg: #ffffff;
@@ -21,9 +29,32 @@
     --brand-text: #403C53;
     --brand-border: #403C53;
     --accent-text: #C33D35;
+    --accent-ring: rgba(195, 61, 53, 0.35);
     --success-text: #015C0C;
     --danger-text: #8a2d2d;
     color-scheme: light;
+
+    /* Stacking order, bottom to top. Theme-independent, so they live here once
+       rather than in both blocks. Every app-level layer takes its z-index from
+       one of these — 20 ad-hoc values from 0 to 10010 is what produced this
+       release's menu-clamping and stacking fixes, and the invisible-toast bug
+       (toasts at 900 behind a 10000 landing page). Values are unchanged, only
+       named; the +1s stay relative so a bump cannot separate a pair.
+       PURELY LOCAL stacking (a slider thumb over its track, a caret over a
+       textarea) keeps its own small integers — those are relative to their own
+       stacking context and mean nothing on this scale. */
+    --z-minimap: 500;
+    --z-workbench: 600;
+    --z-resize-bar: 700;
+    --z-rail: 900;
+    --z-armed-overlay: 950;
+    --z-menu: 1000;
+    --z-popover: 1100;
+    --z-drag-ghost: 9999;
+    --z-scrim: 10000;
+    --z-modal: 10001;
+    --z-toast: 10005;
+    --z-tip: 10010;
 }
 
 [data-theme="dark"] {
@@ -31,6 +62,7 @@
     --surface: #211f2b;
     --surface-2: #262433;
     --surface-3: #322f40;
+    --card-wash: #2b2937cc;
     --row-hover: #2c3a4f;
     --surface-translucent: rgba(33, 31, 43, 0.88);
     --input-bg: #2a2837;
@@ -44,6 +76,7 @@
     --brand-text: #aaa3c4;
     --brand-border: #6b6486;
     --accent-text: #e0635b;
+    --accent-ring: rgba(224, 99, 91, 0.45);
     --success-text: #58c06a;
     --danger-text: #d98a84;
     color-scheme: dark;
@@ -58,45 +91,454 @@ body, html {
     color: var(--text);
 }
 
+/* One focus ring for everything that does not name its own. Without it those
+   controls fell through to Chrome's `outline: auto`, a near-black #101010 ring
+   — most visible after the palette's "show me where", which focuses the
+   control it revealed, so the black ring stayed put long after the flash had
+   faded. Deliberately FIRST: a component that sets its own :focus-visible, or
+   that clears the outline outright, still wins. */
+:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
+}
+
+/* Shell: rail on top, main content flexes, bottom bar rises from below. */
+body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
 #mainContent {
     display: flex;
     flex-direction: row;
-    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
     overflow: hidden;
-    transition: height 0.3s ease-in-out;
+}
+
+/* ---------- the rail ---------- */
+#rail {
+    flex: none;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-sizing: border-box;
+    position: relative;
+    z-index: var(--z-rail);
+}
+
+.rail-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex: none;
+}
+
+.rail-mark img {
+    height: 22px;
+    width: 22px;
+}
+
+.rail-mark:hover {
+    background: var(--surface-3);
+    border-color: var(--border);
+}
+
+.rail-wschip {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 4px 9px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    cursor: pointer;
+    min-width: 150px;
+    max-width: 240px;
+    flex: none;
+    font: inherit;
+    color: var(--text);
+    text-align: left;
+}
+
+.rail-wschip:hover {
+    border-color: var(--border-strong);
+}
+
+.rail-wschip-l1 {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.rail-wschip-l1 #workspaceChipName {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rail-wschip-car {
+    color: var(--text-faint);
+    font-size: 10px;
+    margin-left: auto;
+}
+
+.rail-wschip-l2 {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Global undo/redo, next to the workspace chip they act on. Distinct from the
+   selection chip's ↶↷, which walk the selection stack only. */
+.rail-hist {
+    display: flex;
+    gap: 2px;
+    flex: none;
+}
+
+.rail-div {
+    width: 1px;
+    height: 26px;
+    background: var(--border);
+    flex: none;
+    margin: 0 2px;
+}
+
+.rail-spacer {
+    flex: 1 1 auto;
+}
+
+.rail-vb {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 44px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: none;
+    cursor: pointer;
+    color: var(--text-strong);
+    flex: none;
+    padding: 0 4px;
+    font: inherit;
+}
+
+.rail-vb-g {
+    font-size: 14px;
+    line-height: 1;
+}
+
+/* Optical sizing: ⌕ draws 8.4px wide where the rail's other text glyphs
+   (⊡ ◈ ✎ ⤓) draw 11.7px and the emoji 17.4px at the same font-size, so at 14px
+   it reads as a smaller button. Scaled to match their ink, not their em. */
+#cmdkBtn .rail-vb-g {
+    font-size: 19px;
+}
+
+.rail-vb-t {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.rail-vb:hover {
+    background: var(--surface-3);
+    border-color: var(--border);
+}
+
+/* On-state (lasso active, hover highlight enabled). `.highlight` is kept for
+   the workbench tabs that still use it; rail buttons all speak `.active`. */
+.rail-vb.highlight,
+.rail-vb.active {
+    background: var(--surface-3);
+    border-color: var(--accent-text);
+}
+
+.rail-vb.highlight .rail-vb-t,
+.rail-vb.active .rail-vb-t {
+    color: var(--accent-text);
+}
+
+.rail-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    flex: none;
+}
+
+.rail-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 52px;
+    padding: 3px 0 4px;
+    border-radius: 8px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--text-strong);
+    font: inherit;
+}
+
+.rail-tab:hover {
+    background: var(--surface-3);
+}
+
+.rail-tab.highlight {
+    background: var(--accent-text);
+}
+
+.rail-tab.highlight .rail-vb-t {
+    color: #fff;
+}
+
+.rail-selchip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 34px;
+    padding: 0 6px 0 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text-muted);
+    font-size: 12px;
+    flex: none;
+    white-space: nowrap;
+}
+
+.rail-selchip.live {
+    border-color: var(--accent-text);
+    color: var(--text);
+}
+
+.rail-selchip-counts,
+.rail-selchip.live .rail-selchip-empty {
+    display: none;
+}
+
+.rail-selchip.live .rail-selchip-counts {
+    display: inline;
+}
+
+.rail-selchip-counts strong {
+    color: var(--accent-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.rail-selchip-sep {
+    color: var(--text-faint);
+}
+
+.rail-selchip-warning {
+    font-size: 11px;
+    color: var(--accent-text);
+    font-weight: 600;
+    cursor: help;
+}
+
+/* 11px on the chip's --input-bg puts the shared accent at 4.19:1 — a marginal
+   fail. Lightened here rather than in the token, which is tuned for larger
+   text and for white-on-accent pills. 5.9:1. */
+[data-theme="dark"] .rail-selchip-warning {
+    color: #ea8c86;
+}
+
+.rail-chip-btn {
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--text-strong);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+
+.rail-chip-btn:hover {
+    background: var(--surface-3);
+    border-color: var(--border);
+    color: var(--accent-text);
+}
+
+.rail-mini {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex: none;
+}
+
+.rail-mini:hover {
+    background: var(--surface-3);
+    border-color: var(--border);
+    color: var(--text-strong);
+}
+
+/* Narrow windows: drop the verb/tab labels to icons so the rail never wraps. */
+@media (max-width: 1200px) {
+    .rail-vb .rail-vb-t,
+    .rail-tab .rail-vb-t {
+        display: none;
+    }
+
+    .rail-vb,
+    .rail-tab {
+        min-width: 34px;
+        width: auto;
+        height: 34px;
+    }
+
+    .rail-wschip {
+        min-width: 0;
+    }
+}
+
+/* Rail dropdown menus (app / workspace / layout / export) */
+.rail-menu {
+    position: fixed;
+    z-index: var(--z-menu);
+    display: none;
+    flex-direction: column;
+    min-width: 210px;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    padding: 5px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    color: var(--text);
+    font-size: 13px;
+}
+
+.rail-menu.open {
+    display: flex;
+}
+
+.rail-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.rail-menu-item:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.rail-menu-icon {
+    width: 18px;
+    text-align: center;
+    flex: none;
+    border: none;
+    background: none;
+    font: inherit;
+    padding: 0;
+}
+
+.rail-menu-label {
+    flex: 1 1 auto;
+}
+
+.rail-menu-check {
+    color: var(--accent-text);
+    font-weight: 700;
+}
+
+.rail-menu-item.checked .rail-menu-label {
+    color: var(--text-strong);
+    font-weight: 600;
+}
+
+.rail-menu-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 2px;
+}
+
+.rail-menu-header {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+    padding: 4px 8px 2px;
+}
+
+.rail-menu-toggle-row .rail-menu-icon {
+    cursor: pointer;
+}
+
+.rail-menu-footer {
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    padding: 6px 8px 3px;
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .inline {
     display: inline;
-}
-
-#sidebar {
-    min-width: 200px;
-    width: 360px;
-    background-color: var(--surface);
-    padding-left: 10px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    position: relative;
-}
-
-.sidebar-resize-handle {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 4px;
-    background: transparent;
-    cursor: ew-resize;
-    z-index: 1000;
-}
-
-.sidebar-resize-handle:hover {
-    background: #403C53;
 }
 
 .sidebar-resize-shadow {
@@ -106,53 +548,60 @@ body, html {
     background: rgba(64, 60, 83, 0.3);
     border-right: 2px solid var(--brand-border);
     pointer-events: none;
-    z-index: 9999;
+    z-index: var(--z-drag-ghost);
     display: none;
     backdrop-filter: blur(1px);
 }
 
-#rightSidebar {
-    min-width: 0;
-    width: 0;
-    background-color: var(--surface);
-    padding-right: 0;
-    overflow: hidden;
-    transition: width 0.3s ease-in-out, min-width 0.3s ease-in-out, padding-right 0.3s ease-in-out;
+/* The activity log at the foot of the inspector. Collapsed by default — the
+   toast carries the newest message; this is the scrollback (and the assistant's
+   readRecentActions source, so it must stay in the DOM either way). */
+.insp-log {
+    flex: none;
+    border-top: 1px solid var(--border);
+}
+
+.insp-log-toggle {
     display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    border-left: 0 solid var(--border);
-    position: relative;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 5px 10px;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
 }
 
-#rightSidebar.active {
-    min-width: 420px;
-    width: 420px;
-    border-left: 1px solid var(--border);
+.insp-log-toggle:hover {
+    color: var(--accent-text);
 }
 
-#rightSidebarContentContainer {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-    padding: 0 10px;
+.insp-log-toggle[aria-expanded="true"] .insp-log-chevron {
+    transform: rotate(90deg);
 }
 
-#rightSidebar.active #rightSidebarContentContainer {
-    opacity: 1;
+.insp-log-chevron {
+    display: inline-block;
+    transition: transform 0.15s ease;
 }
 
-#closeStylingPanelBtn {
+.insp-log-count {
     margin-left: auto;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--text-muted);
 }
 
-#sidebarContentContainer {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    border-bottom: 1px solid var(--border-strong);
+/* An author `display` beats the UA sheet's [hidden] on specificity — without
+   this the collapsed strip stays on screen (same trap as .filter-row[hidden]). */
+#sidebarStatusContainer[hidden] {
+    display: none;
 }
 
 #sidebarStatusContainer {
@@ -160,37 +609,113 @@ body, html {
     align-items: flex-start;
     flex-direction: column;
     flex: none;
-    height: 0;
-
-    transition: height 0.3s ease-in-out;
+    max-height: 28vh;
 
     width: 100%;
-    max-width: 360px;
+    box-sizing: border-box;
+    padding: 0 10px 6px 10px;
     overflow-y: auto;
-    /* overflow-x: hidden; */
-    border-top: 1px solid var(--border);
     font-size: 0.8rem;
     white-space: pre-wrap;
     word-wrap: break-word;
 }
 
-#bottomBar {
-    height: 0;
-    width: 100%;
-    display: none;
-    overflow: hidden;
-    box-sizing: border-box;
-}
-
-#bottomBar.active {
-    background-color: var(--surface);
-    border-top: 1px solid var(--brand-border);
+/* ---- toasts: the transient copy of the newest message, over the stage ---- */
+.toasts {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    /* Above every overlay that can be on screen while a message fires — the
+       landing page (10000), popup overlays (10001/10002) and the tour. A
+       load error raised before the landing page clears is otherwise invisible. */
+    z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
-    min-height: 50px;
-    max-height: 50vh;
-    height: auto;
-    position: relative;
+    gap: 6px;
+    align-items: center;
+    /* The stack must never eat clicks meant for the canvas — only the toasts do */
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(560px, 80vw);
+    padding: 7px 8px 7px 12px;
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--text);
+    background: var(--surface-translucent);
+    backdrop-filter: blur(3px);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border-strong);
+    border-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+    pointer-events: auto;
+    animation: toast-in 0.18s ease-out;
+}
+
+.toast-green { border-left-color: var(--success-text); }
+.toast-dark-orange { border-left-color: #e7671f; }
+.toast-red { border-left-color: var(--accent-text); font-weight: 600; }
+
+.toast-text {
+    overflow-wrap: anywhere;
+}
+
+.toast-dismiss {
+    flex: none;
+    margin-left: auto;
+    padding: 2px 6px;
+    font: inherit;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.toast-dismiss:hover {
+    color: var(--accent-text);
+    background: var(--surface-3);
+}
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .toast { animation: none; }
+    .insp-log-chevron { transition: none; }
+    /* The layer switch's knob slides — the state must still land, just not travel. */
+    .layer-switch,
+    .layer-switch::after { transition: none; }
+}
+
+/* The workbench overlays the bottom of the stage — it covers the canvas and
+   never the inspector. Height is driven by workbench.js. */
+#workbench {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-workbench);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 120px;
+    overflow: hidden;
+    background-color: var(--surface);
+    border-top: 1px solid var(--brand-border);
+    box-shadow: 0 -6px 18px rgba(64, 60, 83, 0.18);
+}
+
+#workbench[hidden] {
+    display: none;
 }
 
 /* Panel headers */
@@ -215,12 +740,6 @@ body, html {
     margin: 0;
 }
 
-/* Bottom bar header gets extra visual borders */
-#bottomBar .panel-header {
-    border-left: 1px solid var(--brand-border);
-    border-right: 1px solid var(--brand-border);
-    border-top: 1px solid var(--brand-border);
-}
 
 .panel-header-text {
     flex: 0 0 auto;
@@ -278,18 +797,8 @@ body, html {
     color: white;
 }
 
-/* Right sidebar header visibility */
-#rightSidebar .panel-header {
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
-
-#rightSidebar.active .panel-header {
-    opacity: 1;
-}
-
-/* Bottom bar content area */
-.bottom-bar-content {
+/* Workbench content area — one pane visible at a time, the rest [hidden]. */
+.wb-content {
     display: flex;
     flex: 1;
     min-height: 0;
@@ -297,14 +806,49 @@ body, html {
     gap: 2px;
 }
 
+.wb-pane[hidden] {
+    display: none;
+}
+
+/* Metrics and the assistant were column-shaped panels; in the workbench they
+   own the full width. Metrics stays a flex container all the way down so its
+   ranked list can claim the leftover height instead of sitting in a short box
+   under an expanse of empty pane. */
+#metricsContainer.wb-pane {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    flex-direction: column;
+    padding: 0 12px;
+}
+
+#metricsContainer.wb-pane:not([hidden]) {
+    display: flex;
+}
+
+#assistantPane {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+}
+
+#assistantPane:not([hidden]) {
+    display: flex;
+}
+
+/* Drag preview for the workbench's top edge. Absolute inside the stage (not
+   fixed to the window) so it spans exactly what it is resizing — as a fixed
+   full-width bar it painted straight across the inspector. */
 .resize-shadow-bar {
-    position: fixed;
+    position: absolute;
     left: 0;
     right: 0;
+    bottom: 0;
     background: rgba(64, 60, 83, 0.3);
     border-top: 2px solid var(--brand-border);
     pointer-events: none;
-    z-index: 9999;
+    z-index: var(--z-resize-bar);
     display: none;
     backdrop-filter: blur(1px);
 }
@@ -317,7 +861,7 @@ body, html {
     height: 4px;
     background: transparent;
     cursor: ns-resize;
-    z-index: 1001;
+    z-index: calc(var(--z-menu) + 1);
 }
 
 .resize-handle:hover {
@@ -384,9 +928,14 @@ body, html {
    minimap was CSS-forced to (bottom-right, despite its "bottom-left" config) */
 #innerGraphContainer .gll-minimap {
     position: absolute;
-    bottom: 10px;
+    /* Lifts clear of the workbench, which overlays the bottom of the stage.
+       workbench.js publishes --workbench-height (0px while it is closed).
+       Capped so a full-height workbench cannot push it up past the stage and
+       out over the rail — at that point it is fully covered anyway. */
+    bottom: min(calc(10px + var(--workbench-height, 0px)), calc(100% - 132px));
     right: 10px;
-    z-index: 500;
+    transition: bottom 0.05s linear;
+    z-index: var(--z-minimap);
     border: 1px solid var(--brand-border);
     border-radius: 5px;
     background-color: var(--surface-translucent);
@@ -394,176 +943,151 @@ body, html {
 }
 
 /*************************
- Selection HUD (on-graph)
+ The inspector — one context-driven column: Filters, Overlays, Selection.
  **************************/
-#selectedElementsContainer {
-    position: absolute !important;
-    width: 256px;
+#inspector {
+    flex: none;
+    width: 356px;
+    min-width: 300px;
     box-sizing: border-box;
-    border: 1px solid var(--brand-border);
-    border-radius: 8px;
-    background-color: var(--surface-translucent);
-    backdrop-filter: blur(6px);
-    box-shadow: 0 4px 14px rgba(64, 60, 83, 0.14);
-    transition: width 0.2s ease-in-out, box-shadow 0.2s ease-in-out, opacity 0.1s ease-in-out;
-    text-align: left;
-    padding: 8px 10px;
-    font-size: 13px;
-    z-index: 1000;
-    max-width: calc(100% - 20px);
+    background-color: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: relative;
 }
 
-#selectedElementsContainer.hidden {
-    display: none;
-    pointer-events: none;
-    width: 0;
-    height: 0;
-}
-
-#selectedElementsContainer.expanded {
-    width: 360px;
-    box-shadow: 0 8px 20px rgba(64, 60, 83, 0.22);
-}
-
-/* --- Grid snapping: drag the header, release to one of the 3×3 grid slots.
-   The bottom-right corner is reserved for the minimap (200×120 @ bottom/right
-   10px), so that region offers two slots flanking it instead: "abm" above and
-   "blm" left of the minimap. Generic classes — shared by the panel, the
-   restore pill, and the drag preview. --- */
-.sel-hud-tl  { top: 10px;    left: 10px; }
-.sel-hud-tc  { top: 10px;    left: 50%;  transform: translateX(-50%); }
-.sel-hud-tr  { top: 10px;    right: 10px; }
-.sel-hud-ml  { top: 50%;     left: 10px; transform: translateY(-50%); }
-.sel-hud-mc  { top: 50%;     left: 50%;  transform: translate(-50%, -50%); }
-.sel-hud-mr  { top: 50%;     right: 10px; transform: translateY(-50%); }
-.sel-hud-bl  { bottom: 10px; left: 10px; }
-.sel-hud-bc  { bottom: 10px; left: 50%;  transform: translateX(-50%); }
-.sel-hud-abm { bottom: 140px; right: 10px; }
-.sel-hud-blm { bottom: 10px;  right: 220px; }
-
-#selectedElementsContainer.sel-hud-dragging {
-    transition: none;
-    box-shadow: 0 12px 28px rgba(64, 60, 83, 0.30);
-    opacity: 0.96;
-    user-select: none;
-}
-
-/* Dashed skeleton showing where the panel will snap on release. */
-.sel-hud-snap-preview {
+.inspector-resize-handle {
     position: absolute;
-    display: none;
-    box-sizing: border-box;
-    border: 2px dashed var(--accent-text);
-    border-radius: 8px;
-    background: rgba(64, 60, 83, 0.08);
-    pointer-events: none;
-    z-index: 999;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 4px;
+    background: transparent;
+    cursor: ew-resize;
+    z-index: var(--z-menu);
 }
 
-.sel-hud-snap-preview.visible {
-    display: block;
+.inspector-resize-handle:hover {
+    background: var(--brand-border);
 }
 
-/* --- HUD header: title + tools toggle (doubles as the drag handle) --- */
-.sel-hud-header {
+/* --- context pills: the only navigation the panel has --- */
+
+/* The row carries the chrome; the tablist inside it holds ONLY tabs. A
+   role="tablist" with a spacer and the ⤢ button among its children fails
+   aria-required-children outright (critical), which is what it did while the
+   two were siblings of the pills. */
+.insp-pills-row {
+    flex: none;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    cursor: grab;
-    touch-action: none;
-}
-
-.sel-hud-dragging .sel-hud-header {
-    cursor: grabbing;
-}
-
-.sel-hud-header-tools {
-    display: inline-flex;
-    align-items: center;
     gap: 4px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
 }
 
-.sel-hud-hide-btn {
+.insp-pills {
+    display: flex;
+    gap: 4px;
+    min-width: 0;
+}
+
+.insp-pill {
     font: inherit;
     font-size: 12px;
-    line-height: 1;
-    color: var(--text-faint);
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 2px 6px;
-    cursor: pointer;
-    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-
-.sel-hud-hide-btn:hover {
-    color: #fff;
-    background: var(--accent-text);
-    border-color: var(--accent-text);
-}
-
-/* --- Floating restore pill, shown only while the HUD is hidden --- */
-.sel-hud-restore {
-    position: absolute;
-    display: none;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--text-strong);
-    background: var(--surface-translucent);
-    backdrop-filter: blur(6px);
-    border: 1px solid var(--brand-border);
-    border-radius: 8px;
-    padding: 4px 10px;
-    cursor: pointer;
-    z-index: 1000;
-    box-shadow: 0 4px 14px rgba(64, 60, 83, 0.14);
-    transition: border-color 0.15s ease, color 0.15s ease;
-}
-
-.sel-hud-restore.visible {
-    display: inline-flex;
-}
-
-.sel-hud-restore:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-
-.sel-hud-title {
-    font-weight: 700;
-    color: var(--brand-text);
-    letter-spacing: 0.02em;
-}
-
-.sel-hud-tools-toggle {
-    font: inherit;
-    font-size: 12px;
-    color: var(--text-strong);
+    font-weight: 600;
+    color: var(--text-muted);
     background: var(--surface-3);
     border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    padding: 2px 8px;
+    border-radius: 12px;
+    padding: 3px 12px;
     cursor: pointer;
-    white-space: nowrap;
     transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.sel-hud-tools-toggle:hover {
+/* The pills are the app's primary navigation, and dark's muted grey on
+   surface-3 is 5:1 next to an active pill near 12:1 — legible on paper,
+   washed out beside its neighbour. Strong text and the full border token take
+   the inactive two to 8.5:1. Deliberately ABOVE :hover and .active, which
+   match at the same specificity and must keep winning. */
+[data-theme="dark"] .insp-pill {
+    color: var(--text-strong);
+    border-color: var(--border);
+}
+
+.insp-pill:hover {
     border-color: var(--accent-text);
     color: var(--accent-text);
 }
 
-#selectedElementsContainer.expanded .sel-hud-tools-toggle {
+.insp-pill.active {
     background: var(--accent-text);
-    color: #fff;
     border-color: var(--accent-text);
+    color: #fff;
 }
 
-/* --- shared HUD buttons --- */
-.sel-hud-btn {
+/* No context ever opens itself, so this is the only word the user gets that
+   something arrived in a panel they are not looking at. Two beats, because one
+   fading ring on a 12px pill has to replace a tab switch that was impossible
+   to miss — but a RING, not the active fill: a second solid pill would read as
+   two selected tabs for as long as it lasts. */
+.insp-pill.flash {
+    animation: insp-pill-flash 0.6s ease-in-out 2;
+}
+
+/* Only the ring and the border move. Leaving `color` out of the frames means
+   the label keeps the theme's resting colour throughout — the dark accent is
+   3.8:1 on the pill, which is fine for a border and not for text. */
+@keyframes insp-pill-flash {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(195, 61, 53, 0); }
+    45% { box-shadow: 0 0 0 4px var(--accent-ring); border-color: var(--accent-text); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* Same class, same 1.2 s, no pulse: hold the ring instead of beating it. */
+    .insp-pill.flash {
+        animation: none;
+        box-shadow: 0 0 0 4px var(--accent-ring);
+        border-color: var(--accent-text);
+    }
+}
+
+#inspectorBody {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 10px;
+}
+
+.insp-panel[hidden] {
+    display: none;
+}
+
+.insp-section-title {
+    margin: 14px 0 6px 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+/* --text-muted, not --text-faint. These are prose, so they owe 4.5:1, and #888
+   on the panel background is 3.54:1 — fine for an icon, a fail for a sentence. */
+.insp-note {
+    margin: 0 0 8px 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.insp-note strong {
+    color: var(--text-strong);
+}
+
+/* --- shared inspector buttons --- */
+.insp-btn {
     font: inherit;
     font-size: 12px;
     color: var(--text-strong);
@@ -579,234 +1103,163 @@ body, html {
     transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.sel-hud-btn:hover {
+.insp-btn:hover {
     border-color: var(--accent-text);
     color: var(--accent-text);
 }
 
-.sel-hud-icon-btn {
-    font: inherit;
-    font-size: 13px;
-    line-height: 1;
-    color: var(--text-strong);
-    background: var(--input-bg);
-    border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+.insp-btn.red:hover {
+    border-color: var(--danger-text);
+    color: var(--danger-text);
 }
 
-.sel-hud-icon-btn:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-.sel-hud-icon-btn.red:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-/* --- toolbar row: lasso / style / undo / redo (always visible) --- */
-.sel-hud-toolbar {
-    display: flex;
+.insp-groups,
+.insp-act-row {
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-    margin-top: 8px;
 }
 
-.sel-hud-toolbar-spacer {
-    flex: 1 1 auto;
+.insp-groups {
+    display: flex;
+    /* Matches .insp-note's, so the prose above and the tab bar below sit on one
+       rhythm instead of the tools touching the tabs. */
+    margin-bottom: 8px;
 }
 
-#lassoWrapper {
-    display: inline-flex;
-    border-radius: 6px;
-}
+/* --- group membership (Selection context) ------------------------------- */
 
-#lassoWrapper.active {
-    box-shadow: 0 0 0 2px var(--accent-text);
-}
-
-#lassoWrapper.active .sel-hud-btn {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-/* Inline lasso glyph reused by the guided tour (empty span + --size/--color). */
-.lasso-icon {
-    display: inline-block;
-    vertical-align: middle;
-}
-
-.lasso-icon::before {
-    content: "➰";
-    font-size: var(--size, 14px);
-    line-height: 1;
-}
-
-/* --- empty state (no selection) --- */
-.sel-hud-empty {
-    margin-top: 8px;
-}
-
-#selectedElementsContainer.has-selection .sel-hud-empty {
+/* Meaningless with nothing selected, so it follows .insp-act-row's rule rather
+   than invariant 4's "show and self-disable" — same reason, same treatment. */
+.sel-group-title,
+.sel-group-panel {
     display: none;
 }
 
-.sel-hud-empty-title {
+#inspectorSelection.has-selection .sel-group-title {
+    display: block;
+}
+
+#inspectorSelection.has-selection .sel-group-panel {
+    display: flex;
+}
+
+.sel-group-panel {
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--surface-2);
+}
+
+.sel-group-hint {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-muted);
+}
+
+.sel-group-hint strong {
+    color: var(--text-strong);
+}
+
+/* clip-path used to clip the focus ring on the quadrant pie; a plain button
+   takes the standard one. */
+#addToGroupBtn:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+/* --- Selection context: empty state vs live state --- */
+.insp-empty {
+    margin-top: 14px;
+}
+
+#inspectorSelection.has-selection .insp-empty {
+    display: none;
+}
+
+/* The act row is meaningless with nothing selected; everything below it
+   (arrange, appearance) stays rendered and self-disables, per invariant 4 —
+   a control that exists for this context is shown, not hidden. */
+.insp-act-row {
+    display: none;
+}
+
+#inspectorSelection.has-selection .insp-act-row {
+    display: flex;
+}
+
+.insp-empty-title {
     font-weight: 600;
     color: var(--text-muted);
     margin-bottom: 3px;
 }
 
-.sel-hud-empty-hint {
+.insp-empty-hint {
     font-size: 12px;
     line-height: 1.45;
-    color: var(--text-faint);
-}
-
-.sel-hud-empty-hint strong {
-    color: var(--text-strong);
-}
-
-/* Inline actionable words in the empty-state hint: clicking jumps straight to
-   the named tool (lasso mode / Tools drawer / query editor). */
-.sel-hud-link {
-    font: inherit;
-    font-weight: 600;
-    color: var(--accent-text);
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
-
-.sel-hud-link:hover,
-.sel-hud-link:focus-visible {
-    color: var(--text-strong);
-    text-decoration: none;
-}
-
-/* --- active state (has selection) --- */
-.sel-hud-active {
-    display: none;
-    margin-top: 8px;
-}
-
-#selectedElementsContainer.has-selection .sel-hud-active {
-    display: block;
-}
-
-.sel-hud-counts {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-}
-
-.sel-count {
-    font-size: 13px;
-    color: var(--text);
-}
-
-.sel-count strong {
-    font-size: 14px;
-}
-
-.sel-count-sep {
-    width: 1px;
-    height: 16px;
-    background: var(--border-soft);
-    margin: 0 4px;
-}
-
-.sel-hud-actions {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 8px;
-}
-
-.sel-group-control {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.sel-group-label {
-    font-size: 12px;
     color: var(--text-muted);
 }
 
-.sel-hud-groups {
+.insp-empty-hint strong {
+    color: var(--text-strong);
+}
+
+/* Every route out of the empty state is a button. The prose version named the
+   Select menu and then left you to find it, which is the one thing an empty
+   state must not do. "All nodes" is deliberately absent — the Select menu the
+   middle button opens already holds it. */
+.insp-empty-actions {
     display: flex;
-    align-items: center;
     flex-wrap: wrap;
-    gap: 5px;
-    margin-top: 6px;
-    min-height: 0;
+    gap: 6px;
+    margin-top: 9px;
 }
 
-/* --- expandable tools panel (Focus / Select / Arrange cards) --- */
-.selection-editor-panel {
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    margin-top: 0;
-    transition: max-height 0.25s ease-in-out, opacity 0.2s ease-in-out, margin-top 0.25s ease-in-out;
+/* --text-muted, not --text-faint: this is text, so it owes 4.5:1, and #888
+   on the input background is only 3.54:1. */
+.insp-empty-actions kbd {
+    font: inherit;
+    font-size: 10px;
+    color: var(--text-muted);
+    border: 1px solid var(--border-soft);
+    border-radius: 3px;
+    padding: 0 3px;
+    margin-left: 1px;
 }
 
-#selectedElementsContainer.expanded .selection-editor-panel {
-    max-height: 420px;
-    opacity: 1;
-    margin-top: 8px;
-    overflow-y: auto;
-    border-top: 1px solid var(--border-soft);
-    padding-top: 8px;
-}
-
-#selectedElementsContainer .selection-editor-panel .card-labeled {
+#inspector .card-labeled {
     width: 100%;
     box-sizing: border-box;
 }
 
-#selectedElementsContainer .selection-editor-panel .card-row {
+#inspector .card-row {
     flex-wrap: wrap;
 }
 
-#selectView {
-    margin-bottom: 10px;
+/* Presentation mode (⇧F): stage only, for screenshots and demos. */
+/* Presentation mode hides the workbench, so nothing is covering the minimap. */
+body.presentation #outerGraphContainer {
+    --workbench-height: 0px;
 }
 
-/* Louvain community-detection configurator (anchored to the 🧩 button) */
-.community-detection-popover {
-    position: fixed;
-    z-index: 1000;
+body.presentation #rail,
+body.presentation #inspector,
+body.presentation #workbench {
     display: none;
-    flex-direction: column;
+}
+
+/* Louvain community-detection configurator (anchored to the 🧩 button). It IS a
+   .rail-menu — position, layer, surface, border and open/closed come from there;
+   only the form's own metrics live here. */
+.community-detection-popover {
     gap: 8px;
     width: 240px;
     padding: 12px;
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
-    border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-    color: var(--text);
     font-size: 12px;
-}
-
-.community-detection-popover.open {
-    display: flex;
 }
 
 .community-popover-title {
@@ -837,59 +1290,6 @@ body, html {
     align-self: flex-end;
 }
 
-/* Export resolution picker, anchored to the 📷 header button. */
-.export-resolution-popover {
-    position: fixed;
-    z-index: 1000;
-    display: none;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px;
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
-    border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-    color: var(--text);
-    font-size: 12px;
-}
-
-.export-resolution-popover.open {
-    display: flex;
-}
-
-.export-res-title {
-    font-weight: bold;
-    color: var(--text-strong);
-}
-
-.export-res-row {
-    display: flex;
-    gap: 4px;
-}
-
-.export-res-option {
-    font: inherit;
-    font-size: 12px;
-    color: var(--text-strong);
-    background: var(--surface-3);
-    border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    padding: 4px 10px;
-    cursor: pointer;
-    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-
-.export-res-option:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-.export-res-option.active {
-    background: var(--accent-text);
-    color: #fff;
-    border-color: var(--accent-text);
-}
-
 h4 {
     margin: 0.2rem;
     font-weight: 500;
@@ -907,24 +1307,8 @@ h5 {
     margin: 0.5rem;
 }
 
-.ml-0 {
-    margin-left: 0;
-}
-
 .ml-1 {
     margin-left: 0.2em;
-}
-
-.ml-2 {
-    margin-left: 0.4em;
-}
-
-.mt-1 {
-    margin-top: 0.2em;
-}
-
-.mt-2 {
-    margin-top: 0.4em;
 }
 
 .q-space {
@@ -1015,9 +1399,11 @@ h5 {
     color: var(--brand-text);
 }
 
-/* Auto-generated non-strict-AND filler (IS MISSING): muted + italic so it
-   reads as machine-added glue rather than a hand-written constraint. */
-.q-kw-ismissing {
+/* Auto-generated AND-join fillers (IS MISSING non-strict, IS FOREIGN strict):
+   muted + italic so they read as machine-added glue rather than
+   hand-written constraints. */
+.q-kw-ismissing,
+.q-kw-isforeign {
     color: var(--brand-text);
     opacity: 0.6;
     font-style: italic;
@@ -1027,10 +1413,12 @@ h5 {
     color: var(--brand-text);
 }
 
-.q-connector-opening-bracket {
+.q-kw-istrue,
+.q-kw-isfalse {
+    color: var(--brand-text);
 }
 
-.q-connector-closing-bracket {
+.q-connector-opening-bracket {
 }
 
 .q-connector-or,
@@ -1055,14 +1443,6 @@ h5 {
 }
 
 .q-error-unrecognized {
-    color: red;
-    font-weight: bold;
-    text-decoration-color: red;
-    text-decoration-line: underline;
-    text-decoration-style: wavy;
-}
-
-.q-error-empty-query {
     color: red;
     font-weight: bold;
     text-decoration-color: red;
@@ -1132,15 +1512,205 @@ h5 {
     align-items: center;
 }
 
-.sub-header-card {
-    background-color: #403C53;
-    border: 1px solid var(--border-strong);
-    border-radius: 5px;
-    color: white;
-    padding-right: 4px;
-    margin-bottom: 2px;
+/* ---------- filter scope: node/edge segment (narrow panel only) ---------- */
+
+/* The top of the filter tree is always exactly two sections in a fixed order
+   ("Node filters" / "Edge filters" are app constants, not data), so it is a
+   binary — and drawing a binary as two full-width red accordions spent the
+   panel's loudest token on it. */
+.filter-scope {
+    display: inline-flex;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.filter-scope-segment {
     display: inline-flex;
     align-items: center;
+    gap: 5px;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 11px;
+    border: none;
+    background: var(--surface-3);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.filter-scope-segment:hover {
+    color: var(--text-strong);
+}
+
+.filter-scope-segment.active {
+    background: var(--accent-text);
+    color: #fff;
+    cursor: default;
+}
+
+/* White on the dark theme's lighter accent is 3.43:1 — same fix the inspector
+   pills and the OR/AND segments already carry. */
+[data-theme="dark"] .filter-scope-segment.active {
+    color: #15131c;
+}
+
+.filter-scope-count {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.75;
+}
+
+/* "2/14": this section holds filters that are narrowing the graph right now.
+   Full opacity and the accent, because it is the answer to "why is my graph
+   empty" when the section is the one NOT on screen. */
+.filter-scope-count-active {
+    opacity: 1;
+    font-weight: 600;
+    color: var(--accent-text);
+}
+
+.filter-scope-segment.active .filter-scope-count-active {
+    color: inherit;
+}
+
+/* Narrow panel: one section at a time, chosen by the segment above. */
+#filterContainer .filter-section:not(.filter-section-active) {
+    display: none;
+}
+
+/* ...and the section's own header loses its fill and its name, because the
+   segment now says which section this is. What stays is the triad, which has
+   no other home. Folding is disabled rather than hidden: the segment already
+   decides what is on screen, so a second mechanism for the same thing is just
+   a way to make a section vanish with no visible cause. */
+#filterContainer .filter-section > .header-card {
+    background: none;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    margin: 0 0 2px;
+    display: flex;
+    justify-content: flex-end;
+    pointer-events: none;
+}
+
+#filterContainer .filter-section > .header-card h4,
+#filterContainer .filter-section > .header-card .filter-group-chevron {
+    display: none;
+}
+
+#filterContainer .filter-section > .header-card .small-btn,
+#filterContainer .filter-section > .header-card .filter-scope-segment {
+    pointer-events: auto;
+}
+
+/* The segment shares that row: it hugs the left, the triad keeps the right,
+   and the panel spends one row on the pair instead of two. */
+#filterContainer .filter-section > .header-card > .filter-scope {
+    margin-right: auto;
+}
+
+#filterContainer .filter-section > .header-card:has(> .filter-scope) {
+    margin-bottom: 8px;
+}
+
+/* A running search spans both sections, so the segment steps aside and every
+   section with a match comes back. */
+#filterContainer.filters-searching .filter-scope {
+    display: none;
+}
+
+#filterContainer.filters-searching .filter-section:not(.filter-section-active) {
+    display: block;
+}
+
+/* ...but a section applySearch emptied must STAY hidden. The rule above is an
+   author `display`, which beats the UA sheet's [hidden] on specificity — the
+   same trap as .filter-row[hidden] and #sidebarStatusContainer[hidden]. */
+#filterContainer.filters-searching .filter-section[hidden] {
+    display: none;
+}
+
+/* Property search. Lives in the toolbar inside #filterContainer, so it travels
+   with the rows between the inspector and the expanded surface. */
+.filter-search {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 1 1 120px;
+    min-width: 0;
+    padding: 2px 8px;
+    font-size: 12px;
+    color: var(--text-faint);
+    background: var(--input-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+}
+
+.filter-search:focus-within {
+    border-color: var(--accent-text);
+}
+
+.filter-search input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    color: var(--text);
+    background: none;
+    border: none;
+    outline: none;
+    padding: 2px 0;
+}
+
+/* Sub-groups used to be a second solid pill under the section's solid pill, so
+   the two levels read as two KINDS of thing rather than level 1 and level 2 —
+   and the container ended up louder than the properties it holds. A small-caps
+   label and a hairline carry the same grouping for none of the weight. */
+.sub-header-card {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 10px 0 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.sub-header-card::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-soft);
+}
+
+.sub-header-card h5 {
+    font: inherit;
+    letter-spacing: inherit;
+    margin: 0;
+    white-space: nowrap;
+}
+
+/* The group triads stay in the DOM and stay tabbable — they carry the
+   "Enable all filters: Nodes > Topology" accessible names. Quieting them is a
+   COLOR change, never opacity: these are non-text controls owing 3:1, and
+   --text-faint at full strength is 3.54:1 while the same token at 30% is
+   ~1.3:1 and fails outright. */
+.sub-header-card .small-btn,
+.filter-section > .header-card .small-btn {
+    border-color: var(--border-soft);
+    color: var(--text-faint);
+    background: transparent;
+}
+
+.sub-header-card .small-btn:hover,
+.sub-header-card .small-btn:focus-visible,
+.filter-section > .header-card .small-btn:hover,
+.filter-section > .header-card .small-btn:focus-visible {
+    border-color: var(--accent-text);
+    color: var(--text-strong);
 }
 
 /*#selectedNodes, #selectedEdges {*/
@@ -1155,7 +1725,7 @@ h5 {
     border-radius: 5px;
     margin-top: 8px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    background-color: #E4E3EA80;
+    background-color: var(--card-wash);
     transition: opacity 0.1s ease-in-out;
     text-align: center;
 }
@@ -1185,27 +1755,6 @@ h5 {
     margin-top: 4px;
 }
 
-/* Styling-panel selection status: replaces silently-greyed cards with a
-   plain-language line about what is (or isn't) being styled. */
-.styling-status {
-    font-size: 12px;
-    line-height: 1.4;
-    padding: 8px 10px;
-    /* Match the 8px card rhythm on all sides so the status sits evenly within
-       the config stack instead of hugging the top and floating far above it. */
-    margin-top: 8px;
-    margin-bottom: 8px;
-    border-radius: 6px;
-    background: var(--surface-3);
-    color: var(--text-strong);
-    border-left: 3px solid var(--accent-text);
-}
-
-.styling-status.empty {
-    color: var(--text-muted);
-    border-left-color: var(--border-soft);
-}
-
 /* Collapsible config sections (Node / Edge / Bubble) so the panel reads as
    foldable sections instead of one tall wall of controls. */
 .card-labeled.card-collapsible {
@@ -1217,25 +1766,49 @@ h5 {
     display: none;
 }
 
-.card-collapse-header {
+/* The dark bar lives on the WRAPPER, not the header button, so a layer row's
+   switch sits inside it beside the title rather than out on the panel
+   background — the switch's contrast is designed against this bar. */
+.card-collapse-bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    width: 100%;
+    gap: 7px;
     box-sizing: border-box;
+    padding: 0 8px;
     background: var(--brand-border);
     color: #fff;
-    border: none;
     border-radius: 4px;
-    padding: 4px 8px;
+}
+
+.card-collapse-header {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: none;
+    color: inherit;
+    border: none;
+    padding: 4px 0;
     cursor: pointer;
     font: inherit;
     font-weight: bold;
     font-size: 13px;
 }
 
-.card-collapse-header:hover {
-    background: var(--accent-text);
+/* Hover tints the whole bar, as it did when the header WAS the bar — reaching
+   up rather than colouring a block that stops short of the switch.
+
+   The brand accent in BOTH themes, not --accent-text: that token flips to
+   #e0635b in dark, where the bar's white bold title drops to 3.3:1. Fixed, it
+   is 5.2:1 — the same trade the layer switch makes below. */
+.card-collapse-bar:has(.card-collapse-header:hover) {
+    background: #C33D35;
+}
+
+/* Pushes the count and the chevron to the right edge of the bar. */
+.card-collapse-title {
+    flex: 1 1 auto;
+    text-align: left;
 }
 
 .card-collapse-chevron {
@@ -1243,58 +1816,162 @@ h5 {
     opacity: 0.85;
 }
 
-.card-labeled.collapsed > :not(.card-collapse-header) {
+/* --------------------------------------------------------------------------
+   The Overlays layer stack. Four rows, one per thing drawn over the graph:
+   Groups and the heatmap are collapsible cards whose header bar carries the
+   switch; Notes and the minimap have no parameters, so they are bare rows.
+   Both shapes share the bar geometry so the four read as one stack.
+   -------------------------------------------------------------------------- */
+/* A row with no parameters: the same bar as a card's, minus the disclosure. */
+.layer-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 8px 0 0;
+    padding: 4px 8px;
+    box-sizing: border-box;
+    border-radius: 4px;
+    background: var(--brand-border);
+    color: #fff;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+/* A COLLAPSED layer card is nothing but its bar, so all four rows read as one
+   stack; expanded, the card frame comes back to group the parameters under it. */
+.card-labeled.layer-card {
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+}
+
+.card-labeled.layer-card:not(.collapsed) {
+    border: 1px solid var(--brand-border);
+    background-color: var(--card-wash);
+    padding-bottom: 6px;
+}
+
+/* The card cannot carry the inset itself: the bar is its header and has to stay
+   full-bleed, so everything BELOW the bar is inset instead. Without this the
+   prose and the tab bar sit flush against the card border. */
+.card-labeled.layer-card > :not(.card-collapse-bar) {
+    margin-left: 6px;
+    margin-right: 6px;
+}
+
+/* Breathing room under the bar, which the contents would otherwise touch. */
+.card-labeled.layer-card > .card-collapse-bar + * {
+    margin-top: 6px;
+}
+
+.layer-title {
+    flex: 1 1 auto;
+    text-align: left;
+}
+
+/* Counts are secondary to the name they follow, and sit on the same dark bar
+   as the title — a plain white at lower weight rather than a muted grey.
+   0.9, not 0.8: at 0.8 this lands on 4.22:1 over the dark theme's lighter bar,
+   and 11px prose owes 4.5. */
+.layer-count {
+    font-weight: normal;
+    font-size: 11px;
+    opacity: 0.9;
+}
+
+/* A track with a knob, sized off the 13px bar text so it never dominates the
+   row. role=switch, so aria-checked is the state and CSS follows it.
+   The KNOB POSITION is the state signal, not the fill — colour alone would
+   fail 1.4.1, and no green both contrasts 3:1 with the white knob and 3:1
+   with the bar behind it. The border carries the 3:1 component boundary
+   instead (0.7 alpha: 0.55 lands on 2.88:1 over the dark theme's bar). */
+.layer-switch {
+    flex: 0 0 auto;
+    position: relative;
+    width: 26px;
+    height: 14px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 7px;
+    background: rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.layer-switch::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s ease;
+}
+
+/* The brand accent in BOTH themes, not --accent-text: that token flips to
+   #e0635b in dark, where the white knob drops to 3.44:1. Fixed, it is 5.2:1.
+   Green would be the conventional "on" here, but the app has no green anywhere
+   else, and the knob position — not the fill — is what states the switch. */
+.layer-switch[aria-checked="true"] {
+    background: #C33D35;
+    border-color: rgba(255, 255, 255, 0.9);
+}
+
+.layer-switch[aria-checked="true"]::after {
+    transform: translateX(12px);
+}
+
+.layer-switch:hover:not(:disabled):not(.disabled) {
+    border-color: #fff;
+}
+
+/* Dead by CLASS as well as by attribute: syncOverlays uses the class so the
+   delegated tooltip layer can still explain why the switch cannot act. */
+.layer-switch:disabled,
+.layer-switch.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.layer-switch:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 1px;
+}
+
+.card-labeled.collapsed > :not(.card-collapse-bar) {
     display: none;
 }
 
-/* Allow folding/unfolding a section even while its controls are disabled
-   (nothing selected), so the contents stay readable. */
-.card-labeled.card-collapsible.disabled .card-collapse-header {
+/* Allow folding/unfolding a section — and flipping a layer switch — even while
+   its controls are disabled (nothing selected), so the contents stay readable
+   and the row that owns the switch never locks the user out of it. */
+.card-labeled.card-collapsible.disabled .card-collapse-bar {
     pointer-events: auto;
+}
+
+/* A card is disabled by putting .disabled either on the card ("Arrange
+   Selection" needs >1 node, so the whole section is off at once) or on its
+   individual buttons ("Act on Selection" mixes a >=1-node threshold with
+   Shortest Path's exactly-2, so it can only speak per button). Both are
+   correct; what must not differ is how they LOOK. Dimming the card dimmed its
+   heading too, so the same state read as two different treatments. Keep the
+   title — pseudo-element or collapse bar — at full strength and dim only what
+   is actually unavailable. */
+.card-labeled.disabled {
+    opacity: 1;
+}
+
+.card-labeled.disabled > :not(.card-collapse-bar) {
+    opacity: 0.5;
 }
 
 .bubble-set-config-card-header::before {
     font-size: 12px;
 }
 
-.bubble-set-tab-bar {
-    display: flex;
-    gap: 2px;
-}
-
-.bubble-set-tab {
-    flex: 1;
-    padding: 2px 4px;
-    background: var(--surface-3);
-    border: 1px solid var(--brand-border);
-    border-bottom: 2px solid var(--tab-color, #403C53);
-    border-radius: 3px 3px 0 0;
-    cursor: pointer;
-    font-size: 11px;
-    line-height: 14px;
-    color: var(--brand-text);
-    transition: all 0.15s ease;
-    text-align: center;
-    white-space: nowrap;
-}
-
-.bubble-set-tab:hover {
-    background: var(--surface-3);
-}
-
-.bubble-set-tab.active {
-    background: var(--tab-color, #403C53);
-    color: var(--tab-text-color, #fff);
-    border-color: var(--tab-color, #403C53);
-}
-
-.bubble-set-tab-panel {
-    display: none;
-}
-
-.bubble-set-tab-panel.active {
-    display: block;
-}
 
 .alert-warning {
     background-color: #fff3cd;
@@ -1347,7 +2024,7 @@ h5 {
     padding: 16px;
     background: transparent;
     color: var(--text);
-    z-index: 10001;
+    z-index: var(--z-modal);
     transition: opacity 0.18s ease;
 }
 
@@ -1379,6 +2056,13 @@ h5 {
     line-height: 1.3;
 }
 
+/* Only present while the running operation can be abandoned (see
+   ui.setLoadingCancel) — the card is otherwise pure status. */
+#loadingCancelBtn {
+    align-self: flex-start;
+    margin-top: 8px;
+}
+
 #loadingText {
     margin: 0;
     font-size: 12px;
@@ -1405,11 +2089,6 @@ h5 {
     align-items: center;
 }
 
-.container-vertical-aligned {
-    display: flex;
-    align-items: center;
-}
-
 #filterContainer {
     position: relative;
     margin-right: 6px;
@@ -1421,7 +2100,9 @@ h5 {
    and the slider's min/max inputs all line up). */
 .filter-subgroup-body {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    /* Col2 keeps a readable floor for sliders/dropdowns/inputs; col1 gives up
+       width instead (long property names wrap via .checkboxLabel). */
+    grid-template-columns: minmax(0, auto) minmax(150px, 1fr) auto;
     column-gap: 8px;
     row-gap: 6px;
     align-items: start;
@@ -1429,6 +2110,12 @@ h5 {
 
 .filter-row {
     display: contents;
+}
+
+/* [hidden] must beat display:contents — same specificity as the rule above, so
+   the UA sheet loses and a searched-out row would keep all three grid cells. */
+.filter-row[hidden] {
+    display: none;
 }
 
 .filter-row-col1 {
@@ -1447,52 +2134,87 @@ h5 {
     gap: 3px;
 }
 
-/* Always-visible min/max threshold inputs under the range slider, styled as a
-   single paired control (lower – upper) instead of two bare full-width boxes. */
-.filter-input-row {
-    position: relative;
+/* The exact-value boxes sit at the two ends of the track, on the slider's own
+   line — one row instead of slider-over-boxes, and no second copy of the same
+   two numbers in position:fixed bubbles. They are sized to the column's
+   endpoints, so the track keeps most of the width. */
+.filter-range-row {
     display: flex;
     align-items: center;
-    gap: 14px;
-    margin-top: 2px;
-}
-
-.filter-input-row::before {
-    content: "–";
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    color: var(--text-muted);
-    font-size: 11px;
-    pointer-events: none;
-}
-
-.filter-input-row input {
-    flex: 1 1 0;
+    gap: 6px;
     min-width: 0;
-    height: 20px;
-    padding: 0 6px;
+}
+
+/* [slider] claims only 8px for a track whose thumbs and inner div actually
+   paint ~18px, and the base rule reserves the rest as margin-bottom. On one
+   line that margin would push the row apart, so the box claims the height
+   directly instead — drop it and the thumbs overlap the row below. */
+.filter-range-row > div[slider] {
+    flex: 1 1 auto;
+    min-width: 40px;
+    height: 18px;
+    margin: 0;
+}
+
+/* Width comes from the `size` attribute, fixed per slider to the widest value
+   its column can show — resizing to the CURRENT value made the track (a flex
+   sibling) shift mid-drag and the thumb jump under the cursor. The cap keeps a
+   pathological column from eating the row; the exact value is one click away
+   regardless. */
+/* Child combinator, not a descendant one: the row also contains the slider's
+   two <input type=range> handles, one level down inside div[slider]. They were
+   picking up `max-width: 10ch` here, which cut their 117px track to 58px — so
+   both native thumbs sat in the left half while the visual thumbs were painted
+   across the full width, and the right thumb had no hit area under it. */
+.filter-range-row > input {
+    flex: 0 1 auto;
+    width: auto;
+    max-width: 10ch;
+    min-width: 0;
+    height: 18px;
+    padding: 0 3px;
     font-size: 11px;
-    border: 1px solid var(--border-soft);
-    border-radius: 4px;
-    background: var(--surface-3);
-    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    border: 1px solid transparent;
+    border-bottom-color: var(--border-soft);
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-muted);
     box-sizing: border-box;
 }
 
-.filter-input-row input:first-child {
-    text-align: left;
+/* Inverted: sliderStart holds the HIGHER value, so its box belongs at the
+   right-hand end. Only the visual order swaps — each box still drives its own
+   handle. */
+.filter-range-row.flipped > input:first-child {
+    order: 1;
 }
 
-.filter-input-row input:last-child {
-    text-align: right;
+.filter-range-row.flipped > input:last-child {
+    order: -1;
 }
 
-.filter-input-row input:focus {
+.filter-range-row > input:hover {
+    border-color: var(--border-soft);
+    background: var(--surface-3);
+}
+
+/* Focus shows the exact value, so the box needs room for it. */
+.filter-range-row > input:focus {
     outline: none;
+    max-width: 16ch;
+    flex: 0 0 auto;
+    text-align: left;
+    color: var(--text-strong);
+    background: var(--input-bg);
     border-color: var(--accent-text);
-    box-shadow: 0 0 0 2px rgba(195, 61, 53, 0.25);
+    box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.filter-range-row > input.red {
+    color: var(--accent-text);
+    font-weight: 600;
 }
 
 /* Single-value fallback shown in place of a slider when a numeric property has
@@ -1522,32 +2244,46 @@ h5 {
     align-items: center;
 }
 
-/* Panel-level control bar above all filter sections: the "Details" disclosure
-   on the left, the OR/AND join control (plus its "Complete cases only" option)
-   pushed to the right. Sitting above every section makes clear the join
-   control is global, not scoped to the adjacent section. */
+/* Panel-level control bar above all filter sections: the OR/AND join control
+   plus its "Complete cases only" option. Sitting above every section makes
+   clear the join control is global, not scoped to the adjacent section. */
 .filter-toolbar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    margin-bottom: 6px;
+    margin: 4px 0 6px;
+}
+
+/* The AND join's constraint census — its own full-width line so the join
+   segments never shift when the sentence changes length. */
+.filter-constraint-count {
+    flex-basis: 100%;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.filter-constraint-count[hidden] {
+    display: none;
+}
+
+/* An active filter still at its loaded default adds no constraint under AND,
+   so its name is muted: without this the checkbox looks load-bearing when
+   toggling it does nothing. Only the label is marked, never the whole row —
+   `opacity` on the cells also dims the slider's value bubbles, whose white-on-
+   brand text has no contrast margin to give away (4.08:1 → 2.18:1), and a
+   descendant cannot opt out of an ancestor's opacity. Muting the one element
+   that names the filter says the same thing and keeps the widgets readable,
+   which matters because narrowing them is exactly what un-inerts the row. */
+.filter-row-inert .checkboxLabel {
+    color: var(--text-muted);
+    font-style: italic;
 }
 
 .filter-toolbar-join {
     display: flex;
     align-items: center;
     gap: 8px;
-}
-
-.filter-toolbar .filter-details-toggle {
-    margin-left: auto;
-}
-
-/* The OR/AND join controls are revealed only in Details mode, alongside the
-   exact value inputs and per-row actions. Compact mode shows just the Details
-   button so the panel stays minimal. */
-#filterContainer:not(.show-details) .filter-toolbar-join {
-    display: none;
 }
 
 .filter-strict-checkbox {
@@ -1564,33 +2300,36 @@ h5 {
     display: none;
 }
 
-.filter-details-toggle {
-    display: inline-flex;
+/* Keyboard cheat sheet (opened with "?"): one key/action row per shortcut. */
+.keyboard-sheet {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 12px;
     align-items: center;
-    gap: 4px;
-    padding: 2px 9px;
+}
+
+.keyboard-sheet-row {
+    display: contents;
+}
+
+.keyboard-sheet kbd {
+    justify-self: center;
+    min-width: 26px;
+    padding: 1px 6px;
+    text-align: center;
+    font-family: inherit;
     font-size: 11px;
     font-weight: 600;
     color: var(--text-strong);
     background: var(--surface-3);
     border: 1px solid var(--border-soft);
-    border-radius: 12px;
-    cursor: pointer;
+    border-bottom-width: 2px;
+    border-radius: 4px;
 }
 
-.filter-details-toggle:hover {
-    border-color: var(--accent-text);
-}
-
-.filter-details-toggle.active {
-    background: var(--accent-text);
-    color: #fff;
-    border-color: var(--accent-text);
-}
-
-/* Segmented OR/AND control: how multiple active filters combine. Mirrors the
-   details toggle's pill styling; the active segment is filled so the current
-   mode is always visible (a state, not a morphing action). */
+/* Segmented OR/AND control: how multiple active filters combine. Pill
+   styling; the active segment is filled so the current mode is always
+   visible (a state, not a morphing action). */
 .filter-join-toggle {
     display: inline-flex;
     align-items: stretch;
@@ -1623,18 +2362,34 @@ h5 {
     cursor: default;
 }
 
-/* Compact mode: numeric inputs and the circle / +- actions are hidden so the
-   control uses the full row width. Hiding col3 drops the grid to two columns
-   so the remaining cells stay aligned (a 3-col grid would pull the next row's
-   label into the empty third cell). The hover value bubbles overflow into the
-   canvas via position:fixed, so no right inset is needed. */
-#filterContainer:not(.show-details) .filter-subgroup-body {
-    grid-template-columns: auto minmax(0, 1fr);
+/* The dark theme lightens --accent-text to #e0635b, and white on that is only
+   3.43:1. Flip the fill's foreground dark, as every brand-filled pill does in
+   dark mode. */
+[data-theme="dark"] .filter-join-segment.active,
+[data-theme="dark"] .insp-pill.active,
+[data-theme="dark"] .rail-tab.highlight .rail-vb-t {
+    color: #15131c;
 }
 
-#filterContainer:not(.show-details) .filter-input-row,
-#filterContainer:not(.show-details) .filter-row-col3 {
-    display: none;
+/* Boolean filter rows: the Any/True/False segment reuses the join
+   toggle's pill styling. col2 is a flex column whose default cross-axis
+   stretch would pull the pill to full width — align-self, not justify-self,
+   is what opts out of that in flex. */
+.filter-bool-toggle {
+    align-self: flex-start;
+}
+
+/* Mixed-type rows: visible but inert, with the reason inline. */
+.filter-row-unusable .filter-row-col1 {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+.filter-unusable-reason {
+    font-size: 10px;
+    font-style: italic;
+    color: var(--text-muted);
+    padding-top: 3px;
 }
 
 /* Collapsible filter sections and sub-groups (accordion). Properties within a
@@ -1661,8 +2416,13 @@ h5 {
     opacity: 0.85;
 }
 
-.filter-section.collapsed > .filter-section-body,
-.filter-subgroup.collapsed > .filter-subgroup-body {
+/* Scoped to "not searching": a search has to show what it matched even inside
+   a folded group, and stripping `.collapsed` to do that threw the user's folds
+   away (and left the chevron pointing the wrong way). Suspending the rule for
+   the duration keeps the state — and each body keeps its own display value
+   instead of having it restated here. */
+#filterContainer:not(.filters-searching) .filter-section.collapsed > .filter-section-body,
+#filterContainer:not(.filters-searching) .filter-subgroup.collapsed > .filter-subgroup-body {
     display: none;
 }
 
@@ -1716,19 +2476,18 @@ h5 {
 /* Locked filter state - disable all interactive elements */
 #filterContainer.locked .header-card button,
 #filterContainer.locked .sub-header-card button,
-#filterContainer.locked .circle-button,
-#filterContainer.locked .circle-button .quadrant,
-#filterContainer.locked .checkbox-container,
-#filterContainer.locked .dropdown-checklist,
 #filterContainer.locked .filter-row-col1 label,
 #filterContainer.locked .filter-row-col2,
 #filterContainer.locked .slider-container,
 #filterContainer.locked input[type="number"],
-#filterContainer.locked .filter-input-row,
-#filterContainer.locked .range-slider-thumb,
-#filterContainer.locked .range-slider,
+#filterContainer.locked .filter-range-row,
 #filterContainer.locked .header-card,
-#filterContainer.locked .sub-header-card {
+#filterContainer.locked .sub-header-card,
+/* The join toggle and its "complete cases only" modifier are filter controls
+   too: their handlers already bail under the lock, so undimmed they looked live
+   and did nothing. The search box stays live — searching the list is reading,
+   not filtering. */
+#filterContainer.locked .filter-toolbar-join {
     opacity: 0.5;
     pointer-events: none !important;
     cursor: not-allowed !important;
@@ -1817,7 +2576,7 @@ h5 {
     box-sizing: border-box !important;
     transition: width 0.2s ease, height 0.2s ease !important;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
-    z-index: 1100 !important;
+    z-index: var(--z-popover) !important;
 }
 
 .tooltip.expanded {
@@ -1998,10 +2757,6 @@ hr {
     flex: 1;
 }
 
-.tooltip-section {
-
-}
-
 .tooltip-sub-section {
     background-color: #403C53;
     border: 1px solid var(--border-strong);
@@ -2048,11 +2803,6 @@ hr {
     color: var(--text);
 }
 
-.brown {
-    color: #773901;
-    border: 1px solid #773901;
-}
-
 .green {
     color: var(--success-text);
 }
@@ -2081,43 +2831,12 @@ hr {
     color: white;
 }
 
-.red-border {
-    border: 1px solid #C33D35 !important;
-    border-radius: 3px;
-}
-
 .purple {
     color: var(--brand-text);
 }
 
-.purple-border {
-    border: 1px solid var(--brand-border) !important;
-    border-radius: 3px;
-}
-
 .round-border {
     border-radius: 3px;
-}
-
-.no-border {
-    border: none !important;
-}
-
-.no-background {
-    background: none;
-}
-
-.tiny-btn {
-    width: 14px;
-    height: 14px;
-    text-align: center;
-    line-height: 14px;
-    font-size: 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: 3px;
-    cursor: pointer;
-    padding: 0;
-    vertical-align: middle;
 }
 
 .small-btn {
@@ -2136,52 +2855,6 @@ hr {
     justify-content: center;
 }
 
-.medium-btn {
-    width: 22px;
-    height: 22px;
-    font-size: 14px;
-    line-height: 22px;
-    padding: 0;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    border: 1px solid transparent;
-    background: transparent;
-}
-
-.medium-btn:hover {
-
-    background: #C33D3580;
-    border: 1px solid #C33D35;
-    border-radius: 6px;
-}
-
-.header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 0.6em;
-    margin-bottom: 0.6em;
-}
-
-.header-title-group {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
-.header-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    flex-shrink: 0;
-}
-
-.header-row h3 {
-    margin: 0;
-}
-
 .data-source-label {
     font-size: 0.7em;
     color: var(--text-faint);
@@ -2194,60 +2867,6 @@ hr {
 
 .data-source-label:empty {
     display: none;
-}
-
-.button-group {
-    display: inline-flex;
-    background: #403C5320;
-    outline: 1px solid var(--brand-border);
-    border-radius: 6px;
-    margin-right: 6px;
-    gap: 1px;
-}
-
-/* Labeled app action toolbar (replaces the row of bare-emoji header buttons). */
-.app-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px;
-    margin-bottom: 8px;
-}
-
-.toolbar-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--text-strong);
-    background: var(--surface-3);
-    border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    padding: 3px 8px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-
-.toolbar-pill:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-.toolbar-pill.highlight,
-.toolbar-pill.active {
-    background: var(--accent-text);
-    color: #fff;
-    border-color: var(--accent-text);
-}
-
-.button-separator {
-    display: inline-block;
-    width: 1px;
-    height: 1.2rem;
-    background-color: #403C53;
-    margin: 0 0.1em;
-    vertical-align: middle;
 }
 
 .info-btn {
@@ -2271,17 +2890,12 @@ hr {
 }
 
 .toggle-section-btn:hover {
-    border-color: #C33D35;
+    border-color: var(--accent-text);
     color: var(--accent-text);
 }
 
 .small-btn.red:hover {
     border: 1px solid var(--brand-border) !important;
-}
-
-.small-text {
-    font-size: 12px;
-    line-height: 19px;
 }
 
 .extra-small {
@@ -2307,28 +2921,16 @@ hr {
     cursor: default;
 }
 
-.showOnLoad {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.hideOnLoad {
-    opacity: 1;
+/* A titled disabled control keeps its pointer events, because the tooltip
+   layer is delegated: with pointer-events none the hover never reaches the
+   element and the one thing the user needs — WHY it is disabled ("Nothing to
+   undo") — is unreadable. The clicks that come back with it are swallowed at
+   the document in initUiTooltips. `data-tip` is the same element mid-hover,
+   after the layer stashes the title away. */
+.disabled[title],
+.disabled[data-tip] {
     pointer-events: auto;
-    height: auto;
-}
-
-.disabled-header {
-    cursor: default !important;
-    pointer-events: none;
-}
-
-#appHeader:not(.disabled-header) {
-    cursor: pointer;
-}
-
-#appHeader.compact-header {
-    font-size: 1.0em;
+    cursor: not-allowed;
 }
 
 /*************************
@@ -2343,6 +2945,19 @@ hr {
     margin: 0;
     padding: 0;
     pointer-events: none;
+}
+
+/* A 0x0 transparent input cannot show a ring, but the browser drew one anyway:
+   a black speck floating beside the filter row with no control under it. Hand
+   the ring to the box the user can actually see. */
+.hidden-checkbox:focus-visible {
+    outline: none;
+}
+
+.hidden-checkbox:focus-visible + .checkbox,
+.hidden-checkbox:focus-visible + .custom-checkbox {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
 }
 
 .checkboxWrapper {
@@ -2363,6 +2978,17 @@ hr {
     padding-left: 2px;
     flex-grow: 1;
     font-size: 12px;
+    /* Long property names wrap (breaking mid-word if unavoidable) so the
+       control column never drops below its readable minimum — but clamp at two
+       lines with an ellipsis; the full name lives in the title tooltip. Two
+       lines, not one: sibling properties often differ only in a long suffix,
+       and a one-line clamp would render them identically. */
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
 }
 
 .checkbox {
@@ -2418,21 +3044,19 @@ hr {
 }
 
 
-.checkbox-red,
 .checkbox-green {
     color: var(--accent-text);
-    border: 1px solid #C33D35;
+    border: 1px solid var(--accent-text);
     border-radius: 3px;
 }
 
-.checkbox-red:hover,
 .checkbox-green:hover {
     border-color: var(--text);
 }
 
 input:checked + .checkbox-green {
     color: var(--success-text);
-    border-color: #015C0C;
+    border-color: var(--success-text);
 }
 
 input:checked + .checkbox-green::after {
@@ -2452,26 +3076,9 @@ input:checked + .checkbox-green::after {
     transform: translate(-50%, -50%);
 }
 
-/*************************
- edit button and related
- **************************/
-
-.edit-btn {
-    box-shadow: none;
-    transition: box-shadow 0.2s ease-in-out;
-}
-
-.edit-btn.active {
-    box-shadow: 0 0 5px #C33D35;
-}
-
 .highlight {
     box-shadow: 0 0 5px #C33D35;
     border-radius: 6px;
-}
-
-.edit-container {
-    height: auto !important;
 }
 
 /*************************
@@ -2513,8 +3120,36 @@ input:checked + .checkbox-green::after {
     border-left: 1px solid var(--brand-border);
 }
 
-.pm-group:hover {
-    border-color: #C33D35;
+/* Per-row actions sit on every single filter row, so at full strength they
+   out-shout the properties. Quieted by COLOR, not opacity — they are non-text
+   controls owing 3:1, and dimming the token below --border would fail it.
+   .filter-row is display:contents and therefore has no box to hover, so the
+   transition keys off the controls themselves. */
+#filterContainer .filter-row-col3 .pm-group {
+    border-color: var(--border);
+    background: transparent;
+}
+
+#filterContainer .filter-row-col3 .plus-minus-button {
+    color: var(--text-faint);
+}
+
+#filterContainer .filter-row-col3 .pm-group:hover .plus-minus-button,
+#filterContainer .filter-row-col3 .pm-group:focus-within .plus-minus-button {
+    color: var(--text-strong);
+}
+
+/* Transparent at rest is what keeps these quiet; transparent at 2.5x is a
+   control with the group chip and the row behind it showing through its
+   middle. Opaque the moment it grows. */
+#filterContainer .filter-row-col3 .pm-group:hover,
+#filterContainer .filter-row-col3 .pm-group:focus-within {
+    background: var(--surface-3);
+}
+
+.pm-group:hover,
+.pm-group:focus-within {
+    border-color: var(--accent-text);
     transform: scale(2.5);
     z-index: 99;
 }
@@ -2532,59 +3167,6 @@ input:checked + .checkbox-green::after {
 /*************************
  style button and row
  **************************/
-
-.style-container {
-    border: 1px solid #c33d35;
-    border-radius: 3px;
-    display: grid;
-    grid-template-columns: 1fr 3fr;
-    gap: 10px;
-    margin-top: 6px;
-    margin-bottom: 6px;
-    padding: 4px;
-}
-
-.style-icon-button {
-    width: 17px;
-    height: 17px;
-    border: 1px solid transparent;
-    border-radius: 3px;
-}
-
-.style-icon-button:hover {
-    border: 1px solid var(--brand-border);
-    cursor: pointer;
-}
-
-.style-row-bottom-border {
-    border-bottom: 1px solid #403C5380;
-    padding-bottom: 4px;
-}
-
-.style-row {
-    display: none;
-    width: 0;
-    height: 0;
-    overflow: hidden;
-    transition: width 0.2s ease-in-out, height 0.2s ease-in-out;
-}
-
-.style-row.show {
-    display: block;
-    width: auto;
-    height: auto;
-}
-
-.style-col1-heading {
-    text-align: start;
-    font-size: 14px;
-}
-
-.style-col2-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-}
 
 .style-inner-button {
     display: flex;
@@ -2605,7 +3187,7 @@ input:checked + .checkbox-green::after {
 
 .style-inner-button:hover {
     color: var(--accent-text);
-    border: 1px solid #C33D35;
+    border: 1px solid var(--accent-text);
 }
 
 .style-color-button-container {
@@ -2638,29 +3220,6 @@ input:checked + .checkbox-green::after {
     height: 18px;
     box-sizing: border-box;
     font-size: 12px;
-}
-
-.style-separator {
-    grid-column: 1 / -1;
-    height: 0.02em;
-    background-color: #c33d35;
-}
-
-.style-line-break {
-    display: block;
-    width: 100%;
-    height: 0;
-}
-
-.style-vr {
-    background-color: #C33D35;
-}
-
-.style-vr-label {
-    color: #E4E3EA;
-    background-color: #403C53;
-    border-radius: 3px;
-
 }
 
 .style-slider-container {
@@ -2851,94 +3410,6 @@ div[slider] > input[type=range]::-ms-tooltip {
     display: none;
 }
 
-[slider] > div > [sign] {
-    opacity: 0;
-    /* Fixed so the bubble escapes the sidebar's three overflow-clipping
-       ancestors and can extend into the canvas. JS (positionSigns) sets
-       top/left in viewport coordinates on hover. */
-    position: fixed;
-    margin-left: 0;
-    z-index: 9999;
-    background-color: #C33D35;
-    border: 1px solid var(--brand-border);
-    color: #E4E3EA;
-    width: 32px;
-    height: 24px;
-    border-radius: 28px;
-    -webkit-border-radius: 28px;
-    align-items: center;
-    -webkit-justify-content: center;
-    justify-content: center;
-    text-align: center;
-    pointer-events: none;
-    transition: opacity 0.2s ease-in-out;
-}
-
-[slider] > div > [sign].left {
-    white-space: nowrap;
-}
-
-[slider] > div > [sign].right {
-    white-space: nowrap;
-}
-
-/* Flipped state for labels */
-[slider] > div > [sign].left.flipped {
-    transform: translateX(12px); /* Move closer to the slider to fill the gap */
-}
-
-[slider] > div > [sign].right.flipped {
-    transform: translateX(-12px); /* Move closer to the slider to fill the gap */
-}
-
-[slider] > div > [sign].left:after {
-    position: absolute;
-    content: '';
-    top: 50%;
-    right: -10px; /* controls horizontal position of left tooltip anchor */
-    transform: translateY(-50%);
-    border-top: 6px solid transparent;
-    border-bottom: 6px solid transparent;
-    border-left: 8px solid var(--brand-border);
-}
-
-[slider] > div > [sign].right:after {
-    position: absolute;
-    content: '';
-    top: 50%;
-    left: -10px; /* controls horizontal position of right tooltip anchor */
-    transform: translateY(-50%);
-    border-top: 6px solid transparent;
-    border-bottom: 6px solid transparent;
-    border-right: 8px solid var(--brand-border);
-}
-
-[slider] > div > [sign].left.flipped:after {
-    right: auto;
-    left: -10px; /* Reverses the arrow position */
-    border-left: none;
-    border-right: 8px solid #C33D35; /* Reverse the arrow direction */
-}
-
-[slider] > div > [sign].right.flipped:after {
-    left: auto;
-    right: -10px; /* Reverses the arrow position */
-    border-right: none;
-    border-left: 8px solid #C33D35; /* Reverse the arrow direction */
-}
-
-[slider] > div > [sign] > span {
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 14px;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-}
-
-[slider]:hover > div > [sign] {
-    opacity: 1;
-}
 
 /*************************
  toggle switch css start
@@ -3005,210 +3476,272 @@ input:checked + .slider:before {
 }
 
 /*************************
- Round 4-way circle button
+ Bubble group controls
  **************************/
 
-.circle-button {
-    position: relative;
+/* The per-filter-row group control. 18px is what filter-row-col3 allows, so it
+   shows ONE colour plus a ring meaning "and others" — N colours are not legible
+   at this size and a conic pie would rebuild the 2x2 quadrant wedges this
+   replaced. The tooltip and the menu carry the exact membership.
+   ponytail: 18px misses WCAG 2.5.8's 24px target — the same app-wide issue the
+   rail's icon buttons have; fix globally, not here. */
+.group-chip {
     width: 18px;
     height: 18px;
-    border-radius: 50%;
-    overflow: hidden;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    transition: transform 0.2s ease;
-}
-
-.circle-button:hover {
-    transform: translateX(-75%) scale(2.5);
-    cursor: pointer;
-    z-index: 99;
-}
-
-.circle-button-compact {
-    position: relative;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    overflow: hidden;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    transition: transform 0.2s ease;
-    vertical-align: middle;
-    border: 1px solid var(--border-strong);
-    box-sizing: border-box;
-}
-
-.circle-button-compact:hover {
-    transform: translate(-100%, 75%) scale(4);
-    cursor: pointer;
-    z-index: 99;
-}
-
-.manual-group-container {
-    display: inline-block;
-    vertical-align: middle;
-    line-height: 0;
-    margin-left: 2px;
-}
-
-.manual-group-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
-/* One clickable badge per active manual group: ●count in the group colour,
-   with an ✕ that fades in on hover to signal it clears just that group. */
-.manual-group-badge {
-    font: inherit;
-    font-size: 12px;
-    font-weight: bold;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    padding: 2px 5px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.manual-group-badge:hover,
-.manual-group-badge:focus-visible {
-    border-color: var(--border-soft);
-    background: var(--input-bg);
-}
-
-.mg-badge-x {
-    font-size: 10px;
-    color: var(--text-muted);
-    opacity: 0;
-    transition: opacity 0.15s ease;
-}
-
-.manual-group-badge:hover .mg-badge-x,
-.manual-group-badge:focus-visible .mg-badge-x {
-    opacity: 1;
-}
-
-/* Red text-button variant (e.g. "Clear all"). */
-.sel-hud-btn.red {
-    color: var(--danger-text);
-}
-
-.sel-hud-btn.red:hover {
-    border-color: var(--danger-text);
-    color: var(--danger-text);
-}
-
-.quadrant {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    border: 10px solid transparent;
-    box-sizing: border-box;
-    clip-path: inset(0 0 0 0);
-    transition: background-color 0.3s ease, border-color 0.3s ease;
-    pointer-events: all;
-    cursor: pointer;
+    flex: 0 0 18px;
     padding: 0;
-    margin: 0;
-    outline: none;
-    background: transparent none;
-    font: inherit;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-}
-
-:root {
-  --groupOne-color: var(--brand-text);
-  --groupTwo-color: var(--accent-text);
-  --groupThree-color: #EFB0AA;
-  --groupFour-color: #8CA6D9;
-}
-
-.top-left {
-    --quadrant-color: var(--groupOne-color);
-    clip-path: polygon(0 0, 50% 0, 50% 50%, 0 50%);
-    border-top-left-radius: 50%;
-    border-width: 0.125rem;
-    border-left-color: var(--quadrant-color);
-    border-top-color: var(--quadrant-color);
-    background-color: var(--surface-3);
-}
-
-.top-left.active {
-    background-color: var(--quadrant-color);
-    border-left-color: var(--border-strong);
-    border-top-color: var(--border-strong);
-}
-
-.top-right {
-    --quadrant-color: var(--groupTwo-color);
-    clip-path: polygon(50% 0, 100% 0, 100% 50%, 50% 50%);
-    border-width: 0.125rem;
-    border-top-right-radius: 50%;
-    border-right-color: var(--quadrant-color);
-    border-top-color: var(--quadrant-color);
-    background-color: var(--surface-3);
-}
-
-.top-right.active {
-    background-color: var(--quadrant-color);
-    border-right-color: var(--border-strong);
-    border-top-color: var(--border-strong);
-}
-
-.bottom-left {
-    --quadrant-color: var(--groupThree-color);
-    clip-path: polygon(0 50%, 50% 50%, 50% 100%, 0 100%);
-    border-width: 0.125rem;
-    border-bottom-left-radius: 50%;
-    border-left-color: var(--quadrant-color);
-    border-bottom-color: var(--quadrant-color);
-    background-color: var(--surface-3);
-}
-
-.bottom-left.active {
-    background-color: var(--quadrant-color);
-    border-left-color: var(--border-strong);
-    border-bottom-color: var(--border-strong);
-}
-
-.bottom-right {
-    --quadrant-color: var(--groupFour-color);
-    clip-path: polygon(50% 50%, 100% 50%, 100% 100%, 50% 100%);
-    border-width: 0.125rem;
-    border-bottom-right-radius: 50%;
-    border-right-color: var(--quadrant-color);
-    border-bottom-color: var(--quadrant-color);
-    background-color: var(--surface-3);
-}
-
-.bottom-right.active {
-    background-color: var(--quadrant-color);
-    border-right-color: var(--border-strong);
-    border-bottom-color: var(--border-strong);
-}
-
-.top-left.compact, .top-right.compact, .bottom-left.compact, .bottom-right.compact {
-    border-width: 1px;
-}
-
-.top-left.compact.active, .top-right.compact.active, .bottom-left.compact.active, .bottom-right.compact.active {
-    border: none;
-}
-
-.quadrant:hover {
-    /*background-color: rgba(255, 255, 255, 0.4);*/
-    /*filter: grayscale(0%);*/
+    border-radius: 50%;
+    border: 1.5px dashed var(--text-faint);
+    background: transparent;
     cursor: pointer;
+    display: inline-flex;
+    vertical-align: middle;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.group-chip:hover {
+    transform: scale(1.15);
+}
+
+.group-chip:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+/* A miniature of the bubble: the group's fill inside its stroke colour. */
+.group-chip.assigned {
+    border-style: solid;
+    border-width: 2px;
+    border-color: var(--chip-border, var(--chip-color));
+    background: var(--chip-color);
+}
+
+/* In several groups: an inset ring reads as "there is more here" without
+   pretending to name the others. The ring is a notch cut out of the fill, so it
+   takes the panel's own background — `--surface-1` was never defined in either
+   theme, which made the shadow compute to `none` and the state invisible. */
+.group-chip.multi {
+    box-shadow: inset 0 0 0 2px var(--input-bg);
+}
+
+#filterContainer.locked .group-chip {
+    pointer-events: none;
+    opacity: 0.4;
+}
+
+/* --- the Groups list (Overlays > Groups) -------------------------------- */
+
+.group-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 10px 0;
+}
+
+.group-empty {
+    margin: 4px 0 8px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
+/* Each group is a card, not a table row: at one hairline apart, a list of five
+   read as an undifferentiated block, and the open one has a settings pane
+   inside it that has to be visibly part of THAT group. */
+.group-row {
+    padding: 6px;
+    border: 1px solid var(--border-soft);
+    border-radius: 7px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.group-row:hover {
+    border-color: var(--border-strong);
+}
+
+/* The open row carries its own settings, so it reads as a container rather
+   than a highlighted line. Its edge takes the GROUP's colour (set inline), not
+   the accent: a red frame beside the group's own swatch reads as an error, and
+   this ties the open panel to the bubble it belongs to. */
+.group-row.active {
+    background: var(--surface-2);
+    border-color: var(--border-strong);
+    border-left: 3px solid var(--row-color, var(--border-strong));
+    padding-left: 4px;
+    cursor: default;
+}
+
+.group-row-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* The disclosure. Universal "there is more under this", and the settings really
+   are under this row now. */
+.group-row-chevron {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 10px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.group-row-chevron:hover {
+    color: var(--text-strong);
+}
+
+/* A native colour input is the whole swatch: the platform picker beats any
+   palette we would hand-roll, and it is keyboard accessible for free. */
+.group-swatch {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+}
+
+.group-swatch::-webkit-color-swatch-wrapper { padding: 2px; }
+.group-swatch::-webkit-color-swatch { border: none; border-radius: 2px; }
+.group-swatch::-moz-color-swatch { border: none; border-radius: 2px; }
+
+/* Looks like text until you touch it — the name is read far more often than
+   it is edited, and a field per row would make the list read as a form. */
+.group-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 2px 4px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-strong);
+    font-size: 12px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+}
+
+.group-name:hover {
+    border-color: var(--border-soft);
+}
+
+.group-name:focus {
+    border-color: var(--accent-text);
+    background: var(--input-bg);
+    outline: none;
+    text-overflow: clip;
+}
+
+.group-count {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.group-row-toggle {
+    flex: 0 0 auto;
+    min-width: 34px;
+    height: 22px;
+    padding: 0 6px;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--text-strong);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.group-row-toggle:hover:not(.disabled) {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+.group-row-toggle.remove:not(.disabled) {
+    color: var(--danger-text);
+    border-color: var(--danger-text);
+}
+
+.group-row-more {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.group-row-more:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+/* The line the old UI never showed: a group can be fed by a live filter AND a
+   hand-picked node set at the same time. Two parts, so "follows a filter" and
+   "someone put these here" do not run together into one cryptic string. */
+.group-row-source {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    margin: 3px 0 0 24px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.group-list-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.group-style-panel:empty {
+    display: none;
+}
+
+/* Inside the open row, so it needs its own edge against the row's fill. */
+.group-row .group-style-panel {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border-soft);
+}
+
+/* --- the shared group menu ---------------------------------------------- */
+
+.group-menu-dot {
+    width: 10px;
+    height: 10px;
+    flex: 0 0 10px;
+    border-radius: 50%;
+    border: 1px solid var(--border-soft);
+}
+
+.group-menu-hint {
+    padding: 6px 10px;
+    max-width: 220px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.rail-menu-item.partial .rail-menu-check {
+    color: var(--text-muted);
 }
 
 /*************************
@@ -3265,7 +3798,7 @@ input:checked + .slider:before {
     border-radius: 3px;
     border-top: none;
     background-color: var(--input-bg);
-    z-index: 1000;
+    z-index: var(--z-menu);
     width: auto;
     list-style: none;
     text-align: left;
@@ -3301,7 +3834,7 @@ input:checked + .slider:before {
     height: 14px;
     flex-shrink: 0;
     margin-right: 10px;
-    border: 1px solid #C33D35;
+    border: 1px solid var(--accent-text);
     border-radius: 3px;
     background-color: var(--input-bg);
     vertical-align: middle;
@@ -3361,92 +3894,167 @@ input:checked + .slider:before {
  network metrics
  **************************/
 .nw-root {
-    margin-right: 10px;
-    max-width: 350px;
-    overflow: hidden;
-    max-height: 0;
-    opacity: 0;
-    transition: max-height 0.3s ease-in-out,
-    opacity 0.3s ease-in-out;
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 16px;
+    align-items: stretch;
+    padding: 10px 0 12px;
+    box-sizing: border-box;
 }
 
-.nw-root.open {
-    max-height: 999px;
-    opacity: 1;
+.nw-col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
 }
 
-.nw-header {
-    font-size: 16px;
-    margin-top: 0.8em;
-    margin-bottom: 0.8em;
-    font-weight: bold;
+.nw-col-ranking {
+    flex: 1 1 auto;
+    gap: 8px;
+}
+
+/* The summary is a fixed-width companion: it holds ~6 short rows, so giving
+   it a share of a wide frame would just stretch whitespace. */
+.nw-col-summary {
+    flex: 0 0 clamp(220px, 28%, 340px);
+    gap: 6px;
+    overflow-y: auto;
+}
+
+/* Shown instead of a stale ranking when the visible graph is too small to
+   score — the panel used to keep the previous subgraph's numbers. */
+.nw-empty {
+    margin: 0;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
 }
 
 .nw-subheader {
-    font-size: 14px;
-    font-weight: bold;
-    margin-top: 0.8em;
-    margin-bottom: 0.8em;
-}
-
-.nw-div {
-    margin-top: 16px;
-}
-
-.nw-button {
-    margin: 1px;
-    font-size: 12px;
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
 }
 
 .nw-metric-select-container {
     display: flex;
     align-items: center;
-    gap: 5px;
-    margin-bottom: 0.5em;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 
 .nw-metric-select {
-    width: 100%;
-    height: 18px;
+    flex: 0 1 240px;
+    height: 26px;
+    padding: 0 6px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-strong);
+    background: var(--input-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
 }
 
+.nw-button {
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-strong);
+    background: var(--input-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.nw-button:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+/* Fills whatever height the workbench has — the point of the wide frame is
+   that the ranking is finally readable without scrolling a 120px box. */
 .nw-node-multiselect {
+    flex: 1 1 auto;
+    min-height: 90px;
     width: 100%;
-    min-height: 120px;
+    box-sizing: border-box;
     overflow-y: auto;
-    margin-bottom: 0.5em;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--input-bg);
+    padding: 2px;
 }
 
 .nw-node-multiselect option {
     font-size: 12px;
-    white-space: normal;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 
 .nw-graph-metrics-table {
     border-collapse: collapse;
     width: 100%;
     font-size: 13px;
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    overflow: hidden;
 }
 
 .nw-graph-metrics-table tr:hover {
-    background-color: var(--surface-3);
+    background-color: var(--input-bg);
 }
 
 .nw-graph-metrics-table td {
-    border-bottom: 1px solid #E4E3EA;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-soft);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
+.nw-graph-metrics-table tr:last-child td {
+    border-bottom: none;
+}
+
 .nw-graph-metrics-table td:first-child {
-    width: 80%;
+    width: 70%;
+    color: var(--text-muted);
 }
 
 .nw-graph-metrics-table td:last-child {
-    width: 20%;
+    width: 30%;
     text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-strong);
+}
+
+/* Below ~760px the two columns no longer both fit; stack them. */
+@media (max-width: 760px) {
+    .nw-root {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .nw-col-summary {
+        flex: 0 0 auto;
+    }
+
+    .nw-node-multiselect {
+        flex: 0 0 160px;
+    }
 }
 
 /*************************
@@ -3458,7 +4066,7 @@ input:checked + .slider:before {
     border-radius: 8px;
     border: 2px solid var(--brand-border);
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
-    z-index: 10002;
+    z-index: calc(var(--z-modal) + 1);
     max-width: 90vw;
     max-height: 90vh;
     overflow: hidden;
@@ -3524,7 +4132,7 @@ input:checked + .slider:before {
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
-    z-index: 10001;
+    z-index: var(--z-modal);
 }
 
 .p-icon {
@@ -3554,9 +4162,17 @@ input:checked + .slider:before {
     cursor: pointer;
 }
 
-.p-button:hover {
+.p-button:hover:not(:disabled) {
     background-color: #C33D35;
     border-color: #C33D35;
+}
+
+/* Neo4j's Fetch and the assistant's Save disable natively, and without this a
+   dead button looked live and still lit up on hover. Dimming the button it
+   already is beats repainting it, so each variant keeps its own colour. */
+.p-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .p-button-primary {
@@ -3564,7 +4180,7 @@ input:checked + .slider:before {
     border-color: #015C0C;
 }
 
-.p-button-primary:hover {
+.p-button-primary:hover:not(:disabled) {
     background-color: #018a12;
     border-color: #018a12;
 }
@@ -3575,7 +4191,7 @@ input:checked + .slider:before {
     color: white;
 }
 
-.p-button-secondary:hover {
+.p-button-secondary:hover:not(:disabled) {
     background-color: #6b6d78;
     border-color: #6b6d78;
 }
@@ -3977,14 +4593,6 @@ input:checked + .slider:before {
     }
 }
 
-.editor-help-icon {
-    display: flex;
-    flex-direction: column;
-    flex: 0 0 2%;
-    align-items: center;
-}
-
-
 .editor-panel {
     position: relative;
     flex: 1;
@@ -3994,19 +4602,6 @@ input:checked + .slider:before {
     border-radius: 3px;
     box-sizing: border-box;
     background: var(--input-bg);
-}
-
-#dataTextArea {
-    width: 100%;
-    height: 100%;
-    font-family: "Courier New", monospace;
-    font-size: 12px;
-    line-height: 1.5;
-    border: none;
-    outline: none;
-    resize: none;
-    padding: 4px;
-    box-sizing: border-box;
 }
 
 .panel-header-center-buttons .data-buttons,
@@ -4312,10 +4907,6 @@ input:checked + .slider:before {
   font-size: 12px;
 }
 
-.data-table-header-property.size-xl {
-  font-size: 12px;
-}
-
 .data-table-sort-indicator {
   position: absolute;
   top: 2px;
@@ -4380,10 +4971,6 @@ input:checked + .slider:before {
     display: inline-flex;
 }
 
-.data-table-apply-button {
-
-}
-
 .data-table-tabs {
   display: flex;
   gap: 4px;
@@ -4424,16 +5011,16 @@ input:checked + .slider:before {
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 10000;
+    z-index: var(--z-scrim);
     pointer-events: none;
     background: rgba(0, 0, 0, 0.5);
 }
 
 .tour-highlight {
     position: fixed;
-    border: 3px solid #C33D35;
+    border: 3px solid var(--accent-text);
     border-radius: 6px;
-    z-index: 10001;
+    z-index: var(--z-modal);
     pointer-events: none;
     box-sizing: border-box;
     animation: tour-pulse 1.5s ease-in-out infinite;
@@ -4506,6 +5093,12 @@ input:checked + .slider:before {
     gap: 6px;
 }
 
+/* Left edge, so it never sits next to Next as a mis-click. Absent on the last
+   step, where Back/Finish stay right-aligned on their own. */
+.tour-btn-skip {
+    margin-right: auto;
+}
+
 .tour-btn-next {
     background-color: #015C0C;
     border-color: #015C0C;
@@ -4514,11 +5107,6 @@ input:checked + .slider:before {
 .tour-btn-next:hover {
     background-color: #018a12;
     border-color: #018a12;
-}
-
-.tour-btn-prev {
-    background-color: #878996;
-    border-color: #878996;
 }
 
 .tour-green {
@@ -4534,7 +5122,7 @@ input:checked + .slider:before {
 #landingPage {
     position: fixed;
     inset: 0;
-    z-index: 10000;
+    z-index: var(--z-scrim);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -4661,7 +5249,7 @@ input:checked + .slider:before {
 }
 
 .landing-card:hover {
-    border-color: #C33D35;
+    border-color: var(--accent-text);
     transform: translateY(-1px);
     box-shadow: 0 4px 16px rgba(195, 61, 53, 0.12);
 }
@@ -4679,6 +5267,48 @@ input:checked + .slider:before {
     font-size: 0.75em;
     color: var(--text-faint);
     line-height: 1.4;
+}
+
+/* Actions gated on WebGL2 (gll.js disables them when the probe fails).
+   :hover still matches disabled buttons, so the lift/glow needs neutralizing. */
+
+.landing-browse-btn:disabled,
+.landing-card:disabled,
+.landing-browse-btn:disabled:hover,
+.landing-card:disabled:hover {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+    border-color: var(--border-soft);
+}
+
+/* Hover-only repaints, undone so the disabled state stays flat. */
+.landing-browse-btn:disabled:hover {
+    background: #403C53;
+}
+
+/* WebGL2 warning banner — same .webgl-error markup as the dead stage, but a
+   banner here instead of a full-height centered panel. */
+
+#landingWebglWarning {
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    border: 1px solid var(--danger-text);
+    border-radius: 8px;
+    color: var(--danger-text);
+    text-align: center;
+}
+
+#landingWebglWarning .webgl-error-title {
+    margin: 0;
+    font-weight: 600;
+    font-size: 0.85em;
+}
+
+#landingWebglWarning .webgl-error-hint {
+    margin: 6px 0 0;
+    font-size: 0.75em;
 }
 
 /* footer */
@@ -4724,46 +5354,7 @@ input:checked + .slider:before {
     display: none;
 }
 
-/* ── AI Assistant sidebar ─────────────────────────────────────── */
-
-#assistantSidebar {
-    min-width: 0;
-    width: 0;
-    background-color: var(--surface);
-    overflow: hidden;
-    transition: width 0.3s ease-in-out, min-width 0.3s ease-in-out;
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    border-left: 0 solid var(--border);
-    position: relative;
-}
-
-#assistantSidebar.active {
-    min-width: var(--assistant-width, 380px);
-    width: var(--assistant-width, 380px);
-    border-left: 1px solid var(--border);
-}
-
-.assistant-resize-handle {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 4px;
-    background: transparent;
-    cursor: ew-resize;
-    z-index: 1000;
-}
-
-.assistant-resize-handle:hover {
-    background: #403C53;
-}
-
-#assistantSidebar .panel-header {
-    background-color: #403C53;
-    color: white;
-}
+/* ── AI Assistant (workbench tab) ─────────────────────────────── */
 
 #assistantMessages {
     flex: 1;
@@ -4773,12 +5364,6 @@ input:checked + .slider:before {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
-
-#assistantSidebar.active #assistantMessages {
-    opacity: 1;
 }
 
 .assistant-bubble {
@@ -4788,7 +5373,9 @@ input:checked + .slider:before {
     line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-word;
-    max-width: 92%;
+    /* The pane is full-width, but a prose line is unreadable past ~90ch —
+       cap the bubble, not the pane. */
+    max-width: min(92%, 82ch);
 }
 
 .assistant-bubble-user {
@@ -5414,19 +6001,31 @@ input:checked + .slider:before {
 #assistantEmptyState {
     display: none;
     flex: 1;
+    /* The workbench is short and wide where the old dock was tall and narrow:
+       without min-height/overflow these centred chips grow the pane and push
+       the input row out of sight. `safe center` keeps the top reachable once
+       the content is taller than the space. */
+    min-height: 0;
+    overflow-y: auto;
     flex-direction: column;
-    justify-content: center;
+    justify-content: safe center;
     align-items: center;
     text-align: center;
-    padding: 24px 20px;
+    padding: 16px 20px;
     color: var(--text-faint);
     gap: 8px;
 }
 
 /* The empty-state is shown when there are no message bubbles. Using :has()
-   keeps this purely CSS-driven — no JS tracking of "did we already greet". */
-#assistantSidebar:has(#assistantMessages:empty) #assistantEmptyState {
+   keeps this purely CSS-driven — no JS tracking of "did we already greet".
+   The (empty) message list is hidden with it so the two don't split the
+   available height between them. */
+#assistantPane:has(#assistantMessages:empty) #assistantEmptyState {
     display: flex;
+}
+
+#assistantPane:has(#assistantMessages:empty) #assistantMessages {
+    display: none;
 }
 
 .assistant-empty-state-title {
@@ -5507,13 +6106,7 @@ input:checked + .slider:before {
     padding: 8px 10px;
     border-top: 1px solid var(--border);
     background-color: var(--surface);
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
     flex-shrink: 0;
-}
-
-#assistantSidebar.active #assistantInputRow {
-    opacity: 1;
 }
 
 #assistantInput {
@@ -5815,7 +6408,7 @@ input:checked + .slider:before {
     flex-direction: column;
     gap: 4px;
     padding: 8px 10px;
-    border: 1px solid #dde2ec;
+    border: 1px solid var(--border-soft);
     border-radius: 4px;
 }
 
@@ -5835,16 +6428,190 @@ input:checked + .slider:before {
 }
 
 .assistant-budget-modal-fits {
-    color: #2b7a3a;
+    color: var(--success-text);
 }
 
 .assistant-budget-modal-overflow {
-    color: #a33;
+    color: var(--danger-text);
 }
 
 .assistant-budget-modal-action-danger {
-    border-color: #e3b5b5;
-    background-color: #fdf7f7;
+    border-color: var(--danger-text);
+    background-color: var(--surface-2);
+}
+
+/*************************
+ Neo4j Connector
+ **************************/
+.neo4j-field {
+    margin-bottom: 12px;
+}
+
+.neo4j-field label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: var(--text-strong);
+}
+
+.neo4j-field .p-prompt {
+    margin-top: 0;
+    background-color: var(--input-bg);
+    color: var(--text);
+}
+
+.neo4j-field-row {
+    display: flex;
+    gap: 10px;
+}
+
+.neo4j-field-row .neo4j-field {
+    flex: 1;
+}
+
+.neo4j-query {
+    font-family: monospace;
+    resize: vertical;
+}
+
+.neo4j-hint {
+    font-size: 12px;
+    color: var(--text-faint);
+}
+
+.neo4j-info {
+    padding: 10px 12px;
+    background-color: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+/* Browser-default link blue is illegible on the dark surface. */
+.neo4j-info a {
+    color: var(--brand-text);
+}
+
+.neo4j-error {
+    padding: 10px 12px;
+    border: 1px solid var(--danger-text);
+    border-radius: 4px;
+    color: var(--danger-text);
+    font-size: 13px;
+    margin-bottom: 12px;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+
+/* Inline size warning in the expand checklist (sum of checked counts).
+   Colors mirror the --danger-text pattern; #E57B3C fails AA contrast at this size. */
+.neo4j-warning {
+    padding: 10px 12px;
+    border: 1px solid #9a5b1f;
+    border-radius: 4px;
+    color: #9a5b1f;
+    font-size: 13px;
+    margin: 8px 0 12px;
+    overflow-wrap: break-word;
+}
+
+[data-theme="dark"] .neo4j-warning {
+    border-color: #e0a36a;
+    color: #e0a36a;
+}
+
+/* Stitch checkbox in the join-query popup. */
+.neo4j-stitch-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    cursor: pointer;
+}
+
+.neo4j-btn-spinner {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: -1px;
+    animation: neo4j-spin 0.8s linear infinite;
+}
+
+@keyframes neo4j-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.checklist-heading {
+    margin: 12px 0 6px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--brand-text);
+}
+
+.checklist-heading label {
+    cursor: pointer;
+}
+
+.checklist-list {
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    background-color: var(--input-bg);
+}
+
+.checklist-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 2px 8px;
+    align-items: center;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border-soft);
+    cursor: pointer;
+}
+
+.checklist-row:last-child {
+    border-bottom: none;
+}
+
+.checklist-row:hover {
+    background-color: var(--row-hover);
+}
+
+.checklist-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.checklist-type {
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background-color: var(--surface-3);
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.checklist-examples {
+    grid-column: 2 / -1;
+    font-size: 12px;
+    color: var(--text-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* ==== Data editor: Excel import & merge preview ==== */
@@ -5956,4 +6723,335 @@ input:checked + .slider:before {
 
 .merge-join-mode-text strong {
     color: var(--text);
+}
+
+/* Command palette (⌘K). A native <dialog>: Escape, the focus trap and the
+   backdrop come from the platform, so this is styling only. */
+#cmdk {
+    width: min(680px, calc(100vw - 40px));
+    max-height: min(520px, calc(100vh - 120px));
+    margin: 12vh auto auto;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+    overflow: hidden;
+}
+
+#cmdk::backdrop {
+    background: rgba(0, 0, 0, 0.32);
+}
+
+.cmdk-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.cmdk-input-glyph {
+    color: var(--text-faint);
+    font-size: 15px;
+}
+
+#cmdkInput {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: none;
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 15px;
+}
+
+.cmdk-count {
+    flex: none;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.cmdk-results {
+    max-height: 360px;
+    margin: 0;
+    padding: 6px;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.cmdk-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.cmdk-row.active,
+.cmdk-row:hover {
+    background: var(--surface-3);
+}
+
+.cmdk-row.active {
+    box-shadow: inset 0 0 0 1px var(--accent-text);
+}
+
+/* A disabled command is still a live palette row: it reveals the control
+   instead of running it (command_palette.js kind: 'reveal'), which the Enter
+   hint promises. The generic .disabled pointer-events kill made that promise
+   keyboard-only — a mouse click did nothing at all. */
+.cmdk-row.disabled {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.cmdk-row.disabled .cmdk-name {
+    color: var(--text-muted);
+}
+
+.cmdk-glyph {
+    width: 18px;
+    flex: none;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.cmdk-name {
+    color: var(--text-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The breadcrumb is the point of the palette: it teaches where a control
+   lives instead of only firing it. */
+.cmdk-trail {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: right;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cmdk-row kbd,
+.cmdk-foot kbd,
+.rail-vb-t kbd {
+    flex: none;
+    padding: 1px 5px;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-strong);
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+}
+
+.cmdk-foot {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.cmdk-foot kbd {
+    margin-right: 3px;
+}
+
+.cmdk-foot-note {
+    margin-left: auto;
+}
+
+/* Where did it go? — a brief ring on whatever the palette just revealed. A
+   filter row is display:contents, so the ring lands on its cells instead. */
+.cmdk-flash,
+.filter-row.cmdk-flash > * {
+    animation: cmdk-flash 1.2s ease-out;
+    border-radius: 7px;
+}
+
+@keyframes cmdk-flash {
+    0%, 55% { box-shadow: 0 0 0 2px var(--accent-text); }
+    100% { box-shadow: 0 0 0 2px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cmdk-flash {
+        animation-duration: 0.01ms;
+    }
+}
+
+/* --- Text annotations (notes) — annotation_layer.js ----------------------- */
+
+/* Full-stage host; individual notes re-enable pointer events themselves.
+   z-index 5 is LOCAL to the graph container's canvas stack (it only has to beat
+   sigma's own canvases), which is why it is not on the --z-* scale — the minimap
+   at --z-minimap deliberately draws over the notes. */
+.annotation-layer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* Anchored at its graph-space top-left and scaled by 1/zoom via transform;
+   font/color/border/padding are inline (per-note style). content-box keeps
+   the border additive to the padded text box — the same arithmetic the
+   PNG/SVG export painters use (annotation_geometry.js). */
+.annotation-note {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    box-sizing: content-box;
+    pointer-events: auto;
+    cursor: grab;
+    white-space: pre;
+    user-select: none;
+}
+
+.annotation-note.editing {
+    cursor: text;
+    user-select: text;
+    outline: none;
+}
+
+/* One-shot placement catcher: swallows the next click at crosshair, sits
+   above the lasso overlay (900) and below the toolbar (1000). */
+.annotation-placement-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: var(--z-armed-overlay);
+    cursor: crosshair;
+    touch-action: none;
+}
+
+.annotation-popover {
+    position: fixed;
+    z-index: var(--z-popover);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 190px;
+    padding: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    color: var(--text);
+    font-size: 13px;
+}
+
+.annotation-popover-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.annotation-popover-row input[type='number'] {
+    width: 64px;
+}
+
+.annotation-popover-row input[type='color'] {
+    width: 64px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+}
+
+.annotation-popover-delete {
+    margin-top: 4px;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--danger-text);
+    cursor: pointer;
+}
+
+.annotation-popover-delete:hover {
+    border-color: var(--danger-text);
+}
+
+.annotation-popover-pair {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ---------- ui-tip: styled replacement for native title tooltips ---------- */
+
+.ui-tip {
+    position: fixed;
+    z-index: var(--z-tip);
+    max-width: 280px;
+    padding: 6px 9px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.45;
+    /* Titles are authored with \n line breaks and space-indented └─ trees
+       (formatPropsAsTree) — preserve both, still wrap long lines. */
+    white-space: pre-wrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(3px);
+}
+
+.ui-tip.show {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    /* Stays pointer-events: none. A tip is up to 153px tall and lands right on
+       top of whatever is below its anchor — in the filter panel that is four
+       slider rows, whose thumbs then took a click each to reach: the first
+       pointerdown hit the tip. WCAG 1.4.13 hover-persistence is geometric
+       instead, see overTip() in ui_tooltip.js. */
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-tip.show {
+        transition: none;
+    }
+}
+
+.ui-tip-lead {
+    display: block;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.ui-tip kbd {
+    margin-left: 8px;
+    padding: 1px 5px;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-strong);
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    white-space: nowrap;
 }

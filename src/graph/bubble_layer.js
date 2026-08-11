@@ -1,5 +1,5 @@
 /**
- * Browser-only bubble-set rendering layer (MIGRATION.md Phase 4).
+ * Browser-only bubble-set rendering layer.
  *
  * Two 2d canvases registered with sigma: the fill/outline canvas sits ABOVE
  * the node layer (createCanvasContext + afterLayer: "nodes") so the group
@@ -20,8 +20,6 @@
  *     a filter event can never leave a stale outline painted)
  *   - camera pan/zoom → cheap per-frame reprojection of the cached graph
  *     points; the camera is NOT in the identity key, so zoom never re-fits
- * This replaces the G6 plugin's recompute-per-draw churn (the patched
- * updateBubbleSetsPath path coalescing, issue #7195) with an owned cache.
  */
 import { DEFAULTS } from '../config.js';
 import {
@@ -29,18 +27,30 @@ import {
   computeOutlineGeometry,
   polygonSelfIntersects,
   outlineLabelAnchor,
-  idsKey,
-  positionsChecksum,
-  styleKey,
+  resolveBubbleLabel,
+  OUTLINE_STROKE_WIDTH,
 } from './bubble_geometry.js';
+import { idsKey, positionsChecksum, styleKey } from './overlay_keys.js';
 import { smoothClosedPath } from './bubble_smoothing.js';
+import { prepareOverlayCanvas } from './dpr_watch.js';
+import { FrameCoalescer } from './overlay_frame.js';
 
 const LAYER_NAME = 'bubbleSets';
 const LABEL_LAYER_NAME = 'bubbleSetsLabels';
-const OUTLINE_STROKE_WIDTH = 2;
-// Extra screen-px gap (beyond half the font box) between the outline and a
-// label drawn with labelCloseToPath: false.
-const LABEL_STANDOFF_PX = 8;
+// --- refit deferral (drag responsiveness) ----------------------------------
+// Fitting an outline is bubblesets' marching-squares pass over an influence
+// field; on a dense graph with avoidance on it costs far more than a frame.
+// #paint runs on every sigma afterRender, so dragging a member used to re-fit
+// 60×/second and the whole canvas crawled.
+//
+// A fit whose last run stayed inside this budget keeps re-fitting live — small
+// graphs are unaffected and the hull tracks the node exactly as before.
+const CHEAP_FIT_MS = 8;
+// Past it, MEMBERSHIP and STYLE changes still fit immediately (they are
+// discrete user actions), but POSITION changes coast on the cached hull and
+// re-fit once motion stops. The hull lags the node mid-drag and snaps true on
+// release, which is the trade the alternative cannot buy: a locked UI.
+const REFIT_SETTLE_MS = 90;
 
 class BubbleSetLayer {
   /**
@@ -51,6 +61,9 @@ class BubbleSetLayer {
     this.adapter = adapter;
     this.cache = cache;
     this.killed = false;
+    // Layer visibility, driven by the inspector's Overlays stack. Runtime
+    // state like heatmapEnabled — never persisted, resets with the adapter.
+    this.visible = true;
 
     /** @type {Map<string, {members: Map<string, true>, avoidMembers: string[], opts: object}>} */
     this.groups = new Map();
@@ -59,8 +72,14 @@ class BubbleSetLayer {
     /** @type {Map<string, {key: string, graphPoints: Array<{x,y}>, graphHoles: Array<Array<{x,y}>>}>} */
     this.outlines = new Map();
 
-    this.rafHandle = null;
+    this.frame = new FrameCoalescer(() => this.#paint());
     this.lastPaintSignature = null;
+    /** Last fit duration per group, in ms — drives refit deferral. */
+    this.fitDurations = new Map();
+    this.settleHandle = null;
+    // Set while a settled refit is running so #syncGroupOutline stops
+    // deferring and actually fits.
+    this.forceRefit = false;
 
     const sigma = adapter.sigma;
     // createCanvasContext returns the Sigma instance (fluent API); the canvas
@@ -107,10 +126,24 @@ class BubbleSetLayer {
     };
   }
 
+  /**
+   * Forget a group entirely. Without this a deleted group keeps its state slot
+   * and its cached outline, and #drawOutlines keeps painting a hull for a group
+   * that no longer exists.
+   * @param {string} group
+   */
+  removeGroup(group) {
+    this.groups.delete(group);
+    this.outlines.delete(group);
+    this.fitDurations.delete(group);
+    this.scheduleRedraw();
+  }
+
   destroy() {
     if (this.killed) return;
     this.killed = true;
-    if (this.rafHandle !== null) cancelAnimationFrame(this.rafHandle);
+    this.frame.kill();
+    clearTimeout(this.settleHandle);
     this.adapter.sigma.off('afterRender', this.renderHandler);
     // sigma.kill() may or may not remove custom layer canvases; remove() on
     // an already-detached node is a no-op, so drop ours defensively.
@@ -118,12 +151,40 @@ class BubbleSetLayer {
     this.labelCanvas?.remove();
   }
 
+  /** Show or hide every bubble, on screen and in both export paths. */
+  setVisible(visible) {
+    if (this.visible === visible) return;
+    this.visible = visible;
+    this.scheduleRedraw();
+  }
+
   scheduleRedraw() {
-    if (this.killed || this.rafHandle !== null) return;
-    this.rafHandle = requestAnimationFrame(() => {
-      this.rafHandle = null;
-      this.#paint();
-    });
+    this.frame.schedule();
+  }
+
+  /** Did this group's last fit blow the frame budget? */
+  #fitIsExpensive(group) {
+    if (this.forceRefit) return false;
+    return (this.fitDurations.get(group) ?? 0) > CHEAP_FIT_MS;
+  }
+
+  /**
+   * Re-fit every deferred outline once the graph stops moving. Restarted on
+   * each deferred frame, so a continuous drag fits exactly once, on release.
+   */
+  #scheduleSettledRefit() {
+    if (this.killed) return;
+    clearTimeout(this.settleHandle);
+    this.settleHandle = setTimeout(() => {
+      this.settleHandle = null;
+      if (this.killed) return;
+      this.forceRefit = true;
+      try {
+        this.#paint();
+      } finally {
+        this.forceRefit = false;
+      }
+    }, REFIT_SETTLE_MS);
   }
 
   // ------------------------------------------------------------ group state
@@ -170,41 +231,84 @@ class BubbleSetLayer {
     // zoom with members always enclosed.
     let outlinesChanged = false;
     const active = [];
+    // Viewport cull: 1.17 made the group count unbounded (auto-group mints up to
+    // 50), and zoomed into one of them the other 49 were still building a
+    // Path2D, stroking and filling entirely off-canvas. The bbox is graph-space
+    // and cached with the rings, so the test is four comparisons per group.
+    const view = viewportTransform(sigma);
+    const cullRect = view ? visibleGraphRect(view, width, height, CULL_MARGIN_PX) : null;
     for (const [group, state] of this.groups) {
       if (state.members.size === 0) {
         if (this.outlines.delete(group)) outlinesChanged = true;
         continue;
       }
       outlinesChanged = this.#syncGroupOutline(group, state) || outlinesChanged;
-      if (this.outlines.get(group)?.graphPoints.length) active.push([group, state]);
+      const cached = this.outlines.get(group);
+      if (!cached?.graphPoints.length) continue;
+      if (cullRect && cached.bbox && !rectsIntersect(cached.bbox, cullRect)) continue;
+      active.push([group, state]);
     }
+
+    // Hiding paints an empty frame rather than skipping the paint: a skip
+    // would leave the last outlines on a canvas sigma never clears for us.
+    const shown = this.visible ? active : [];
 
     // Skip repainting when neither the outlines nor the view changed (sigma
     // re-renders on hover etc. without clearing custom layers).
     const signature =
       `${width}x${height}x${dpr}|${camera.x},${camera.y},${camera.ratio},${camera.angle}` +
-      `|${active.map(([g]) => g).join(',')}`;
+      `|${shown.map(([g]) => g).join(',')}`;
     if (!outlinesChanged && signature === this.lastPaintSignature) return;
     this.lastPaintSignature = signature;
 
-    this.#prepareCanvas(this.canvas, this.ctx, width, height, dpr);
-    this.#prepareCanvas(this.labelCanvas, this.labelCtx, width, height, dpr);
-    this.#drawOutlines(active, sigma);
+    prepareOverlayCanvas(this.canvas, this.ctx, width, height, dpr);
+    prepareOverlayCanvas(this.labelCanvas, this.labelCtx, width, height, dpr);
+    this.#drawOutlines(shown, sigma, dpr, view);
   }
 
-  /** Reproject each cached graph-space outline to viewport px and paint it. */
-  #drawOutlines(active, sigma) {
+  /**
+   * Paint each cached graph-space outline under the camera transform.
+   *
+   * The path itself is built once per fit, in graph space, and every camera
+   * move is then a `setTransform` rather than a fresh projection and bezier
+   * path per point per frame — which is what made 50 groups over 62k points
+   * cost twelve milliseconds of paint JS per frame. Labels stay in viewport
+   * space (their font size and standoff are screen quantities), so only their
+   * one anchor point is projected.
+   */
+  #drawOutlines(active, sigma, dpr, view) {
+    const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE_TEMPLATE;
+    if (!view) return;
+
+    this.ctx.save();
+    try {
+      this.ctx.setTransform(
+        dpr * view.sx, 0, 0, dpr * view.sy,
+        dpr * view.tx, dpr * view.ty
+      );
+      for (const [group, state] of active) {
+        const cached = this.outlines.get(group);
+        cached.path ??= ringsPath(cached.graphPoints, cached.graphHoles ?? []);
+        // A stroke under a scaled transform would thicken with the zoom.
+        this.#drawGroup(this.ctx, cached.path, state, defaults, Math.abs(view.sx));
+      }
+    } finally {
+      this.ctx.restore();
+    }
+
     for (const [group, state] of active) {
-      // Reprojection assumes camera.angle === 0 (the app never rotates the camera).
+      if (!state.opts.label) continue;
       const cached = this.outlines.get(group);
-      const points = cached.graphPoints.map((p) => sigma.graphToViewport(p));
-      const holes = (cached.graphHoles ?? []).map((h) => h.map((p) => sigma.graphToViewport(p)));
-      const defaults = this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {};
-      const drawn = this.#drawGroup(this.ctx, points, state, defaults, holes);
-      // Labels paint on the top canvas (afterLayer: "labels") so they read
-      // over member-node labels; the body/outline stayed on the bottom one.
-      if (drawn && state.opts.label) {
-        this.#drawLabel(this.labelCtx, points, state.opts, defaults);
+      const placement = state.opts.labelPlacement ?? defaults.labelPlacement ?? 'bottom';
+      if (cached.anchorPlacement !== placement) {
+        // Sigma's map is a uniform scale plus a y flip, so the extreme vertex,
+        // the tangent angle and the outward normal all survive it — only the
+        // anchor's position needs projecting, once per frame.
+        cached.anchor = outlineLabelAnchor(cached.graphPoints, placement);
+        cached.anchorPlacement = placement;
+      }
+      if (cached.anchor) {
+        this.#drawLabel(this.labelCtx, projectAnchor(cached.anchor, view), state.opts, defaults);
       }
     }
   }
@@ -221,7 +325,7 @@ class BubbleSetLayer {
    *   opts: object, defaults: object}>}
    */
   exportOutlines() {
-    const graph = this.adapter.graph;
+    if (!this.visible) return [];
     const sigma = this.adapter.sigma;
     const out = [];
     for (const [group, state] of this.groups) {
@@ -230,12 +334,7 @@ class BubbleSetLayer {
       let graphPoints = cached?.graphPoints;
       let graphHoles = cached?.graphHoles ?? [];
       if (!graphPoints?.length) {
-        const visibleMembers = [];
-        for (const id of state.members.keys()) {
-          if (!graph.hasNode(id)) continue;
-          const attrs = graph.getNodeAttributes(id);
-          if (!attrs.hidden) visibleMembers.push({ id, attrs });
-        }
+        const visibleMembers = this.#visibleNodes(state.members.keys());
         if (visibleMembers.length === 0) continue;
         ({ outer: graphPoints, holes: graphHoles } = this.#fitGraphOutline(state, visibleMembers));
       }
@@ -245,7 +344,7 @@ class BubbleSetLayer {
         points: graphPoints.map((p) => sigma.graphToViewport(p)),
         holes: graphHoles.map((h) => h.map((p) => sigma.graphToViewport(p))),
         opts: state.opts,
-        defaults: this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group] ?? {},
+        defaults: this.cache.DEFAULTS.BUBBLE_GROUP_STYLE_TEMPLATE,
       });
     }
     return out;
@@ -267,7 +366,7 @@ class BubbleSetLayer {
     try {
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
       for (const { points, holes, opts, defaults } of groups) {
-        this.#drawGroup(ctx, points, { opts }, defaults, holes ?? []);
+        this.#drawGroup(ctx, ringsPath(points, holes ?? []), { opts }, defaults);
       }
     } finally {
       ctx.restore();
@@ -287,31 +386,13 @@ class BubbleSetLayer {
     try {
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
       for (const { points, opts, defaults } of groups) {
-        if (opts.label) this.#drawLabel(ctx, points, opts, defaults);
+        if (!opts.label) continue;
+        const placement = opts.labelPlacement ?? defaults.labelPlacement ?? 'bottom';
+        this.#drawLabel(ctx, outlineLabelAnchor(points, placement), opts, defaults);
       }
     } finally {
       ctx.restore();
     }
-  }
-
-  /** Resize (if needed) and clear a layer canvas, scaled to the device ratio. */
-  #prepareCanvas(canvas, ctx, width, height, dpr) {
-    if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-    }
-    // Own the CSS display size too: sigma.createCanvasContext only sets
-    // position:absolute, and sigma.resize() (the sole writer of element.style
-    // width/height) runs once at construction — before this canvas exists — and
-    // early-returns on unchanged dimensions. Left unset, the canvas displays at
-    // its backing-store size (width*dpr CSS px), which is dpr* too large on a
-    // >1 DPR display, so the group lands in the wrong place until a panel toggle
-    // forces a real sigma resize. Setting it here keeps the overlay 1:1 with the
-    // WebGL layers regardless of sigma's resize timing or the display's DPR.
-    if (canvas.style.width !== `${width}px`) canvas.style.width = `${width}px`;
-    if (canvas.style.height !== `${height}px`) canvas.style.height = `${height}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, width, height);
   }
 
   /**
@@ -322,23 +403,16 @@ class BubbleSetLayer {
    * @returns {boolean} true when the cached outline was replaced
    */
   #syncGroupOutline(group, state) {
-    const graph = this.adapter.graph;
     const sigma = this.adapter.sigma;
-    const memberPositions = [];
-    const visibleMembers = [];
-    for (const id of state.members.keys()) {
-      if (!graph.hasNode(id)) continue;
-      const attrs = graph.getNodeAttributes(id);
-      if (attrs.hidden) continue;
-      visibleMembers.push({ id, attrs });
-      // The ratio-1 radius feeds the fit (see #fitGraphOutline), so fold it
-      // into the checksum: a node-size change must invalidate the outline.
-      memberPositions.push({
-        x: attrs.x,
-        y: attrs.y,
-        s: sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1),
-      });
-    }
+    const visibleMembers = this.#visibleNodes(state.members.keys());
+    // The ratio-1 radius feeds the fit (see #fitGraphOutline), so fold it into
+    // the checksum: a node-size change must invalidate the outline.
+    const checksumPoint = ({ attrs }) => ({
+      x: attrs.x,
+      y: attrs.y,
+      s: sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1),
+    });
+    const memberPositions = visibleMembers.map(checksumPoint);
 
     // Avoid-node MOVES reshape the fit too (their negative field pushes the
     // outline), so their positions/sizes fold into the key as well — without
@@ -348,29 +422,24 @@ class BubbleSetLayer {
     // the manager passes no avoid members at all (see getAvoidMembers).
     const avoidanceRaw = Number(state.opts.avoidance ?? 1);
     const avoidanceActive = !Number.isFinite(avoidanceRaw) || avoidanceRaw !== 0;
-    const avoidPositions = [];
-    if (avoidanceActive) {
-      for (const id of state.avoidMembers) {
-        if (!graph.hasNode(id)) continue;
-        const attrs = graph.getNodeAttributes(id);
-        if (attrs.hidden) continue;
-        avoidPositions.push({
-          x: attrs.x,
-          y: attrs.y,
-          s: sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1),
-        });
-      }
-    }
+    const avoidPositions = avoidanceActive
+      ? this.#visibleNodes(state.avoidMembers).map(checksumPoint)
+      : [];
 
     // membersKey/avoidKey are precomputed in #updateGroup, so the per-frame
     // cost here is the O(n) position checksums. Hidden flips stay correct: an
     // unhide changes visibleMembers.length, and a same-count hidden swap
     // changes the checksum. No camera/viewport term — the graph-space outline
     // is the same at every zoom.
-    const key =
-      `${state.membersKey}|${state.avoidKey}|${visibleMembers.length}` +
-      `|${styleKey(state.opts)}|${positionsChecksum(memberPositions)}` +
-      `|${positionsChecksum(avoidPositions)}`;
+    //
+    // Split in two so the two kinds of change can be treated differently:
+    // identity (what is in the group and how it is styled) always re-fits;
+    // position may be deferred while the graph is in motion.
+    const identityKey =
+      `${state.membersKey}|${state.avoidKey}|${visibleMembers.length}|${styleKey(state.opts)}`;
+    const positionKey =
+      `${positionsChecksum(memberPositions)}|${positionsChecksum(avoidPositions)}`;
+    const key = `${identityKey}|${positionKey}`;
     const cached = this.outlines.get(group);
     if (cached && cached.key === key) return false;
 
@@ -379,7 +448,17 @@ class BubbleSetLayer {
       return cached !== undefined;
     }
 
+    // Position-only change on a group whose last fit blew the frame budget:
+    // keep painting the cached hull and re-fit once motion settles. Without a
+    // cached hull there is nothing to coast on, so the first fit always runs.
+    if (cached && cached.identityKey === identityKey && this.#fitIsExpensive(group)) {
+      this.#scheduleSettledRefit();
+      return false;
+    }
+
+    const started = performance.now();
     const { outer: graphPoints, holes: graphHoles } = this.#fitGraphOutline(state, visibleMembers);
+    this.fitDurations.set(group, performance.now() - started);
     // computeOutlineGeometry repairs self-intersections, so a bad fit here is
     // a collapse to nothing or the rare unrepairable self-cross. Never let it
     // replace a good outline.
@@ -389,15 +468,23 @@ class BubbleSetLayer {
       if (cached?.graphPoints.length) {
         this.outlines.set(group, {
           key,
+          identityKey,
           graphPoints: cached.graphPoints,
           graphHoles: cached.graphHoles ?? [],
+          bbox: cached.bbox ?? ringBBox(cached.graphPoints),
         });
         return true;
       }
       // No prior good outline yet: stay absent until a clean fit appears.
       return this.outlines.delete(group);
     }
-    this.outlines.set(group, { key, graphPoints, graphHoles });
+    this.outlines.set(group, {
+      key,
+      identityKey,
+      graphPoints,
+      graphHoles,
+      bbox: ringBBox(graphPoints),
+    });
     return true;
   }
 
@@ -416,33 +503,11 @@ class BubbleSetLayer {
    *   holes: Array<Array<{x: number, y: number}>>}} graph-space rings
    */
   #fitGraphOutline(state, visibleMembers) {
-    const graph = this.adapter.graph;
-    const sigma = this.adapter.sigma;
-    const { width, height } = sigma.getDimensions();
-    const camera = sigma.getCamera().getState();
-    const cx = width / 2;
-    const cy = height / 2;
-    const r = camera.ratio;
-    // graphToViewport divides the offset-from-centre by the ratio; multiply it
-    // back to land at the ratio-1 viewport (ratio cancels, so this is the same
-    // at any zoom). Node radius is taken at ratio 1 too.
-    const toRefRect = (attrs) => {
-      const v = sigma.graphToViewport({ x: attrs.x, y: attrs.y });
-      const rx = cx + (v.x - cx) * r;
-      const ry = cy + (v.y - cy) * r;
-      return nodeViewportRect(rx, ry, sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1));
-    };
+    const { toRefRect, toGraph } = this.#refSpace();
     const memberRects = visibleMembers.map(({ attrs }) => toRefRect(attrs));
-    const avoidRects = [];
-    for (const id of state.avoidMembers) {
-      if (!graph.hasNode(id)) continue;
-      const attrs = graph.getNodeAttributes(id);
-      if (attrs.hidden) continue;
-      avoidRects.push(toRefRect(attrs));
-    }
+    const avoidRects = this.referenceRects(state.avoidMembers);
 
     const outlineOpts = {
-      virtualEdges: state.opts.virtualEdges,
       padding: state.opts.padding,
       corridor: state.opts.corridor,
       avoidance: state.opts.avoidance,
@@ -455,12 +520,71 @@ class BubbleSetLayer {
     }
     // Reference-viewport → graph space (undo the ratio-1 mapping, then the
     // camera): the cache holds zoom-independent graph coords.
-    const toGraph = (p) =>
-      sigma.viewportToGraph({ x: cx + (p.x - cx) / r, y: cy + (p.y - cy) / r });
     return {
       outer: geometry.outer.map(toGraph),
       holes: geometry.holes.map((h) => h.map(toGraph)),
     };
+  }
+
+  /**
+   * The ratio-1 reference space the fit runs in: graph coords → the viewport
+   * the camera would show at ratio 1 (graphToViewport divides the
+   * offset-from-centre by the ratio; multiplying it back cancels the zoom, so
+   * the mapping is the same at any camera). Node radius is taken at ratio 1
+   * too. `toGraph` is the inverse, for caching fitted rings zoom-free.
+   */
+  #refSpace() {
+    const sigma = this.adapter.sigma;
+    const { width, height } = sigma.getDimensions();
+    const { ratio } = sigma.getCamera().getState();
+    const cx = width / 2;
+    const cy = height / 2;
+    return {
+      toRefRect: (attrs) => {
+        const v = sigma.graphToViewport({ x: attrs.x, y: attrs.y });
+        const rx = cx + (v.x - cx) * ratio;
+        const ry = cy + (v.y - cy) * ratio;
+        return nodeViewportRect(rx, ry, sigma.scaleSize(attrs.size ?? DEFAULTS.NODE.SIZE / 2, 1));
+      },
+      toGraph: (p) =>
+        sigma.viewportToGraph({ x: cx + (p.x - cx) / ratio, y: cy + (p.y - cy) / ratio }),
+    };
+  }
+
+  /**
+   * The visible nodes of an id set, with their attributes — the ONE definition
+   * of "a member that counts": present in the graph and not hidden. Three copies
+   * of this loop (#syncGroupOutline, exportOutlines, referenceRects) could
+   * disagree about that, and a disagreement means the fit and the export draw
+   * different hulls.
+   *
+   * @param {Iterable<string>} ids
+   * @returns {Array<{id: string, attrs: object}>}
+   */
+  #visibleNodes(ids) {
+    const graph = this.adapter.graph;
+    const out = [];
+    for (const id of ids) {
+      if (!graph.hasNode(id)) continue;
+      const attrs = graph.getNodeAttributes(id);
+      if (attrs.hidden) continue;
+      out.push({ id, attrs });
+    }
+    return out;
+  }
+
+  /**
+   * Reference-space rects for a set of node ids (hidden or missing nodes
+   * skipped) — exactly the rects a fit would consume, exposed so the
+   * bubble-set manager can measure a group's surroundings for layout-aware
+   * initial settings (bubble_tuning.js).
+   *
+   * @param {Iterable<string>} ids
+   * @returns {Array<{x: number, y: number, width: number, height: number}>}
+   */
+  referenceRects(ids) {
+    const { toRefRect } = this.#refSpace();
+    return this.#visibleNodes(ids).map(({ attrs }) => toRefRect(attrs));
   }
 
   /**
@@ -469,27 +593,8 @@ class BubbleSetLayer {
    * when something was painted (false when the outline is too small), so the
    * caller knows whether a label belongs on the top canvas.
    */
-  #drawGroup(ctx, points, { opts }, defaults, holes = []) {
-    if (!points || points.length < 2) return false;
-
-    const path = new Path2D();
-    // Rings paint as Catmull-Rom curves (smoothClosedPath — same control
-    // points the SVG export emits); rings too small to smooth fall back to
-    // the polyline. The polygon stays the geometric source of truth.
-    const addRing = (ring) => {
-      const segments = smoothClosedPath(ring);
-      if (!segments) {
-        path.moveTo(ring[0].x, ring[0].y);
-        for (let i = 1; i < ring.length; i++) path.lineTo(ring[i].x, ring[i].y);
-        path.closePath();
-        return;
-      }
-      path.moveTo(segments[0].x0, segments[0].y0);
-      for (const s of segments) path.bezierCurveTo(s.c1x, s.c1y, s.c2x, s.c2y, s.x, s.y);
-      path.closePath();
-    };
-    addRing(points);
-    for (const hole of holes) if (hole.length >= 3) addRing(hole);
+  #drawGroup(ctx, path, { opts }, defaults, strokeScale = 1) {
+    if (!path) return false;
 
     ctx.save();
     try {
@@ -498,7 +603,9 @@ class BubbleSetLayer {
       ctx.fill(path, 'evenodd');
       ctx.globalAlpha = opts.strokeOpacity ?? defaults.strokeOpacity ?? 1;
       ctx.strokeStyle = opts.stroke ?? defaults.stroke ?? '#403C53';
-      ctx.lineWidth = OUTLINE_STROKE_WIDTH;
+      // The stroke is a screen quantity, so it has to survive the transform
+      // the path is painted under.
+      ctx.lineWidth = OUTLINE_STROKE_WIDTH / strokeScale;
       ctx.stroke(path);
       ctx.globalAlpha = 1;
     } finally {
@@ -513,55 +620,131 @@ class BubbleSetLayer {
    * the outward normal; labelAutoRotate aligns on-path labels with the
    * outline tangent. labelOffsetX/Y stay additive in screen space.
    */
-  #drawLabel(ctx, points, opts, defaults) {
-    const text = opts.labelText ?? defaults.labelText ?? '';
-    if (!text) return;
-    const placement = opts.labelPlacement ?? defaults.labelPlacement ?? 'bottom';
-    const closeToPath = opts.labelCloseToPath ?? defaults.labelCloseToPath ?? true;
-    const autoRotate = opts.labelAutoRotate ?? defaults.labelAutoRotate ?? true;
-    const anchor = outlineLabelAnchor(points, placement);
-    if (!anchor) return;
+  #drawLabel(ctx, anchor, opts, defaults) {
+    // Geometry from resolveBubbleLabel (bubble_geometry.js), so this and the SVG
+    // export cannot disagree about standoff, rotation or the background box.
+    // Measuring needs the font set first; the resolver hands back the same
+    // string it measured with.
+    const label = resolveBubbleLabel(anchor, opts, defaults, (text, font) => {
+      ctx.font = font;
+      return ctx.measureText(text).width;
+    });
+    if (!label) return;
 
-    const fontSize = opts.labelFontSize ?? defaults.labelFontSize ?? 12;
-    const padding = opts.labelPadding ?? defaults.labelPadding ?? 2;
-    // Off-path labels clear the outline by half the padded font box plus a
-    // fixed gap, pushed along the outward normal (no-op for "center").
-    const standoff = closeToPath ? 0 : fontSize / 2 + padding + LABEL_STANDOFF_PX;
-    const x = anchor.x + anchor.nx * standoff + (opts.labelOffsetX ?? 0);
-    const y = anchor.y + anchor.ny * standoff + (opts.labelOffsetY ?? 0);
-
-    ctx.font = `${fontSize}px Arial, sans-serif`;
+    ctx.font = label.font;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const textWidth = ctx.measureText(text).width;
-
-    // Rotation only makes sense hugging the path; "center" has no tangent.
-    const rotated = autoRotate && closeToPath && placement !== 'center';
-    if (rotated) {
+    if (label.rotated) {
       ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(anchor.angle);
+      ctx.translate(label.x, label.y);
+      ctx.rotate(label.angle);
     }
-    const lx = rotated ? 0 : x;
-    const ly = rotated ? 0 : y;
-
-    if (opts.labelBackground ?? defaults.labelBackground) {
-      const radius = opts.labelBackgroundRadius ?? defaults.labelBackgroundRadius ?? 5;
-      ctx.fillStyle = opts.labelBackgroundFill ?? defaults.labelBackgroundFill ?? '#403C53';
+    if (label.background) {
+      const bg = label.background;
+      ctx.fillStyle = bg.fill;
       ctx.beginPath();
-      ctx.roundRect(
-        lx - textWidth / 2 - padding,
-        ly - fontSize / 2 - padding,
-        textWidth + 2 * padding,
-        fontSize + 2 * padding,
-        radius
-      );
+      ctx.roundRect(bg.x, bg.y, bg.width, bg.height, bg.radius);
       ctx.fill();
     }
-    ctx.fillStyle = opts.labelFill ?? defaults.labelFill ?? '#fff';
-    ctx.fillText(text, lx, ly);
-    if (rotated) ctx.restore();
+    ctx.fillStyle = label.fill;
+    ctx.fillText(label.text, label.lx, label.ly);
+    if (label.rotated) ctx.restore();
   }
+}
+
+/**
+ * Sigma's graph→viewport map as a canvas transform. It composes a uniform
+ * normalization with a uniform camera scale and a vertical flip — the app
+ * never rotates the camera, which the reprojection has always assumed — so
+ * two probes pin it exactly.
+ *
+ * @returns {{sx: number, sy: number, tx: number, ty: number}|null} null when
+ *   the camera is degenerate (a zero or non-finite scale)
+ */
+function viewportTransform(sigma) {
+  const origin = sigma.graphToViewport({ x: 0, y: 0 });
+  const unit = sigma.graphToViewport({ x: 1, y: 1 });
+  const sx = unit.x - origin.x;
+  const sy = unit.y - origin.y;
+  if (!Number.isFinite(sx) || !Number.isFinite(sy) || sx === 0 || sy === 0) return null;
+  return { sx, sy, tx: origin.x, ty: origin.y };
+}
+
+/** Screen-space slack on the cull rect: a stroke straddles the ring and a
+ * label sits a standoff outside it, so a group just off-canvas can still paint
+ * into it. Generous on purpose — the cull is about the 49 groups that are
+ * nowhere near, not about shaving the boundary. */
+const CULL_MARGIN_PX = 200;
+
+function rectsIntersect(a, b) {
+  return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
+}
+
+/** Graph-space bounds of a ring, for the viewport cull. */
+function ringBBox(points) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/**
+ * The visible canvas as a GRAPH-space rect, inflated by `marginPx` of screen
+ * space (a stroke straddles the ring, and a label sits a standoff outside it).
+ */
+function visibleGraphRect(view, width, height, marginPx) {
+  const toGraphX = (vx) => (vx - view.tx) / view.sx;
+  const toGraphY = (vy) => (vy - view.ty) / view.sy;
+  const xs = [toGraphX(-marginPx), toGraphX(width + marginPx)];
+  const ys = [toGraphY(-marginPx), toGraphY(height + marginPx)];
+  return {
+    minX: Math.min(...xs), maxX: Math.max(...xs),
+    minY: Math.min(...ys), maxY: Math.max(...ys),
+  };
+}
+
+/** @returns {{x: number, y: number, angle: number, nx: number, ny: number}|null} */
+function projectAnchor(anchor, view) {
+  return {
+    ...anchor,
+    x: anchor.x * view.sx + view.tx,
+    y: anchor.y * view.sy + view.ty,
+    // The flip mirrors the tangent and the normal along y.
+    angle: view.sy < 0 ? -anchor.angle : anchor.angle,
+    ny: view.sy < 0 ? -anchor.ny : anchor.ny,
+  };
+}
+
+/**
+ * One Path2D over an outer ring and its holes (filled even-odd). Rings paint
+ * as Catmull-Rom curves (smoothClosedPath — the same control points the SVG
+ * export emits); rings too small to smooth fall back to the polyline. The
+ * polygon stays the geometric source of truth.
+ *
+ * @returns {Path2D|null} null for a ring too short to be a shape
+ */
+function ringsPath(outer, holes = []) {
+  if (!outer || outer.length < 2) return null;
+  const path = new Path2D();
+  const addRing = (ring) => {
+    const segments = smoothClosedPath(ring);
+    if (!segments) {
+      path.moveTo(ring[0].x, ring[0].y);
+      for (let i = 1; i < ring.length; i++) path.lineTo(ring[i].x, ring[i].y);
+      path.closePath();
+      return;
+    }
+    path.moveTo(segments[0].x0, segments[0].y0);
+    for (const s of segments) path.bezierCurveTo(s.c1x, s.c1y, s.c2x, s.c2y, s.x, s.y);
+    path.closePath();
+  };
+  addRing(outer);
+  for (const hole of holes) if (hole.length >= 3) addRing(hole);
+  return path;
 }
 
 export { BubbleSetLayer };

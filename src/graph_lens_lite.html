@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Mirrors CONTENT_SECURITY_POLICY in server/static.js, which only applies
+       when the app is served by server/index.js — the packaged Electron build
+       and the single-file inline build shipped with no policy at all.
+       frame-ancestors is header-only and is omitted here by spec. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src *; worker-src 'self' blob:; object-src 'none'; base-uri 'none'">
   <title>Delta4 | Graph Lens Lite</title>
   <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='4' y='24' font-size='24'>🔍</text></svg>"
@@ -22,8 +28,11 @@
       <p class="landing-subtitle">From spreadsheet to graph visualization in seconds</p>
     </div>
 
+    <!-- Filled by gll.js only when the WebGL2 probe fails (see webgl_support.js) -->
+    <div id="landingWebglWarning" role="alert" hidden></div>
+
     <div class="landing-primary-action">
-      <button class="landing-browse-btn" onclick="document.getElementById('fileInput').click()">
+      <button class="landing-browse-btn" data-needs-webgl onclick="document.getElementById('fileInput').click()">
         <span class="landing-browse-icon">📂</span>
         <span class="landing-browse-label">Open Graph File</span>
         <span class="landing-browse-desc">Load from Excel (.xlsx, .xls) or a saved model (.json)</span>
@@ -36,12 +45,17 @@
         <span class="landing-card-title">Download Template</span>
         <span class="landing-card-desc">Get a pre-filled Excel template showing how to structure your graph data</span>
       </button>
-      <button class="landing-card" onclick="loadDemoData()">
+      <button class="landing-card" data-needs-webgl onclick="loadDemoData()">
         <span class="landing-card-icon">🔍</span>
         <span class="landing-card-title">STRING Database</span>
         <span class="landing-card-desc">Explore protein-protein interaction networks from the STRING database</span>
       </button>
-      <button class="landing-card" onclick="startTour()">
+      <button class="landing-card" data-needs-webgl onclick="loadNeo4jData()">
+        <span class="landing-card-icon">🛢️</span>
+        <span class="landing-card-title">Neo4j Database</span>
+        <span class="landing-card-desc">Fetch a graph from a Neo4j server with a Cypher query — or try the built-in Stack Overflow demo</span>
+      </button>
+      <button class="landing-card" data-needs-webgl onclick="startTour()">
         <span class="landing-card-icon">🗺️</span>
         <span class="landing-card-title">Take a Tour</span>
         <span class="landing-card-desc">A guided walkthrough of the app's features and interface</span>
@@ -68,240 +82,328 @@
     <div id="loadingTextGroup">
       <h3 id="loadingHeader">Loading ..</h3>
       <span id="loadingText" class="h7">Please wait</span>
+      <button id="loadingCancelBtn" class="p-button p-button-secondary" hidden>Cancel</button>
     </div>
   </div>
 </div>
+<header id="rail">
+  <button id="appMenuBtn" class="rail-mark" aria-label="App menu" title="Menu — load data, take the tour, reload the app">
+    <img inline src="delta-4-icon.png" alt="Delta4 Icon">
+  </button>
+  <button id="workspaceChip" class="rail-wschip" title="Workspace — switch, create, rename or delete">
+    <span class="rail-wschip-l1"><span id="workspaceChipName">Workspace</span><span class="rail-wschip-car">⌄</span></span>
+    <span class="rail-wschip-l2">
+      <span id="visibleNodes" class="red">0</span>/<span id="totalNodes">0</span> nodes ·
+      <span id="visibleEdges" class="red">0</span>/<span id="totalEdges">0</span> edges
+    </span>
+  </button>
+  <select name="selectView" id="selectView" hidden onchange="cache.lm.changeLayout()" aria-hidden="true" tabindex="-1"></select>
+  <input type="file" id="fileInput" name="fileInput" hidden onchange="cache.io.loadFileWrapper(event);"
+         accept=".json, .xls, .xlsx"/>
+  <div class="rail-hist">
+    <button id="historyUndoBtn" class="rail-mini disabled" aria-label="Undo"
+            title="Nothing to undo" onclick="cache.history.undo()">↶</button>
+    <button id="historyRedoBtn" class="rail-mini disabled" aria-label="Redo"
+            title="Nothing to redo" onclick="cache.history.redo()">↷</button>
+  </div>
+  <div class="rail-div"></div>
+  <button class="rail-vb" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">
+    <span class="rail-vb-g">⊡</span><span class="rail-vb-t">Fit</span>
+  </button>
+  <button id="relayoutBtn" class="rail-vb"
+          title="Layout — re-layout the workspace, remove overlaps, hide disconnected elements">
+    <span class="rail-vb-g">↻</span><span class="rail-vb-t"><span id="layoutTypeLabel">Layout</span> ⌄</span>
+  </button>
+  <button id="lassoToggleBtn" class="rail-vb" title="Toggle lasso selection: drag to select elements (L)" onclick="cache.ui.toggleLassoSelection()">
+    <span class="rail-vb-g">➰</span><span class="rail-vb-t">Lasso</span>
+  </button>
+  <button id="hoverToggleBtn" class="rail-vb active" title="Disable hover highlight effect (H)" onclick="cache.ui.toggleHoverEffect(this)">
+    <span class="rail-vb-g">✨</span><span class="rail-vb-t">Hover</span>
+  </button>
+  <button id="selectMenuBtn" class="rail-vb"
+          title="Select — all/no nodes and edges, or select by ID or label">
+    <span class="rail-vb-g">◈</span><span class="rail-vb-t">Select ⌄</span>
+  </button>
+  <button id="noteToggleBtn" class="rail-vb" title="Place a text note: click the canvas to place, drag to move, double-click to edit, single-click for style and delete"
+          onclick="cache.ui.startTextAnnotation()">
+    <span class="rail-vb-g">✎</span><span class="rail-vb-t">Note</span>
+  </button>
+  <!-- With the verbs, not after the selection chip: search acts on the whole
+       workspace like they do, and the chip's width changes with the selection,
+       which used to slide this button around under the pointer. -->
+  <button id="cmdkBtn" class="rail-vb" title="Search every control, node and property by name (Ctrl+K)"
+          aria-label="Search commands, nodes and properties" onclick="cache.palette.open()">
+    <span class="rail-vb-g">⌕</span><span class="rail-vb-t">Search</span>
+  </button>
+  <div class="rail-div"></div>
+  <div id="selectionChip" class="rail-selchip">
+    <span class="rail-selchip-empty">Nothing selected</span>
+    <span class="rail-selchip-counts">
+      <strong id="selectedNodes">0</strong>&nbsp;nodes <span class="rail-selchip-sep">·</span>
+      <strong id="selectedEdges">0</strong>&nbsp;edges
+    </span>
+    <button id="focusSelectionBtn" class="rail-chip-btn disabled" title="Center and zoom to the selection"
+            aria-label="Center and zoom to the selection" onclick="cache.gcm.focusSelection()">🔍</button>
+    <button id="clearSelectionBtn" class="rail-chip-btn red disabled" title="Clear selection"
+            aria-label="Clear selection" onclick="cache.sm.clearSelection()">×</button>
+    <span id="selectionHiddenWarning" class="rail-selchip-warning" style="display: none;"
+          title="Filters currently hide part of your selection. Hidden elements stay selected, but actions only touch visible ones."></span>
+    <button id="undoSelectionBtn" class="rail-chip-btn disabled" title="Undo selection"
+            aria-label="Undo selection" onclick="cache.sm.undoSelection()">↶</button>
+    <button id="redoSelectionBtn" class="rail-chip-btn disabled" title="Redo selection"
+            aria-label="Redo selection" onclick="cache.sm.redoSelection()">↷</button>
+  </div>
+  <span class="rail-spacer"></span>
+  <div class="rail-tabs">
+    <button id="dataToggleBtn" class="rail-tab" title="Toggle data editor (D)" onclick="cache.ui.toggleDataEditor()">
+      <span class="rail-vb-g">🔢</span><span class="rail-vb-t">Data</span>
+    </button>
+    <button id="queryToggleBtn" class="rail-tab" title="Toggle query editor (Q)" onclick="cache.ui.toggleQueryEditor()">
+      <span class="rail-vb-g">📝</span><span class="rail-vb-t">Query</span>
+    </button>
+    <button id="metricsToggleBtn" class="rail-tab" title="Toggle network metrics panel (M)" onclick="cache.metrics.toggleUI()">
+      <span class="rail-vb-g">📊</span><span class="rail-vb-t">Metrics</span>
+    </button>
+    <button id="assistantToggleBtn" class="rail-tab" title="Toggle Graph Assistant (A)" onclick="cache.assistant.togglePanel()">
+      <span class="rail-vb-g">🤖</span><span class="rail-vb-t">Assist</span>
+    </button>
+  </div>
+  <div class="rail-div"></div>
+  <button id="neo4jJoinBtn" class="rail-vb" style="display: none;" aria-label="Add Neo4j query"
+          title="Fetch an additional Cypher query from the connected Neo4j server and merge the results into the current graph"
+          onclick="openNeo4jJoinPopup()">
+    <span class="rail-vb-g">🛢️</span><span class="rail-vb-t">Add</span>
+  </button>
+  <button id="exportMenuBtn" class="rail-vb"
+          title="Export — PNG, SVG, JSON model, Excel data (P: PNG, S: JSON)">
+    <span class="rail-vb-g">⤓</span><span class="rail-vb-t">Export</span>
+  </button>
+  <!-- Presentation mode is app chrome, not an overlay: it hides the shell
+       rather than drawing anything over the graph, so it sits with the other
+       chrome toggles. No state glyph — the rail is gone while it is on.
+       ⛶ is this codebase's fullscreen mark everywhere else (popup.js,
+       interactions.js, core.js, ui_components.js), so it belongs on the button
+       with no text label. Fit, which is labelled "Fit", took ⊡ in exchange. -->
+  <button id="presentationToggleBtn" class="rail-mini" aria-label="Presentation mode"
+          title="Presentation mode — hide the rail and the inspector for a clean screenshot (⇧F, Escape to exit)"
+          onclick="cache.ui.togglePresentationMode()">⛶</button>
+  <button id="darkModeToggleBtn" class="rail-mini" aria-label="Switch to dark mode" title="Switch to dark mode" onclick="cache.ui.toggleDarkMode()">🌙</button>
+  <button id="keyboardSheetBtn" class="rail-mini" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onclick="cache.ui.toggleKeyboardSheet()">?</button>
+</header>
 <div id="mainContent">
-  <div id="sidebar">
-    <div class="sidebar-resize-handle"></div>
-    <div id="sidebarContentContainer">
-      <div class="header-row">
-        <div class="header-title-group">
-          <h3 id="appHeader" class="disabled-header" onclick="cache.ui.reloadApp()">
-            <img inline src="delta-4-icon.png" alt="Delta4 Icon" style="height: 1em; vertical-align: middle; margin-right: 0.3em;">
-            Graph Lens Lite <span id="versionInfo" style="font-size: 0.6em; color: #666; font-weight: normal;"></span>
-          </h3>
-          <span id="dataSourceLabel" class="data-source-label"></span>
-        </div>
-        <div class="header-actions">
-          <button id="exportImage" class="showOnLoad medium-btn" title="Save image (P)" onclick="cache.ui.toggleExportResolutionPopover()">📷</button>
-          <button id="exportModel" class="showOnLoad medium-btn" title="Save model (S)" onclick="cache.io.exportGraphAsJSON()">💾</button>
-          <button id="darkModeToggleBtn" class="medium-btn" title="Switch to dark mode" onclick="cache.ui.toggleDarkMode()">🌙</button>
-        </div>
-      </div>
-      <div class="showOnLoad app-toolbar">
-        <button id="metricsToggleBtn" class="showOnLoad toolbar-pill" title="Toggle network metrics panel (M)" onclick="cache.metrics.toggleUI()">📊 Metrics</button>
-        <button id="dataToggleBtn" class="showOnLoad toolbar-pill" title="Toggle data editor (D)" onclick="cache.ui.toggleDataEditor()">🔢 Data</button>
-        <button id="queryToggleBtn" class="showOnLoad toolbar-pill" title="Toggle query editor (Q)" onclick="cache.ui.toggleQueryEditor()">📝 Query</button>
-        <button id="assistantToggleBtn" class="toolbar-pill" title="Toggle Graph Assistant (A)" onclick="cache.assistant.togglePanel()">🤖 Assistant</button>
-      </div>
-      <div class="hideOnLoad">
-        <input type="file" id="fileInput" name="fileInput" onchange="cache.io.loadFileWrapper(event);"
-               title="Load graph data from Excel (.xlsx, .xls) or Graph Lens Lite exports (.json)"
-               accept=".json, .xls, .xlsx"/>
-      </div>
-      <div class="hideOnLoad">
-        <button onclick="cache.io.downloadExcelTemplate()" class="mt-2">📥 Download Excel Template</button>
-        <br>
-        <button onclick="loadDemoData()" class="mt-2">🔍 Load from STRING Database</button>
-        <br>
-        <button onclick="startTour()" class="mt-2">🗺️ Take a Tour</button>
-      </div>
-      <div class="showOnLoad">
-        <hr>
-        <div id="workspaceContainer">
-          <label for="selectView">Workspace:</label>
-          <select name="selectView" id="selectView" onchange="cache.lm.changeLayout()"></select>
-          <button class="small-btn red disabled" id="removeSelectedLayoutButton" title="Delete current workspace" onclick="cache.lm.removeSelectedLayout()">&nbsp;✗&nbsp;</button>
-          <button class="small-btn green" title="Create new workspace" onclick="cache.lm.addLayout()" >&nbsp;✚&nbsp;</button>
-          <div class="button-separator"></div>
-          <button class="small-btn" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">⛶</button>
-          <button id="removeOverlapsBtn" class="small-btn" title="Remove overlaps: minimally spread overlapping nodes apart (applies to all nodes in this workspace)" onclick="cache.lm.removeNodeOverlaps()">↔️</button>
-          <button id="relayoutBtn" class="small-btn" title="Re-layout: recompute positions for the entire workspace with a chosen layout algorithm (overwrites manual positions)" onclick="cache.lm.relayoutWorkspace()">🔄</button>
-          <button id="hideDisconnectedBtn" class="small-btn red" title="Hide all nodes and edges that are not connected to any other node or edge" onclick="cache.gcm.toggleCleanUpDanglingElements(this)">🚫</button>
-          <button id="hoverToggleBtn" class="small-btn green highlight" title="Disable hover highlight effect (H)" onclick="cache.ui.toggleHoverEffect(this)">✨</button>
-          <div id="debugDiv" class="inline"></div>
-          <br>
-          <h5 class="purple">Shown:
-            <span id="visibleNodes" class="red">0</span>/<span id="totalNodes">0</span> nodes,
-            <span id="visibleEdges" class="red">0</span>/<span id="totalEdges">0</span> edges
-          </h5>
-        </div>
-        <hr>
-        <div id="metricsContainer"></div>
-        <div id="filterContainer"></div>
-      </div>
-    </div>
-    <div id="sidebarStatusContainer"></div>
-  </div>
   <div id="outerGraphContainer">
-    <div id="selectedElementsContainer" class="showOnLoad sel-hud-tr">
-      <div class="sel-hud-header" title="Drag to move — releases to the nearest corner">
-        <span class="sel-hud-title">Selection</span>
-        <span class="sel-hud-header-tools">
-          <button class="sel-hud-tools-toggle" id="selectionEditorToggleBtn"
-                  title="Show selection tools: select by name, neighbours, or arrange the selection"
-                  aria-expanded="false" onclick="cache.ui.toggleSelectionEditor()">Tools ▾</button>
-          <button class="sel-hud-hide-btn" id="selHudHideBtn" title="Hide the selection panel (e.g. for a screenshot)" aria-label="Hide selection panel">✕</button>
-        </span>
-      </div>
-
-      <div class="sel-hud-toolbar">
-        <div id="lassoWrapper" class="showOnLoad"><button id="lassoToggleBtn" class="sel-hud-btn" title="Toggle lasso selection: drag to select elements (L)" onclick="cache.ui.toggleLassoSelection()">➰ Lasso</button></div>
-        <button id="styleToggleBtn" class="sel-hud-btn showOnLoad" title="Open styling panel (Y)" onclick="cache.ui.toggleStylingPanel()">🎨 Style</button>
-        <span class="sel-hud-toolbar-spacer"></span>
-        <button class="sel-hud-icon-btn disabled" title="Undo selection" id="undoSelectionBtn"
-                onclick="cache.sm.undoSelection()">↩</button>
-        <button class="sel-hud-icon-btn disabled" title="Redo selection" id="redoSelectionBtn"
-                onclick="cache.sm.redoSelection()">↪</button>
-      </div>
-
-      <div class="sel-hud-empty">
-        <div class="sel-hud-empty-title">Nothing selected</div>
-        <div class="sel-hud-empty-hint">Click an element, drag a <button type="button" class="sel-hud-link" onclick="cache.ui.toggleLassoSelection()">lasso</button> (L), or use <button type="button" class="sel-hud-link" onclick="cache.ui.toggleSelectionEditor()">Tools</button> to select by name or neighbours. The <button type="button" class="sel-hud-link" onclick="cache.ui.toggleQueryEditor()">query editor</button> allows selection by properties.</div>
-      </div>
-
-      <div class="sel-hud-active">
-        <div class="sel-hud-counts">
-          <span class="sel-count"><strong id="selectedNodes" class="red">0</strong>&nbsp;nodes</span>
-          <button id="focusNodesBtn" class="sel-hud-icon-btn disabled" title="Center and zoom to selected nodes"
-                  onclick="cache.gcm.focusNodes()">🔍</button>
-          <button id="deselectNodesBtn" class="sel-hud-icon-btn red disabled" title="Clear node selection"
-                  onclick="cache.sm.toggleSelectionForAllNodes(false)">×</button>
-          <span class="sel-count-sep"></span>
-          <span class="sel-count"><strong id="selectedEdges" class="red">0</strong>&nbsp;edges</span>
-          <button id="focusEdgesBtn" class="sel-hud-icon-btn disabled" title="Center and zoom to selected edges"
-                  onclick="cache.gcm.focusEdges()">🔍</button>
-          <button id="deselectEdgesBtn" class="sel-hud-icon-btn red disabled" title="Clear edge selection"
-                  onclick="cache.sm.toggleSelectionForAllEdges(false)">×</button>
-        </div>
-
-        <div class="sel-hud-actions">
-          <span class="sel-group-control">
-            <span class="sel-group-label">Add to group:</span>
-            <span id="manualBubbleGroupButtonContainer" class="manual-group-container"></span>
-          </span>
-          <button class="sel-hud-btn disabled" title="Reset the style of selected elements to defaults" id="resetSelectedElementsStyleBtn"
-                  onclick="cache.style.resetStyleForSelectedElements()">⟳ Reset style</button>
-        </div>
-      </div>
-
-      <div class="sel-hud-groups">
-        <span class="sel-group-label">Groups:</span>
-        <button id="detectCommunitiesBtn" class="sel-hud-btn" title="Auto-group by community (Louvain): pick edge weighting & resolution, then assign the largest communities to bubble groups"
-                onclick="cache.bs.toggleCommunityDetectionPopover()">🧩 Auto</button>
-        <span id="manualGroupSeparator" class="button-separator" style="display: none;"></span>
-        <span id="manualBubbleGroupStatus" class="manual-group-status" style="display: none;"></span>
-        <button id="clearManualGroupsBtn" class="sel-hud-btn red" title="Clear all manual bubble groups"
-                onclick="cache.bs.clearAllManualGroups()" style="display: none;">Clear all</button>
-      </div>
-
-      <div id="selectionEditorPanel" class="selection-editor-panel"></div>
-    </div>
-    <button id="selHudRestoreBtn" class="sel-hud-restore sel-hud-tr showOnLoad" title="Show the selection panel" aria-label="Show selection panel">▸ Selection</button>
     <div id="innerGraphContainer"></div>
+    <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+    <section id="workbench" aria-label="Workbench" hidden>
+      <div class="resize-handle"></div>
+      <div class="panel-header panel-header-full-width">
+        <span id="workbenchTitle" class="panel-header-text">Query Editor</span>
+        <div class="panel-header-center-buttons">
+          <div class="query-buttons">
+            <button id="queryUpdateBtn" class="purple disabled" onclick="cache.qm.handleQueryUpdateEvent()"
+                    title="Apply the query to filter the graph">🔍 Filter</button>
+            <button id="querySelectBtn" class="blue disabled" onclick="cache.qm.handleQuerySelectEvent()"
+                    title="Apply the query to select nodes in the graph without filtering">🎯 Select</button>
+            <button id="queryResetBtn" class="pink" onclick="cache.qm.resetQuery();" title="Reset query to match UI filters">⟳ Sync</button>
+            <button id="queryClearBtn" class="red" onclick="cache.qm.clearQuery();"
+                    title="Empty the query text. The graph stays as it is — use ⟳ Sync to hand it back to the filters">✗ Clear text</button>
+          </div>
+          <div class="data-buttons" style="display: none;">
+            <button id="updateDataTableBtn" class="blue" onclick="cache.dataTable.update()"
+                    title="Update the graph after modifying the data table">✔ Apply</button>
+            <button id="resetDataTableBtn" onclick="cache.dataTable.reset()" class="pink"
+                    title="Reset the data table to current graph state">⟳ Reset</button>
+            <button onclick="cache.dataTable.addNode()" class="blue" title="Add a node"><strong>+</strong>&nbsp;Node</button>
+            <button onclick="cache.dataTable.addEdge()" class="blue" title="Add an edge"><strong>+</strong>&nbsp;Edge</button>
+            <button onclick="cache.dataTable.addColumn()" class="blue" title="Add a new property column"><strong>+</strong>&nbsp;Column</button>
+            <button id="importDataTableBtn" onclick="cache.dataTable.importExcel()" class="green"
+                    title="Merge an Excel file into the current graph — preview changes and choose to add new nodes/edges or only extend existing ones">⤒ Import</button>
+            <button id="exportDataTableBtn" onclick="cache.dataTable.exportToExcel()" class="green"
+                    title="Export the data table and styling properties as Excel">⤓ Export</button>
+          </div>
+          <div class="assistant-buttons" style="display: none;">
+            <button id="assistantSettingsBtn" class="green" title="Configure the endpoint and model"
+                    onclick="cache.assistant.openSettings()">⚙ Settings</button>
+            <button id="assistantClearBtn" class="red" title="Clear the conversation"
+                    onclick="cache.assistant.clearHistory()">🗑 Clear</button>
+          </div>
+        </div>
+        <div class="panel-header-buttons">
+          <button id="workbenchHelpBtn" class="panel-header-btn info-btn" title="Display query editor help" onclick="cache.qm.showQueryHelp();">🛈</button>
+          <button id="workbenchExpandBtn" class="panel-header-btn" title="Expand to full height"
+                  aria-pressed="false" onclick="cache.workbench.toggleExpanded()">⤢</button>
+          <button id="workbenchCloseBtn" class="panel-header-btn" title="Close the workbench"
+                  onclick="cache.workbench.close()">×</button>
+        </div>
+      </div>
+      <div class="wb-content">
+        <div id="queryEditor" class="editor-panel wb-pane">
+          <div id="queryOverlay" aria-hidden="true"></div>
+          <div id="queryTextArea" contenteditable="true" spellcheck="false" oninput="cache.qm.handleQueryValidationEvent();"></div>
+          <div id="queryCaret" class="custom-caret"></div>
+        </div>
+        <div id="dataEditor" class="editor-panel wb-pane" hidden>
+          <div id="dataTableContainer">
+            <table id="dataTable" class="data-table">
+              <thead id="dataTableHead"></thead>
+              <tbody id="dataTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="metricsContainer" class="wb-pane" hidden></div>
+        <div id="assistantPane" class="wb-pane" hidden>
+          <div id="assistantMessages"></div>
+          <div id="assistantEmptyState">
+            <div class="assistant-empty-state-title">Graph Assistant</div>
+            <div class="assistant-empty-state-body">Ask about navigating, filtering, querying, styling, or analysing your graph. I can see the current workspace state when you send a message.</div>
+            <div class="assistant-chips" role="list">
+              <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">How can I visually group and style elements?</button>
+              <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">How does the query editor work?</button>
+              <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">Figure out a strategy to select elements of high importance.</button>
+              <button type="button" class="assistant-chip" data-when="selection" onclick="cache.assistant.sendFromChip(this)">Tell me something about the selected elements.</button>
+              <button type="button" class="assistant-chip" data-when="selection" onclick="cache.assistant.sendFromChip(this)">Which of my selected nodes have the highest degree centrality?</button>
+              <button type="button" class="assistant-chip" data-when="no-selection" onclick="cache.assistant.sendFromChip(this)">How do I select nodes?</button>
+            </div>
+          </div>
+          <div id="assistantInputRow">
+            <textarea id="assistantInput" rows="3" placeholder="Ask about your graph..."></textarea>
+            <div id="assistantInputSide">
+              <button id="assistantStatusBadge" type="button" class="assistant-status-badge" onclick="cache.assistant.openSettings()" aria-label="Assistant status — click to open settings">
+                <span class="assistant-status-badge-dot" aria-hidden="true"></span>
+                <span class="assistant-status-badge-text">…</span>
+              </button>
+              <button id="assistantBudget" type="button" class="assistant-budget" onclick="cache.assistant.openBudgetDetails()" aria-label="Context budget — click for breakdown">
+                <span class="assistant-budget-dot" aria-hidden="true"></span>
+                <span class="assistant-budget-text" role="status" aria-live="polite">— / —</span>
+              </button>
+              <button id="assistantSendBtn" onclick="cache.assistant.sendOrStop()">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
-  <div id="rightSidebar">
-    <div class="panel-header panel-header-full-width">
-      <span class="panel-header-text">Styling Panel</span>
-      <button id="rightSidebarCloseBtn" class="panel-header-btn" title="Close styling panel"
-              onclick="cache.ui.toggleStylingPanel()">×</button>
-    </div>
-    <div id="rightSidebarContentContainer">
-      <div id="stylingSelectionStatus" class="styling-status empty">Nothing selected — select nodes or edges to style them. Bubble-group styling below works without a selection.</div>
-      <div id="stylingPanelContent">
-        <!-- Styling controls will be populated here -->
+  <aside id="inspector">
+    <div class="inspector-resize-handle"></div>
+    <div class="insp-pills-row">
+      <div class="insp-pills" role="tablist" aria-label="Inspector context">
+      <button id="inspectorPillFilters" class="insp-pill active" role="tab" aria-selected="true"
+              aria-controls="inspectorFilters" tabindex="0"
+              title="What is visible: one filter per property, across the whole workspace">Filters</button>
+      <button id="inspectorPillOverlays" class="insp-pill" role="tab" aria-selected="false"
+              aria-controls="inspectorOverlays" tabindex="-1"
+              title="What is drawn over the graph: groups, density heatmap, notes, minimap">Overlays</button>
+      <button id="inspectorPillSelection" class="insp-pill" role="tab" aria-selected="false"
+              aria-controls="inspectorSelection" tabindex="-1"
+              title="Everything that acts on the current selection: actions, arrange, appearance">Selection</button>
       </div>
     </div>
-  </div>
-  <div id="assistantSidebar">
-    <div class="assistant-resize-handle"></div>
-    <div class="panel-header panel-header-full-width">
-      <span class="panel-header-text">Graph Assistant</span>
-      <div class="panel-header-buttons">
-        <button class="panel-header-btn" title="Settings" onclick="cache.assistant.openSettings()">⚙</button>
-        <button class="panel-header-btn" title="Clear conversation" onclick="cache.assistant.clearHistory()">🗑</button>
-        <button class="panel-header-btn" title="Close" onclick="cache.assistant.togglePanel()">×</button>
-      </div>
-    </div>
-    <div id="assistantMessages"></div>
-    <div id="assistantEmptyState">
-      <div class="assistant-empty-state-title">Graph Assistant</div>
-      <div class="assistant-empty-state-body">Ask about navigating, filtering, querying, styling, or analysing your graph. I can see the current workspace state when you send a message.</div>
-      <div class="assistant-chips" role="list">
-        <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">How can I visually group and style elements?</button>
-        <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">How does the query editor work?</button>
-        <button type="button" class="assistant-chip" data-when="always" onclick="cache.assistant.sendFromChip(this)">Figure out a strategy to select elements of high importance.</button>
-        <button type="button" class="assistant-chip" data-when="selection" onclick="cache.assistant.sendFromChip(this)">Tell me something about the selected elements.</button>
-        <button type="button" class="assistant-chip" data-when="selection" onclick="cache.assistant.sendFromChip(this)">Which of my selected nodes have the highest degree centrality?</button>
-        <button type="button" class="assistant-chip" data-when="no-selection" onclick="cache.assistant.sendFromChip(this)">How do I select nodes?</button>
-      </div>
-    </div>
-    <div id="assistantInputRow">
-      <textarea id="assistantInput" rows="3" placeholder="Ask about your graph..."></textarea>
-      <div id="assistantInputSide">
-        <button id="assistantStatusBadge" type="button" class="assistant-status-badge" onclick="cache.assistant.openSettings()" aria-label="Assistant status — click to open settings">
-          <span class="assistant-status-badge-dot" aria-hidden="true"></span>
-          <span class="assistant-status-badge-text">…</span>
-        </button>
-        <button id="assistantBudget" type="button" class="assistant-budget" onclick="cache.assistant.openBudgetDetails()" aria-label="Context budget — click for breakdown">
-          <span class="assistant-budget-dot" aria-hidden="true"></span>
-          <span class="assistant-budget-text" role="status" aria-live="polite">— / —</span>
-        </button>
-        <button id="assistantSendBtn" onclick="cache.assistant.sendOrStop()">Send</button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="bottomBar">
-  <div class="resize-handle"></div>
-  <div class="panel-header panel-header-full-width">
-    <span id="bottomBarHeaderText" class="panel-header-text">Query Editor</span>
-    <div class="panel-header-center-buttons">
-      <div class="query-buttons">
-        <button id="queryUpdateBtn" class="purple disabled" onclick="cache.qm.handleQueryUpdateEvent()"
-                title="Apply the query to filter the graph">🔍 Filter</button>
-        <button id="querySelectBtn" class="blue disabled" onclick="cache.qm.handleQuerySelectEvent()"
-                title="Apply the query to select nodes in the graph without filtering">🎯 Select</button>
-        <button id="queryResetBtn" class="pink" onclick="cache.qm.resetQuery();" title="Reset query to match UI filters">⟳ Sync</button>
-        <button id="queryClearBtn" class="red" onclick="cache.qm.clearQuery();" title="Clear query">✗ Clear</button>
-      </div>
-      <div class="data-buttons" style="display: none;">
-        <button id="updateDataTableBtn" class="blue" onclick="cache.dataTable.update()"
-                title="Update the graph after modifying the data table">✔ Apply</button>
-        <button id="resetDataTableBtn" onclick="cache.dataTable.reset()" class="pink"
-                title="Reset the data table to current graph state">⟳ Reset</button>
-        <button onclick="cache.dataTable.addNode()" class="blue" title="Add a node"><strong>+</strong>&nbsp;Node</button>
-        <button onclick="cache.dataTable.addEdge()" class="blue" title="Add an edge"><strong>+</strong>&nbsp;Edge</button>
-        <button onclick="cache.dataTable.addColumn()" class="blue" title="Add a new property column"><strong>+</strong>&nbsp;Column</button>
-        <button id="importDataTableBtn" onclick="cache.dataTable.importExcel()" class="green"
-                title="Merge an Excel file into the current graph — preview changes and choose to add new nodes/edges or only extend existing ones">⤒ Import</button>
-        <button id="exportDataTableBtn" onclick="cache.dataTable.exportToExcel()" class="green"
-                title="Export the data table and styling properties as Excel">⤓ Export</button>
-      </div>
-    </div>
-    <div class="panel-header-buttons">
-      <button id="bottomBarHelpBtn" class="panel-header-btn info-btn" title="Display query editor help" onclick="cache.qm.showQueryHelp();">🛈</button>
-      <button id="bottomBarCloseBtn" class="panel-header-btn" title="Close bottom panel"
-              onclick="cache.ui.closeBottomBar()">×</button>
-    </div>
-  </div>
-  <div class="bottom-bar-content">
-    <div id="queryEditor" class="editor-panel">
-      <div id="queryOverlay" aria-hidden="true"></div>
-      <div id="queryTextArea" contenteditable="true" spellcheck="false" oninput="cache.qm.handleQueryValidationEvent();"></div>
-      <div id="queryCaret" class="custom-caret"></div>
-    </div>
-    <div id="dataEditor" class="editor-panel" style="display: none;">
-      <div id="dataTableContainer">
-        <table id="dataTable" class="data-table">
-          <thead id="dataTableHead"></thead>
-          <tbody id="dataTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+    <div id="inspectorBody">
+      <section id="inspectorFilters" class="insp-panel" role="tabpanel" tabindex="0"
+               aria-labelledby="inspectorPillFilters">
+        <div id="filterContainer"></div>
+      </section>
 
+      <!-- The layer stack: one row per thing drawn over the graph, each owning
+           both its switch and its settings. Groups and the heatmap are the two
+           rows with settings, so they are styling cards mounted into
+           #inspectorLayerCards (UIManager.CARD_MOUNTS); Notes and the minimap
+           have none and are plain rows. UIManager.OVERLAYS is the contract. -->
+      <section id="inspectorOverlays" class="insp-panel" role="tabpanel" tabindex="0"
+               aria-labelledby="inspectorPillOverlays" hidden>
+        <div id="inspectorLayerCards"></div>
+        <div class="layer-row">
+          <button type="button" id="overlaySwitchNotes" class="layer-switch" role="switch"
+                  aria-checked="false" disabled aria-label="Notes"
+                  title="Show or hide every text note (place a new one with ✎ Note on the rail)"
+                  onclick="cache.ui.toggleOverlay('notes')"></button>
+          <span class="layer-title">Notes</span>
+        </div>
+        <div class="layer-row">
+          <button type="button" id="overlaySwitchMinimap" class="layer-switch" role="switch"
+                  aria-checked="false" disabled aria-label="Minimap"
+                  title="Show or hide the overview thumbnail in the bottom-right corner"
+                  onclick="cache.ui.toggleOverlay('minimap')"></button>
+          <span class="layer-title">Minimap</span>
+        </div>
+      </section>
+
+      <section id="inspectorSelection" class="insp-panel" role="tabpanel" tabindex="0"
+               aria-labelledby="inspectorPillSelection" hidden>
+        <div class="insp-empty">
+          <div class="insp-empty-title">Nothing selected</div>
+          <div class="insp-empty-hint">Click an element on the canvas, or:</div>
+          <div class="insp-empty-actions">
+            <button type="button" class="insp-btn"
+                    title="Drag a freeform area around the elements you want (L)"
+                    onclick="cache.ui.toggleLassoSelection()">➰ Lasso <kbd>L</kbd></button>
+            <button type="button" class="insp-btn"
+                    title="Open the rail's Select menu: all/no nodes, all/no edges, or by ID or label"
+                    onclick="document.getElementById('selectMenuBtn').click()">◈ By name or ID</button>
+            <button type="button" class="insp-btn"
+                    title="Write a predicate over any property and turn it into a selection"
+                    onclick="cache.ui.toggleQueryEditor()">📝 Query editor</button>
+          </div>
+        </div>
+
+        <!-- Group membership gets its own framed section: it is the one action
+             here that changes what the graph DRAWS. The h4 stays a direct child
+             of the panel so the palette's sectionOf() finds it. One button
+             opening a named checklist replaces the 2x2 quadrant pie, which used
+             the same glyph as the filter rows for a different verb and could
+             only ever address four groups. -->
+        <h4 class="insp-section-title sel-group-title">Group membership</h4>
+        <div class="sel-group-panel">
+          <button type="button" id="addToGroupBtn" class="insp-btn"
+                  title="Add or remove the selected nodes in a bubble group">＋ Add to group ⌄</button>
+          <div class="sel-group-hint">Groups are listed under <strong>Overlays › Groups</strong>,
+            where you can rename, recolour and restyle them.</div>
+        </div>
+
+        <div class="insp-act-row">
+          <button class="insp-btn disabled" title="Reset the style of selected elements to defaults" id="resetSelectedElementsStyleBtn"
+                  onclick="cache.style.resetStyleForSelectedElements()">⟳ Reset style</button>
+          <button class="insp-btn disabled" style="display: none;" id="neo4jExpandBtn"
+                  title="Fetch the neighbors of the selected nodes from Neo4j and merge them into the graph"
+                  onclick="expandNeo4jSelection()">🛢️ Expand</button>
+        </div>
+        <div id="inspectorActMount"></div>
+        <div id="inspectorArrangeMount"></div>
+
+        <h4 class="insp-section-title" id="inspectorAppearanceTitle">Appearance</h4>
+        <div id="inspectorAppearanceMount"></div>
+      </section>
+    </div>
+    <div id="inspectorLog" class="insp-log" hidden>
+      <button id="logToggleBtn" class="insp-log-toggle" aria-expanded="false"
+              aria-controls="sidebarStatusContainer"
+              title="Activity log — recent activity, oldest first"
+              onclick="cache.ui.toggleLog()">
+        <span class="insp-log-chevron" aria-hidden="true">▸</span>
+        <span>Activity log</span>
+        <span id="logCount" class="insp-log-count"></span>
+      </button>
+      <div id="sidebarStatusContainer" hidden></div>
+    </div>
+  </aside>
 </div>
+<dialog id="cmdk" aria-label="Command palette">
+  <div class="cmdk-input-row">
+    <span class="cmdk-input-glyph" aria-hidden="true">⌕</span>
+    <input id="cmdkInput" type="text" autocomplete="off" spellcheck="false"
+           placeholder="Find a control, a node or a property…"
+           aria-label="Find a control, a node or a property"
+           role="combobox" aria-expanded="true" aria-controls="cmdkResults" aria-autocomplete="list">
+    <span id="cmdkCount" class="cmdk-count" role="status" aria-live="polite"></span>
+  </div>
+  <ul id="cmdkResults" class="cmdk-results" role="listbox" aria-label="Results"></ul>
+  <div class="cmdk-foot">
+    <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
+    <span><kbd>↵</kbd> <span id="cmdkEnterHint">run</span></span>
+    <span><kbd>⇥</kbd> show me where</span>
+    <span><kbd>esc</kbd> close</span>
+    <span class="cmdk-foot-note">controls, nodes, edges and properties in one list</span>
+  </div>
+</dialog>
 </body>
 </html>

@@ -1,8 +1,7 @@
 /**
- * Browser-only interaction wiring for the sigma renderer (MIGRATION.md
- * Phase 3): node drag with position persistence, click/shift-select, hover
- * 1-degree highlight, freehand lasso overlay and the click tooltip. Replaces
- * the G6 behaviors/plugins; instantiated by SigmaAdapter.
+ * Browser-only interaction wiring for the sigma renderer: node drag with
+ * position persistence, click/shift-select, hover 1-degree highlight, freehand
+ * lasso overlay and the click tooltip. Instantiated by SigmaAdapter.
  *
  * Selection changes are routed through GraphSelectionManager so selection
  * memory (undo/redo), the data table and button states stay in sync.
@@ -186,6 +185,9 @@ class InteractionManager {
     // persist in order instead of racing.
     this.persistChain = this.persistChain.then(() => this.cache.lm.persistNodePositions());
     await this.persistChain;
+    // Only after the positions are in the layout: the snapshot reads from
+    // there, so committing earlier would record the pre-drag coordinates.
+    this.cache.history?.commit('Move nodes');
   }
 
   // ----------------------------------------------------------------- clicks
@@ -377,6 +379,10 @@ class InteractionManager {
     // strips inline onclick attrs; the expand/close buttons are driven by
     // the delegated listener in #ensureTooltipEl instead.
     el.innerHTML = DOMPurify.sanitize(content);
+    // The metric line lives in a side map, not in the stored HTML: composing it
+    // here costs one querySelector on an element we just built, instead of an
+    // innerHTML round trip per node every time the metric changes.
+    if (!isEdge) this.cache.metrics?.applyTooltipMetricText?.(el, id);
     el.style.visibility = "visible";
     this.#positionTooltip(el, id, isEdge);
     this.#syncExpandButton(el);

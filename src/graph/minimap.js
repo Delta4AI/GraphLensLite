@@ -1,6 +1,5 @@
 /**
- * Browser-only minimap for the sigma renderer (MIGRATION.md Phase 4,
- * replaces the G6 minimap plugin). Deliberately minimal: visible nodes as
+ * Browser-only minimap for the sigma renderer. Deliberately minimal: visible nodes as
  * dots over a graph-space bounding-box fit, the current viewport as a
  * rectangle, click/drag pans the camera. No edges, no labels.
  *
@@ -8,6 +7,8 @@
  * style.css always overrode it to bottom-right, so that is the shipped
  * position this port preserves (CSS class .gll-minimap).
  */
+import { FrameCoalescer } from './overlay_frame.js';
+
 const MINIMAP_WIDTH = 200;
 const MINIMAP_HEIGHT = 120;
 const MINIMAP_PADDING = 8;
@@ -24,7 +25,7 @@ class Minimap {
   constructor(adapter, container) {
     this.adapter = adapter;
     this.killed = false;
-    this.rafHandle = null;
+    this.frame = new FrameCoalescer(() => this.#draw());
     this.dragging = false;
     // Graph-space fit of the last draw; #panTo inverts it for clicks.
     this.fit = null;
@@ -48,20 +49,26 @@ class Minimap {
     this.scheduleRedraw();
   }
 
+  /** Show or hide the overview thumbnail (inspector's Overlays stack). */
+  setVisible(visible) {
+    this.canvas.hidden = !visible;
+    if (visible) this.scheduleRedraw();
+  }
+
+  get visible() {
+    return !this.canvas.hidden;
+  }
+
   destroy() {
     if (this.killed) return;
     this.killed = true;
-    if (this.rafHandle !== null) cancelAnimationFrame(this.rafHandle);
+    this.frame.kill();
     this.adapter.sigma.off("afterRender", this.renderHandler);
     this.canvas.remove();
   }
 
   scheduleRedraw() {
-    if (this.killed || this.rafHandle !== null) return;
-    this.rafHandle = requestAnimationFrame(() => {
-      this.rafHandle = null;
-      this.#draw();
-    });
+    this.frame.schedule();
   }
 
   // ------------------------------------------------------------------ draw

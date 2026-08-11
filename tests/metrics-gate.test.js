@@ -53,6 +53,44 @@ beforeEach(() => {
   globalThis.requestAnimationFrame = (cb) => cb()
 })
 
+describe('NetworkMetrics empty results', () => {
+  it('clears the panel and says so when the view is too small to score', async () => {
+    // A filter can leave one visible node; every calculator returns no scores
+    // there, and the panel used to keep the pre-filter numbers on screen.
+    const cache = makeCache()
+    const metrics = makeMetrics(cache)
+    await metrics.updateMetricUI()
+    expect(metrics.multiselect.options.length).toBe(3)
+
+    cache.nodeIDsToBeShown = new Set(['A'])
+    cache.edgeIDsToBeShown = new Set()
+    cache.visibleElementsChanged = true
+    await metrics.updateMetricUI()
+
+    expect(metrics.multiselect.options.length).toBe(0)
+    expect(metrics.table.querySelectorAll('tr').length).toBe(0)
+    expect(metrics.emptyNote.hidden).toBe(false)
+    expect(document.getElementById('metricInfoBtn').disabled).toBe(true)
+  })
+
+  it('hides the note again once the view can be scored', async () => {
+    const cache = makeCache()
+    cache.nodeIDsToBeShown = new Set(['A'])
+    cache.edgeIDsToBeShown = new Set()
+    const metrics = makeMetrics(cache)
+    await metrics.updateMetricUI()
+    expect(metrics.emptyNote.hidden).toBe(false)
+
+    cache.nodeIDsToBeShown = new Set(['A', 'B', 'C'])
+    cache.edgeIDsToBeShown = new Set(['A::B', 'B::C'])
+    cache.visibleElementsChanged = true
+    await metrics.updateMetricUI()
+
+    expect(metrics.emptyNote.hidden).toBe(true)
+    expect(document.getElementById('metricInfoBtn').disabled).toBe(false)
+  })
+})
+
 describe('NetworkMetrics.updateMetricUI gating', () => {
   it('computes on fresh load when visibleElementsChanged is false and cache is empty', async () => {
     // Arrange
@@ -136,46 +174,62 @@ describe('NetworkMetrics lazy panel gate', () => {
     expect(metrics.multiselect.options.length).toBe(0)
   })
 
-  it('triggers a compute and flips collapsed when the panel is opened', () => {
+  // Visibility is the workbench's call now; the gate follows it through
+  // setWorkbenchVisible. toggleUI is a one-line delegation, covered below.
+  it('triggers a compute and flips collapsed when the tab becomes visible', () => {
     // Arrange
     const cache = makeCache()
     const metrics = makeMetrics(cache, { open: false })
     const spy = vi.spyOn(metrics, 'updateMetricUI').mockResolvedValue(undefined)
 
     // Act
-    metrics.toggleUI()
+    metrics.setWorkbenchVisible(true)
 
     // Assert
     expect(metrics.collapsed).toBe(false)
     expect(spy).toHaveBeenCalledTimes(1)
   })
 
-  it('does not compute when the panel is collapsed via toggleUI', () => {
-    // Arrange: start open so the first toggle closes it
+  it('does not compute when the tab is hidden', () => {
+    // Arrange: start visible so the call under test is the hide
     const cache = makeCache()
     const metrics = makeMetrics(cache, { open: true })
-    document.getElementById('networkMetricsContainer').classList.add('open')
     const spy = vi.spyOn(metrics, 'updateMetricUI').mockResolvedValue(undefined)
 
-    // Act: toggle → closes
-    metrics.toggleUI()
+    // Act
+    metrics.setWorkbenchVisible(false)
 
     // Assert
     expect(metrics.collapsed).toBe(true)
     expect(spy).not.toHaveBeenCalled()
   })
+
+  it('toggleUI defers to the workbench rather than driving the DOM itself', () => {
+    // Arrange
+    const cache = makeCache()
+    cache.workbench = { toggle: vi.fn() }
+    const metrics = makeMetrics(cache, { open: false })
+
+    // Act
+    metrics.toggleUI()
+
+    // Assert
+    expect(cache.workbench.toggle).toHaveBeenCalledWith('metrics')
+  })
 })
 
 describe('NetworkMetrics.invalidateMetricValues tooltip blanking', () => {
   const TOOLTIP_WITH_METRIC =
-    '<div class="tooltip-metric-wrapper visible">' +
-    '<span class="tooltip-metric-header">Degree Centrality</span>' +
-    '<p class="tooltip-metric-content">Degree 2</p></div>'
+    '<div class="tooltip-metric-wrapper">' +
+    '<span class="tooltip-metric-header"></span>' +
+    '<p class="tooltip-metric-content"></p></div>'
 
-  function metricContentOf(tooltipHtml) {
-    const div = document.createElement('div')
-    div.innerHTML = tooltipHtml
-    return div.querySelector('.tooltip-metric-content')?.textContent
+  /** What a hover would render for `nodeId`, metric line included. */
+  function renderTooltip(metrics, cache, nodeId) {
+    const el = document.createElement('div')
+    el.innerHTML = cache.toolTips.get(nodeId)
+    metrics.applyTooltipMetricText(el, nodeId)
+    return el
   }
 
   it('blanks stale tooltip metric text when metrics were displayed', () => {
@@ -184,15 +238,34 @@ describe('NetworkMetrics.invalidateMetricValues tooltip blanking', () => {
     cache.toolTips = new Map([['A', TOOLTIP_WITH_METRIC]])
     const metrics = makeMetrics(cache)
     metrics.metricValueCache.set('centrality', { values: new Map([['A', 2]]) })
+    metrics.updateNodeToolTipMetricText('A', 'Degree Centrality', 'Degree 2')
     metrics.metricTooltipsActive = true
+    expect(renderTooltip(metrics, cache, 'A').querySelector('.tooltip-metric-content').textContent)
+      .toBe('Degree 2')
 
     // Act
     metrics.invalidateMetricValues()
 
-    // Assert: cache cleared, tooltip metric text blanked, flag reset
+    // Assert: cache cleared, metric line gone, flag reset
     expect(metrics.metricValueCache.size).toBe(0)
-    expect(metricContentOf(cache.toolTips.get('A'))).toBe('')
+    const el = renderTooltip(metrics, cache, 'A')
+    expect(el.querySelector('.tooltip-metric-content').textContent).toBe('')
+    expect(el.querySelector('.tooltip-metric-wrapper').classList.contains('visible')).toBe(false)
     expect(metrics.metricTooltipsActive).toBe(false)
+  })
+
+  it('never rewrites the stored tooltip HTML', () => {
+    // The metric line is composed onto the live element at hover time, so a
+    // metric switch is Map writes — not an innerHTML parse and serialize per
+    // node, twice (reset + repopulate).
+    const cache = makeCache()
+    cache.toolTips = new Map([['A', TOOLTIP_WITH_METRIC]])
+    const metrics = makeMetrics(cache)
+
+    metrics.updateNodeToolTipMetricText('A', 'Degree Centrality', 'Degree 2')
+    metrics.resetNodeToolTipMetricTexts()
+
+    expect(cache.toolTips.get('A')).toBe(TOOLTIP_WITH_METRIC)
   })
 
   it('leaves tooltips untouched when no metric text is active', () => {
@@ -207,5 +280,86 @@ describe('NetworkMetrics.invalidateMetricValues tooltip blanking', () => {
 
     // Assert: tooltip preserved verbatim
     expect(cache.toolTips.get('A')).toBe(TOOLTIP_WITH_METRIC)
+  })
+})
+
+// ==========================================================================
+// Switching back to an already-computed metric must repaint the panel.
+//
+// The gate that skips recompute used to skip the *render* with it, so the
+// second visit to a metric left the previous one's ranking, graph-level table
+// and 🛈 popup on screen with no way back. Going to a metric for the first
+// time worked (no cache -> full path), which is what made it look like only
+// "backwards" navigation was broken.
+// ==========================================================================
+
+describe('NetworkMetrics metric switching', () => {
+  const rankedIds = (metrics) => [...metrics.multiselect.options].map((o) => o.textContent)
+  const tableRows = (metrics) =>
+    [...metrics.table.rows].map((r) => r.cells[0].textContent)
+
+  async function select(metrics, id) {
+    metrics.selected = id
+    await metrics.updateMetricUI()
+  }
+
+  it('repaints when returning to a metric that is already cached', async () => {
+    const cache = makeCache({ visibleElementsChanged: false })
+    const metrics = makeMetrics(cache)
+
+    await select(metrics, 'centrality')
+    const degreeRanking = rankedIds(metrics)
+    const degreeTable = tableRows(metrics)
+    expect(degreeRanking.length).toBeGreaterThan(0)
+
+    await select(metrics, 'betweenness')
+    expect(rankedIds(metrics)).not.toEqual(degreeRanking)
+    expect(tableRows(metrics)).not.toEqual(degreeTable)
+
+    // The regression: this left betweenness on screen.
+    await select(metrics, 'centrality')
+    expect(rankedIds(metrics)).toEqual(degreeRanking)
+    expect(tableRows(metrics)).toEqual(degreeTable)
+  })
+
+  it('serves the return visit from cache instead of recomputing', async () => {
+    const cache = makeCache({ visibleElementsChanged: false })
+    const metrics = makeMetrics(cache)
+    const spy = vi.spyOn(metrics.m.centrality, 'calculate')
+
+    await select(metrics, 'centrality')
+    expect(spy).toHaveBeenCalledTimes(1)
+
+    await select(metrics, 'betweenness')
+    await select(metrics, 'centrality')
+
+    // Repainted, but the expensive calculation ran exactly once.
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(rankedIds(metrics).length).toBeGreaterThan(0)
+    spy.mockRestore()
+  })
+
+  it('does not repaint on an unrelated refresh of the same metric', async () => {
+    const cache = makeCache({ visibleElementsChanged: false })
+    const metrics = makeMetrics(cache)
+    await select(metrics, 'centrality')
+
+    const firstOption = metrics.multiselect.options[0]
+    // decideToRenderOrDraw calls updateMetricUI on every render; with nothing
+    // changed it must touch neither the algorithms nor the DOM.
+    await metrics.updateMetricUI()
+    expect(metrics.multiselect.options[0]).toBe(firstOption)
+  })
+
+  it('recomputes and repaints when the visible subgraph changed', async () => {
+    const cache = makeCache({ visibleElementsChanged: false })
+    const metrics = makeMetrics(cache)
+    await select(metrics, 'centrality')
+
+    const spy = vi.spyOn(metrics.m.centrality, 'calculate')
+    cache.visibleElementsChanged = true
+    await metrics.updateMetricUI()
+    expect(spy).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
   })
 })

@@ -1,0 +1,771 @@
+/**
+ * Browser-only text-annotation ("note") layer.
+ *
+ * Unlike the bubble/heatmap layers this one is DOM, not canvas: each note is
+ * an absolutely-positioned div over the sigma canvases, which buys native
+ * text rendering, contenteditable editing, CSS borders and per-note pointer
+ * events for free — a canvas layer would need hand-rolled hit-testing and a
+ * text-input overlay anyway. The divs are re-anchored on every afterRender
+ * via graphToViewport and scaled by 1/camera.ratio (transform-origin 0 0),
+ * so a note pans and zooms with the drawing it annotates.
+ *
+ * State lives in the CURRENT workspace's layout object
+ * (cache.data.layouts[selected].annotations, app-model y-down coordinates,
+ * flipY at this boundary like layout.positions) — mutating it IS persistence:
+ * buildExportPayload serializes cache.data wholesale, parseLayouts sanitizes
+ * on the way back in (annotation_geometry.js). Workspace switches need no
+ * events: every sync re-reads the selected layout.
+ *
+ * Exports: the flattened sigma PNG and the SVG document carry no DOM, so
+ * drawExport (canvas) and exportPlacements (SVG primitive input) repaint the
+ * notes from the same annotationLayout metrics the DOM element uses.
+ */
+import { flipY } from './graph_model.js';
+import {
+  ANNOTATION_DEFAULTS,
+  ANNOTATION_SHADOW,
+  ANNOTATION_FONT_FAMILY,
+  ANNOTATION_LINE_HEIGHT,
+  ANNOTATION_PADDING_PX,
+  MAX_TEXT_LENGTH,
+  MIN_FONT_SIZE,
+  MAX_FONT_SIZE,
+  MAX_BORDER_WIDTH,
+  MAX_BORDER_RADIUS,
+  annotationLayout,
+} from './annotation_geometry.js';
+import { clampPopoverLeft, clampPopoverTop } from '../utilities/popover_position.js';
+import { FrameCoalescer } from './overlay_frame.js';
+
+// A press that travels less than this many screen px is a click (open the
+// style popover), not a drag.
+const DRAG_THRESHOLD_PX = 3;
+const POPOVER_OFFSET_PX = 8;
+
+// ------------------------------------------------------------ popover inputs
+// Row + input builders for the note style popover. Module scope rather than
+// closures inside #openPopover, which was 114 lines mostly made of these.
+// `after` is the caller's per-edit hook (repaint + mark dirty).
+
+function popoverRow(labelText, input) {
+  const label = document.createElement('label');
+  label.className = 'annotation-popover-row';
+  const span = document.createElement('span');
+  span.textContent = labelText;
+  label.append(span, input);
+  return label;
+}
+
+function popoverNumberInput(value, min, max, step, onChange, after) {
+  const input = document.createElement('input');
+  input.type = 'number';
+  Object.assign(input, { min, max, step, value });
+  input.addEventListener('input', () => {
+    const n = Number(input.value);
+    if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
+    after();
+  });
+  return input;
+}
+
+function popoverColorInput(value, onChange, after) {
+  const input = document.createElement('input');
+  input.type = 'color';
+  input.value = value;
+  input.addEventListener('input', () => {
+    onChange(input.value);
+    after();
+  });
+  return input;
+}
+
+function popoverCheckboxInput(checked, onChange, after) {
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = checked;
+  input.addEventListener('input', () => {
+    onChange(input.checked);
+    after();
+  });
+  return input;
+}
+
+/**
+ * The two rows that depend on each other: background (a toggle plus a colour,
+ * because <input type=color> has no "none") and shadow, which needs a fill to
+ * be visible at all (see ANNOTATION_SHADOW) and so switches the background on
+ * rather than doing nothing.
+ */
+function buildPopoverFillRows(ann, after) {
+  const bgColorInput = popoverColorInput(ann.bgColor ?? '#ffffff', (v) => {
+    if (ann.bgColor != null) ann.bgColor = v;
+  }, after);
+  const bgToggle = popoverCheckboxInput(ann.bgColor != null, (on) => {
+    ann.bgColor = on ? bgColorInput.value : null;
+  }, after);
+  const bgControls = document.createElement('span');
+  bgControls.className = 'annotation-popover-pair';
+  bgControls.append(bgToggle, bgColorInput);
+  const bgRow = popoverRow('Background', bgControls);
+
+  const shadowToggle = popoverCheckboxInput(ann.shadow === true, (on) => {
+    ann.shadow = on;
+    if (on && ann.bgColor == null) {
+      ann.bgColor = bgColorInput.value;
+      bgToggle.checked = true;
+    }
+  }, after);
+  return { bgRow, shadowToggle };
+}
+
+class AnnotationLayer {
+  /**
+   * @param {object} adapter  SigmaAdapter (owns sigma + graphology)
+   * @param {object} cache    app cache (layout state, ui toasts)
+   * @param {HTMLElement} container  the sigma container (#innerGraphContainer)
+   */
+  constructor(adapter, cache, container) {
+    this.adapter = adapter;
+    this.cache = cache;
+    this.container = container;
+    this.killed = false;
+    // Layer visibility, driven by the inspector's Overlays stack. Runtime
+    // state like heatmapEnabled — never persisted, resets with the adapter.
+    this.visible = true;
+
+    /** @type {Map<string, HTMLElement>} note id → element */
+    this.els = new Map();
+    this.editingId = null;
+    this.popover = null;
+    this.popoverId = null;
+    this.placementOverlay = null;
+    // Every other piece of mutable state, declared rather than materialising
+    // mid-method: what the open editor started from and how it ends (a cancel
+    // discards, and a cancel on a note that only existed for this edit deletes
+    // it), whether the popover changed anything worth an undo entry, and the
+    // handlers/fingerprints the teardown and the per-frame gate compare.
+    this.editingIsNew = false;
+    this.editingOriginal = null;
+    this.editingCancelled = false;
+    this.popoverDirty = false;
+    this.placementEscape = null;
+    this.lastAnns = null;
+    this.frame = new FrameCoalescer(() => {
+      if (this.#stale()) this.sync();
+    });
+
+    this.root = document.createElement('div');
+    this.root.className = 'annotation-layer';
+    container.appendChild(this.root);
+
+    this.renderHandler = () => this.scheduleSync();
+    adapter.sigma.on('afterRender', this.renderHandler);
+    // Camera + note-set fingerprint of the last reconcile, so the per-frame
+    // hook can tell "nothing moved" from "re-anchor everything" (see #stale).
+    this.syncStamp = null;
+  }
+
+  /**
+   * Show or hide every note, on screen and in both export paths. Hiding also
+   * closes the styling popover — it would otherwise float over a note that is
+   * no longer on screen.
+   */
+  setVisible(visible) {
+    if (this.visible === visible) return;
+    this.visible = visible;
+    this.root.hidden = !visible;
+    if (!visible) {
+      this.cancelPlacement();
+      this.#closePopover();
+      return;
+    }
+    // Frames rendered while hidden are skipped, so a camera that moved in the
+    // meantime left the notes anchored to their old spots. Nothing re-renders
+    // on unhide by itself — re-anchor them here.
+    if (this.#stale()) this.sync();
+  }
+
+  destroy() {
+    if (this.killed) return;
+    this.killed = true;
+    this.frame.kill();
+    this.adapter.sigma.off('afterRender', this.renderHandler);
+    this.cancelPlacement();
+    this.#closePopover();
+    this.root.remove();
+    this.els.clear();
+  }
+
+  // ------------------------------------------------------------------- state
+
+  /** The selected workspace's annotations (read-only view; [] when absent). */
+  annotations() {
+    return this.cache.data?.layouts?.[this.cache.data.selectedLayout]?.annotations ?? [];
+  }
+
+  #annotationById(id) {
+    return this.annotations().find((a) => a.id === id) ?? null;
+  }
+
+  // ----------------------------------------------------------------- placing
+
+  /**
+   * One-shot placement: a crosshair overlay captures the next click, creates
+   * a note there and opens it for editing. Escape cancels.
+   */
+  armPlacement() {
+    if (this.placementOverlay) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'annotation-placement-overlay';
+    overlay.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      const { x, y } = this.#relativePoint(event);
+      this.cancelPlacement();
+      this.#createAt(x, y);
+    });
+    this.placementEscape = (event) => {
+      if (event.key === 'Escape') {
+        this.cancelPlacement();
+        this.cache.ui?.info?.('Note placement canceled');
+      }
+    };
+    document.addEventListener('keydown', this.placementEscape, true);
+    this.container.appendChild(overlay);
+    this.placementOverlay = overlay;
+    this.cache.ui?.setNotePlacementActive?.(true);
+  }
+
+  cancelPlacement() {
+    if (!this.placementOverlay) return;
+    this.placementOverlay.remove();
+    this.placementOverlay = null;
+    // Every route out of placement lands here — the placing click, Escape,
+    // hiding the layer — so the rail button's armed look is dropped here too.
+    this.cache.ui?.setNotePlacementActive?.(false);
+    document.removeEventListener('keydown', this.placementEscape, true);
+    this.placementEscape = null;
+  }
+
+  #createAt(viewportX, viewportY) {
+    const layout = this.cache.data?.layouts?.[this.cache.data.selectedLayout];
+    if (!layout) return;
+    const g = this.adapter.sigma.viewportToGraph({ x: viewportX, y: viewportY });
+    const ann = {
+      id: typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `ann-${Date.now()}`,
+      ...ANNOTATION_DEFAULTS,
+      x: g.x,
+      y: flipY(g.y),
+    };
+    (layout.annotations ??= []).push(ann);
+    this.sync();
+    // First note: the Notes row's switch is disabled while there is nothing to
+    // show, so it has to be re-read here. Not in sync() — that runs per render.
+    this.cache.ui?.syncOverlays?.();
+    const el = this.els.get(ann.id);
+    if (el) this.#startEditing(ann, el, { selectAll: true });
+  }
+
+  /**
+   * Remove a note by id (popover delete).
+   *
+   * `record: false` is for discarding a note the user never really made — a
+   * fresh placement blurred without typing. Committing there would push an
+   * undo entry whose before and after are the same state.
+   */
+  removeAnnotation(id, { record = true } = {}) {
+    const layout = this.cache.data?.layouts?.[this.cache.data.selectedLayout];
+    if (!layout?.annotations) return;
+    layout.annotations = layout.annotations.filter((a) => a.id !== id);
+    this.#closePopover();
+    this.sync();
+    this.cache.ui?.syncOverlays?.();
+    if (record) this.cache.history?.commit('Delete note');
+  }
+
+  // ------------------------------------------------------------------- sync
+
+  scheduleSync() {
+    this.frame.schedule();
+  }
+
+  /**
+   * Has anything changed that the notes' DOM depends on? This runs on every
+   * rendered frame — hover included — where a full sync() would rebuild a
+   * signature string per note (note text runs to 2000 chars) and rewrite every
+   * transform for nothing.
+   *
+   * The fingerprint covers the camera and the note-set identity. Content edits
+   * mutate a note in place and call sync() directly, so they never need to be
+   * detected here; a restored workspace (undo) swaps the array, which does show
+   * up as a new reference.
+   */
+  #stale() {
+    if (!this.visible) return false;
+    const camera = this.adapter.sigma.getCamera().getState();
+    const anns = this.annotations();
+    const stamp = `${camera.x}|${camera.y}|${camera.ratio}|${camera.angle}|${anns.length}`;
+    if (stamp === this.syncStamp && anns === this.lastAnns) return false;
+    this.syncStamp = stamp;
+    this.lastAnns = anns;
+    return true;
+  }
+
+  /** Reconcile the DOM notes with the selected workspace, immediately. */
+  sync() {
+    if (this.killed) return;
+    const anns = this.annotations();
+    const seen = new Set();
+    for (const ann of anns) {
+      seen.add(ann.id);
+      let el = this.els.get(ann.id);
+      if (!el) {
+        el = this.#createElement(ann.id);
+        this.els.set(ann.id, el);
+      }
+      this.#applyStyle(ann, el);
+      this.#place(ann, el);
+    }
+    for (const [id, el] of this.els) {
+      if (seen.has(id)) continue;
+      el.remove();
+      this.els.delete(id);
+      if (this.editingId === id) this.editingId = null;
+    }
+    // A deleted note or a workspace switch must not leave a popover editing
+    // a note that is no longer on screen.
+    if (this.popoverId && !seen.has(this.popoverId)) this.#closePopover();
+    else if (this.popoverId) this.#positionPopover();
+  }
+
+  #createElement(id) {
+    const el = document.createElement('div');
+    el.className = 'annotation-note';
+    el.dataset.annotationId = id;
+    // Keyboard operability for existing notes: focus with Tab, Enter to
+    // edit, Delete to remove (pointer users dblclick / use the popover).
+    el.setAttribute('role', 'note');
+    el.setAttribute('tabindex', '0');
+    el.addEventListener('pointerdown', (event) => this.#onNotePointerDown(id, el, event));
+    el.addEventListener('dblclick', (event) => {
+      event.preventDefault();
+      const ann = this.#annotationById(id);
+      if (ann) this.#startEditing(ann, el, { selectAll: false });
+    });
+    el.addEventListener('keydown', (event) => {
+      if (this.editingId === id) return; // typing, not commanding
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        const ann = this.#annotationById(id);
+        if (ann) this.#startEditing(ann, el, { selectAll: false });
+      } else if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+        this.removeAnnotation(id);
+      }
+    });
+    this.root.appendChild(el);
+    return el;
+  }
+
+  /** Restyle only when the note's content/style signature changed. */
+  #applyStyle(ann, el) {
+    const signature =
+      `${ann.text}|${ann.fontSize}|${ann.fontColor}|${ann.borderColor}|${ann.borderWidth}` +
+      `|${ann.borderRadius ?? 0}|${ann.bgColor ?? ''}|${ann.shadow ? 1 : 0}`;
+    if (el.dataset.signature === signature) return;
+    el.dataset.signature = signature;
+    // Text as textContent, never innerHTML — note text is user data.
+    if (this.editingId !== ann.id) el.textContent = ann.text;
+    const shadow = ann.shadow && ann.bgColor; // ring shadows are unreproducible in exports
+    Object.assign(el.style, {
+      font: `${ann.fontSize}px ${ANNOTATION_FONT_FAMILY}`,
+      lineHeight: String(ANNOTATION_LINE_HEIGHT),
+      color: ann.fontColor,
+      padding: `${ANNOTATION_PADDING_PX}px`,
+      border: ann.borderWidth > 0 ? `${ann.borderWidth}px solid ${ann.borderColor}` : 'none',
+      borderRadius: `${ann.borderRadius ?? 0}px`,
+      background: ann.bgColor ?? 'transparent',
+      boxShadow: shadow
+        ? `0 ${ANNOTATION_SHADOW.offsetY}px ${ANNOTATION_SHADOW.blur}px ${ANNOTATION_SHADOW.color}`
+        : 'none',
+    });
+  }
+
+  #place(ann, el) {
+    const sigma = this.adapter.sigma;
+    const v = sigma.graphToViewport({ x: ann.x, y: flipY(ann.y) });
+    const k = 1 / sigma.getCamera().getState().ratio;
+    el.style.transform = `translate(${v.x}px, ${v.y}px) scale(${k})`;
+  }
+
+  // ---------------------------------------------------------- drag / select
+
+  #relativePoint(event) {
+    const rect = this.container.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  #onNotePointerDown(id, el, event) {
+    if (event.button !== 0 || this.editingId === id) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const ann = this.#annotationById(id);
+    if (!ann) return;
+
+    const sigma = this.adapter.sigma;
+    const start = this.#relativePoint(event);
+    const g0 = sigma.viewportToGraph(start);
+    // Grab offset in app-model coordinates: the note keeps its position
+    // under the cursor for the whole drag.
+    const dx = ann.x - g0.x;
+    const dy = ann.y - flipY(g0.y);
+    let moved = false;
+
+    const onMove = (moveEvent) => {
+      const p = this.#relativePoint(moveEvent);
+      if (!moved && Math.hypot(p.x - start.x, p.y - start.y) < DRAG_THRESHOLD_PX) return;
+      moved = true;
+      const g = sigma.viewportToGraph(p);
+      ann.x = g.x + dx;
+      ann.y = flipY(g.y) + dy;
+      this.#place(ann, el);
+      if (this.popoverId === id) this.#positionPopover();
+    };
+    const onUp = () => {
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onUp);
+      if (!moved) this.#openPopover(ann.id);
+      else this.cache.history?.commit('Move note');
+    };
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+    // jsdom (tests) lacks pointer capture; without it a fast drag can slip
+    // off the note mid-move, which is tolerable there.
+    try {
+      el.setPointerCapture(event.pointerId);
+    } catch {
+      /* no pointer capture available */
+    }
+  }
+
+  // ----------------------------------------------------------------- editing
+
+  #startEditing(ann, el, { selectAll }) {
+    this.#closePopover();
+    this.editingId = ann.id;
+    // Only #createAt selects all, so this doubles as "the note was just placed"
+    // — it has to be committed even if the default text is left untouched.
+    this.editingIsNew = selectAll;
+    // Escape means cancel (see onKey): restore this on an existing note, drop
+    // the note entirely on one that was just placed.
+    this.editingOriginal = ann.text;
+    this.editingCancelled = false;
+    el.classList.add('editing');
+    // plaintext-only strips markup from paste natively; engines that reject
+    // the keyword fall back to "true", where the explicit paste handler below
+    // provides the same guarantee.
+    try {
+      el.contentEditable = 'plaintext-only';
+    } catch {
+      el.contentEditable = 'true';
+    }
+    el.focus();
+    if (selectAll && typeof window.getSelection === 'function') {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        // Flagged before the blur, because blurring runs the COMMIT path: the
+        // flag is what turns that into a discard, so Escape on a freshly placed
+        // note cannot save the untouched "Text" default.
+        this.editingCancelled = true;
+        el.blur();
+      }
+    };
+    // Pasted markup must never render live in the note, regardless of
+    // whether the engine honored plaintext-only above: always insert the
+    // clipboard's plain text instead of the default rich paste.
+    const onPaste = (event) => {
+      event.preventDefault();
+      const text = event.clipboardData?.getData('text/plain') ?? '';
+      if (text) document.execCommand?.('insertText', false, text);
+    };
+    const onBlur = () => {
+      el.removeEventListener('blur', onBlur);
+      el.removeEventListener('keydown', onKey);
+      el.removeEventListener('paste', onPaste);
+      this.#commitEditing(ann.id, el);
+    };
+    el.addEventListener('blur', onBlur);
+    el.addEventListener('keydown', onKey);
+    el.addEventListener('paste', onPaste);
+  }
+
+  #commitEditing(id, el) {
+    this.editingId = null;
+    const wasNew = this.editingIsNew === true;
+    const cancelled = this.editingCancelled === true;
+    const original = this.editingOriginal;
+    this.editingIsNew = false;
+    this.editingCancelled = false;
+    el.contentEditable = 'false';
+    el.classList.remove('editing');
+    const ann = this.#annotationById(id);
+    if (!ann) return;
+
+    if (cancelled) {
+      // A note that only existed for this edit goes with it; an older one keeps
+      // the text it had. Either way nothing reaches the undo history.
+      if (wasNew) {
+        this.removeAnnotation(id, { record: false });
+        // Escape on a fresh note takes the note AND everything typed into it,
+        // with no undo entry to get it back — so it has to say so, the way
+        // cancelPlacement already does.
+        this.cache.ui?.info?.('Note discarded.');
+      } else {
+        el.textContent = original;
+        delete el.dataset.signature;
+        this.sync();
+      }
+      return;
+    }
+
+    // innerText preserves the visual line breaks contenteditable produced.
+    // Same length cap as the JSON-load boundary, so a save/load round-trip
+    // never silently truncates what the user just typed.
+    const typed = (el.innerText ?? el.textContent ?? '').replace(/\n+$/, '');
+    const text = typed.slice(0, MAX_TEXT_LENGTH);
+    if (typed.length > text.length) {
+      this.cache.ui?.warning?.(
+        `Note trimmed to ${MAX_TEXT_LENGTH} characters (${typed.length} pasted).`,
+      );
+    }
+    if (text.trim() === '') {
+      // A note that only existed for this edit leaves no trace. An older one
+      // is a deletion the user never asked for by name, so it gets both an
+      // undo entry and a word about what just happened.
+      this.removeAnnotation(id, { record: !wasNew });
+      if (!wasNew) this.cache.ui?.info?.('Note deleted — its text was emptied.');
+      return;
+    }
+    const changed = ann.text !== text;
+    ann.text = text;
+    delete el.dataset.signature; // force a restyle with the committed text
+    this.sync();
+    // A note is created and opened for typing in one gesture, so this is where
+    // "add a note" ends as far as undo is concerned.
+    if (wasNew) this.cache.history?.commit('Add note');
+    else if (changed) this.cache.history?.commit('Edit note');
+  }
+
+  // ----------------------------------------------------------------- popover
+
+  #openPopover(id) {
+    this.#closePopover();
+    const ann = this.#annotationById(id);
+    if (!ann) return;
+    this.popoverId = id;
+    // Style inputs mutate the note live and fire per keystroke and per colour
+    // drag, so the undo entry is recorded once when the popover closes.
+    this.popoverDirty = false;
+
+    const pop = document.createElement('div');
+    pop.className = 'annotation-popover';
+    pop.setAttribute('role', 'group');
+    pop.setAttribute('aria-label', 'Note style');
+    // Every input reports through the same hook: repaint now, record one undo
+    // entry when the popover closes.
+    const after = () => this.#afterStyleEdit();
+    const numberInput = (value, min, max, step, onChange) =>
+      popoverNumberInput(value, min, max, step, onChange, after);
+    const colorInput = (value, onChange) => popoverColorInput(value, onChange, after);
+
+    const { bgRow, shadowToggle } = buildPopoverFillRows(ann, after);
+
+    pop.append(
+      // Same bounds the sanitizer clamps to on load — stated once, there.
+      popoverRow(
+        'Font size',
+        numberInput(ann.fontSize, MIN_FONT_SIZE, MAX_FONT_SIZE, 1, (v) => (ann.fontSize = v))
+      ),
+      popoverRow('Font color', colorInput(ann.fontColor, (v) => (ann.fontColor = v))),
+      popoverRow('Border color', colorInput(ann.borderColor, (v) => (ann.borderColor = v))),
+      popoverRow(
+        'Border width',
+        numberInput(ann.borderWidth, 0, MAX_BORDER_WIDTH, 0.5, (v) => (ann.borderWidth = v))
+      ),
+      popoverRow(
+        'Corner radius',
+        numberInput(ann.borderRadius ?? 0, 0, MAX_BORDER_RADIUS, 1, (v) => (ann.borderRadius = v))
+      ),
+      bgRow,
+      popoverRow('Shadow', shadowToggle)
+    );
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'annotation-popover-delete';
+    del.textContent = '✗ Delete note';
+    del.addEventListener('click', () => this.removeAnnotation(id));
+    pop.appendChild(del);
+
+    document.body.appendChild(pop);
+    this.popover = pop;
+    this.#positionPopover();
+    pop.querySelector('input')?.focus();
+    this.#wirePopoverDismiss(id, pop);
+  }
+
+  /** Outside-pointerdown and Escape, both scoped to this popover's lifetime.
+   * Escape hands focus back to the note it belongs to. */
+  #wirePopoverDismiss(id, pop) {
+    this.popoverOutside = (event) => {
+      const noteEl = this.els.get(id);
+      if (pop.contains(event.target) || noteEl?.contains(event.target)) return;
+      this.#closePopover();
+    };
+    document.addEventListener('pointerdown', this.popoverOutside, true);
+    this.popoverEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation();
+      const noteEl = this.els.get(id);
+      this.#closePopover();
+      noteEl?.focus();
+    };
+    document.addEventListener('keydown', this.popoverEscape, true);
+  }
+
+  /** A style input changed the note: repaint now, record the undo on close. */
+  #afterStyleEdit() {
+    this.popoverDirty = true;
+    this.sync();
+  }
+
+  #positionPopover() {
+    const el = this.els.get(this.popoverId);
+    if (!el || !this.popover) return;
+    const rect = el.getBoundingClientRect();
+    // Below the note by default, above it when the colour rows and Delete would
+    // fall off the bottom edge (same flip as the tooltip layer). The clamp is
+    // the last resort for a popover taller than the space on either side.
+    const height = this.popover.offsetHeight;
+    let top = rect.bottom + POPOVER_OFFSET_PX;
+    if (top + height > window.innerHeight - POPOVER_OFFSET_PX) {
+      top = rect.top - height - POPOVER_OFFSET_PX;
+    }
+    this.popover.style.top = `${clampPopoverTop(top, height, window.innerHeight)}px`;
+    this.popover.style.left = `${clampPopoverLeft(
+      rect.left,
+      this.popover.offsetWidth,
+      window.innerWidth
+    )}px`;
+  }
+
+  #closePopover() {
+    if (!this.popover) return;
+    this.popover.remove();
+    this.popover = null;
+    this.popoverId = null;
+    document.removeEventListener('pointerdown', this.popoverOutside, true);
+    this.popoverOutside = null;
+    document.removeEventListener('keydown', this.popoverEscape, true);
+    this.popoverEscape = null;
+    if (this.popoverDirty) {
+      this.popoverDirty = false;
+      this.cache.history?.commit('Style note');
+    }
+  }
+
+  // ------------------------------------------------------------------ export
+
+  /**
+   * Notes with their current viewport anchor (CSS px, top-left) and zoom
+   * factor — the SVG export's input, mirroring the live transform exactly.
+   *
+   * @returns {Array<{ann: object, x: number, y: number, k: number}>}
+   */
+  exportPlacements() {
+    if (!this.visible) return [];
+    const sigma = this.adapter.sigma;
+    const k = 1 / sigma.getCamera().getState().ratio;
+    return this.annotations().map((ann) => {
+      const v = sigma.graphToViewport({ x: ann.x, y: flipY(ann.y) });
+      return { ann, x: v.x, y: v.y, k };
+    });
+  }
+
+  /**
+   * Repaint the notes onto a PNG-export context at `scale` device px per CSS
+   * px, ABOVE the flattened sigma image (the live DOM sits above every
+   * canvas). Geometry is the shared annotationLayout metrics, so the export
+   * matches the DOM box to the pixel.
+   *
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} scale
+   */
+  drawExport(ctx, scale) {
+    const placements = this.exportPlacements();
+    if (placements.length === 0) return;
+    ctx.save();
+    try {
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      for (const { ann, x, y, k } of placements) {
+        const layout = annotationLayout(ann, (text, font) => {
+          ctx.font = font;
+          return ctx.measureText(text).width;
+        });
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(k, k);
+        // Every rectangle and origin below comes from annotationLayout, so this
+        // and the SVG export cannot disagree about the border inset, the corner
+        // shrink or where a line sits.
+        const { fillBox, strokeBox } = layout;
+        if (ann.bgColor) {
+          if (ann.shadow) {
+            // Canvas shadows live in DEVICE px (the transform does not apply
+            // to them), so the CSS-px values scale by the full device factor.
+            ctx.shadowColor = ANNOTATION_SHADOW.color;
+            ctx.shadowOffsetY = ANNOTATION_SHADOW.offsetY * scale * k;
+            ctx.shadowBlur = ANNOTATION_SHADOW.blur * scale * k;
+          }
+          ctx.fillStyle = ann.bgColor;
+          ctx.beginPath();
+          ctx.roundRect(fillBox.x, fillBox.y, fillBox.width, fillBox.height, fillBox.radius);
+          ctx.fill();
+          ctx.shadowColor = 'transparent';
+          ctx.shadowOffsetY = 0;
+          ctx.shadowBlur = 0;
+        }
+        if (strokeBox) {
+          ctx.strokeStyle = ann.borderColor;
+          ctx.lineWidth = strokeBox.strokeWidth;
+          ctx.beginPath();
+          ctx.roundRect(
+            strokeBox.x,
+            strokeBox.y,
+            strokeBox.width,
+            strokeBox.height,
+            strokeBox.radius
+          );
+          ctx.stroke();
+        }
+        ctx.fillStyle = ann.fontColor;
+        ctx.font = layout.font;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        for (const line of layout.textLines) ctx.fillText(line.text, line.x, line.y);
+        ctx.restore();
+      }
+    } finally {
+      ctx.restore();
+    }
+  }
+}
+
+export { AnnotationLayer };

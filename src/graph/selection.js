@@ -97,6 +97,12 @@ class GraphSelectionManager {
     await this.updateSelectedState(edges, enable);
   }
 
+  /** Clear the whole selection — the rail chip's ×. */
+  async clearSelection() {
+    await this.toggleSelectionForAllNodes(false);
+    await this.toggleSelectionForAllEdges(false);
+  }
+
   async syncSelectionCacheAndElementStates() {
     const snapshot = this.cache.selectionMemory[this.cache.selectedMemoryIndex];
 
@@ -122,8 +128,8 @@ class GraphSelectionManager {
     }
     await this.cache.graph.setElementState(stateMap);
 
-    // Update manual bubble group button state when selection is synced (undo/redo)
-    this.cache.bs.updateManualGroupButtonState();
+    // Resync the group rows' ＋/－ buttons after an undo/redo of the selection
+    this.cache.bs.syncGroupRows();
   }
 
   undoSelection() {
@@ -370,13 +376,17 @@ class GraphSelectionManager {
   }
 
   async updateSelectedNodesAndEdges() {
-    this.cache.selectedNodes = await this.cache.graph
-      .getNodeData()
-      .filter((n) => n.states?.includes('selected') && this.cache.nodeIDsToBeShown.has(n.id))
+    const selectedNodeStates = (await this.cache.graph.getNodeData()).filter((n) =>
+      n.states?.includes('selected')
+    );
+    const selectedEdgeStates = (await this.cache.graph.getEdgeData()).filter((e) =>
+      e.states?.includes('selected')
+    );
+    this.cache.selectedNodes = selectedNodeStates
+      .filter((n) => this.cache.nodeIDsToBeShown.has(n.id))
       .map((n) => n.id);
-    this.cache.selectedEdges = await this.cache.graph
-      .getEdgeData()
-      .filter((e) => e.states?.includes('selected') && this.cache.edgeIDsToBeShown.has(e.id))
+    this.cache.selectedEdges = selectedEdgeStates
+      .filter((e) => this.cache.edgeIDsToBeShown.has(e.id))
       .map((e) => e.id);
 
     const selectedNodesCount = this.cache.selectedNodes?.length || 0;
@@ -389,31 +399,28 @@ class GraphSelectionManager {
     const atLeastOneEdgeSelected = selectedEdgesCount > 0;
     const atLeastOneNodeOrEdgeSelected = atLeastOneNodeSelected || atLeastOneEdgeSelected;
 
-    // Swap the HUD between its empty state (instructions) and its active
-    // state (counts + actions). CSS keys off the `has-selection` class.
+    // Rail selection chip: swap "Nothing selected" for the live counts, and
+    // warn when filters hide part of the selection (filters and selection are
+    // orthogonal — hidden elements stay selected but actions skip them).
     document
-      .getElementById('selectedElementsContainer')
-      ?.classList.toggle('has-selection', atLeastOneNodeOrEdgeSelected);
+      .getElementById('selectionChip')
+      ?.classList.toggle('live', atLeastOneNodeOrEdgeSelected);
+    const hiddenSelectedCount =
+      selectedNodeStates.length - selectedNodesCount +
+      (selectedEdgeStates.length - selectedEdgesCount);
+    const hiddenWarning = document.getElementById('selectionHiddenWarning');
+    if (hiddenWarning) {
+      hiddenWarning.style.display = hiddenSelectedCount > 0 ? '' : 'none';
+      hiddenWarning.textContent = hiddenSelectedCount > 0 ? `${hiddenSelectedCount} hidden` : '';
+    }
 
-    // Tell the styling panel what it is acting on, so the node/edge cards
-    // are no longer silently greyed with no explanation.
-    const stylingStatus = document.getElementById('stylingSelectionStatus');
-    if (stylingStatus) {
-      if (atLeastOneNodeOrEdgeSelected) {
-        const parts = [];
-        if (selectedNodesCount)
-          parts.push(`${selectedNodesCount} node${selectedNodesCount === 1 ? '' : 's'}`);
-        if (selectedEdgesCount)
-          parts.push(`${selectedEdgesCount} edge${selectedEdgesCount === 1 ? '' : 's'}`);
-        stylingStatus.textContent = `Styling ${parts.join(' · ')}`;
-        stylingStatus.classList.remove('empty');
-        // Open the config card(s) matching the selection (additive).
-        this.cache.ui.syncStylingCardsToSelection(atLeastOneNodeSelected, atLeastOneEdgeSelected);
-      } else {
-        stylingStatus.textContent =
-          'Nothing selected — select nodes or edges to style them. Bubble-group styling below works without a selection.';
-        stylingStatus.classList.add('empty');
-      }
+    // Swap the inspector's Selection context between its empty state
+    // (instructions) and its active state, and flash its pill when the
+    // selection changed while another context is up.
+    this.cache.inspector?.syncToSelection(selectedNodesCount, selectedEdgesCount);
+    if (atLeastOneNodeOrEdgeSelected) {
+      // Open the appearance card(s) matching the selection (additive).
+      this.cache.ui.syncStylingCardsToSelection(atLeastOneNodeSelected, atLeastOneEdgeSelected);
     }
     const moreThanOneNodeSelected = selectedNodesCount > 1;
     const exactlyTwoNodesSelected = selectedNodesCount === 2;
@@ -430,9 +437,9 @@ class GraphSelectionManager {
     this.updateEnabledStateUndoRedoSelectionButtons();
 
     // Single authoritative point where cache.selectedNodes is recomputed, so
-    // resync the "Add to group" quadrant button here. (updateSelectedState
-    // fires before this refresh and would read a stale selection.)
-    this.cache.bs.updateManualGroupButtonState();
+    // resync the group rows' ＋/－ buttons here. (updateSelectedState fires
+    // before this refresh and would read a stale selection.)
+    this.cache.bs.syncGroupRows();
 
     if (typeof this.cache.dataTable !== 'undefined' && this.cache.dataTable.fileData) {
       if (

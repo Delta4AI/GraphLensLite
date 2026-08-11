@@ -23,7 +23,8 @@ class GraphStyleManager {
     }
 
     // Reapply the layout to use the original default styles
-    await this.cache.lm.changeLayout();
+    await this.cache.lm.changeLayout('Reset style of the selected elements');
+    this.cache.history?.commit('Reset style');
   }
 
   async handleStyleChangeLoadingEvent(header, text) {

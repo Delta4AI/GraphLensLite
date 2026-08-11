@@ -131,15 +131,26 @@ describe("hotkey handler — gated on ui.isBusy()", () => {
   const exportJSON = vi.fn();
   const state = { busy: false };
 
-  function pressKey(key) {
-    document.dispatchEvent(new KeyboardEvent("keydown", { key }));
+  function pressKey(key, modifiers = {}) {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key, ...modifiers }));
     // hotkey switch branches are async; let the microtask queue drain.
     return Promise.resolve();
   }
 
+  // The 1.17 additions: the target methods are unit-tested, the key → action
+  // mapping was not, so a typo in the switch would go unnoticed.
+  const showAppearance = vi.fn();
+  const togglePresentationMode = vi.fn();
+  const toggleKeyboardSheet = vi.fn();
+
   beforeAll(() => {
     const cache = {
-      ui: { isBusy: () => state.busy },
+      ui: {
+        isBusy: () => state.busy,
+        togglePresentationMode,
+        toggleKeyboardSheet,
+      },
+      inspector: { showAppearance },
       io: { exportGraphAsJSON: exportJSON, exportPNG: vi.fn() },
     };
     new GraphCoreManager(cache).registerHotkeyEvents();
@@ -171,5 +182,34 @@ describe("hotkey handler — gated on ui.isBusy()", () => {
 
     // Assert
     expect(exportJSON).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['y', () => showAppearance],
+    ['F', () => togglePresentationMode],
+    ['?', () => toggleKeyboardSheet],
+  ])('dispatches %s to its action', async (key, target) => {
+    target().mockClear();
+    await pressKey(key);
+    expect(target()).toHaveBeenCalledTimes(1);
+  });
+
+  it('gates the new shortcuts on busy too', async () => {
+    state.busy = true;
+    showAppearance.mockClear();
+    await pressKey('y');
+    expect(showAppearance).not.toHaveBeenCalled();
+  });
+
+  // The switch matches the BARE key, so every chord that shares a letter with a
+  // hotkey used to fire it: Ctrl+S exported JSON over the browser's own save
+  // dialog, Ctrl+P over its print dialog.
+  it.each([
+    ["ctrlKey", { ctrlKey: true }],
+    ["metaKey", { metaKey: true }],
+    ["altKey", { altKey: true }],
+  ])("leaves %s chords to the browser", async (_name, modifiers) => {
+    await pressKey("s", modifiers);
+    expect(exportJSON).not.toHaveBeenCalled();
   });
 });

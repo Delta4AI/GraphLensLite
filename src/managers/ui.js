@@ -1,15 +1,11 @@
 import { StaticUtilities } from '../utilities/static.js';
-import { DropdownChecklist, InvertibleRangeSlider } from './ui_components.js';
+import { BooleanToggle, DropdownChecklist, InvertibleRangeSlider } from './ui_components.js';
 import { createStyleDiv } from './ui_style_div.js';
+import { attachGroupMenu } from './group_menu.js';
 import { Popup } from '../utilities/popup.js';
 import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
-import { EXPORT_SCALES } from '../utilities/export_scale.js';
-import { clampPopoverLeft } from '../utilities/popover_position.js';
-
-// Persisted preference: whether the filter panel reveals exact numeric inputs
-// and the per-row group / selection actions. Off keeps rows scannable when a
-// dataset has 30-50 properties.
-const FILTER_DETAILS_KEY = 'gll.filterDetails';
+import { isFilterNarrowed } from './query.js';
+import { hotkeyLabel, paletteAccelerator } from './command_palette.js';
 
 // Persisted preference: how multiple active filters combine — "OR" (match any)
 // or "AND" (match every, non-strict: a property an element lacks does not
@@ -22,23 +18,65 @@ const FILTER_JOIN_KEY = 'gll.filterJoinMode';
 // same-type filter.
 const FILTER_STRICT_KEY = 'gll.filterStrict';
 
+// The keyboard cheat sheet (opened with "?"). Must mirror the hotkey switch
+// in graph/core.js registerHotkeyEvents — update both when a key changes.
+const KEYBOARD_SHORTCUTS = [
+  [paletteAccelerator(), 'Find any control, node or property by name'],
+  [hotkeyLabel('Z'), 'Undo the last change to this workspace'],
+  [hotkeyLabel('Y'), 'Redo it (⇧ with undo works too)'],
+  ['P', 'Export PNG image (at the remembered resolution)'],
+  ['S', 'Save graph as JSON'],
+  ['F', 'Fit view to visible elements'],
+  ['D', 'Toggle data table'],
+  ['Q', 'Toggle query editor'],
+  ['M', 'Toggle metrics panel'],
+  ['Y', 'Jump to the inspector’s appearance controls'],
+  ['L', 'Toggle lasso selection'],
+  ['H', 'Toggle hover highlight'],
+  ['A', 'Toggle assistant'],
+  ['⇧F', 'Presentation mode (hide the rail and inspector)'],
+  ['Esc', 'Exit lasso or presentation mode'],
+  ['?', 'Show this sheet'],
+];
+
+// Toasts. Every message still lands in the activity log (the assistant reads it
+// back as context, and the Neo4j connector writes its Cypher trace there) — the
+// toast is only the transient copy of the newest one. "grey" is trace severity:
+// log-only, or a multi-statement Neo4j expand would fire a stack of toasts.
+const TOAST_MS = { red: 9000, 'dark-orange': 7000 };
+const TOAST_DEFAULT_MS = 4500;
+const MAX_TOASTS = 4;
+// The log is a ring: readRecentActions only ever reads the last 20 lines, and an
+// unbounded strip grows for the whole session.
+const LOG_MAX_LINES = 200;
+
 class UIManager {
   constructor(cache, debugEnabled = false) {
     this.cache = cache;
     this.debugEnabled = debugEnabled;
-    this.bottomBarHeight = null;
     // While > 0, hideLoading() is a no-op so a long multi-step orchestration
     // (workspace create/switch) keeps the overlay up across its nested
     // render→#postRefresh→hideLoading calls. See holdLoading/releaseLoading.
     this._loadingHolds = 0;
   }
 
-  setDataSourceLabel(text) {
+  /**
+   * Stamp what the on-screen graph came from. `source` is the machine-readable
+   * half — code that has to recognise a source (the Neo4j session's expand/join
+   * buttons) reads that, so rewording the visible text stays a copy change.
+   */
+  setDataSourceLabel(text, source = '') {
     const label = document.getElementById('dataSourceLabel');
     if (label) {
       label.textContent = text;
       label.title = text;
+      label.dataset.source = source;
     }
+    // Every loader stamps the label, so this is the one seam where "another
+    // source replaced the graph" is visible. Announced rather than called:
+    // importing a data-source connector here pulled neo4j_loader (and through it
+    // api_client) into every consumer of ui.js, to reach one function.
+    document.dispatchEvent(new CustomEvent('gll:datasourcechange', { detail: { text, source } }));
   }
 
   /**
@@ -91,10 +129,25 @@ class UIManager {
     return new Promise((resolve) => requestAnimationFrame(resolve));
   }
 
+  /**
+   * Offer a Cancel on the loading card for as long as an operation can be
+   * abandoned. The overlay blocks the whole UI, so a query with a five-minute
+   * timeout and no cancel is a five-minute lockout. Cleared by hideLoading.
+   *
+   * @param {(() => void)|null} onCancel
+   */
+  setLoadingCancel(onCancel) {
+    const btn = document.getElementById('loadingCancelBtn');
+    if (!btn) return;
+    btn.hidden = !onCancel;
+    btn.onclick = onCancel ?? null;
+  }
+
   async hideLoading() {
     // Pinned open by an in-progress orchestration — keep blocking until it
     // releases its hold and calls hideLoading() itself at the true end.
     if (this._loadingHolds > 0) return;
+    this.setLoadingCancel(null);
 
     const overlay = document.getElementById('loadingOverlay');
     // Idempotent: already hidden (e.g. a defensive second call in a finally) —
@@ -130,6 +183,7 @@ class UIManager {
       `${this.cache.edgeIDsToBeShown.size - this.cache.hiddenDanglingEdgeIDs.size}`;
     document.getElementById('totalEdges').innerHTML = `${this.cache.data.edges.length}`;
 
+    this.cache.rail?.refresh();
     this.cache.bs.refreshBubbleStyleElements();
   }
 
@@ -141,22 +195,21 @@ class UIManager {
         'Reduce Edges',
         'Expand Neighbors',
         'Reduce Neighbors',
-        'deselectNodesBtn',
-        'focusNodesBtn',
+        'neo4jExpandBtn',
       ],
       enable
     );
   }
 
   toggleStyleElementsThatRequireAtLeastOneSelectedEdge(enable) {
-    this.toggleDisabledElements(
-      ['Edge Configuration', 'deselectEdgesBtn', 'focusEdgesBtn'],
-      enable
-    );
+    this.toggleDisabledElements(['Edge Configuration'], enable);
   }
 
   toggleStyleElementsThatRequireAtLeastOneSelectedNodeOrEdge(enable) {
-    this.toggleDisabledElements(['resetSelectedElementsStyleBtn'], enable);
+    this.toggleDisabledElements(
+      ['resetSelectedElementsStyleBtn', 'focusSelectionBtn', 'clearSelectionBtn'],
+      enable
+    );
   }
 
   toggleStyleElementsThatRequireAtLeastOneVisibleNode(enable) {
@@ -208,14 +261,20 @@ class UIManager {
     }
   }
 
-  logMessage(text, colorClass, bold = false, iconPrefix = '') {
+  /**
+   * @param {{sensitive?: boolean}} [options]  `sensitive` marks a line that
+   *   carries user data verbatim — executed Cypher, with its literals — so the
+   *   assistant's context builder can leave it out of what it sends to the
+   *   configured LLM endpoint.
+   */
+  logMessage(text, colorClass, bold = false, iconPrefix = '', options = {}) {
     const timestamp = StaticUtilities.getTimestamp();
 
     const container = document.getElementById('sidebarStatusContainer');
-    container.style.height = '8%';
 
     const p = document.createElement('p');
     p.style.margin = '0 0 1px 0';
+    if (options.sensitive) p.dataset.sensitive = 'true';
 
     const spanTime = document.createElement('span');
     spanTime.textContent = `${timestamp} | `;
@@ -236,7 +295,87 @@ class UIManager {
     p.appendChild(spanText);
 
     container.appendChild(p);
+    while (container.childElementCount > LOG_MAX_LINES) container.firstElementChild.remove();
     container.scrollTop = container.scrollHeight;
+    this.#syncLogFooter(container);
+
+    return this.showToast(text, colorClass, iconPrefix);
+  }
+
+  /**
+   * The transient copy of a message, over the stage. Returns the element so a
+   * caller can hang an action on it (the undo slice does).
+   */
+  showToast(text, colorClass = 'black', iconPrefix = '') {
+    if (colorClass === 'grey') return null;
+
+    const host = document.getElementById('toasts');
+    if (!host) return null;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${colorClass}`;
+
+    if (iconPrefix) {
+      const icon = document.createElement('span');
+      icon.className = 'toast-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = iconPrefix;
+      toast.appendChild(icon);
+    }
+
+    const body = document.createElement('span');
+    body.className = 'toast-text';
+    body.textContent = text;
+    toast.appendChild(body);
+
+    const dismiss = document.createElement('button');
+    dismiss.className = 'toast-dismiss';
+    dismiss.setAttribute('aria-label', 'Dismiss message');
+    dismiss.title = 'Dismiss (the activity log keeps it)';
+    dismiss.textContent = '✕';
+    dismiss.addEventListener('click', () => toast.remove());
+    toast.appendChild(dismiss);
+
+    host.appendChild(toast);
+    // Evict the oldest NON-error first: four routine info toasts used to push a
+    // red one off screen, and the error is the only one the user has to read.
+    // Errors still go when they are all there is.
+    while (host.childElementCount > MAX_TOASTS) {
+      const victim =
+        host.querySelector(`:scope > :not(.toast-red):not(.toast-dark-orange)`) ??
+        host.firstElementChild;
+      victim.remove();
+    }
+    setTimeout(() => toast.remove(), TOAST_MS[colorClass] ?? TOAST_DEFAULT_MS);
+
+    return toast;
+  }
+
+  /** Empty the activity log (a new graph makes every line stale). */
+  clearLog() {
+    const container = document.getElementById('sidebarStatusContainer');
+    if (!container) return;
+    container.replaceChildren();
+    this.#syncLogFooter(container);
+  }
+
+  /** Expand/collapse the log strip at the foot of the inspector. */
+  toggleLog() {
+    const container = document.getElementById('sidebarStatusContainer');
+    const btn = document.getElementById('logToggleBtn');
+    if (!container || !btn) return;
+    const open = container.hidden;
+    container.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+    if (open) container.scrollTop = container.scrollHeight;
+  }
+
+  #syncLogFooter(container) {
+    const footer = document.getElementById('inspectorLog');
+    const count = document.getElementById('logCount');
+    const lines = container.childElementCount;
+    if (footer) footer.hidden = lines === 0;
+    if (count) count.textContent = lines ? String(lines) : '';
   }
 
   info(message) {
@@ -255,249 +394,64 @@ class UIManager {
     this.logMessage(message, 'green', false);
   }
 
+  /**
+   * Trace line, gated on the constructor's `debugEnabled` — production leaves it
+   * false, so 19 call sites used to spam the browser console for nobody while
+   * only the in-app log respected the flag.
+   */
   debug(message) {
+    if (!this.debugEnabled) return;
     console.log(`${StaticUtilities.getTimestamp(true)} | ${message}`);
-    if (this.debugEnabled) {
-      this.logMessage(message, 'grey', false);
-    }
+    this.logMessage(message, 'grey', false);
   }
 
   toggleQueryEditor() {
-    const queryBtn = document.getElementById('queryToggleBtn');
-    const dataBtn = document.getElementById('dataToggleBtn');
-    const shouldEnable = !queryBtn.classList.contains('highlight');
-
-    if (shouldEnable) {
-      this.showEditor('query');
-      queryBtn.classList.add('highlight');
-      dataBtn.classList.remove('highlight');
-    } else {
-      this.hideBottomBar();
-      queryBtn.classList.remove('highlight');
-    }
-  }
-
-  async closeBottomBar() {
-    const queryBtn = document.getElementById('queryToggleBtn');
-    const dataBtn = document.getElementById('dataToggleBtn');
-
-    if (dataBtn.classList.contains('highlight')) {
-      await this.toggleDataEditor();
-      return;
-    }
-
-    if (queryBtn.classList.contains('highlight')) {
-      this.toggleQueryEditor();
-      return;
-    }
-
-    const bottomBar = document.getElementById('bottomBar');
-    if (bottomBar.classList.contains('active')) {
-      this.hideBottomBar();
-    }
+    this.cache.workbench?.toggle('query');
   }
 
   async toggleDataEditor() {
-    const queryBtn = document.getElementById('queryToggleBtn');
-    const dataBtn = document.getElementById('dataToggleBtn');
-    const shouldEnable = !dataBtn.classList.contains('highlight');
-
-    if (shouldEnable) {
-      await this.showLoading('Data Editor', 'Loading Data Editor ..');
-      this.showEditor('data');
-      dataBtn.classList.add('highlight');
-      queryBtn.classList.remove('highlight');
-    } else {
-      await this.showLoading('Data Editor', 'Closing Data Editor ..');
-      this.hideBottomBar();
-      dataBtn.classList.remove('highlight');
-    }
-
+    const opening = !this.cache.workbench?.isTabOpen('data');
+    await this.showLoading('Data Editor', `${opening ? 'Loading' : 'Closing'} Data Editor ..`);
+    this.cache.workbench?.toggle('data');
     await this.hideLoading();
   }
 
   async reloadApp() {
     if (!this.cache.initialized) return;
 
-    const confirmed = await Popup.confirm('Reload the application and start from scratch?');
+    const confirmed = await Popup.confirm(
+      'Reload the application and start from scratch? Everything loaded is discarded.',
+      'Reload'
+    );
     if (confirmed) {
       location.reload();
     }
   }
 
-  showEditor(editorType) {
-    const mainContent = document.getElementById('mainContent');
-    const bottomBar = document.getElementById('bottomBar');
-    const queryEditor = document.getElementById('queryEditor');
-    const dataEditor = document.getElementById('dataEditor');
-    const queryButtons = document.querySelector('.query-buttons');
-    const dataButtons = document.querySelector('.data-buttons');
-    const queryToggleButtons = document.querySelectorAll('.add-to-query-button');
-    const headerText = document.getElementById('bottomBarHeaderText');
-    const helpBtn = document.getElementById('bottomBarHelpBtn');
-
-    if (this.bottomBarHeight) {
-      const mainHeight = window.innerHeight - this.bottomBarHeight;
-      bottomBar.style.height = this.bottomBarHeight + 'px';
-      mainContent.style.height = mainHeight + 'px';
-    } else {
-      mainContent.style.height = '65%';
-      bottomBar.style.height = '35%';
+  /**
+   * Presentation mode (⇧F): strip the shell down to the stage for a screenshot
+   * or a demo. Hides all the chrome rather than one widget, and Escape always
+   * brings it back.
+   */
+  togglePresentationMode() {
+    const on = document.body.classList.toggle('presentation');
+    if (on) {
+      this._presentationEscape = (e) => {
+        if (e.key === 'Escape') this.togglePresentationMode();
+      };
+      document.addEventListener('keydown', this._presentationEscape, true);
+      this.info('Presentation mode — press Escape or ⇧F to bring the interface back');
+    } else if (this._presentationEscape) {
+      document.removeEventListener('keydown', this._presentationEscape, true);
+      this._presentationEscape = null;
     }
-    bottomBar.classList.add('active');
-
-    if (editorType === 'query') {
-      queryEditor.style.display = 'block';
-      dataEditor.style.display = 'none';
-      queryButtons.style.display = 'flex';
-      dataButtons.style.display = 'none';
-      queryToggleButtons.forEach((btn) => btn.classList.add('show'));
-      headerText.textContent = 'Query Editor';
-      helpBtn.onclick = () => this.cache.qm.showQueryHelp();
-      helpBtn.title = 'Display query editor help';
-    } else if (editorType === 'data') {
-      queryEditor.style.display = 'none';
-      dataEditor.style.display = 'block';
-      queryButtons.style.display = 'none';
-      dataButtons.style.display = 'flex';
-      queryToggleButtons.forEach((btn) => btn.classList.remove('show'));
-      headerText.textContent = 'Data Editor';
-      helpBtn.onclick = () => this.cache.dataTable.help();
-      helpBtn.title = 'Display data editor help';
-    }
-  }
-
-  hideBottomBar() {
-    const mainContent = document.getElementById('mainContent');
-    const bottomBar = document.getElementById('bottomBar');
-    const queryToggleButtons = document.querySelectorAll('.add-to-query-button');
-
-    mainContent.style.height = '100%';
-    bottomBar.style.height = '0';
-    bottomBar.classList.remove('active');
-    queryToggleButtons.forEach((btn) => btn.classList.remove('show'));
-  }
-
-  makeBottomBarResizable() {
-    const bottomBar = document.getElementById('bottomBar');
-    const mainContent = document.getElementById('mainContent');
-    const resizeHandle = bottomBar.querySelector('.resize-handle');
-    let isResizing = false;
-    let startY = 0;
-    let startHeight = 0;
-    let shadowBar = null;
-
-    function createShadowBar() {
-      if (shadowBar) return shadowBar;
-
-      shadowBar = document.createElement('div');
-      shadowBar.classList.add('resize-shadow-bar');
-      document.body.appendChild(shadowBar);
-      return shadowBar;
-    }
-
-    resizeHandle.addEventListener('mousedown', (e) => {
-      if (!bottomBar.classList.contains('active')) return;
-
-      isResizing = true;
-      startY = e.clientY;
-      startHeight = parseInt(document.defaultView.getComputedStyle(bottomBar).height, 10);
-
-      createShadowBar();
-      shadowBar.style.display = 'block';
-      shadowBar.style.bottom = startHeight + 'px';
-      shadowBar.style.height = startHeight + 'px';
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      e.preventDefault();
-
-      document.body.style.userSelect = 'none';
-      document.body.style.cursor = 'ns-resize';
-    });
-
-    function handleMouseMove(e) {
-      if (!isResizing || !bottomBar.classList.contains('active')) return;
-
-      const dy = startY - e.clientY;
-      const newHeight = startHeight + dy;
-      const minHeight = 50;
-      const maxHeight = window.innerHeight * 0.5;
-      const clampedHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
-
-      shadowBar.style.bottom = '0px';
-      shadowBar.style.height = clampedHeight + 'px';
-    }
-
-    const handleMouseUp = (e) => {
-      if (!isResizing) return;
-
-      isResizing = false;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-
-      const dy = startY - e.clientY;
-      const newHeight = startHeight + dy;
-      const minHeight = 50;
-      const maxHeight = window.innerHeight * 0.5;
-      const finalHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
-
-      if (finalHeight !== startHeight) {
-        const viewportHeight = window.innerHeight;
-        const newMainHeight = viewportHeight - finalHeight;
-
-        bottomBar.style.height = finalHeight + 'px';
-        mainContent.style.height = newMainHeight + 'px';
-        this.bottomBarHeight = finalHeight;
-      }
-
-      shadowBar.style.display = 'none';
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-    };
-
-    window.addEventListener('beforeunload', () => {
-      if (shadowBar && shadowBar.parentNode) {
-        shadowBar.parentNode.removeChild(shadowBar);
-      }
-    });
-  }
-
-  toggleStylingPanel() {
-    const rightSidebar = document.getElementById('rightSidebar');
-    const styleBtn = document.getElementById('styleToggleBtn');
-    const outerGraphContainer = document.getElementById('outerGraphContainer');
-    const isActive = rightSidebar.classList.contains('active');
-
-    if (isActive) {
-      rightSidebar.classList.remove('active');
-      styleBtn.classList.remove('highlight');
-      outerGraphContainer.classList.remove('styling-panel-active');
-    } else {
-      rightSidebar.classList.add('active');
-      styleBtn.classList.add('highlight');
-      outerGraphContainer.classList.add('styling-panel-active');
-    }
-  }
-
-  toggleSelectionEditor() {
-    const container = document.getElementById('selectedElementsContainer');
-    const panel = document.getElementById('selectionEditorPanel');
-    const toggleBtn = document.getElementById('selectionEditorToggleBtn');
-    if (!container || !panel || !toggleBtn) return;
-
-    const isExpanded = container.classList.toggle('expanded');
-    toggleBtn.textContent = isExpanded ? 'Tools ▴' : 'Tools ▾';
-    toggleBtn.title = isExpanded
-      ? 'Hide selection tools'
-      : 'Show selection tools: select by name, neighbours, or arrange the selection';
-    toggleBtn.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+    this.cache.graph?.resize();
   }
 
   async toggleLassoSelection() {
-    const lassoWrapper = document.getElementById('lassoWrapper');
-    const enableLasso = !lassoWrapper.classList.contains('active');
-    lassoWrapper.classList.toggle('active', enableLasso);
+    const lassoBtn = document.getElementById('lassoToggleBtn');
+    const enableLasso = !lassoBtn.classList.contains('active');
+    lassoBtn.classList.toggle('active', enableLasso);
 
     // The lasso overlay owns the pointer while active (camera pan and node
     // drag are swallowed by it); tooltip clicks are routed away too. Hover
@@ -509,19 +463,145 @@ class UIManager {
     this.info(enableLasso ? 'Switched to lasso selection mode' : 'Switched to click and drag mode');
   }
 
+  /**
+   * Arm the one-shot text-note tool: the next canvas click places a note.
+   * A second press disarms it, and the button shows the armed state — same
+   * contract as the lasso toggle, which this button sits next to.
+   */
+  startTextAnnotation() {
+    const layer = this.cache.graph?.annotationLayer;
+    if (!layer) {
+      this.error('Load a graph first.');
+      return;
+    }
+    if (layer.placementOverlay) {
+      layer.cancelPlacement();
+      this.info('Note placement canceled');
+      return;
+    }
+    // Placing a note into a hidden layer would look like a no-op, so the tool
+    // brings its own layer back rather than failing quietly.
+    if (!layer.visible) this.setOverlayVisible('notes', true);
+    layer.armPlacement();
+    this.info('Click the canvas to place a text note — Escape to cancel');
+  }
+
+  /** The armed look on the note button. Driven from the layer, which owns every
+   * route out of placement (the placing click, Escape, hiding the layer). */
+  setNotePlacementActive(active) {
+    document.getElementById('noteToggleBtn')?.classList.toggle('active', active);
+  }
+
+  // ------------------------------------------------------- the overlay stack
+
+  /**
+   * The inspector's Overlays context is a layer stack: one row per thing drawn
+   * over the graph, each row owning both its switch and its parameters. Every
+   * layer answers the same two-member contract (`visible` / `setVisible`), so
+   * a row needs no per-layer code — see the rows in graph_lens_lite.html and
+   * the two switch-bearing cards in ui_style_div.js.
+   *
+   * This table is the whole of "what is an overlay". It replaced the rail's ◐
+   * menu, which held the on/off switches while the parameters lived here — a
+   * split down a mechanism seam that left the parameter card greyed with no
+   * affordance pointing at its switch.
+   */
+  static OVERLAYS = {
+    groups: {
+      switchId: 'overlaySwitchGroups',
+      layer: (c) => c.graph?.bubbleLayer,
+      // A group with no members draws nothing, so the count IS the content.
+      empty: (c) => UIManager.#groupSetCount(c) === 0,
+      emptyHint: 'Nothing to show yet — put nodes in a group below',
+    },
+    heatmap: { switchId: 'overlaySwitchHeatmap', layer: (c) => c.graph?.heatmapLayer },
+    notes: {
+      switchId: 'overlaySwitchNotes',
+      layer: (c) => c.graph?.annotationLayer,
+      empty: (c) => (c.graph?.annotationLayer?.annotations?.() ?? []).length === 0,
+      emptyHint: 'Nothing to show yet — place a note with ✎ Note on the rail',
+    },
+    minimap: { switchId: 'overlaySwitchMinimap', layer: (c) => c.graph?.minimap },
+  };
+
+  /** Groups that actually draw something: the "N sets" beside the Groups row. */
+  static #groupSetCount(cache) {
+    const bs = cache.bs;
+    if (!bs || !cache.data?.layouts?.[cache.data.selectedLayout]) return 0;
+    let sets = 0;
+    for (const group of bs.traverseBubbleSets()) {
+      if (bs.getEffectiveGroupMembers(group).size > 0) sets++;
+    }
+    return sets;
+  }
+
+  /** @param {'groups'|'heatmap'|'notes'|'minimap'} name */
+  toggleOverlay(name) {
+    const spec = UIManager.OVERLAYS[name];
+    const layer = spec?.layer(this.cache);
+    if (!layer) {
+      this.error('Load a graph first.');
+      return;
+    }
+    // The switch is class-disabled so its tooltip stays reachable (see
+    // syncOverlays), which means the click still arrives here. Say the hint
+    // rather than toggling a layer that would draw nothing.
+    if (spec.empty?.(this.cache)) {
+      this.info(spec.emptyHint);
+      return;
+    }
+    this.setOverlayVisible(name, !layer.visible);
+  }
+
+  setOverlayVisible(name, visible) {
+    UIManager.OVERLAYS[name]?.layer(this.cache)?.setVisible(visible);
+    this.syncOverlays();
+  }
+
+  /**
+   * Re-read every layer and mirror it onto its row: switch state and whether the
+   * row can act at all. Called after any toggle, on graph (re)build, and from
+   * the three places that flip a layer without going through a row — a JSON
+   * load's heatmap flag, a bubble-group membership change, and placing or
+   * deleting a note.
+   *
+   * A layer whose content is empty gets a disabled switch: Groups with no
+   * populated group and Notes with no note draw nothing either way, so an
+   * enabled switch promises an effect it cannot deliver. The title says why.
+   */
+  syncOverlays() {
+    for (const { switchId, layer: layerOf, empty, emptyHint } of Object.values(UIManager.OVERLAYS)) {
+      const layer = layerOf(this.cache);
+      const btn = document.getElementById(switchId);
+      if (!btn) continue;
+      btn.setAttribute('aria-checked', String(!!layer?.visible));
+      const blank = !!layer && !!empty?.(this.cache);
+      // Class, not the disabled ATTRIBUTE: an attribute-disabled control is out
+      // of the delegated tooltip layer's reach, so emptyHint — the only thing
+      // that explains why the switch is dead — was unreachable. group_list.js
+      // uses the class for exactly this reason; toggleOverlay guards the click.
+      btn.classList.toggle('disabled', !layer || blank);
+      btn.setAttribute('aria-disabled', String(!layer || blank));
+      // The enabled title is authored once (markup or makeCollapsible); stash it
+      // the first time so the hint can be swapped in and back out.
+      // ui_tooltip.js stashes the title in data-tip while hovered; without the
+      // fallback a mid-hover sync would freeze baseTitle at "".
+      btn.dataset.baseTitle ??= btn.title || btn.dataset.tip || '';
+      btn.title = blank ? emptyHint : btn.dataset.baseTitle;
+    }
+
+    // "3 sets" beside the Groups row — only groups with members count.
+    const count = document.getElementById('overlayCountGroups');
+    if (!count) return;
+    const sets = UIManager.#groupSetCount(this.cache);
+    count.textContent = sets ? `${sets} ${sets === 1 ? 'set' : 'sets'}` : '';
+  }
+
   async toggleHoverEffect(btn) {
     const enable = this.cache.CFG.DISABLE_HOVER_EFFECT;
     this.cache.CFG.DISABLE_HOVER_EFFECT = !enable;
 
-    if (enable) {
-      btn.classList.remove('red');
-      btn.classList.add('green', 'highlight');
-      btn.title = 'Disable hover highlight effect (H)';
-    } else {
-      btn.classList.remove('green', 'highlight');
-      btn.classList.add('red');
-      btn.title = 'Enable hover highlight effect (H)';
-    }
+    this.#paintHoverToggle(btn, enable);
 
     // Disabling also clears any lingering hover highlight/dim layer;
     // selection states are untouched (they live in elementStates).
@@ -529,12 +609,43 @@ class UIManager {
     this.info(enable ? 'Hover highlight effect enabled' : 'Hover highlight effect disabled');
   }
 
+  // Keyboard cheat sheet, opened with "?" (and closed by it, acting as a
+  // toggle). Content is static — one row per KEYBOARD_SHORTCUTS entry.
+  toggleKeyboardSheet() {
+    if (this._keyboardSheet) {
+      this._keyboardSheet.close();
+      return;
+    }
+
+    const content = document.createElement('div');
+    content.className = 'keyboard-sheet';
+    for (const [key, action] of KEYBOARD_SHORTCUTS) {
+      const row = document.createElement('div');
+      row.className = 'keyboard-sheet-row';
+      const kbd = document.createElement('kbd');
+      kbd.textContent = key;
+      const label = document.createElement('span');
+      label.textContent = action;
+      row.append(kbd, label);
+      content.appendChild(row);
+    }
+
+    this._keyboardSheet = new Popup(content, {
+      title: 'Keyboard shortcuts',
+      width: '340px',
+      showFullscreenButton: false,
+      onClose: () => {
+        this._keyboardSheet = null;
+      },
+    });
+  }
+
   /**
    * Close every anchored popover (graph teardown hook — the popovers outlive
    * the adapter, but their outside-click document listeners must not).
    */
   closeAnchoredPopovers() {
-    this.#closeExportResolutionPopover();
+    this.cache.rail?.closeMenus();
   }
 
   toggleDarkMode() {
@@ -558,107 +669,23 @@ class UIManager {
     const isDark = currentTheme(document) === 'dark';
     btn.textContent = isDark ? '☀️' : '🌙';
     btn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
-  }
-
-  /**
-   * Resolution picker anchored to the 📷 button: choose 1×/2×/4× and export
-   * immediately at that scale. The chosen factor is remembered (and reused by
-   * the "P" shortcut). Built lazily on first open.
-   */
-  toggleExportResolutionPopover() {
-    if (this._exportPopover?.classList.contains('open')) {
-      this.#closeExportResolutionPopover();
-      return;
-    }
-    this.#openExportResolutionPopover();
-  }
-
-  #closeExportResolutionPopover() {
-    this._exportPopover?.classList.remove('open');
-    if (this._exportOutsideHandler) {
-      document.removeEventListener('pointerdown', this._exportOutsideHandler, true);
-      this._exportOutsideHandler = null;
-    }
-  }
-
-  #openExportResolutionPopover() {
-    const anchor = document.getElementById('exportImage');
-    if (!anchor) return;
-
-    const popover = this.#ensureExportResolutionPopover();
-    const current = this.cache.io.exportScale || 1;
-    popover.querySelectorAll('.export-res-option').forEach((btn) => {
-      btn.classList.toggle('active', Number(btn.dataset.scale) === current);
-    });
-
-    const rect = anchor.getBoundingClientRect();
-    popover.classList.add('open');
-    // Anchor below the button, clamped to the viewport's right edge.
-    popover.style.top = `${rect.bottom + 6}px`;
-    popover.style.left = `${clampPopoverLeft(rect.left, popover.offsetWidth, window.innerWidth)}px`;
-
-    this._exportOutsideHandler = (e) => {
-      if (!popover.contains(e.target) && e.target !== anchor) this.#closeExportResolutionPopover();
-    };
-    document.addEventListener('pointerdown', this._exportOutsideHandler, true);
-  }
-
-  #ensureExportResolutionPopover() {
-    if (this._exportPopover) return this._exportPopover;
-    const popover = document.createElement('div');
-    popover.className = 'export-resolution-popover';
-    popover.id = 'exportResolutionPopover';
-
-    const title = document.createElement('div');
-    title.className = 'export-res-title';
-    title.textContent = 'Export image resolution';
-    popover.appendChild(title);
-
-    const row = document.createElement('div');
-    row.className = 'export-res-row';
-    for (const scale of EXPORT_SCALES) {
-      const btn = document.createElement('button');
-      btn.className = 'export-res-option';
-      btn.dataset.scale = String(scale);
-      btn.textContent = `${scale}×`;
-      btn.title = `Export at ${scale}× viewport resolution`;
-      btn.addEventListener('click', () => {
-        this.#closeExportResolutionPopover();
-        this.cache.io.exportPNG(scale);
-      });
-      row.appendChild(btn);
-    }
-    popover.appendChild(row);
-
-    // Vector output has no resolution to pick — one button, below the PNG
-    // scales. SVG never participates in the remembered scale (PNG-only).
-    const svgBtn = document.createElement('button');
-    svgBtn.className = 'export-res-option export-res-svg';
-    svgBtn.textContent = 'Vector (SVG)';
-    svgBtn.title = 'Export as resolution-independent SVG vector graphic';
-    svgBtn.addEventListener('click', () => {
-      this.#closeExportResolutionPopover();
-      this.cache.io.exportSVG();
-    });
-    popover.appendChild(svgBtn);
-
-    document.body.appendChild(popover);
-    this._exportPopover = popover;
-    return popover;
+    btn.setAttribute('aria-label', btn.title);
   }
 
   updateHoverToggleButton() {
     const btn = document.getElementById('hoverToggleBtn');
-    if (!btn) return;
-    if (this.cache.CFG.DISABLE_HOVER_EFFECT) {
-      btn.classList.remove('green', 'highlight');
-      btn.classList.add('red');
-      btn.title = 'Enable hover highlight effect (H)';
-    } else {
-      btn.classList.remove('red');
-      btn.classList.add('green', 'highlight');
-      btn.title = 'Disable hover highlight effect (H)';
-    }
+    if (btn) this.#paintHoverToggle(btn, !this.cache.CFG.DISABLE_HOVER_EFFECT);
+  }
+
+  /**
+   * The on/off look for the rail's Hover button. Plain `.active`, like the
+   * lasso and note buttons beside it — the old green/red pair painted OFF in
+   * the app's loudest colour, so "off" shouted louder than "on".
+   */
+  #paintHoverToggle(btn, on) {
+    btn.classList.remove('green', 'red', 'highlight');
+    btn.classList.toggle('active', on);
+    btn.title = on ? 'Disable hover highlight effect (H)' : 'Enable hover highlight effect (H)';
   }
 
   buildUI() {
@@ -683,10 +710,7 @@ class UIManager {
     div.innerHTML = '';
     div.appendChild(this.cache.metrics.buildMetricUI());
 
-    // Initialize manual bubble group button
-    const manualButtonContainer = document.getElementById('manualBubbleGroupButtonContainer');
-    manualButtonContainer.innerHTML = '';
-    manualButtonContainer.appendChild(this.cache.uiComponents.createManualBubbleGroupButton());
+    this.buildAddToGroupButton();
 
     this.buildFilterUI();
 
@@ -698,36 +722,81 @@ class UIManager {
     this.cache.qm.validateAlignment();
   }
 
+  /**
+   * Wire the Selection panel's "Add to group" button to the shared group
+   * checklist — the same menu the filter rows open, so one gesture covers both
+   * ways of putting things in a group.
+   */
+  buildAddToGroupButton() {
+    const btn = document.getElementById('addToGroupBtn');
+    if (!btn) return;
+    attachGroupMenu(btn, this.cache, () => ({
+      isChecked: (group) => this.cache.bs.selectionMembership(group) === 'all',
+      isPartial: (group) => this.cache.bs.selectionMembership(group) === 'some',
+      onToggle: (group) => this.cache.bs.toggleSelectedNodesInManualGroup(group),
+      onNew: () => this.cache.bs.createGroupFromSelection(),
+      newLabel: 'New group from selection',
+      emptyHint: 'A group draws a coloured bubble around the nodes you put in it.',
+    }));
+  }
+
   buildFilterUI() {
     const div = document.getElementById('filterContainer');
     div.innerHTML = '';
+    this.#buildFilterLockBar(div);
+    div.appendChild(this.#buildFilterToolbar());
 
-    // Always create lock status bar, show/hide based on lock state
-    const statusBar = this.createFilterLockStatusBar();
-    statusBar.id = 'filterLockStatusBar';
-    statusBar.style.display = this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY
-      ? 'flex'
-      : 'none';
-    div.appendChild(statusBar);
+    // Each section (and sub-group) is a collapsible accordion so large
+    // property sets can be folded down to just the groups in use.
+    const sectionBodies = new Map();
+    const subBodies = new Map();
+    const propIDs = [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()];
+    if (this.cache.CFG.SORT_FILTERS) propIDs.sort();
 
-    // Add/remove locked class on container
-    if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
-      div.classList.add('locked');
-    } else {
-      div.classList.remove('locked');
+    for (const propID of propIDs) {
+      const [section, subSection, prop] = StaticUtilities.decodePropHashId(propID);
+      if (!sectionBodies.has(section)) {
+        sectionBodies.set(section, this.#buildFilterSection(div, section));
+      }
+      const subKey = `${section}::${subSection}`;
+      if (!subBodies.has(subKey)) {
+        const body = this.#buildFilterSubgroup(sectionBodies.get(section), section, subSection);
+        subBodies.set(subKey, body);
+      }
+      const { row, widget } = this.#buildFilterRow(propID, section, subSection, prop);
+      subBodies.get(subKey).append(row);
+      // Strictly after the append: InvertibleRangeSlider.appendListeners looks
+      // its parts up with getElementById, which finds nothing off-document.
+      widget?.appendListeners();
     }
 
-    // Panel-level control bar. Sits above every section so its controls read
-    // as global, not scoped to the adjacent section:
-    //  - "Combine filters" OR/AND: how multiple active filters combine.
-    //  - "Details": reveals exact numeric inputs and per-row group / selection
-    //    actions. Compact by default so dense property sets (30-50 properties)
-    //    stay scannable.
+    this.buildFilterScopeToggle(div);
+
+    this.cache.qm.updateQueryTextArea();
+  }
+
+  /** The manual-query lock: its explanatory bar, and the class every locked
+   * control's dimming hangs off. */
+  #buildFilterLockBar(div) {
+    const locked = this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY;
+    const statusBar = this.createFilterLockStatusBar();
+    statusBar.id = 'filterLockStatusBar';
+    statusBar.style.display = locked ? 'flex' : 'none';
+    div.appendChild(statusBar);
+    div.classList.toggle('locked', locked);
+  }
+
+  /**
+   * Panel-level control bar. Sits above every section so its controls read as
+   * global, not scoped to the adjacent section: the OR/AND join toggle and its
+   * "complete cases" modifier, the search box, the constraint count.
+   */
+  #buildFilterToolbar() {
     const toolbar = document.createElement('div');
     toolbar.className = 'filter-toolbar';
-    // OR/AND join control (left). "Complete cases only" is a modifier of AND,
-    // revealed only under AND (the join toggle drives its visibility). It sits
-    // to the RIGHT of the toggle so switching OR<->AND never shifts the toggle.
+    // "Complete cases only" is a modifier of AND, revealed only under AND (the
+    // join toggle drives its visibility). It sits to the RIGHT of the toggle so
+    // switching OR<->AND never shifts the toggle.
     const strictCheckbox = this.createFilterStrictCheckbox();
     const joinToggle = this.createFilterJoinToggle((mode) => {
       strictCheckbox.hidden = mode !== 'AND';
@@ -735,142 +804,311 @@ class UIManager {
     const joinCluster = document.createElement('div');
     joinCluster.className = 'filter-toolbar-join';
     joinCluster.append(joinToggle, strictCheckbox);
-    // Details (view option) is pushed to the far right.
-    toolbar.append(joinCluster, this.createFilterDetailsToggle(div));
-    div.appendChild(toolbar);
+    toolbar.append(joinCluster, this.createFilterSearch(), this.createFilterConstraintCount());
+    return toolbar;
+  }
 
-    // Each section (and sub-group) is a collapsible accordion so large
-    // property sets can be folded down to just the groups in use.
-    const sectionBodies = new Map();
-    const subBodies = new Map();
-    const sortedPropIDs = this.cache.CFG.SORT_FILTERS
-      ? [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()].sort()
-      : [...this.cache.data.layouts[this.cache.data.selectedLayout].filters.keys()];
+  /** @returns {HTMLElement} the section's body, for sub-groups to append to */
+  #buildFilterSection(div, section) {
+    const sectionWrap = document.createElement('div');
+    sectionWrap.className = 'filter-section';
+    sectionWrap.dataset.section = section;
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'header-card';
+    const header = document.createElement('h4');
+    header.textContent = section;
+    header.className = 'm-0 white';
+    headerDiv.appendChild(header);
+    headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(false, section));
+    headerDiv.appendChild(this.cache.uiComponents.createSectionResetButton(section));
+    headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(true, section));
+    const sectionBody = document.createElement('div');
+    sectionBody.className = 'filter-section-body';
+    this.makeFilterGroupCollapsible(sectionWrap, headerDiv);
+    sectionWrap.append(headerDiv, sectionBody);
+    div.appendChild(sectionWrap);
+    return sectionBody;
+  }
 
-    for (let propID of sortedPropIDs) {
-      let [section, subSection, prop] = StaticUtilities.decodePropHashId(propID);
-      let isCategoricalProperty = this.cache.data.filterDefaults.get(propID).isCategory;
+  /** @returns {HTMLElement} the sub-group's body, for rows to append to */
+  #buildFilterSubgroup(sectionBody, section, subSection) {
+    const subWrap = document.createElement('div');
+    subWrap.className = 'filter-subgroup';
+    const subHeaderDiv = document.createElement('div');
+    subHeaderDiv.className = 'sub-header-card';
+    const subHeader = document.createElement('h5');
+    subHeader.textContent = subSection;
+    subHeader.className = 'm-0 inline';
+    subHeaderDiv.append(
+      subHeader,
+      this.cache.uiComponents.createSectionToggleButton(false, section, subSection),
+      this.cache.uiComponents.createSectionResetButton(section, subSection),
+      this.cache.uiComponents.createSectionToggleButton(true, section, subSection)
+    );
+    const subBody = document.createElement('div');
+    subBody.className = 'filter-subgroup-body';
+    this.makeFilterGroupCollapsible(subWrap, subHeaderDiv);
+    subWrap.append(subHeaderDiv, subBody);
+    sectionBody.appendChild(subWrap);
+    return subBody;
+  }
 
-      if (!sectionBodies.has(section)) {
-        const sectionWrap = document.createElement('div');
-        sectionWrap.className = 'filter-section';
-        const headerDiv = document.createElement('div');
-        headerDiv.className = 'header-card';
-        const header = document.createElement('h4');
-        header.textContent = section;
-        header.className = 'm-0 white';
-        headerDiv.appendChild(header);
-        headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(false, section));
-        headerDiv.appendChild(this.cache.uiComponents.createSectionResetButton(section));
-        headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(true, section));
-        const sectionBody = document.createElement('div');
-        sectionBody.className = 'filter-section-body';
-        this.makeFilterGroupCollapsible(sectionWrap, headerDiv);
-        sectionWrap.append(headerDiv, sectionBody);
-        div.appendChild(sectionWrap);
-        sectionBodies.set(section, sectionBody);
-      }
-      const sectionBody = sectionBodies.get(section);
+  /**
+   * One property's row: checkbox, its widget, and the per-row actions.
+   *
+   * The widget comes back unwired — its appendListeners() resolves parts by id
+   * and so has to run after the caller has put the row in the document.
+   *
+   * @returns {{row: HTMLElement, widget: object|null}}
+   */
+  #buildFilterRow(propID, section, subSection, prop) {
+    const filterDefault = this.cache.data.filterDefaults.get(propID);
 
-      const subKey = `${section}::${subSection}`;
-      if (!subBodies.has(subKey)) {
-        const subWrap = document.createElement('div');
-        subWrap.className = 'filter-subgroup';
-        const subHeaderDiv = document.createElement('div');
-        subHeaderDiv.className = 'sub-header-card';
-        const subHeader = document.createElement('h5');
-        subHeader.textContent = subSection;
-        subHeader.className = 'm-0 inline';
-        subHeaderDiv.appendChild(subHeader);
-        subHeaderDiv.appendChild(
-          this.cache.uiComponents.createSectionToggleButton(false, section, subSection)
-        );
-        subHeaderDiv.appendChild(
-          this.cache.uiComponents.createSectionResetButton(section, subSection)
-        );
-        subHeaderDiv.appendChild(
-          this.cache.uiComponents.createSectionToggleButton(true, section, subSection)
-        );
-        const subBody = document.createElement('div');
-        subBody.className = 'filter-subgroup-body';
-        this.makeFilterGroupCollapsible(subWrap, subHeaderDiv);
-        subWrap.append(subHeaderDiv, subBody);
-        sectionBody.appendChild(subWrap);
-        subBodies.set(subKey, subBody);
-      }
-      const subBody = subBodies.get(subKey);
+    const row = document.createElement('div');
+    row.className = 'filter-row';
+    // Identity on the row, so the search matches on data instead of scraping
+    // rendered label text.
+    row.dataset.propId = propID;
+    row.dataset.search = `${section} ${subSection} ${prop}`.toLowerCase();
+    const col1 = document.createElement('div');
+    col1.className = 'filter-row-col1';
+    col1.appendChild(this.cache.uiComponents.createCheckbox(propID, prop));
+    const col2 = document.createElement('div');
+    col2.className = 'filter-row-col2';
+    row.append(col1, col2);
 
-      const row = document.createElement('div');
-      row.className = 'filter-row';
-      const col1 = document.createElement('div');
-      col1.className = 'filter-row-col1';
-      col1.appendChild(this.cache.uiComponents.createCheckbox(propID, prop));
-      row.appendChild(col1);
-      const col2 = document.createElement('div');
-      col2.className = 'filter-row-col2';
-      row.appendChild(col2);
+    // Mixed-type property: rendered, but disabled with the reason —
+    // no widget, no per-row actions, checkbox inert via the row class.
+    if (filterDefault.unusable) {
+      row.classList.add('filter-row-unusable');
+      col2.appendChild(this.#buildUnusableReason(filterDefault));
+      row.appendChild(document.createElement('div'));
+      return { row, widget: null };
+    }
 
-      const sliderOrDropdown = isCategoricalProperty
+    const widget = filterDefault.isBoolean
+      ? new BooleanToggle(propID, this.cache)
+      : filterDefault.isCategory
         ? new DropdownChecklist(propID, this.cache)
         : new InvertibleRangeSlider(propID, this.cache);
 
-      sliderOrDropdown.appendTo(col2);
-      const col3 = document.createElement('div');
-      col3.className = 'filter-row-col3';
-      if (this.cache.nodeExclusiveProps.has(propID) || this.cache.mixedProps.has(propID)) {
-        col3.appendChild(this.cache.uiComponents.createCircleGroupButtonWithQuadrants(propID));
-      } else {
-        const placeHolder = document.createElement('div');
-        placeHolder.style.width = '18px';
-        col3.appendChild(placeHolder);
-      }
-      col3.appendChild(this.cache.uiComponents.createAddOrRemoveToSelectionGroup(propID));
-      row.appendChild(col3);
-      subBody.append(row);
-      sliderOrDropdown.appendListeners();
+    widget.appendTo(col2);
+    const col3 = document.createElement('div');
+    col3.className = 'filter-row-col3';
+    if (this.cache.nodeExclusiveProps.has(propID) || this.cache.mixedProps.has(propID)) {
+      col3.appendChild(this.cache.uiComponents.createGroupChip(propID));
+    } else {
+      const placeHolder = document.createElement('div');
+      placeHolder.style.width = '18px';
+      col3.appendChild(placeHolder);
     }
-
-    this.manageDynamicWidgets();
-    this.cache.qm.updateQueryTextArea();
+    col3.appendChild(this.cache.uiComponents.createAddOrRemoveToSelectionGroup(propID));
+    row.appendChild(col3);
+    return { row, widget };
   }
 
-  // Builds the panel-level "Details" toggle button. Adding/removing
-  // `show-details` on the filter container drives input/action visibility
-  // purely via CSS. Returned button is mounted on the first section header.
-  createFilterDetailsToggle(container) {
-    const detailsBtn = document.createElement('button');
-    detailsBtn.type = 'button';
-    detailsBtn.className = 'filter-details-toggle';
-    detailsBtn.textContent = '⚙ Details';
+  #buildUnusableReason(filterDefault) {
+    const reason = document.createElement('div');
+    reason.className = 'filter-unusable-reason';
+    reason.textContent =
+      `Mixes ${filterDefault.numericCount} numeric and ` +
+      `${filterDefault.textCount} text values — filter disabled`;
+    reason.title =
+      'This column holds both numbers and text, so neither a range slider nor a ' +
+      'category list fits it. Clean the column to a single type to filter by it.';
+    // ponytail: a "jump to the offending rows" link into the data table needs
+    // search/filter support the data editor does not have yet; add it here once
+    // the editor can focus a row subset.
+    return reason;
+  }
 
-    const apply = (on) => {
-      container.classList.toggle('show-details', on);
-      detailsBtn.classList.toggle('active', on);
-      detailsBtn.setAttribute('aria-pressed', String(on));
-      detailsBtn.title = on
-        ? 'Hide exact value inputs and per-row group / selection actions'
-        : 'Show exact value inputs and per-row group / selection actions';
+  /**
+   * Property search, built INTO #filterContainer with the rows it filters — the
+   * rebuild that replaces the rows replaces the box too, so a stale query can
+   * never survive over a fresh list. `filter_search.js` listens for it.
+   */
+  createFilterSearch() {
+    const label = document.createElement('label');
+    label.className = 'filter-search';
+    const glyph = document.createElement('span');
+    glyph.setAttribute('aria-hidden', 'true');
+    glyph.textContent = '⌕';
+    const input = document.createElement('input');
+    input.id = 'filterSearch';
+    input.type = 'search';
+    input.placeholder = 'Search properties…';
+    input.setAttribute('aria-label', 'Search filter properties');
+    label.append(glyph, input);
+    return label;
+  }
+
+  /**
+   * Node/edge scope segment, shown in the active section's header row in the
+   * narrow panel.
+   *
+   * The top level of the filter tree is always exactly two sections in a fixed
+   * order — `EXCEL_NODE_HEADER` and `EXCEL_EDGE_HEADER` are app constants, not
+   * data — so drawing it as two full-width accordions spent the panel's loudest
+   * token on a binary. One segment, one section body at a time, roughly half
+   * the rows on screen at once. (It is built from whatever sections exist, so a
+   * file with different top-level headers still works.)
+   *
+   * A running search hides it and shows every section: a hit in the section you
+   * are not looking at is a hit you cannot see.
+   */
+  buildFilterScopeToggle(container) {
+    // Walked as elements rather than looked up by selector: section names are
+    // spreadsheet column headers, so they are user data and have no business
+    // being interpolated into a selector.
+    const wraps = [...container.querySelectorAll('.filter-section')];
+    const names = wraps.map((wrap) => wrap.dataset.section);
+    const bar = document.createElement('div');
+    bar.className = 'filter-scope';
+    bar.setAttribute('role', 'group');
+    bar.setAttribute('aria-label', 'Show filters for');
+
+    const show = (name) => {
+      for (const wrap of wraps) {
+        const active = wrap.dataset.section === name;
+        wrap.classList.toggle('filter-section-active', active);
+        // The segment rides in the active section's header row rather than
+        // above it: in the narrow panel that row is stripped down to the
+        // right-aligned triad, so the pair costs one row instead of two.
+        if (active && wraps.length > 1) {
+          wrap.querySelector(':scope > .header-card').prepend(bar);
+        }
+      }
+      for (const btn of bar.children) {
+        const active = btn.dataset.section === name;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', String(active));
+      }
+      this.filterScope = name;
     };
 
-    detailsBtn.addEventListener('click', () => {
-      const on = !container.classList.contains('show-details');
-      try {
-        window.localStorage.setItem(FILTER_DETAILS_KEY, on ? '1' : '0');
-      } catch (err) {
-        this.debug(`Could not persist filter-details preference: ${err.message}`);
-      }
-      apply(on);
-    });
-
-    let stored = '0';
-    try {
-      stored = window.localStorage.getItem(FILTER_DETAILS_KEY) ?? '0';
-    } catch (err) {
-      this.debug(`Could not read filter-details preference: ${err.message}`);
+    for (const wrap of wraps) {
+      const name = wrap.dataset.section;
+      const count = wrap.querySelectorAll('.filter-row').length;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'filter-scope-segment';
+      btn.dataset.section = name;
+      // "Node filters" is the column header; as a segment label the noun alone
+      // reads better next to its sibling.
+      btn.append(name.replace(/\s*filters$/i, ''), Object.assign(document.createElement('span'), {
+        className: 'filter-scope-count',
+        textContent: String(count),
+      }));
+      btn.title = `Show the ${count} ${name.toLowerCase()}`;
+      btn.addEventListener('click', () => show(name));
+      bar.appendChild(btn);
     }
-    apply(stored === '1');
 
-    return detailsBtn;
+    // A rebuild (data reload, workspace switch) keeps whichever scope was up,
+    // as long as that section still exists.
+    show(names.includes(this.filterScope) ? this.filterScope : names[0]);
+  }
+
+  // Explanation of the AND join's least obvious rule, in the panel rather than
+  // only in the code: under AND a filter constrains the graph only once it is
+  // narrowed away from the range or values it loaded with. Until then it means
+  // "don't care", so ticking its checkbox on or off changes nothing and the
+  // derived query can legitimately be empty. Nothing on a filter row shows
+  // that difference, which reads as a broken panel.
+  createFilterConstraintCount() {
+    const el = document.createElement('span');
+    el.id = 'filterConstraintCount';
+    el.className = 'filter-constraint-count';
+    el.hidden = true;
+    el.title =
+      'Under AND, a filter only constrains the graph once you narrow it from ' +
+      'the range or values it loaded with.\n' +
+      'Filters still at their defaults mean "don\'t care" — they are shown ' +
+      'dimmed, and switching them on or off changes nothing.';
+    return el;
+  }
+
+  // Keeps that explanation in step with the filters. Called from
+  // updateQueryTextArea, which every filter change funnels through, so the
+  // census and the query are always derived from the same state.
+  updateFilterConstraintHints() {
+    const container = document.getElementById('filterContainer');
+    const layout = this.cache.data?.layouts?.[this.cache.data?.selectedLayout];
+    if (!container || !layout?.filters) return;
+
+    const andMode = layout.filterJoinMode === 'AND';
+    const defaults = this.cache.data.filterDefaults;
+    let constraining = 0;
+    let total = 0;
+    // Per section, because only one section's rows are on screen at a time: an
+    // active filter in the hidden one empties the graph with nothing on screen
+    // saying so.
+    const perSection = new Map();
+
+    for (const row of container.querySelectorAll('.filter-row')) {
+      const fo = layout.filters.get(row.dataset.propId);
+      if (!fo || fo.unusable) continue;
+      total += 1;
+      const section = row.closest('.filter-section')?.dataset.section;
+      const tally = perSection.get(section) ?? { constraining: 0, total: 0 };
+      tally.total += 1;
+      perSection.set(section, tally);
+      // Under OR every active filter contributes a disjunct; under AND it has
+      // to be narrowed as well. Same rule the query derivation applies.
+      const counts =
+        !!fo.active && (!andMode || isFilterNarrowed(fo, defaults?.get(row.dataset.propId)));
+      if (counts) {
+        constraining += 1;
+        tally.constraining += 1;
+      }
+      const inert = andMode && !!fo.active && !counts;
+      row.classList.toggle('filter-row-inert', inert);
+      // The row is dimmed but its checkbox still offered to "hide elements".
+      // This pass runs on every filter change (query.js funnels into it), so it
+      // is also where the row's tooltip is kept honest.
+      const wrapper = row.querySelector('.checkboxWrapper');
+      if (wrapper) {
+        wrapper.title = inert
+          ? this.cache.uiComponents.getInertCheckboxTT(row.dataset.propId)
+          : this.cache.uiComponents.getCheckboxTT(!!fo.active, row.dataset.propId);
+      }
+    }
+
+    this.renderFilterConstraintCount(andMode, constraining, total);
+    UIManager.#renderScopeCounts(perSection);
+  }
+
+  renderFilterConstraintCount(andMode, constraining, total) {
+    const el = document.getElementById('filterConstraintCount');
+    if (!el) return;
+    // Shown in both join modes. Hiding it under OR left the panel silent about
+    // the one thing that explains an empty graph, and "active" and
+    // "constraining" being the same thing under OR does not make the count
+    // redundant — the active filter may be in the section that is not on screen.
+    el.hidden = !total;
+    if (el.hidden) return;
+    el.textContent = constraining
+      ? `${constraining} of ${total} filters constrain the graph`
+      : 'No filter constrains the graph — every filter is still at its loaded range';
+  }
+
+  /**
+   * Badge each scope segment with how many of ITS filters constrain, so the
+   * hidden section can still account for itself.
+   * @param {Map<string, {constraining: number, total: number}>} perSection
+   */
+  static #renderScopeCounts(perSection) {
+    for (const btn of document.querySelectorAll('.filter-scope-segment')) {
+      const { constraining = 0, total = 0 } = perSection.get(btn.dataset.section) ?? {};
+      const count = btn.querySelector('.filter-scope-count');
+      if (!count) continue;
+      count.textContent = constraining ? `${constraining}/${total}` : String(total);
+      count.classList.toggle('filter-scope-count-active', constraining > 0);
+      const name = btn.dataset.section?.toLowerCase() ?? 'filters';
+      btn.title = constraining
+        ? `Show the ${total} ${name} — ${constraining} of them constrain the graph`
+        : `Show the ${total} ${name}`;
+    }
   }
 
   // Builds the segmented OR/AND control that sets how multiple active filters
@@ -912,15 +1150,14 @@ class UIManager {
       onModeChange?.(mode);
     };
 
-    for (const [mode, tip] of [
-      ['OR', 'Match any active filter'],
-      ['AND', 'Match every active filter'],
-    ]) {
+    // The segments carry no own titles: the group tooltip above already
+    // explains both modes, and per-segment titles made the tooltip swap
+    // three times across one small control.
+    for (const mode of ['OR', 'AND']) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'filter-join-segment';
       btn.textContent = mode;
-      btn.title = tip;
       btn.addEventListener('click', async () => {
         if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
         if (layout().filterJoinMode === mode) return;
@@ -1007,46 +1244,46 @@ class UIManager {
     headerDiv.classList.add('collapsible-filter-header');
     headerDiv.addEventListener('click', (e) => {
       if (e.target.closest('button')) return;
-      const collapsed = wrapper.classList.toggle('collapsed');
-      chevron.textContent = collapsed ? '▸' : '▾';
+      this.setFilterGroupCollapsed(wrapper, !wrapper.classList.contains('collapsed'));
     });
   }
 
+  /**
+   * Fold or unfold one filter group. The class and the chevron glyph are two
+   * halves of one state, so the palette's "reveal" (command_palette.js) unfolds
+   * through here rather than re-deriving the pair — and it no longer has to
+   * assume the chevron's position in the header.
+   *
+   * @param {HTMLElement} wrapper the .filter-group element
+   * @param {boolean} collapsed
+   */
+  setFilterGroupCollapsed(wrapper, collapsed) {
+    if (!wrapper) return;
+    wrapper.classList.toggle('collapsed', collapsed);
+    // The group's OWN chevron: it sits in the group header, a direct child of the
+    // wrapper, and a plain descendant query would find a nested group's instead.
+    const chevron = wrapper.querySelector(':scope > * > .filter-group-chevron');
+    if (chevron) chevron.textContent = collapsed ? '▸' : '▾';
+  }
+
+  // Pre-load, the landing page (a full-viewport overlay) covers the shell;
+  // post-load it is hidden.
   showUI(show) {
     const landing = document.getElementById('landingPage');
     if (landing) {
       if (show) landing.classList.add('hidden');
       else landing.classList.remove('hidden');
     }
-
-    document.querySelectorAll('.showOnLoad').forEach((element) => {
-      element.style.opacity = show ? '1' : '0';
-      element.style.pointerEvents = show ? 'auto' : 'none';
-    });
-
-    document.querySelectorAll('.hideOnLoad').forEach((element) => {
-      element.style.opacity = show ? '0' : '1';
-      element.style.pointerEvents = show ? 'none' : 'auto';
-      element.style.height = show ? '0' : 'auto';
-    });
-
-    const appHeader = document.getElementById('appHeader');
-    if (appHeader) {
-      if (show) {
-        appHeader.classList.remove('disabled-header');
-        appHeader.classList.add('compact-header');
-        appHeader.title = 'Click to reload application';
-      } else {
-        appHeader.classList.add('disabled-header');
-        appHeader.classList.remove('compact-header');
-        appHeader.title = '';
-      }
-    }
   }
 
   uncheckAllCheckboxes() {
     for (const propID of this.cache.propIDs) {
       this.checkCheckbox(propID, false);
+    }
+    // Boolean toggles resync from the manual query starting from Any, so a
+    // query with only IS TRUE (or only IS FALSE) lands on the right segment.
+    for (const toggle of this.cache.propIDToBooleanToggles.values()) {
+      toggle.resetToAny();
     }
   }
 
@@ -1061,13 +1298,6 @@ class UIManager {
     enable ? this.cache.activeProps.add(propID) : this.cache.activeProps.delete(propID);
     span.textContent = enable ? '✔' : '';
     wrapper.title = this.cache.uiComponents.getCheckboxTT(enable, propID);
-  }
-
-  manageDynamicWidgets() {
-    let isCustomLayout = this.cache.data.layouts[this.cache.data.selectedLayout].isCustom;
-    let removeLayoutBtnCls = document.getElementById('removeSelectedLayoutButton').classList;
-
-    isCustomLayout ? removeLayoutBtnCls.remove('disabled') : removeLayoutBtnCls.add('disabled');
   }
 
   async toggleSection(enable, section) {
@@ -1177,30 +1407,41 @@ class UIManager {
     }
   }
 
+  // Every config card is built by one call to createStyleDiv and then
+  // re-parented to its home in the shell. There is exactly one copy of each
+  // card; the mount ids below are the whole of the "which panel owns what"
+  // mapping.
+  static CARD_MOUNTS = {
+    'Select Elements': 'selectMenuMount',
+    'Act on Selection': 'inspectorActMount',
+    'Arrange Selection': 'inspectorArrangeMount',
+    'Node Configuration': 'inspectorAppearanceMount',
+    'Edge Configuration': 'inspectorAppearanceMount',
+    // Both overlay cards land in the layer stack, in this order — the two
+    // switch-less rows (Notes, Minimap) follow them in the markup.
+    'Bubble Sets': 'inspectorLayerCards',
+    'Density Heatmap': 'inspectorLayerCards',
+  };
+
   buildStylingPanelUI() {
-    const content = document.getElementById('stylingPanelContent');
-    content.innerHTML = '';
-    content.appendChild(createStyleDiv(this.cache));
-    this.mountSelectionEditorCards();
-  }
-
-  mountSelectionEditorCards() {
-    const selectionPanel = document.getElementById('selectionEditorPanel');
-    if (!selectionPanel) return;
-
-    selectionPanel.innerHTML = '';
-    ['Focus Elements', 'Select Elements', 'Arrange Selection'].forEach((cardId) => {
-      const card = document.getElementById(cardId);
-      if (card) selectionPanel.appendChild(card);
-    });
+    const built = createStyleDiv(this.cache);
+    for (const mountId of new Set(Object.values(UIManager.CARD_MOUNTS))) {
+      const mount = document.getElementById(mountId);
+      if (mount) mount.innerHTML = '';
+    }
+    for (const [label, mountId] of Object.entries(UIManager.CARD_MOUNTS)) {
+      const card = built.querySelector(`[data-label="${label}"]`);
+      if (card) document.getElementById(mountId)?.appendChild(card);
+    }
+    // The two card switches were just rebuilt, so they start unset.
+    this.syncOverlays();
   }
 
   // Additively open a collapsible styling card by its label (never closes one).
   // Driven by the current selection so the relevant card is already open when
   // the user reaches for it, without fighting cards they toggled themselves.
   expandStylingCard(label) {
-    const content = document.getElementById('stylingPanelContent');
-    const card = content?.querySelector(`[data-label="${label}"]`);
+    const card = document.querySelector(`[data-label="${label}"]`);
     if (!card || !card.classList.contains('collapsed')) return;
     card.classList.remove('collapsed');
     const header = card.querySelector('.card-collapse-header');

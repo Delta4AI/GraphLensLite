@@ -61,7 +61,11 @@ class OllamaClient {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')
-      throw new Error(`Ollama error ${res.status}: ${text}`)
+      // The status as data: the panel's error mapping used to re-read this
+      // message, and "model requires more system memory" is not a 404.
+      const err = new Error(`Ollama error ${res.status}: ${text}`)
+      err.status = res.status
+      throw err
     }
 
     const reader = res.body.getReader()
@@ -122,7 +126,11 @@ class OllamaClient {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')
-      throw new Error(`Ollama error ${res.status}: ${text}`)
+      // The status as data: the panel's error mapping used to re-read this
+      // message, and "model requires more system memory" is not a 404.
+      const err = new Error(`Ollama error ${res.status}: ${text}`)
+      err.status = res.status
+      throw err
     }
 
     const data = await res.json()

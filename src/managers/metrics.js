@@ -12,6 +12,10 @@ import {
 
 const NODE_CONNECTIVITY_METRICS_PRECISION = 5;
 const POWER_ITERATION_OPTIONS = {maxIterations: 100, tolerance: 1e-6};
+// Every calculator shares the n <= 1 guard, so "no scores" always means the
+// visible graph is too small — whether nothing is loaded or a filter emptied it.
+const EMPTY_METRIC_NOTE =
+  'Not computable for this view — the metric needs at least two visible nodes.';
 const METRIC_VALUE_LABELS = {
   centrality: "Centrality",
   betweenness: "Score",
@@ -50,17 +54,28 @@ class NetworkMetrics {
     this.selected = 'centrality';
     this.multiselect = null;
     this.table = null;
+    this.emptyNote = null;
     this.m = metrics;
-    // Panel starts visually closed (CSS .nw-root is max-height:0). Metrics are
-    // computed lazily — only while the panel is open — so this gate must start
-    // true to match the DOM and avoid an eager compute on first load.
+    // The Metrics workbench tab starts closed. Metrics are computed lazily —
+    // only while the tab is visible — so this gate must start true to match
+    // the DOM and avoid an eager compute on first load.
     this.collapsed = true;
     this.cache = cache;
     this.metricValueCache = new Map();
+    // Which metric the panel is currently showing. Distinct from `selected`
+    // (what the dropdown says) so a repaint can be skipped when they agree.
+    this.renderedMetric = null;
     // Tracks whether any node tooltip currently carries metric text, so
-    // invalidation can blank stale values without parsing every tooltip when
+    // invalidation can blank stale values without touching the map when
     // metrics were never shown.
     this.metricTooltipsActive = false;
+    /**
+     * nodeId → {header, text}: the metric line the tooltip shows, kept OUT of
+     * the stored tooltip HTML so painting a metric is Map writes rather than an
+     * innerHTML parse-and-serialize per node.
+     * @type {Map<string, {header: string, text: string}>}
+     */
+    this.nodeMetricText = new Map();
 
     this.selectBtns = {
       'Add to Selection': async () => this.updateSelectedNodes(true),
@@ -69,37 +84,21 @@ class NetworkMetrics {
   }
 
   toggleUI() {
-    const panel = document.getElementById('networkMetricsContainer');
-    const willOpen = panel.classList.toggle('open');
-    const fullHeight = panel.scrollHeight + 'px';
-    panel.style.maxHeight = fullHeight;
+    this.cache.workbench?.toggle('metrics');
+  }
 
-    const btn = document.getElementById('metricsToggleBtn');
-
-    requestAnimationFrame(() => {
-      panel.style.maxHeight = willOpen ? fullHeight : '0';
-    });
-
-    if (willOpen) {
-      panel.addEventListener(
-        'transitionend',
-        () => (panel.style.maxHeight = 'none'),
-        {once: true}
-      );
-      btn.classList.add("highlight");
-    } else {
-      btn.classList.remove("highlight");
-    }
-
-    this.collapsed = !willOpen;
-
-    // Compute on open: the panel and tooltips are only refreshed while visible,
-    // so opening is the trigger that fills (or refreshes) the selected metric.
-    if (willOpen) {
-      this.updateMetricUI().catch(err =>
-        this.cache.ui.error(`Failed to update metrics: ${err.message}`)
-      );
-    }
+  /**
+   * Called by the workbench when the Metrics tab becomes visible or hidden.
+   * Drives the lazy-compute gate: the panel and the node tooltips are only
+   * refreshed while visible, so becoming visible is the trigger that fills
+   * (or refreshes) the selected metric.
+   */
+  setWorkbenchVisible(visible) {
+    this.collapsed = !visible;
+    if (!visible) return;
+    this.updateMetricUI().catch((err) =>
+      this.cache.ui.error(`Failed to update metrics: ${err.message}`)
+    );
   }
 
   async updateMetricUI() {
@@ -110,11 +109,17 @@ class NetworkMetrics {
     // filter drag when nobody is looking at metrics.
     if (this.collapsed) return;
 
-    // Recompute when visibility changed OR the selected metric was never
-    // computed. Under sigma a fresh load produces no visibility diff (elements
-    // start visible), so gating on the flag alone would block metrics forever.
+    // Nothing changed and we already have this metric: skip the algorithms,
+    // but still paint if what is on screen belongs to a different metric.
+    // Conflating "don't recompute" with "don't render" is what used to strand
+    // the panel on the previously selected metric — switching to a fresh one
+    // worked (no cache entry, so the full path ran) while switching *back*
+    // never did.
     const cached = this.metricValueCache.get(this.selected);
-    if (!this.cache.visibleElementsChanged && cached?.values?.size) return;
+    if (!this.cache.visibleElementsChanged && cached?.values?.size) {
+      if (this.renderedMetric !== this.selected) this.#renderMetric(this.selected, cached);
+      return;
+    }
 
     const metricName = this.m[this.selected].label;
     await this.cache.ui.showLoading("Calculating", `Network Metric: ${metricName}`);
@@ -123,59 +128,93 @@ class NetworkMetrics {
     // try/finally so a failing calculation (e.g. non-converging eigenvector)
     // never leaves the loading overlay stuck on screen.
     try {
-      this.resetNodeToolTipMetricTexts();
-      this.metricTooltipsActive = false;
-
       const metricResult = await this.m[this.selected]?.calculate(this.cache);
       this.storeMetricValues(this.selected, metricResult);
-
-      /* multiselect */
-      const selectedValues = Array.from(this.multiselect.selectedOptions, opt => opt.value);
-
-      this.multiselect.innerHTML = '';
-      for (const ns of metricResult.scores) {
-        const opt = document.createElement('option');
-        opt.value = ns.id;
-        opt.textContent = `${ns.id} | ${ns.text}`;
-        opt.selected = selectedValues.includes(ns.id);
-        this.updateNodeToolTipMetricText(ns.id, metricName, ns.text);
-        this.multiselect.appendChild(opt);
-      }
-      this.metricTooltipsActive = metricResult.scores.length > 0;
-
-      /* graph-level table */
-      this.table.innerHTML = '';
-      Object.entries(metricResult.graphLevelMetrics).forEach(([label, value]) => {
-        const row = document.createElement('tr');
-        const labelCell = document.createElement('td');
-        labelCell.textContent = label;
-        const valueCell = document.createElement('td');
-        valueCell.textContent = `${value}`;
-        row.append(labelCell, valueCell);
-        this.table.appendChild(row);
-      });
-
-      /* tooltip */
-      document.getElementById("metricInfoBtn").onclick = () => {
-        this.cache.popup = new Popup(metricResult.popupContent, {title: metricResult.popupTitle, width: '400px'});
-      };
+      this.#renderMetric(this.selected, this.metricValueCache.get(this.selected));
     } finally {
       await this.cache.ui.hideLoading();
       await new Promise(resolve => requestAnimationFrame(resolve));
     }
   }
 
+  /**
+   * Paint one cached metric into the panel: ranked node list, graph-level
+   * table, 🛈 popup and the per-node tooltip values. Pure rendering — every
+   * number it needs is already in the cache entry, so a return visit to a
+   * metric costs a repaint and not a recomputation.
+   */
+  #renderMetric(metricId, entry) {
+    if (!entry) return;
+
+    this.resetNodeToolTipMetricTexts();
+    this.metricTooltipsActive = false;
+
+    /* multiselect — preserve whatever the user had highlighted */
+    const selectedValues = Array.from(this.multiselect.selectedOptions, opt => opt.value);
+    this.multiselect.innerHTML = '';
+    for (const ns of entry.scores) {
+      const opt = document.createElement('option');
+      opt.value = ns.id;
+      opt.textContent = `${ns.id} | ${ns.text}`;
+      opt.selected = selectedValues.includes(ns.id);
+      this.updateNodeToolTipMetricText(ns.id, entry.label, ns.text);
+      this.multiselect.appendChild(opt);
+    }
+    this.metricTooltipsActive = entry.scores.length > 0;
+
+    /* graph-level table */
+    this.table.innerHTML = '';
+    Object.entries(entry.graphLevelMetrics).forEach(([label, value]) => {
+      const row = document.createElement('tr');
+      const labelCell = document.createElement('td');
+      labelCell.textContent = label;
+      const valueCell = document.createElement('td');
+      valueCell.textContent = `${value}`;
+      row.append(labelCell, valueCell);
+      this.table.appendChild(row);
+    });
+
+    /* 🛈 explanation for the metric now on screen — nothing to explain when
+       the metric did not run, so the button says so instead of opening blank */
+    const infoBtn = document.getElementById("metricInfoBtn");
+    if (infoBtn) {
+      infoBtn.disabled = !entry.popupContent;
+      infoBtn.onclick = entry.popupContent
+        ? () => {
+            this.cache.popup = new Popup(entry.popupContent, {title: entry.popupTitle, width: '400px'});
+          }
+        : null;
+    }
+
+    if (this.emptyNote) this.emptyNote.hidden = entry.scores.length > 0;
+
+    this.renderedMetric = metricId;
+  }
+
+  // The cache holds everything the panel needs to redraw, not just the node
+  // values — otherwise a cache hit could satisfy the scale pickers but not a
+  // repaint. Scale-picker consumers read label/valueLabel/values only.
   storeMetricValues(metricId, metricResult) {
-    if (!metricResult?.nodeValues) return;
+    if (!metricResult) return;
     this.metricValueCache.set(metricId, {
       label: this.m[metricId]?.label || metricId,
       valueLabel: METRIC_VALUE_LABELS[metricId] || "Value",
-      values: metricResult.nodeValues,
+      // A subgraph too small to score is a result, not a missing one. Dropping
+      // it here used to leave the panel showing the previous subgraph's numbers
+      // under the new metric's name.
+      values: metricResult.nodeValues ?? new Map(),
+      scores: metricResult.scores || [],
+      graphLevelMetrics: metricResult.graphLevelMetrics || {},
+      popupContent: metricResult.popupContent,
+      popupTitle: metricResult.popupTitle,
     });
   }
 
   invalidateMetricValues() {
     this.metricValueCache.clear();
+    // Nothing on screen is backed by the cache any more, so the next update
+    // must repaint even if it lands on the same metric.
+    this.renderedMetric = null;
     // Blank per-node tooltip metric text so a value computed for the previous
     // subgraph is never shown after filtering. Cheap string work, and skipped
     // entirely when no tooltip carries metric text (the common closed-panel
@@ -224,60 +263,71 @@ class NetworkMetrics {
     return this.metricValueCache.get(metricId) || null;
   }
 
+  /**
+   * Drop every node's metric line. A plain Map clear: this used to be an
+   * innerHTML parse-and-serialize of every cached tooltip, so a return visit to
+   * an already-computed metric cost 2N HTML round trips.
+   */
   resetNodeToolTipMetricTexts() {
-    for (const nodeID of this.cache.toolTips.keys()) {
-      this.updateNodeToolTipMetricText(nodeID, undefined, undefined, true);
-    }
+    this.nodeMetricText.clear();
   }
 
-  updateNodeToolTipMetricText(nodeId = undefined, header = undefined, text = undefined, reset = false) {
-    const tooltip = this.cache.toolTips.get(nodeId);
-    if (!tooltip) return;
-
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = tooltip;
-
-    const metricWrapper = tempDiv.querySelector('.tooltip-metric-wrapper');
-    if (!metricWrapper) return;
-
-    const metricContent = metricWrapper.querySelector('.tooltip-metric-content');
-    if (!metricContent) return;
-
-    const metricHeader = metricWrapper.querySelector('.tooltip-metric-header');
-    if (!metricHeader) return;
-
-    if (reset) {
-      metricWrapper.classList.remove('visible');
-      metricContent.textContent = '';
-      metricHeader.textContent = '';
-    } else {
-      metricWrapper.classList.add('visible');
-      metricContent.textContent = text;
-      metricHeader.textContent = header;
-    }
-
-    this.cache.toolTips.set(nodeId, tempDiv.innerHTML);
+  /** Remember one node's metric line; the tooltip picks it up at hover time. */
+  updateNodeToolTipMetricText(nodeId, header, text) {
+    if (nodeId == null) return;
+    this.nodeMetricText.set(nodeId, { header, text });
   }
 
+  /**
+   * Fill (or blank) the metric line inside a tooltip element that has just been
+   * rendered. Called from interactions.showTooltip — the metric text is NOT
+   * baked into the stored tooltip HTML, so it stays out of the sanitize/serialize
+   * path and a metric switch touches no strings at all.
+   *
+   * @param {HTMLElement} el  the live tooltip element
+   * @param {string} nodeId
+   */
+  applyTooltipMetricText(el, nodeId) {
+    const wrapper = el?.querySelector?.('.tooltip-metric-wrapper');
+    if (!wrapper) return;
+    const content = wrapper.querySelector('.tooltip-metric-content');
+    const header = wrapper.querySelector('.tooltip-metric-header');
+    if (!content || !header) return;
+
+    const entry = this.nodeMetricText.get(nodeId);
+    if (!entry) {
+      wrapper.classList.remove('visible');
+      content.textContent = '';
+      header.textContent = '';
+      return;
+    }
+    wrapper.classList.add('visible');
+    header.textContent = entry.header;
+    content.textContent = entry.text;
+  }
+
+  /**
+   * The metrics surface. Laid out for the workbench's frame — wide and short —
+   * as two columns: the ranked node list (which wants every pixel of height it
+   * can get) beside the graph-level summary. In the old narrow sidebar these
+   * were stacked, which is why the list was capped at 120px and the summary
+   * was always below the fold.
+   */
   buildMetricUI() {
     const container = document.createElement('div');
     container.className = 'nw-root';
     container.id = 'networkMetricsContainer';
 
-    const div = document.createElement('div');
-    div.className = 'nw-div';
+    /* left column: pick a metric, read the ranking, act on it ------- */
+    const ranking = document.createElement('div');
+    ranking.className = 'nw-col nw-col-ranking';
 
-    /* header ------------------------------------------------------- */
-    const header = document.createElement('h3');
-    header.textContent = 'Network Metrics';
-    div.appendChild(header);
-
-    /* metric dropdown --------------------------------------------- */
-    const dropdownContainer = document.createElement("div");
-    dropdownContainer.className = "nw-metric-select-container";
+    const pickerRow = document.createElement('div');
+    pickerRow.className = 'nw-metric-select-container';
 
     const dropdown = document.createElement('select');
     dropdown.className = 'nw-metric-select';
+    dropdown.setAttribute('aria-label', 'Network metric to rank nodes by');
     Object.values(this.m).forEach(metric => {
       const opt = document.createElement('option');
       opt.value = metric.id;
@@ -293,48 +343,55 @@ class NetworkMetrics {
         this.cache.ui.error(`Failed to update metrics: ${err.message}`);
       }
     });
-    dropdownContainer.appendChild(dropdown);
+    pickerRow.appendChild(dropdown);
 
-    const infoBtn = document.createElement("button");
-    infoBtn.className = "info-btn";
-    infoBtn.textContent = "🛈";
-    infoBtn.id = "metricInfoBtn";
-    dropdownContainer.appendChild(infoBtn);
-    div.append(dropdownContainer);
+    const infoBtn = document.createElement('button');
+    infoBtn.className = 'info-btn';
+    infoBtn.textContent = '🛈';
+    infoBtn.id = 'metricInfoBtn';
+    infoBtn.title = 'What does this metric measure?';
+    pickerRow.appendChild(infoBtn);
 
-    /* node multiselect -------------------------------------------- */
-    this.multiselect = document.createElement('select');
-    this.multiselect.className = 'nw-node-multiselect';
-    this.multiselect.multiple = true;
-    this.multiselect.id = 'metricsMultiselect';
-    div.appendChild(this.multiselect);
-
-    /* buttons ------------------------------------------------------ */
-    const buttonRow = document.createElement('div');
+    // Selection verbs sit with the list they act on, on the same row as the
+    // picker, so the list itself gets the whole remaining height.
     Object.entries(this.selectBtns).forEach(([text, cb]) => {
       const btn = document.createElement('button');
       btn.textContent = text;
       btn.className = 'nw-button';
       btn.onclick = cb;
-      buttonRow.appendChild(btn);
+      pickerRow.appendChild(btn);
     });
-    div.appendChild(buttonRow);
+    ranking.appendChild(pickerRow);
 
-    div.appendChild(document.createElement('hr'));
+    // Native <select multiple>: ctrl/shift range selection and keyboard
+    // navigation for free. A div-based list would mean reimplementing both.
+    this.multiselect = document.createElement('select');
+    this.multiselect.className = 'nw-node-multiselect';
+    this.multiselect.multiple = true;
+    this.multiselect.id = 'metricsMultiselect';
+    this.multiselect.setAttribute('aria-label', 'Nodes ranked by the selected metric');
+    ranking.appendChild(this.multiselect);
 
-    /* graph-level metrics table ------------------------------------ */
+    this.emptyNote = document.createElement('p');
+    this.emptyNote.className = 'nw-empty';
+    this.emptyNote.hidden = true;
+    this.emptyNote.textContent = EMPTY_METRIC_NOTE;
+    ranking.appendChild(this.emptyNote);
+
+    /* right column: whole-graph summary ----------------------------- */
+    const summary = document.createElement('div');
+    summary.className = 'nw-col nw-col-summary';
+
     const tHeader = document.createElement('p');
     tHeader.className = 'nw-subheader';
-    tHeader.textContent = 'Graph Level Metrics';
-    div.appendChild(tHeader);
+    tHeader.textContent = 'Graph level metrics';
+    summary.appendChild(tHeader);
 
     this.table = document.createElement('table');
     this.table.className = 'nw-graph-metrics-table';
-    div.appendChild(this.table);
+    summary.appendChild(this.table);
 
-    div.appendChild(document.createElement('hr'));
-
-    container.appendChild(div);
+    container.append(ranking, summary);
     return container;
   }
 
@@ -343,6 +400,12 @@ class NetworkMetrics {
       this.multiselect.selectedOptions,
       opt => opt.value
     );
+    // The two buttons are always live, so with nothing highlighted in the
+    // ranking list the click used to be a silent no-op.
+    if (!ids.length) {
+      this.cache.ui?.info?.('Highlight nodes in the ranking list first.');
+      return;
+    }
     if (ids.length) {
       const nodeData = await this.cache.graph.getNodeData(ids);
       await this.cache.sm.updateSelectedState(nodeData, add);

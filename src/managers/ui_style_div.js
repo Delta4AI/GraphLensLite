@@ -1,48 +1,141 @@
 import {StaticUtilities} from "../utilities/static.js";
+import {attachCommunityMenu} from "./community_menu.js";
+
+// ----------------------------------------------------------- DOM primitives
+// The style div's generic control builders. They only ever needed their
+// arguments, but lived as closures inside createStyleDiv — a 1556-line
+// function whose single export made none of it importable or testable.
+
+function createNewRow(parent) {
+  const row = document.createElement("div");
+  row.classList.add("card-row");
+  parent.appendChild(row);
+  return row;
+}
+
+function appendVerticalRule(parent, label = undefined, tooltip = undefined, id = undefined, customCSSClass = undefined) {
+  const verticalRule = document.createElement("div");
+  verticalRule.className = "vr";
+  if (customCSSClass) verticalRule.classList.add(customCSSClass);
+  parent.appendChild(verticalRule);
+  appendLabel(parent, label, tooltip, id, customCSSClass);
+}
+
+function appendHorizontalRule(parent, label = undefined, tooltip = undefined, id = undefined, customCSSClass = undefined) {
+  const horizontalRule = document.createElement("hr");
+  horizontalRule.className = "hr";
+  if (customCSSClass) horizontalRule.classList.add(customCSSClass);
+  parent.appendChild(horizontalRule);
+}
+
+function createLabel(labelText, tooltip = undefined) {
+  if (labelText) {
+    const label = document.createElement("label");
+    label.textContent = labelText;
+    label.className = "vr-label";
+    label.id = labelText;
+    if (tooltip) label.title = tooltip;
+    return label;
+  }
+  return null;
+}
+
+function appendLabel(parent, labelText, tooltip = undefined, id = undefined, customCSSClass = undefined) {
+  const label = createLabel(labelText, tooltip);
+  if (id) label.id = id;
+  if (customCSSClass) label.classList.add(customCSSClass);
+  if (label) parent.appendChild(label);
+}
+
+function createSwitch(callback = undefined, inputId = undefined, enabledByDefault = false) {
+  const label = document.createElement('label');
+  label.className = 'switch';
+
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = enabledByDefault;
+
+  const span = document.createElement('span');
+  span.className = 'slider round';
+
+  if (callback) {
+    input.addEventListener('change', callback);
+  }
+
+  if (inputId) {
+    input.id = inputId;
+    label.id = `${inputId}Label`;
+  }
+
+  label.append(input, span);
+
+  label.setChecked = (checked) => {
+    input.checked = checked;
+  };
+
+  label.toggle = () => {
+    input.checked = !input.checked;
+  };
+
+  label.isChecked = () => input.checked;
+
+  return label;
+}
+
+function createColorPicker(defaultColor, title) {
+  const colorPicker = document.createElement("input");
+  colorPicker.type = "color";
+  colorPicker.classList.add("style-inner-button");
+  colorPicker.style.width = "24px";
+  colorPicker.value = defaultColor;
+  colorPicker.title = title;
+  return colorPicker;
+}
+
+function createButton(label, tooltip, callback, id = undefined) {
+  const btn = document.createElement("button");
+  btn.textContent = label;
+  btn.title = tooltip;
+  btn.classList.add("style-inner-button");
+  if (label === "Clear") btn.classList.add("red");
+  if (id) {
+    btn.id = id;
+  } else {
+    btn.id = label;
+  }
+  btn.onclick = () => {
+    callback();
+  }
+  return btn;
+}
+
+function appendButton(parent, label, tooltip, callback) {
+  const btn = createButton(label, tooltip, callback);
+  parent.appendChild(btn);
+}
+
+function createInput(widthInPx = 80, placeholder = undefined, title = undefined,
+                     defaultValue = undefined, callback = undefined) {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = placeholder;
+  input.title = title;
+  input.classList.add("style-input");
+  input.style.width = `${widthInPx}px`;
+  input.value = defaultValue || "";
+  if (callback) {
+    input.addEventListener("keypress", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        callback(input.value.trim());
+      }
+    });
+  }
+  return input;
+}
 
 function createStyleDiv(cache) {
   const root = document.createElement("div");
-
-  function createNewRow(parent) {
-    const row = document.createElement("div");
-    row.classList.add("card-row");
-    parent.appendChild(row);
-    return row;
-  }
-
-  function appendVerticalRule(parent, label = undefined, tooltip = undefined, id = undefined, customCSSClass = undefined) {
-    const verticalRule = document.createElement("div");
-    verticalRule.className = "vr";
-    if (customCSSClass) verticalRule.classList.add(customCSSClass);
-    parent.appendChild(verticalRule);
-    appendLabel(parent, label, tooltip, id, customCSSClass);
-  }
-
-  function appendHorizontalRule(parent, label = undefined, tooltip = undefined, id = undefined, customCSSClass = undefined) {
-    const horizontalRule = document.createElement("hr");
-    horizontalRule.className = "hr";
-    if (customCSSClass) horizontalRule.classList.add(customCSSClass);
-    parent.appendChild(horizontalRule);
-  }
-
-  function createLabel(labelText, tooltip = undefined) {
-    if (labelText) {
-      const label = document.createElement("label");
-      label.textContent = labelText;
-      label.className = "vr-label";
-      label.id = labelText;
-      if (tooltip) label.title = tooltip;
-      return label;
-    }
-    return null;
-  }
-
-  function appendLabel(parent, labelText, tooltip = undefined, id = undefined, customCSSClass = undefined) {
-    const label = createLabel(labelText, tooltip);
-    if (id) label.id = id;
-    if (customCSSClass) label.classList.add(customCSSClass);
-    if (label) parent.appendChild(label);
-  }
 
   function createCard(label, parent = undefined, additionalCSSClass = undefined) {
     const card = document.createElement("div");
@@ -56,41 +149,6 @@ function createStyleDiv(cache) {
       root.appendChild(card);
     }
     return card;
-  }
-
-  function createSwitch(callback = undefined, inputId = undefined, enabledByDefault = false) {
-    const label = document.createElement('label');
-    label.className = 'switch';
-
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.checked = enabledByDefault;
-
-    const span = document.createElement('span');
-    span.className = 'slider round';
-
-    if (callback) {
-      input.addEventListener('change', callback);
-    }
-
-    if (inputId) {
-      input.id = inputId;
-      label.id = `${inputId}Label`;
-    }
-
-    label.append(input, span);
-
-    label.setChecked = (checked) => {
-      input.checked = checked;
-    };
-
-    label.toggle = () => {
-      input.checked = !input.checked;
-    };
-
-    label.isChecked = () => input.checked;
-
-    return label;
   }
 
   async function handleStyleChangeEvent(property, value) {
@@ -358,16 +416,6 @@ function createStyleDiv(cache) {
     parent.appendChild(container);
   }
 
-  function createColorPicker(defaultColor, title) {
-    const colorPicker = document.createElement("input");
-    colorPicker.type = "color";
-    colorPicker.classList.add("style-inner-button");
-    colorPicker.style.width = "24px";
-    colorPicker.value = defaultColor;
-    colorPicker.title = title;
-    return colorPicker;
-  }
-
   function createColorControls(parent, property, defaultColor, colors, continuousScaleBtn = true, customCSSClass = undefined) {
     const colorButtonDiv = document.createElement("div");
     colorButtonDiv.className = "style-color-button-container";
@@ -488,48 +536,6 @@ function createStyleDiv(cache) {
     parent.appendChild(clearLabelButton);
   }
 
-  function createButton(label, tooltip, callback, id = undefined) {
-    const btn = document.createElement("button");
-    btn.textContent = label;
-    btn.title = tooltip;
-    btn.classList.add("style-inner-button");
-    if (label === "Clear") btn.classList.add("red");
-    if (id) {
-      btn.id = id;
-    } else {
-      btn.id = label;
-    }
-    btn.onclick = () => {
-      callback();
-    }
-    return btn;
-  }
-
-  function appendButton(parent, label, tooltip, callback) {
-    const btn = createButton(label, tooltip, callback);
-    parent.appendChild(btn);
-  }
-
-  function createInput(widthInPx = 80, placeholder = undefined, title = undefined,
-                       defaultValue = undefined, callback = undefined) {
-    const input = document.createElement("input");
-    input.type = "text";
-    input.placeholder = placeholder;
-    input.title = title;
-    input.classList.add("style-input");
-    input.style.width = `${widthInPx}px`;
-    input.value = defaultValue || "";
-    if (callback) {
-      input.addEventListener("keypress", function (event) {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          callback(input.value.trim());
-        }
-      });
-    }
-    return input;
-  }
-
   function createNodeShapeControls(parent) {
     for (const [label, value] of Object.entries(cache.DEFAULTS.STYLES.NODE_FORM)) {
       appendButton(parent, label, value,
@@ -579,85 +585,33 @@ function createStyleDiv(cache) {
     });
   }
 
-  function createFocusCard() {
-    const focDiv = createCard("Focus Elements");
+  // Two cards, split by what they need to already have: "Select Elements"
+  // *creates* a selection out of the visible graph (rail ◈ menu), while
+  // "Act on Selection" *grows or walks* one you already have, so it lives in
+  // the inspector's selection context next to the thing it operates on.
+  function createActOnSelectionCard() {
+    const actDiv = createCard("Act on Selection");
 
-    const row1 = createNewRow(focDiv);
-    appendLabel(row1, "Node", "Select the Node ID or Label to focus.", "nodeFocusLabel");
-    appendEditableDropdown(row1, true);
+    const rowTwo = createNewRow(actDiv);
+    appendButton(rowTwo, "Expand Edges",
+      "Add all edges connected to the currently selected nodes to the selection",
+      async () => await cache.sm.toggleSelectionByNeighbors("expand-edges"));
+    appendButton(rowTwo, "Reduce Edges",
+      "Remove edges that do not connect two selected nodes",
+      async () => await cache.sm.toggleSelectionByNeighbors("reduce-edges"));
 
-    const row2 = createNewRow(focDiv);
-    appendLabel(row2, "Edge", "Select the Edge ID or Label to focus.", "edgeFocusLabel");
-    appendEditableDropdown(row2, false);
-  }
+    const rowThree = createNewRow(actDiv);
+    appendButton(rowThree, "Expand Neighbors",
+      "Add all directly connected neighbor nodes (and their edges) to the current selection",
+      async () => await cache.sm.toggleSelectionByNeighbors("expand-neighbors"));
+    appendButton(rowThree, "Reduce Neighbors",
+      "Remove the outermost layer of selected neighbor nodes (and their edges) from the ",
+      async () => await cache.sm.toggleSelectionByNeighbors("reduce-neighbors"));
 
-  function appendEditableDropdown(parent, isNode, widthInPx = 220) {
-    const input = document.createElement('input');
-    const dataListID = `focusOptions${isNode ? 'Node' : 'Edge'}`;
-    input.setAttribute('list', dataListID);
-    input.placeholder = `Search ${isNode ? 'node' : 'edge'} ID or label...`;
-    input.classList.add('style-input');
-    input.style.width = `${widthInPx}px`;
-
-    const datalist = document.createElement('datalist');
-    datalist.id = dataListID;
-
-    const sourceMap = isNode
-      ? cache.nodeIDOrLabelToNodeIDs
-      : cache.edgeIDOrLabelToEdgeIDs;
-
-    const getVisibleIDs = () => {
-      const visibleIDs = isNode ? cache.nodeIDsToBeShown : cache.edgeIDsToBeShown;
-      return visibleIDs && visibleIDs.size ? visibleIDs : null;
-    };
-
-    const populateFocusOptions = () => {
-      const visibleIDs = getVisibleIDs();
-      const fragment = document.createDocumentFragment();
-      datalist.textContent = '';
-      for (const [key, ids] of sourceMap.entries()) {
-        let include = !visibleIDs;
-        if (visibleIDs) {
-          for (const id of ids) {
-            if (visibleIDs.has(id)) {
-              include = true;
-              break;
-            }
-          }
-        }
-        if (include) {
-          const option = document.createElement('option');
-          option.value = key;
-          fragment.appendChild(option);
-        }
-      }
-      datalist.appendChild(fragment);
-    };
-
-    populateFocusOptions();
-    input.addEventListener('focus', populateFocusOptions);
-
-    const focusButton = document.createElement('button');
-    focusButton.textContent = 'Focus';
-    focusButton.classList.add('style-inner-button');
-    focusButton.onclick = async () => {
-      const selectedValue = input.value;
-      if (selectedValue) {
-        const ids = sourceMap.get(selectedValue);
-        if (ids) {
-          if (ids.size !== 1) {
-            cache.ui.warning(`Ambiguous selection: ${selectedValue} matches ${ids.size} ${isNode ? 'nodes' : 'edges'} (${Array.from(ids).join(',')}).`);
-          }
-          await cache.gcm.focusElements(ids, isNode);
-        } else {
-          cache.ui.warning(`No ${isNode ? 'node' : 'edge'} found for: ${selectedValue}`);
-        }
-      }
-    };
-
-    parent.appendChild(input);
-    parent.appendChild(datalist);
-    parent.appendChild(focusButton);
+    const rowShortestPath = createNewRow(actDiv);
+    appendButton(rowShortestPath, "Shortest Path",
+      "Add the shortest path connecting the two selected nodes — its nodes and the edges between them — to the selection.\nComputed on the visible graph, so it honours active filters.\nRequires exactly two selected nodes.",
+      async () => await cache.sm.selectShortestPathBetweenSelected());
   }
 
   function createSelectCard() {
@@ -673,27 +627,6 @@ function createStyleDiv(cache) {
       async () => await cache.sm.toggleSelectionForAllEdges(true));
     appendButton(rowOne, "No Edges", "Deselect all visible edges",
       async () => await cache.sm.toggleSelectionForAllEdges(false));
-
-    const rowTwo = createNewRow(selDiv);
-    appendButton(rowTwo, "Expand Edges",
-      "Add all edges connected to the currently selected nodes to the selection",
-      async () => await cache.sm.toggleSelectionByNeighbors("expand-edges"));
-    appendButton(rowTwo, "Reduce Edges",
-      "Remove edges that do not connect two selected nodes",
-      async () => await cache.sm.toggleSelectionByNeighbors("reduce-edges"));
-
-    const rowThree = createNewRow(selDiv);
-    appendButton(rowThree, "Expand Neighbors",
-      "Add all directly connected neighbor nodes (and their edges) to the current selection",
-      async () => await cache.sm.toggleSelectionByNeighbors("expand-neighbors"));
-    appendButton(rowThree, "Reduce Neighbors",
-      "Remove the outermost layer of selected neighbor nodes (and their edges) from the ",
-      async () => await cache.sm.toggleSelectionByNeighbors("reduce-neighbors"));
-
-    const rowShortestPath = createNewRow(selDiv);
-    appendButton(rowShortestPath, "Shortest Path",
-      "Add the shortest path connecting the two selected nodes — its nodes and the edges between them — to the selection.\nComputed on the visible graph, so it honours active filters.\nRequires exactly two selected nodes.",
-      async () => await cache.sm.selectShortestPathBetweenSelected());
 
     appendHorizontalRule(selDiv);
 
@@ -836,12 +769,14 @@ function createStyleDiv(cache) {
   function createArrangeNodesCard() {
     const arrDiv = createCard("Arrange Selection");
 
+    // Six equally-weighted actions — a 3x2 grid of labelled cells reads as a
+    // palette, where one wrapping row read as an overflow accident.
     const rowOne = createNewRow(arrDiv);
+    rowOne.classList.add("card-row-grid");
     appendButton(rowOne, "Shrink", "Move nodes closer together, halving their distance to the center.",
       async () => await cache.lm.layoutSelectedNodes("shrink"));
     appendButton(rowOne, "Expand", "Move nodes farther apart, doubling their distance to the center.",
       async () => await cache.lm.layoutSelectedNodes("expand"));
-    appendVerticalRule(rowOne);
     appendButton(rowOne, "Circle", "Arrange nodes evenly in a circular layout around the center.",
       async () => await cache.lm.layoutSelectedNodes("circle"));
     appendButton(rowOne, "Force", "Apply a force-directed layout to the selected nodes.",
@@ -1145,218 +1080,334 @@ function createStyleDiv(cache) {
       {min: 0.5, max: 3, step: 0.25}, "Pattern spacing multiplier — higher spreads the dashes/dots further apart.", true);
   }
 
+  // The Groups overlay card. The four fixed style tabs are gone: a workspace
+  // holds any number of groups, so the card is a LIST (bubble_sets.renderGroupList
+  // paints it) over one settings pane that is rebuilt for whichever row is
+  // selected. Building a pane per group would be N x ~20 rows of DOM for a
+  // surface that only ever shows one.
   function createBubbleSetConfigCard() {
     const bubbleDiv = createCard("Bubble Sets", undefined, "bubble-set-config-card-header");
+
+    // What a group IS comes before the buttons that make one.
+    const note = document.createElement("p");
+    note.className = "insp-note";
+    note.textContent =
+      "Coloured bubbles drawn around nodes you group together. A group can be fed " +
+      "by a filter (it then follows that filter) or by a selection, or both.";
+    bubbleDiv.appendChild(note);
+
+    // Creation verbs sit ABOVE the list: they answer "how do I get one", which
+    // is the question the empty state asks and the question a user returning to
+    // add another asks. "Clear all" is destructive and goes below, on its own —
+    // it has no business sitting in a row of ＋ buttons.
+    const tools = document.createElement("div");
+    tools.className = "insp-groups";
+
+    const newBtn = document.createElement("button");
+    newBtn.id = "newGroupBtn";
+    newBtn.className = "insp-btn";
+    newBtn.textContent = "＋ New group";
+    newBtn.title = "Create an empty group, then add nodes to it from a selection or a filter";
+    newBtn.onclick = async () => {
+      const group = cache.bs.createGroup();
+      if (!group) return;
+      cache.bs.selectedGroup = group;
+      await cache.bs.afterMembershipChange("New bubble group");
+      cache.ui.info(`Created "${cache.bs.groupName(group)}" — add nodes to it from a selection or a filter`);
+    };
+    tools.appendChild(newBtn);
+
+    const fromSelBtn = document.createElement("button");
+    fromSelBtn.id = "newGroupFromSelectionBtn";
+    fromSelBtn.className = "insp-btn";
+    fromSelBtn.textContent = "＋ From selection";
+    fromSelBtn.title = "Create a group holding the currently selected nodes";
+    fromSelBtn.onclick = () => cache.bs.createGroupFromSelection();
+    tools.appendChild(fromSelBtn);
+
+    const detectBtn = document.createElement("button");
+    detectBtn.id = "detectCommunitiesBtn";
+    detectBtn.className = "insp-btn";
+    detectBtn.textContent = "🧩 Auto-detect";
+    detectBtn.title =
+      "Auto-group by community (Louvain): pick edge weighting, resolution and how " +
+      "many groups to create. Adds new groups; existing ones are left alone.";
+    // A RailMenu, so Escape, aria-expanded, close-on-scroll and focus restore
+    // come with it (see managers/community_menu.js). It attaches its own click
+    // handler; the assignment below keeps the "is it wired" check meaningful for
+    // the card's tests and mirrors the other buttons here.
+    detectBtn.onclick = null;
+    attachCommunityMenu(detectBtn, cache.bs);
+    tools.appendChild(detectBtn);
+
+    bubbleDiv.appendChild(tools);
+
+    // One row per group, plus the empty state. Filled by renderGroupList.
+    const list = document.createElement("div");
+    list.id = "groupList";
+    list.className = "group-list";
+    bubbleDiv.appendChild(list);
+
+    const footer = document.createElement("div");
+    footer.className = "group-list-footer";
+    const clearBtn = document.createElement("button");
+    clearBtn.id = "clearManualGroupsBtn";
+    clearBtn.className = "insp-btn red";
+    clearBtn.textContent = "Empty all groups";
+    clearBtn.title =
+      "Remove every node from every group. The groups themselves stay — " +
+      "delete one from its ⋯ menu.";
+    clearBtn.onclick = () => cache.bs.clearAllManualGroups();
+    footer.appendChild(clearBtn);
+    bubbleDiv.appendChild(footer);
+
+    // Settings for the open row. group_list re-parents this ONE element into
+    // whichever row is expanded; #groupStylePanelHome is where it waits when
+    // none is, so a list rebuild can never destroy it.
+    const panelHome = document.createElement("div");
+    panelHome.id = "groupStylePanelHome";
+    const panel = document.createElement("div");
+    panel.id = "groupStylePanel";
+    panel.className = "group-style-panel";
+    panelHome.appendChild(panel);
+    bubbleDiv.appendChild(panelHome);
+  }
+
+  /**
+   * Build the style controls for ONE group into `#groupStylePanel`. Called
+   * whenever the selected row changes, so the pane always describes exactly the
+   * group whose row is highlighted.
+   * @param {string|null} group  null clears the pane (no groups exist)
+   */
+  function buildGroupStylePanel(group) {
+    const panel = document.getElementById("groupStylePanel");
+    if (!panel) return;
+    panel.replaceChildren();
+    const bs = cache.data?.layouts?.[cache.data?.selectedLayout]?.bubbleSetStyle?.[group];
+    if (!bs) return;
+
     const optionalCSSClass = "bubbleSetOptionalLabelConfig";
+    // No heading: the pane sits inside the group's own row, which already
+    // carries its name, colour and count.
+    const name = bs.labelText || group;
 
-    // Tab bar
-    const tabBar = document.createElement("div");
-    tabBar.className = "bubble-set-tab-bar";
-    bubbleDiv.appendChild(tabBar);
+    // Fill Color
+    const rowFillColor = createNewRow(panel);
+    appendLabel(rowFillColor, "Fill Color");
+    createColorControls(rowFillColor, `Bubble Set ${group} Fill Color`, bs.fill, [], false);
 
-    const panels = [];
-    let tabIndex = 0;
+    // Fill Opacity
+    const rowFillOpacity = createNewRow(panel);
+    appendLabel(rowFillOpacity, "Fill Opacity");
+    createNumericalSlider(rowFillOpacity, `Bubble Set ${group} Fill Opacity`, bs.fillOpacity,
+      {min: 0, max: 1, step: 0.01}, `Define the fill opacity of "${name}".`, false);
 
-    for (const group of cache.bs.traverseBubbleSets()) {
-      tabIndex++;
-      const bs = cache.data.layouts[cache.data.selectedLayout].bubbleSetStyle[group];
+    // Stroke Color
+    const rowStrokeColor = createNewRow(panel);
+    appendLabel(rowStrokeColor, "Stroke Color");
+    createColorControls(rowStrokeColor, `Bubble Set ${group} Stroke Color`, bs.stroke, [], false);
 
-      // Create tab button with group color accent
-      const tab = document.createElement("button");
-      tab.className = `bubble-set-tab${tabIndex === 1 ? " active" : ""}`;
-      tab.textContent = `Bubble Set ${tabIndex}`;
-      tab.dataset.group = group;
-      tab.style.setProperty("--tab-color", bs.fill);
-      tab.style.setProperty("--tab-text-color", StaticUtilities.getReadableForegroundColor(bs.fill));
-      tabBar.appendChild(tab);
+    // Stroke Opacity
+    const rowStrokeOpacity = createNewRow(panel);
+    appendLabel(rowStrokeOpacity, "Stroke Opacity");
+    createNumericalSlider(rowStrokeOpacity, `Bubble Set ${group} Stroke Opacity`, bs.strokeOpacity,
+      {min: 0, max: 1, step: 0.01}, `Define the stroke opacity of "${name}".`, false);
 
-      // Create tab panel
-      const panel = document.createElement("div");
-      panel.className = `bubble-set-tab-panel${tabIndex === 1 ? " active" : ""}`;
-      panel.id = `bubbleSetStyleCard${group}`;
-      bubbleDiv.appendChild(panel);
-      panels.push(panel);
+    // Padding (node influence field multiplier)
+    const rowPadding = createNewRow(panel);
+    appendLabel(rowPadding, "Padding",
+      "How far the bubble body extends past its member nodes — lower for a tighter hug, higher for more breathing room.");
+    createNumericalSlider(rowPadding, `Bubble Set ${group} Padding`, bs.padding ?? 1,
+      {min: 0.01, max: 3, step: 0.01},
+      `How far "${name}" extends past its member nodes.`, false);
 
-      tab.onclick = () => {
-        tabBar.querySelectorAll(".bubble-set-tab").forEach(t => t.classList.remove("active"));
-        panels.forEach(p => p.classList.remove("active"));
-        tab.classList.add("active");
-        panel.classList.add("active");
-      };
+    // Corridor Width (virtual-edge influence field multiplier)
+    const rowCorridor = createNewRow(panel);
+    appendLabel(rowCorridor, "Corridor Width",
+      "Thickness of the connecting arms that reach outlying member nodes.");
+    createNumericalSlider(rowCorridor, `Bubble Set ${group} Corridor Width`, bs.corridor ?? 1,
+      {min: 0.01, max: 3, step: 0.01},
+      `Thickness of "${name}"'s connecting arms to outlying members.`, false);
 
-      // Fill Color
-      const rowFillColor = createNewRow(panel);
-      appendLabel(rowFillColor, "Fill Color");
-      createColorControls(rowFillColor, `Bubble Set ${group} Fill Color`, bs.fill, [], false);
+    // Avoidance (non-member field on/off; persisted numeric 0/1 for
+    // JSON back-compat — legacy saved values > 0 read as ON)
+    const rowAvoidance = createNewRow(panel);
+    appendLabel(rowAvoidance, "Avoid Other Nodes",
+      "Steer the hull around nodes that are not in the group and carve holes for enclosed ones. " +
+      "Two overlapping groups with this on will each route around the other's nodes.");
+    const avoidanceSwitch = createSwitch(async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Avoidance`, avoidanceSwitch.isChecked() ? 1 : 0);
+    }, undefined, (bs.avoidance ?? 1) > 0);
+    avoidanceSwitch.dataset.property = `Bubble Set ${group} Avoidance`;
+    // The row label is a separate element, so name the checkbox directly.
+    avoidanceSwitch.querySelector("input").setAttribute("aria-label", `Avoid other nodes ("${name}")`);
+    rowAvoidance.appendChild(avoidanceSwitch);
 
-      // Fill Opacity
-      const rowFillOpacity = createNewRow(panel);
-      appendLabel(rowFillOpacity, "Fill Opacity");
-      createNumericalSlider(rowFillOpacity, `Bubble Set ${group} Fill Opacity`, bs.fillOpacity,
-        {min: 0, max: 1, step: 0.01}, `Define the fill opacity of bubble set ${tabIndex}.`, false);
-
-      // Stroke Color
-      const rowStrokeColor = createNewRow(panel);
-      appendLabel(rowStrokeColor, "Stroke Color");
-      createColorControls(rowStrokeColor, `Bubble Set ${group} Stroke Color`, bs.stroke, [], false);
-
-      // Stroke Opacity
-      const rowStrokeOpacity = createNewRow(panel);
-      appendLabel(rowStrokeOpacity, "Stroke Opacity");
-      createNumericalSlider(rowStrokeOpacity, `Bubble Set ${group} Stroke Opacity`, bs.strokeOpacity,
-        {min: 0, max: 1, step: 0.01}, `Define the stroke opacity of bubble set ${tabIndex}.`, false);
-
-      // Padding (node influence field multiplier)
-      const rowPadding = createNewRow(panel);
-      appendLabel(rowPadding, "Padding",
-        "How far the bubble body extends past its member nodes — lower for a tighter hug, higher for more breathing room.");
-      createNumericalSlider(rowPadding, `Bubble Set ${group} Padding`, bs.padding ?? 1,
-        {min: 0.01, max: 3, step: 0.01},
-        `How far bubble set ${tabIndex} extends past its member nodes.`, false);
-
-      // Corridor Width (virtual-edge influence field multiplier)
-      const rowCorridor = createNewRow(panel);
-      appendLabel(rowCorridor, "Corridor Width",
-        "Thickness of the connecting arms that reach outlying member nodes.");
-      createNumericalSlider(rowCorridor, `Bubble Set ${group} Corridor Width`, bs.corridor ?? 1,
-        {min: 0.01, max: 3, step: 0.01},
-        `Thickness of bubble set ${tabIndex}'s connecting arms to outlying members.`, false);
-
-      // Avoidance (non-member field on/off; persisted numeric 0/1 for
-      // JSON back-compat — legacy saved values > 0 read as ON)
-      const rowAvoidance = createNewRow(panel);
-      appendLabel(rowAvoidance, "Avoid Other Nodes",
-        "Steer the hull around nodes that are not in the group and carve holes for enclosed ones.");
-      const avoidanceSwitch = createSwitch(async () => {
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Avoidance`, avoidanceSwitch.isChecked() ? 1 : 0);
-      }, undefined, (bs.avoidance ?? 1) > 0);
-      avoidanceSwitch.dataset.property = `Bubble Set ${group} Avoidance`;
-      // The row label is a separate element, so name the checkbox directly.
-      avoidanceSwitch.querySelector("input").setAttribute("aria-label",
-        `Avoid other nodes (bubble set ${tabIndex})`);
-      rowAvoidance.appendChild(avoidanceSwitch);
-
-      // Label (toggle + text input)
-      const rowLabel = createNewRow(panel);
-      appendLabel(rowLabel, "Label Text");
-      const enableTextSwitch = createSwitch(async () => {
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label`, enableTextSwitch.isChecked());
-      }, undefined, bs.label);
-      rowLabel.appendChild(enableTextSwitch);
-      const labelInput = createInput(120, `${group} label text`,
-        `Enter the label text for bubble set ${tabIndex}.`, bs.labelText, async () => {
+    // Label (toggle + text input)
+    const rowLabel = createNewRow(panel);
+    appendLabel(rowLabel, "Label Text");
+    const enableTextSwitch = createSwitch(async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label`, enableTextSwitch.isChecked());
+    }, undefined, bs.label);
+    enableTextSwitch.dataset.property = `Bubble Set ${group} Label`;
+    enableTextSwitch.querySelector("input").setAttribute("aria-label", `Show the label for "${name}"`);
+    rowLabel.appendChild(enableTextSwitch);
+    const labelInput = createInput(120, "label text",
+      "The text drawn on the bubble. This is the same name the group list shows.",
+      bs.labelText, async () => {
         await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Text`, labelInput.value.trim());
+        cache.bs.renderGroupList();
       });
-      labelInput.classList.add(optionalCSSClass);
-      rowLabel.appendChild(labelInput);
+    labelInput.dataset.property = `Bubble Set ${group} Label Text`;
+    labelInput.classList.add(optionalCSSClass);
+    rowLabel.appendChild(labelInput);
 
-      // Label Background (toggle + color)
-      const rowLabelBg = createNewRow(panel);
-      appendLabel(rowLabelBg, "Label Background", undefined, undefined, optionalCSSClass);
-      const enableBackgroundSwitch = createSwitch(async () => {
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Background`, enableBackgroundSwitch.isChecked());
-      }, undefined, bs.labelBackground);
-      enableBackgroundSwitch.classList.add(optionalCSSClass);
-      rowLabelBg.appendChild(enableBackgroundSwitch);
-      createColorControls(rowLabelBg, `Bubble Set ${group} Label Background Color`,
-        bs.labelBackgroundFill || bs.fill, [], false, optionalCSSClass);
+    // Label Background (toggle + color)
+    const rowLabelBg = createNewRow(panel);
+    appendLabel(rowLabelBg, "Label Background", undefined, undefined, optionalCSSClass);
+    const enableBackgroundSwitch = createSwitch(async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Background`, enableBackgroundSwitch.isChecked());
+    }, undefined, bs.labelBackground);
+    enableBackgroundSwitch.classList.add(optionalCSSClass);
+    enableBackgroundSwitch.dataset.property = `Bubble Set ${group} Label Background`;
+    enableBackgroundSwitch
+      .querySelector("input")
+      .setAttribute("aria-label", `Draw a background plate behind the "${name}" label`);
+    rowLabelBg.appendChild(enableBackgroundSwitch);
+    createColorControls(rowLabelBg, `Bubble Set ${group} Label Background Color`,
+      bs.labelBackgroundFill || bs.fill, [], false, optionalCSSClass);
 
-      // Label Fill Color
-      const rowLabelFill = createNewRow(panel);
-      appendLabel(rowLabelFill, "Label Color", undefined, undefined, optionalCSSClass);
-      createColorControls(rowLabelFill, `Bubble Set ${group} Label Fill Color`, bs.labelFill, [], false, optionalCSSClass);
+    // Label Fill Color
+    const rowLabelFill = createNewRow(panel);
+    appendLabel(rowLabelFill, "Label Color", undefined, undefined, optionalCSSClass);
+    createColorControls(rowLabelFill, `Bubble Set ${group} Label Fill Color`, bs.labelFill, [], false, optionalCSSClass);
 
-      // Label Font Size
-      const rowFontSize = createNewRow(panel);
-      appendLabel(rowFontSize, "Label Font Size", undefined, undefined, optionalCSSClass);
-      createNumericalSlider(rowFontSize, `Bubble Set ${group} Label Font Size`, bs.labelFontSize,
-        {min: 6, max: 36, step: 1}, `Define the label font size for bubble set ${tabIndex}.`, false);
-      rowFontSize.lastChild.classList.add(optionalCSSClass);
+    // Label Font Size
+    const rowFontSize = createNewRow(panel);
+    appendLabel(rowFontSize, "Label Font Size", undefined, undefined, optionalCSSClass);
+    createNumericalSlider(rowFontSize, `Bubble Set ${group} Label Font Size`, bs.labelFontSize,
+      {min: 6, max: 36, step: 1}, `Define the label font size for "${name}".`, false);
+    rowFontSize.lastChild.classList.add(optionalCSSClass);
 
-      // Label Placement
-      const rowPlacement = createNewRow(panel);
-      appendLabel(rowPlacement, "Label Placement", undefined, undefined, optionalCSSClass);
-      const placementDropdown = document.createElement("select");
-      placementDropdown.className = "style-inner-button";
-      placementDropdown.dataset.property = `Bubble Set ${group} Label Placement`;
-      placementDropdown.classList.add(optionalCSSClass);
-      ['left', 'right', 'top', 'bottom', 'center'].forEach(v => {
-        const opt = document.createElement("option");
-        opt.value = v;
-        opt.textContent = v;
-        placementDropdown.appendChild(opt);
-      });
-      placementDropdown.value = bs.labelPlacement;
-      placementDropdown.onchange = async () => {
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Placement`, placementDropdown.value);
-      };
-      rowPlacement.appendChild(placementDropdown);
+    // Label Placement
+    const rowPlacement = createNewRow(panel);
+    appendLabel(rowPlacement, "Label Placement", undefined, undefined, optionalCSSClass);
+    const placementDropdown = document.createElement("select");
+    placementDropdown.className = "style-inner-button";
+    placementDropdown.dataset.property = `Bubble Set ${group} Label Placement`;
+    placementDropdown.classList.add(optionalCSSClass);
+    ['left', 'right', 'top', 'bottom', 'center'].forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      placementDropdown.appendChild(opt);
+    });
+    placementDropdown.value = bs.labelPlacement;
+    placementDropdown.onchange = async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Placement`, placementDropdown.value);
+    };
+    rowPlacement.appendChild(placementDropdown);
 
-      // Label Close To Path
-      const rowClosePath = createNewRow(panel);
-      appendLabel(rowClosePath, "Close To Path", undefined, undefined, optionalCSSClass);
-      const closeToPathSwitch = createSwitch(async () => {
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Close To Path`, closeToPathSwitch.isChecked());
-      }, undefined, bs.labelCloseToPath);
-      closeToPathSwitch.classList.add(optionalCSSClass);
-      closeToPathSwitch.dataset.property = `Bubble Set ${group} Label Close To Path`;
-      rowClosePath.appendChild(closeToPathSwitch);
+    // Label Close To Path
+    const rowClosePath = createNewRow(panel);
+    appendLabel(rowClosePath, "Close To Path", undefined, undefined, optionalCSSClass);
+    const closeToPathSwitch = createSwitch(async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Close To Path`, closeToPathSwitch.isChecked());
+    }, undefined, bs.labelCloseToPath);
+    closeToPathSwitch.classList.add(optionalCSSClass);
+    closeToPathSwitch.dataset.property = `Bubble Set ${group} Label Close To Path`;
+    rowClosePath.appendChild(closeToPathSwitch);
 
-      // Label Auto Rotate
-      const rowAutoRotate = createNewRow(panel);
-      appendLabel(rowAutoRotate, "Auto Rotate", undefined, undefined, optionalCSSClass);
-      const autoRotateSwitch = createSwitch(async () => {
-        await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Auto Rotate`, autoRotateSwitch.isChecked());
-      }, undefined, bs.labelAutoRotate);
-      autoRotateSwitch.classList.add(optionalCSSClass);
-      autoRotateSwitch.dataset.property = `Bubble Set ${group} Label Auto Rotate`;
-      rowAutoRotate.appendChild(autoRotateSwitch);
+    // Label Auto Rotate
+    const rowAutoRotate = createNewRow(panel);
+    appendLabel(rowAutoRotate, "Auto Rotate", undefined, undefined, optionalCSSClass);
+    const autoRotateSwitch = createSwitch(async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Auto Rotate`, autoRotateSwitch.isChecked());
+    }, undefined, bs.labelAutoRotate);
+    autoRotateSwitch.classList.add(optionalCSSClass);
+    autoRotateSwitch.dataset.property = `Bubble Set ${group} Label Auto Rotate`;
+    rowAutoRotate.appendChild(autoRotateSwitch);
 
-      // Label Offset X
-      const rowOffsetX = createNewRow(panel);
-      appendLabel(rowOffsetX, "Label Offset X", undefined, undefined, optionalCSSClass);
-      createNumericalSlider(rowOffsetX, `Bubble Set ${group} Label Offset X`, bs.labelOffsetX,
-        {min: -50, max: 50, step: 1}, `Define the label X offset for bubble set ${tabIndex}.`, false);
-      rowOffsetX.lastChild.classList.add(optionalCSSClass);
+    // Label Offset X
+    const rowOffsetX = createNewRow(panel);
+    appendLabel(rowOffsetX, "Label Offset X", undefined, undefined, optionalCSSClass);
+    createNumericalSlider(rowOffsetX, `Bubble Set ${group} Label Offset X`, bs.labelOffsetX,
+      {min: -50, max: 50, step: 1}, `Define the label X offset for "${name}".`, false);
+    rowOffsetX.lastChild.classList.add(optionalCSSClass);
 
-      // Label Offset Y
-      const rowOffsetY = createNewRow(panel);
-      appendLabel(rowOffsetY, "Label Offset Y", undefined, undefined, optionalCSSClass);
-      createNumericalSlider(rowOffsetY, `Bubble Set ${group} Label Offset Y`, bs.labelOffsetY,
-        {min: -50, max: 50, step: 1}, `Define the label Y offset for bubble set ${tabIndex}.`, false);
-      rowOffsetY.lastChild.classList.add(optionalCSSClass);
-    }
+    // Label Offset Y
+    const rowOffsetY = createNewRow(panel);
+    appendLabel(rowOffsetY, "Label Offset Y", undefined, undefined, optionalCSSClass);
+    createNumericalSlider(rowOffsetY, `Bubble Set ${group} Label Offset Y`, bs.labelOffsetY,
+      {min: -50, max: 50, step: 1}, `Define the label Y offset for "${name}".`, false);
+    rowOffsetY.lastChild.classList.add(optionalCSSClass);
   }
 
   // Turn a config card into a collapsible section: replace the floating
   // `::before` title with a real clickable header (so the panel reads as a
   // set of foldable sections instead of one tall wall of controls).
-  function makeCollapsible(label, startCollapsed = false) {
+  //
+  // `title` renames the header without touching data-label (the lookup key
+  // other modules, the palette breadcrumb and the tests all use). `overlay`
+  // names a UIManager.OVERLAYS layer and turns the header into a layer row:
+  // a switch for the layer beside the disclosure for its parameters, so the
+  // one row owns both. The disclosure gets its own accessible name ("…
+  // settings") because the switch already answers to the plain one.
+  function makeCollapsible(label, startCollapsed = false, {title = label, overlay, countId} = {}) {
     const card = root.querySelector(`[data-label="${label}"]`);
     if (!card) return;
     card.classList.add("card-collapsible");
+
+    const bar = document.createElement("div");
+    bar.className = "card-collapse-bar";
+    if (overlay) card.classList.add("layer-card");
+
+    if (overlay) {
+      const sw = document.createElement("button");
+      sw.type = "button";
+      sw.id = `overlaySwitch${overlay[0].toUpperCase()}${overlay.slice(1)}`;
+      sw.className = "layer-switch";
+      sw.setAttribute("role", "switch");
+      sw.setAttribute("aria-checked", "false");
+      sw.setAttribute("aria-label", title);
+      // syncOverlays swaps this out for a reason while the layer has nothing to
+      // draw, and back in when it does, so it has to exist to be restored.
+      sw.title = `Show or hide ${title.toLowerCase()} on the graph`;
+      sw.addEventListener("click", () => cache.ui.toggleOverlay(overlay));
+      bar.appendChild(sw);
+    }
 
     const header = document.createElement("button");
     header.type = "button";
     header.className = "card-collapse-header";
     header.setAttribute("aria-expanded", startCollapsed ? "false" : "true");
+    if (overlay) header.setAttribute("aria-label", `${title} settings`);
 
-    const title = document.createElement("span");
-    title.className = "card-collapse-title";
-    title.textContent = label;
+    const titleSpan = document.createElement("span");
+    titleSpan.className = "card-collapse-title";
+    titleSpan.textContent = title;
+    header.appendChild(titleSpan);
+
+    if (countId) {
+      const count = document.createElement("span");
+      count.className = "layer-count";
+      count.id = countId;
+      header.appendChild(count);
+    }
 
     const chevron = document.createElement("span");
     chevron.className = "card-collapse-chevron";
     chevron.textContent = startCollapsed ? "▸" : "▾";
+    header.appendChild(chevron);
 
-    header.append(title, chevron);
     header.addEventListener("click", () => {
       const collapsed = card.classList.toggle("collapsed");
       chevron.textContent = collapsed ? "▸" : "▾";
       header.setAttribute("aria-expanded", collapsed ? "false" : "true");
     });
 
-    card.insertBefore(header, card.firstChild);
+    bar.appendChild(header);
+    card.insertBefore(bar, card.firstChild);
     if (startCollapsed) card.classList.add("collapsed");
   }
 
@@ -1380,7 +1431,7 @@ function createStyleDiv(cache) {
         threshold: D.THRESHOLD,
         bandwidthScale: D.BANDWIDTH_SCALE,
         ramp: D.RAMP,
-        dimGraph: D.DIM_GRAPH,
+        fadeGraph: D.FADE_GRAPH,
       };
     const syncFns = [];
     const syncControls = () => syncFns.forEach((fn) => fn());
@@ -1430,26 +1481,17 @@ function createStyleDiv(cache) {
       parent.appendChild(container);
     }
 
-    const rowSwitches = createNewRow(card);
-    appendLabel(rowSwitches, "Enable",
-      "Render a density field under the graph showing where nodes crowd together.");
-    const enableSwitch = createSwitch(() => {
-      layer()?.setHeatmapEnabled(enableSwitch.isChecked());
-    }, "heatmapEnabledSwitch", layer()?.heatmapEnabled ?? D.ENABLED);
-    rowSwitches.appendChild(enableSwitch);
-    appendVerticalRule(rowSwitches);
-    appendLabel(rowSwitches, "Dim graph",
-      "De-emphasize nodes and edges while the heatmap is on, so the density field reads through.");
-    const dimSwitch = createSwitch(() => {
-      layer()?.updateSettings({ dimGraph: dimSwitch.isChecked() });
-    }, "heatmapDimGraphSwitch", settings().dimGraph);
-    rowSwitches.appendChild(dimSwitch);
-    syncFns.push(() => dimSwitch.setChecked(settings().dimGraph));
-
+    // On/off is the switch in this card's own header (makeCollapsible's
+    // `overlay`), so the row owns both halves of the overlay.
+    //
     // min/max are UI guardrails, not physical limits: intensity beyond 0.5
     // saturates with 2 overlaps, contrast beyond 2 crushes everything but
     // peaks, and a threshold above 0.5 hides all but the densest cores.
     const sliders = [
+      ["Fade graph", "fadeGraph", { min: 0, max: 1, step: 0.05 },
+        "Fade nodes toward transparent so the density field reads through. Past 40% the two "
+        + "big occluders — labels and edges — drop out entirely, leaving the field and the node "
+        + "positions. Selected and hovered elements keep their normal treatment."],
       ["Intensity", "intensity", { min: 0.05, max: 0.5, step: 0.01 },
         "Per-node splat strength — how quickly overlapping nodes climb the color ramp."],
       ["Opacity", "opacity", { min: 0.1, max: 1, step: 0.05 },
@@ -1489,10 +1531,13 @@ function createStyleDiv(cache) {
       layer()?.resetSettings();
       syncControls();
     });
+    // No greying while the overlay is off: the switch sits in this card's own
+    // header, so the relationship needs no explaining, and pre-tuning before
+    // switching on is legitimate.
   }
 
-  createFocusCard();
   createSelectCard();
+  createActOnSelectionCard();
   createArrangeNodesCard();
   createNodeConfigCard();
   createEdgeConfigCard();
@@ -1500,14 +1545,36 @@ function createStyleDiv(cache) {
   createHeatmapConfigCard();
 
   // Node stays open (most common); Edge is the largest section so it starts
-  // folded; bubble styling only matters once groups exist, so fold it too.
-  // The heatmap overlay is an occasional set-and-leave feature — folded.
+  // folded. The two overlay cards are the layer stack's settings-bearing rows:
+  // both fold, and both carry their own switch (see makeCollapsible's
+  // `overlay`), which is what keeps on/off and parameters in one place.
   makeCollapsible("Node Configuration");
   makeCollapsible("Edge Configuration", true);
-  makeCollapsible("Bubble Sets", true);
-  makeCollapsible("Density Heatmap", true);
+  makeCollapsible("Bubble Sets", true, {
+    title: "Groups",
+    overlay: "groups",
+    countId: "overlayCountGroups",
+  });
+  makeCollapsible("Density Heatmap", true, {
+    title: "Density heatmap",
+    overlay: "heatmap",
+  });
+
+  // The group settings pane is rebuilt whenever the selected row changes, long
+  // after this builder has returned, so hand the closure to the UI manager
+  // rather than making bubble_sets reach back into this module.
+  cache.ui.buildGroupStylePanel = buildGroupStylePanel;
 
   return root;
 }
 
-export {createStyleDiv}
+export {
+  createStyleDiv,
+  createNewRow,
+  createLabel,
+  appendLabel,
+  createSwitch,
+  createButton,
+  createInput,
+  createColorPicker,
+}

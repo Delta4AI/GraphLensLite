@@ -71,7 +71,7 @@ export const QUERY_RESPONSE_SCHEMA = {
         field: {type: 'string', pattern: FIELD_PATTERN},
         // ↑ shape only. `buildQuerySchema` replaces this with an `enum` of
         // real paths drawn from the current graph's hierarchy.
-        op: {enum: ['BETWEEN', 'LT_OR_GT', 'IN']},
+        op: {enum: ['BETWEEN', 'LT_OR_GT', 'IN', 'IS_TRUE', 'IS_FALSE']},
         min: {type: 'number'},
         max: {type: 'number'},
         lt: {type: 'number'},
@@ -170,6 +170,8 @@ function renderCondition(cond) {
     })
     return `${field} IN [${rendered.join(', ')}]`
   }
+  if (op === 'IS_TRUE') return `${field} IS TRUE`
+  if (op === 'IS_FALSE') return `${field} IS FALSE`
   throw new QueryShapeError(`unknown condition.op: ${op}`)
 }
 

@@ -20,7 +20,7 @@ dnf install libxcrypt-compat wine   # only needed for cross-platform builds
 | `npm run bundle:serve` | Dev server with watch + sourcemaps (recommended for development) |
 | `npm run serve` | Static http-server on :8000 |
 | `npm run serve:api` | Standalone HTTP ingest service with live SSE viewer (see [SERVICE.md](SERVICE.md)) |
-| `npm start` | Electron app (injects version automatically) |
+| `npm start` | Electron app (injects version automatically; the first run after a fresh `npm install` downloads the ~110 MB Electron runtime, since Electron 43 no longer fetches it at install time) |
 | `npm run bundle` | One-off bundle (no minify) |
 | `npm run bundle:prod` | Production bundle (minified) |
 | `npm test` | Run the vitest unit test suite |

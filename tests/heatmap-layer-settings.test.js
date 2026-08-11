@@ -17,7 +17,7 @@ function stubLayer({ heatmapEnabled = true, settings = {} } = {}) {
       threshold: DEFAULTS.HEATMAP.THRESHOLD,
       bandwidthScale: DEFAULTS.HEATMAP.BANDWIDTH_SCALE,
       ramp: DEFAULTS.HEATMAP.RAMP,
-      dimGraph: DEFAULTS.HEATMAP.DIM_GRAPH,
+      fadeGraph: DEFAULTS.HEATMAP.FADE_GRAPH,
       ...settings,
     },
     lastPaintSignature: "stale",
@@ -64,12 +64,27 @@ describe("HeatmapLayer.updateSettings", () => {
     expect(layer.settings.intensity).toBe(DEFAULTS.HEATMAP.INTENSITY);
   });
 
-  it("coerces dimGraph to a boolean", () => {
+  it("clamps fadeGraph into [0, 1]", () => {
     const layer = stubLayer();
 
-    update(layer, { dimGraph: 1 });
+    update(layer, { fadeGraph: 4 });
+    expect(layer.settings.fadeGraph).toBe(1);
 
-    expect(layer.settings.dimGraph).toBe(true);
+    update(layer, { fadeGraph: -2 });
+    expect(layer.settings.fadeGraph).toBe(0);
+  });
+
+  it("restores a pre-slider workspace's dimGraph as a fade", () => {
+    // Unknown keys are dropped, so without the alias an older saved workspace
+    // would silently lose its setting instead of failing loudly.
+    const layer = stubLayer({ settings: { fadeGraph: 0 } });
+
+    update(layer, { dimGraph: true });
+    expect(layer.settings.fadeGraph).toBe(0.7);
+    expect(layer.settings.dimGraph).toBeUndefined();
+
+    update(layer, { dimGraph: false });
+    expect(layer.settings.fadeGraph).toBe(0);
   });
 
   it("accepts a known ramp preset name", () => {
@@ -90,26 +105,26 @@ describe("HeatmapLayer.updateSettings", () => {
     expect(layer.settings.ramp).toBe(DEFAULTS.HEATMAP.RAMP);
   });
 
-  it("refreshes sigma when dimGraph flips while the heatmap is enabled", () => {
-    const layer = stubLayer({ heatmapEnabled: true, settings: { dimGraph: false } });
+  it("refreshes sigma when fadeGraph changes while the heatmap is enabled", () => {
+    const layer = stubLayer({ heatmapEnabled: true, settings: { fadeGraph: 0 } });
 
-    update(layer, { dimGraph: true });
+    update(layer, { fadeGraph: 0.7 });
 
     expect(layer.adapter.sigma.refresh).toHaveBeenCalledTimes(1);
   });
 
-  it("does NOT refresh sigma when dimGraph flips while the heatmap is off", () => {
-    const layer = stubLayer({ heatmapEnabled: false, settings: { dimGraph: false } });
+  it("does NOT refresh sigma when fadeGraph changes while the heatmap is off", () => {
+    const layer = stubLayer({ heatmapEnabled: false, settings: { fadeGraph: 0 } });
 
-    update(layer, { dimGraph: true });
+    update(layer, { fadeGraph: 0.7 });
 
     expect(layer.adapter.sigma.refresh).not.toHaveBeenCalled();
   });
 
-  it("does NOT refresh sigma when dimGraph is unchanged", () => {
-    const layer = stubLayer({ settings: { dimGraph: true } });
+  it("does NOT refresh sigma when fadeGraph is unchanged", () => {
+    const layer = stubLayer({ settings: { fadeGraph: 0.7 } });
 
-    update(layer, { dimGraph: true, opacity: 0.9 });
+    update(layer, { fadeGraph: 0.7, opacity: 0.9 });
 
     expect(layer.adapter.sigma.refresh).not.toHaveBeenCalled();
   });
@@ -125,7 +140,7 @@ describe("HeatmapLayer.resetSettings", () => {
         threshold: 0.4,
         bandwidthScale: 3,
         ramp: "magma",
-        dimGraph: true,
+        fadeGraph: 0.8,
       },
     });
 
@@ -138,7 +153,47 @@ describe("HeatmapLayer.resetSettings", () => {
       threshold: DEFAULTS.HEATMAP.THRESHOLD,
       bandwidthScale: DEFAULTS.HEATMAP.BANDWIDTH_SCALE,
       ramp: DEFAULTS.HEATMAP.RAMP,
-      dimGraph: DEFAULTS.HEATMAP.DIM_GRAPH,
+      fadeGraph: DEFAULTS.HEATMAP.FADE_GRAPH,
     });
+  });
+});
+
+describe("HeatmapLayer.setHeatmapEnabled", () => {
+  // The card is no longer greyed while the overlay is off — its switch now sits
+  // in its own header, so the relationship needs no explaining. What the setter
+  // owes the UI instead is a re-read, because a JSON load flips the flag
+  // without going through that switch.
+  it("re-reads the overlay row after a change, and only on a change", () => {
+    const layer = stubLayer({ heatmapEnabled: false });
+    const syncOverlays = vi.fn();
+    layer.adapter.cache = { ui: { syncOverlays } };
+
+    HeatmapLayer.prototype.setHeatmapEnabled.call(layer, true);
+    expect(syncOverlays).toHaveBeenCalledTimes(1);
+
+    HeatmapLayer.prototype.setHeatmapEnabled.call(layer, true);
+    expect(syncOverlays).toHaveBeenCalledTimes(1);
+
+    HeatmapLayer.prototype.setHeatmapEnabled.call(layer, false);
+    expect(syncOverlays).toHaveBeenCalledTimes(2);
+  });
+
+  // `visible`/`setVisible` is the layer-stack contract (UIManager.OVERLAYS);
+  // heatmapEnabled keeps its own name because it is the persisted JSON field.
+  it("answers the layer-stack contract with the persisted flag", () => {
+    const layer = Object.assign(
+      Object.create(HeatmapLayer.prototype),
+      stubLayer({ heatmapEnabled: false })
+    );
+    expect(layer.visible).toBe(false);
+    layer.setVisible(true);
+    expect(layer.heatmapEnabled).toBe(true);
+    expect(layer.visible).toBe(true);
+  });
+
+  it("tolerates bare adapters without a cache/ui (unit-test seam)", () => {
+    const layer = stubLayer({ heatmapEnabled: false });
+    expect(() => HeatmapLayer.prototype.setHeatmapEnabled.call(layer, true)).not.toThrow();
+    expect(layer.heatmapEnabled).toBe(true);
   });
 });

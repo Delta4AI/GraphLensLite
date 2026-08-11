@@ -372,7 +372,7 @@ To group by data instead of by id, use `groupOneProps` — e.g.
 (handy with §6 categorical values).
 
 Useful `bubbleSetStyle.<group>` fields: `fill`, `fillOpacity`, `stroke`,
-`strokeOpacity`, `virtualEdges` (boolean), `label` (boolean), `labelText`,
+`strokeOpacity`, `padding`, `corridor`, `avoidance`, `label` (boolean), `labelText`,
 `labelFill`, `labelFontSize`, `labelBackground`, `labelBackgroundFill`,
 `labelBackgroundRadius`, `labelPlacement`.
 
@@ -488,7 +488,9 @@ an `active` flag plus slider thresholds or selected categories.
 > `LOWER THAN <a> OR GREATER THAN <b>` (always two-sided — there is **no**
 > standalone `LOWER THAN`), `IN [value1, value2]`, or the unary `IS MISSING`
 > (true when the property is absent/empty or belongs to the other element type;
-> emitted automatically by the filter panel's non-strict AND join) — with
+> emitted automatically by the filter panel's non-strict AND join) or
+> `IS FOREIGN` (true only when the property belongs to the other element type;
+> emitted by the AND join's "complete cases only" mode) — with
 > clauses combined by `AND` / `OR` / `NOT` and grouped in parentheses. There are
 > no `<`, `>`, or `=` operators.
 

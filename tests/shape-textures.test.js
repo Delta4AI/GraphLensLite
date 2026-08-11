@@ -46,6 +46,21 @@ describe("shapeTextureURI — shapes and determinism", () => {
     expect(a).toBe(b); // same reference via cache
   });
 
+  it("quantizes the size so a float radius cannot multiply the cache keyspace", () => {
+    // Degree scaling yields fractional radii; unquantized, every distinct one
+    // minted its own bake on top of distinct colours × 20 fade steps, and the
+    // cache clears WHOLESALE when it fills. `size` reaches the SVG through the
+    // px→viewBox scale, so a bordered shape is where it is observable.
+    const bordered = (size) => shapeTextureURI({ ...BASE, stroke: "#000", lineWidth: 2, size });
+
+    expect(bordered(12.1)).toBe(bordered(12));
+    expect(bordered(12.24)).toBe(bordered(12));
+    // Half-pixel granularity is still honoured — the quantum, not a free-for-all.
+    expect(bordered(12.5)).not.toBe(bordered(12));
+    // A sub-quantum radius still bakes something rather than collapsing to 0.
+    expect(decode(bordered(0.1))).toContain("<svg");
+  });
+
   it("falls back to a circle for unknown shapes and guards bad sizes", () => {
     const unknown = shapeTextureURI({ ...BASE, shape: "pentagon" });
     expect(decode(unknown)).toContain("<circle");

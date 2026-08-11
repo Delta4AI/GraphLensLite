@@ -78,7 +78,7 @@ function makeGraph(nodes) {
 }
 
 function makeCache() {
-  return { DEFAULTS: { BUBBLE_GROUP_STYLE: { groupOne: {} } } };
+  return { DEFAULTS: { BUBBLE_GROUP_STYLE_TEMPLATE: {} } };
 }
 
 class FakePath2D {

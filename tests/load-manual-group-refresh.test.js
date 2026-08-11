@@ -6,7 +6,7 @@ const { IOManager } = await import("../src/managers/io.js");
 // --------------------------------------------------------------------------
 // Regression: loading a JSON workspace restores ManualMembers into the layout,
 // but the selection-panel deselect toggles only refresh via
-// bs.updateManualGroupStatus(). The load path must call it (mirroring the
+// bs.renderGroupList(). The load path must call it (mirroring the
 // post-layout sync) or auto/louvain groups load un-deselectable.
 // --------------------------------------------------------------------------
 
@@ -18,8 +18,8 @@ function makeCache() {
     graph: undefined,
     EVENT_LOCKS: {},
     bs: {
-      updateManualGroupStatus: vi.fn(),
-      updateManualGroupButtonState: vi.fn(),
+      renderGroupList: vi.fn(),
+      syncGroupRows: vi.fn(),
     },
     gcm: {
       destroyGraphAndRollBackUI: asyncNoop,
@@ -71,8 +71,8 @@ describe("loadFileWrapper — manual bubble group panel refresh", () => {
     await io.loadFileWrapper(event);
     await flushAsync();
 
-    expect(cache.bs.updateManualGroupStatus).toHaveBeenCalledTimes(1);
-    expect(cache.bs.updateManualGroupButtonState).toHaveBeenCalledTimes(1);
+    // One call: renderGroupList repaints the rows AND syncs their ＋/－ buttons.
+    expect(cache.bs.renderGroupList).toHaveBeenCalledTimes(1);
   });
 
   it("resets the file input after load", async () => {
@@ -102,6 +102,6 @@ describe("loadFileWrapper — manual bubble group panel refresh", () => {
     await io.loadFileWrapper(event);
     await flushAsync();
 
-    expect(cache.bs.updateManualGroupStatus).not.toHaveBeenCalled();
+    expect(cache.bs.renderGroupList).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { VERSION, DEFAULTS, CFG } from '../src/config.js'
+import { VERSION, DEFAULTS, CFG, bubbleGroupColor, bubbleGroupStyle } from '../src/config.js'
 
 // ==========================================================================
 // Config — structural validation tests
@@ -158,13 +158,10 @@ describe('DEFAULTS.LAYOUT_INTERNALS', () => {
   })
 })
 
-describe('DEFAULTS.BUBBLE_GROUP_STYLE', () => {
-  it('has exactly 4 groups', () => {
-    expect(Object.keys(DEFAULTS.BUBBLE_GROUP_STYLE)).toHaveLength(4)
-  })
-
-  it('each group has required style properties', () => {
-    for (const [name, style] of Object.entries(DEFAULTS.BUBBLE_GROUP_STYLE)) {
+describe('bubble group style factory', () => {
+  it('produces a complete style for any index', () => {
+    for (const index of [0, 3, 4, 17]) {
+      const style = bubbleGroupStyle(index)
       expect(style).toHaveProperty('fill')
       expect(style).toHaveProperty('fillOpacity')
       expect(style).toHaveProperty('stroke')
@@ -174,26 +171,53 @@ describe('DEFAULTS.BUBBLE_GROUP_STYLE', () => {
       expect(style.fillOpacity).toBeLessThanOrEqual(1)
       expect(style.strokeOpacity).toBeGreaterThanOrEqual(0)
       expect(style.strokeOpacity).toBeLessThanOrEqual(1)
+      // The label background follows the fill, or a recoloured group keeps a
+      // label plate in its old colour.
+      expect(style.labelBackgroundFill).toBe(style.fill)
     }
   })
 
-  it('quadrant positions map to all 4 groups', () => {
-    const positions = DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS
-    const groups = Object.keys(DEFAULTS.BUBBLE_GROUP_STYLE)
-    for (const group of groups) {
-      expect(positions).toHaveProperty(group)
+  it('keeps the original four brand colours for the first four groups', () => {
+    // A user creating four groups should get exactly what the fixed four were.
+    expect([0, 1, 2, 3].map((i) => bubbleGroupColor(i)))
+      .toEqual(['#403C53', '#C33D35', '#EFB0AA', '#8CA6D9'])
+  })
+
+  it('keeps generating distinct colours past the palette', () => {
+    const beyond = [4, 5, 6, 7, 8].map((i) => bubbleGroupColor(i))
+    expect(new Set(beyond).size).toBe(beyond.length)
+  })
+
+  it('always returns #rrggbb, at any index', () => {
+    // The group row's swatch is <input type="color">, which accepts NOTHING
+    // else — an hsl() string collapsed every group past the fourth onto the
+    // swatch fallback, so they all looked identical. Found live.
+    for (const index of [0, 3, 4, 5, 12, 99]) {
+      expect(bubbleGroupColor(index)).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(bubbleGroupStyle(index).fill).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(bubbleGroupStyle(index).stroke).toMatch(/^#[0-9a-f]{6}$/i)
     }
-    const validPositions = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
-    for (const pos of Object.values(positions)) {
-      expect(validPositions).toContain(pos)
-    }
+  })
+
+  it('names groups by position but lets a caller override', () => {
+    expect(bubbleGroupStyle(0).labelText).toBe('Group 1')
+    expect(bubbleGroupStyle(6).labelText).toBe('Group 7')
+    expect(bubbleGroupStyle(0, 'Kinases').labelText).toBe('Kinases')
+  })
+
+  it('gives the template no group keys of its own', () => {
+    // The whole point of the collapse: config no longer enumerates groups, so
+    // nothing downstream can key a group list off it (see io.parseLayouts).
+    expect(DEFAULTS.BUBBLE_GROUP_STYLE).toBeUndefined()
+    expect(DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS).toBeUndefined()
+    expect(DEFAULTS.BUBBLE_GROUP_STYLE_TEMPLATE).not.toHaveProperty('fill')
   })
 })
 
 describe('CFG', () => {
   it('has expected threshold settings', () => {
     expect(CFG.MAX_NODES_BEFORE_HIDING_LABELS).toBeGreaterThan(0)
-    expect(CFG.MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS).toBeGreaterThan(0)
+    expect(CFG.AVOID_FIT_CONFIRM_MS).toBeGreaterThan(0)
   })
 
   it('has selection memory limit', () => {

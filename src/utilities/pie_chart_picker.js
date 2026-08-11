@@ -194,10 +194,15 @@ class PieChartPicker {
       const node = this.cache.nodeRef.get(nodeId);
       node?.features.forEach((propId) => {
         const filter = filters.get(propId);
-        if (filter && Boolean(filter.isCategory) === wantCategory) available.add(propId);
+        if (filter && !filter.unusable && Boolean(filter.isCategory) === wantCategory)
+          available.add(propId);
       });
     }
-    return Array.from(available).sort();
+    // Sort by short name first so colliding names (score (Cell) / score
+    // (Document)) end up adjacent, then by full id for a stable tiebreak.
+    return Array.from(available).sort(
+      (a, b) => this.displayName(a).localeCompare(this.displayName(b)) || a.localeCompare(b),
+    );
   }
 
   /** Distinct categorical values the selected nodes carry across `props`. */
@@ -223,8 +228,36 @@ class PieChartPicker {
     return propId.includes("::") ? propId.split("::").pop() : propId;
   }
 
+  /** subGroup segment of a hashed propId (`main::sub::name`), or null for bare names. */
+  subGroupOf(propId) {
+    return propId.includes("::") ? propId.split("::")[1] : null;
+  }
+
+  /**
+   * Map propId → display label, appending "(subGroup)" only when two or more
+   * listed ids collapse to the same short name (e.g. Cell::score vs
+   * Document::score both display as "score").
+   * @param {string[]} propIds
+   * @returns {Map<string, string>}
+   */
+  labelsFor(propIds) {
+    const nameCount = new Map();
+    for (const id of propIds) {
+      const name = this.displayName(id);
+      nameCount.set(name, (nameCount.get(name) ?? 0) + 1);
+    }
+    return new Map(
+      propIds.map((id) => {
+        const name = this.displayName(id);
+        const sub = this.subGroupOf(id);
+        return [id, nameCount.get(name) > 1 && sub ? `${name} (${sub})` : name];
+      }),
+    );
+  }
+
   renderProperties() {
     const props = this.availableProperties();
+    const labels = this.labelsFor(props);
     const list = this.dom.propList;
     list.innerHTML = "";
 
@@ -248,7 +281,9 @@ class PieChartPicker {
         this.renderColors();
       });
       const text = document.createElement("span");
-      text.textContent = this.displayName(prop);
+      text.textContent = labels.get(prop);
+      const sub = this.subGroupOf(prop);
+      row.title = sub ? `${sub} > ${this.displayName(prop)}` : this.displayName(prop);
       row.append(cb, text);
       list.appendChild(row);
     }
@@ -275,7 +310,8 @@ class PieChartPicker {
     if (this.mode === "categorical") {
       sources = this.distinctValues(selectedProps).map((v) => ({ key: v, label: v }));
     } else {
-      sources = selectedProps.map((p) => ({ key: p, label: this.displayName(p) }));
+      const labels = this.labelsFor(selectedProps);
+      sources = selectedProps.map((p) => ({ key: p, label: labels.get(p) }));
     }
 
     // Assign palette colors to any source that doesn't have one yet.
@@ -318,7 +354,7 @@ class PieChartPicker {
       row.className = "picker-category-row pie-color-row";
       if (dropped) row.classList.add("pie-color-row--dropped");
       const label = document.createElement("span");
-      label.textContent = dropped ? `${src.label} (not shown)` : src.label;
+      label.textContent = dropped ? `${src.label} — not shown` : src.label;
       const color = document.createElement("input");
       color.type = "color";
       color.className = "picker-color-swatch";
@@ -330,6 +366,14 @@ class PieChartPicker {
 
     const canApply = selectedProps.length > 0 && sources.length > 0;
     this.dom.applyButton.classList.toggle("disabled", !canApply);
+    this.dom.applyButton.setAttribute("aria-disabled", String(!canApply));
+    // `.disabled[title]` keeps pointer events so the delegated tooltip can be
+    // read: without a title the greyed Apply was a dead button with no reason.
+    this.dom.applyButton.title = canApply
+      ? "Apply the pie chart styling to the selected nodes"
+      : selectedProps.length === 0
+        ? "Pick at least one property to chart"
+        : "The selected properties carry no values to chart";
   }
 
   /**

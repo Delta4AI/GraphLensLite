@@ -1,0 +1,555 @@
+/**
+ * The command palette: ⌘K / Ctrl+K over every control in the app.
+ *
+ * **The index is derived from the live DOM on every open, never hand-written.**
+ * A static registry of ~120 command descriptors would be a permanent
+ * maintenance obligation; the DOM already is the one source — rail buttons, rail
+ * menu rows, inspector cards, workbench toolbars and filter rows each carry
+ * their own label, tooltip and accelerator — so a control added later is
+ * searchable the day it lands, with no registry entry to forget.
+ *
+ * Three verbs:
+ * - `run` clicks the real control, so the real handler fires with whatever
+ *   state guards it already carries.
+ * - `reveal` walks the control back into view — switching inspector context,
+ *   opening its rail menu, un-collapsing its card — because the palette is
+ *   meant to teach where a control lives, not to replace its location.
+ * - `focus` centres a node or edge matched by ID or label. This absorbs the old
+ *   "Focus Elements" card, which was two datalists behind a section title.
+ */
+import { splitShortcut } from '../utilities/ui_tooltip.js';
+
+const MAX_RESULTS = 60;
+const MAX_ELEMENTS = 8;
+/** Matches the .cmdk-flash animation in style.css; the class is what drives it. */
+const FLASH_MS = 1200;
+/** What ↵ does to the active row, by kind (the footer says so). */
+const ENTER_HINTS = { run: 'run', reveal: 'show', focus: 'go to' };
+// Rail and menu tooltips already end in "(F)", "(L)", "(D)" … — free
+// accelerators, and they cannot drift from the hotkey they document because
+// they ARE the tooltip the user reads on hover. The parser is ui_tooltip's
+// (splitShortcut): two copies disagreed, so "(⇧F)" rendered a kbd chip in the
+// tooltip and yielded no accelerator here.
+
+const hasWords = (text) => /[a-z]{2}/i.test(text || '');
+const clean = (text) =>
+  (text || '')
+    .replace(/\s+/g, ' ')
+    .replace(/[⌄▾▸▴]\s*$/, '')
+    .trim();
+
+/**
+ * The best human name for a control: its own label span, then its accessible
+ * name, then its text (only when that is words rather than a bare glyph), then
+ * the first clause of its tooltip.
+ *
+ * A control that opens a menu is the exception. Those are labelled with their
+ * current *state* — the workspace name, the active layout algorithm — so the
+ * tooltip is the only place their function is written down: "Layout", not
+ * "force"; "Workspace", not "Default 0/120 nodes · 0/240 edges".
+ */
+function controlName(el) {
+  const inner = el.querySelector?.('.rail-vb-t, .rail-menu-label')?.textContent;
+  const label = el.getAttribute?.('aria-label');
+  const own = el.textContent;
+  // data-tip fallback: ui_tooltip.js stashes the title there while hovered.
+  const title = (el.getAttribute?.('title') ?? el.dataset?.tip)?.split(/[—:(]/)[0];
+  const candidates = el.hasAttribute?.('aria-expanded')
+    ? [label, title, inner, own]
+    : [inner, label, own, title];
+  return clean(candidates.filter(hasWords)[0]);
+}
+
+function accelerator(el) {
+  return splitShortcut(el.getAttribute?.('title') ?? el.dataset?.tip).shortcut ?? '';
+}
+
+/** Hidden by an attribute or an inline style anywhere below `root`. */
+function visibleWithin(el, root) {
+  for (let node = el; node && node !== root; node = node.parentElement) {
+    if (node.hasAttribute?.('hidden') || node.style?.display === 'none') return false;
+  }
+  return true;
+}
+
+/**
+ * Clickable things under `root`, without descending into one another: a rail
+ * menu's toggle row is itself the control, and the button inside it is only its
+ * state glyph.
+ */
+function actionables(root) {
+  const kept = [];
+  // querySelectorAll is document order, so a container always precedes its
+  // descendants: checking only the last kept element skips them all, where the
+  // old `found.some(other => other.contains(el))` was a full O(n²) sweep.
+  for (const el of root.querySelectorAll('.rail-menu-item, button')) {
+    if (kept.length > 0 && kept[kept.length - 1].contains(el)) continue;
+    if (!visibleWithin(el, root)) continue;
+    kept.push(el);
+  }
+  return kept;
+}
+
+function command(el, trail, extra = {}) {
+  const name = controlName(el);
+  if (!name) return null;
+  // The app disables far more by class than by attribute (ui.js
+  // toggleDisabledElements, and whole cards carry it) — checking only the
+  // attribute made the palette Enter-click selection-gated controls, which
+  // flashes a loading overlay and files a no-op undo entry.
+  const disabled =
+    el.disabled ||
+    el.getAttribute?.('aria-disabled') === 'true' ||
+    !!el.closest?.('.disabled');
+  return {
+    name,
+    trail,
+    el,
+    glyph: extra.glyph ?? '▸',
+    accel: accelerator(el),
+    // A control that cannot fire right now still belongs in the index — the
+    // palette teaches location — but running it would be a silent no-op, so it
+    // reveals itself instead.
+    kind: disabled ? 'reveal' : (extra.kind ?? 'run'),
+    disabled,
+    ...extra,
+  };
+}
+
+/** The inspector section heading a control sits under ("Filters", "Groups"…). */
+function sectionOf(el, panel) {
+  let node = el;
+  while (node && node.parentElement !== panel) node = node.parentElement;
+  let prev = node?.previousElementSibling;
+  while (prev && !prev.matches('h4.insp-section-title')) prev = prev.previousElementSibling;
+  return prev ? clean(prev.textContent) : '';
+}
+
+function breadcrumb(...parts) {
+  // A section holding a single card of the same name ("Density heatmap" ›
+  // "Density Heatmap") would otherwise stutter. Case-insensitive, because the
+  // section title is prose and the card label is a lookup key.
+  return parts
+    .filter(Boolean)
+    .filter((part, i, all) => i === 0 || part.toLowerCase() !== all[i - 1].toLowerCase())
+    .join(' › ');
+}
+
+function collectRail(cache, out) {
+  const rail = document.getElementById('rail');
+  if (rail) {
+    for (const el of actionables(rail)) {
+      if (el.id === 'cmdkBtn') continue; // the way in is not a destination
+      out.push(command(el, 'Rail', { glyph: '◆' }));
+    }
+  }
+  for (const menu of cache.rail?.menus ?? []) {
+    // Build the menu without opening it: contents that only exist while a
+    // dropdown is on screen would be a hole in the index.
+    menu.ensureBuilt();
+    const trail = controlName(menu.anchor) || 'Menu';
+    for (const el of actionables(menu.el)) out.push(command(el, trail, { glyph: '⌄' }));
+  }
+}
+
+// Breadcrumb label → panel id, and the reverse lookup `reveal` needs to switch
+// the inspector back to whichever context holds the hit. One table, so a fourth
+// context cannot be indexed without also being revealable.
+const INSPECTOR_PANELS = [
+  ['Filters', 'inspectorFilters'],
+  ['Overlays', 'inspectorOverlays'],
+  ['Selection', 'inspectorSelection'],
+];
+
+function collectInspector(out) {
+  for (const [context, panelId] of INSPECTOR_PANELS) {
+    const panel = document.getElementById(panelId);
+    if (!panel) continue;
+    const trailFor = (el) =>
+      breadcrumb(
+        'Inspector',
+        context,
+        sectionOf(el, panel),
+        clean(el.closest('[data-label]')?.dataset.label)
+      );
+
+    for (const el of actionables(panel)) {
+      // The filters have their own collector: #filterContainer moves between
+      // the inspector and the expanded surface, so indexing it from here would
+      // make half the app searchable only while ⤢ is off. The empty state's
+      // links are prose shortcuts to rail controls already in the index.
+      if (el.closest('#filterContainer, .insp-empty')) continue;
+      // ~13 preset swatches × ~12 colour properties would be half the index,
+      // all of it "Set X of the selected elements to red". The row's label is
+      // already indexed as the destination, and the swatch is one click away
+      // once you are there — the palette says where colours live, it is not a
+      // paint program.
+      if (el.classList.contains('style-color-button')) continue;
+      out.push(command(el, trailFor(el), { glyph: '⚙' }));
+    }
+    // A row of inputs is one destination, not one command per field: the label
+    // names it and revealing it puts the whole row on screen.
+    for (const label of panel.querySelectorAll('.card-row > label')) {
+      const row = label.parentElement;
+      if (!row.querySelector('input, select')) continue;
+      out.push(
+        command(label, trailFor(label), { glyph: '⚙', kind: 'reveal', el: row, name: clean(label.textContent) })
+      );
+    }
+  }
+  // The activity log sits below both panels, so the loop above cannot see it.
+  // Its own label carries the line count, which is state, not a name.
+  const logToggle = document.getElementById('logToggleBtn');
+  if (logToggle && !logToggle.closest('[hidden]')) {
+    out.push(command(logToggle, 'Inspector', { glyph: '⚙', name: 'Activity log' }));
+  }
+}
+
+function collectWorkbench(cache, out) {
+  for (const [tab, spec] of Object.entries(cache.workbench?.tabs ?? {})) {
+    const toolbar = spec.toolbar && document.querySelector(spec.toolbar);
+    if (!toolbar) continue;
+    for (const el of actionables(toolbar)) {
+      out.push(command(el, breadcrumb('Workbench', spec.title), { glyph: '▤', tab }));
+    }
+  }
+}
+
+/**
+ * Filters are collected by container rather than by panel: `#filterContainer`
+ * is re-parented between the inspector and the expanded surface, and its
+ * controls mean the same thing in either place.
+ */
+function collectFilters(out) {
+  const container = document.getElementById('filterContainer');
+  if (!container) return;
+  const trailFor = (el) =>
+    breadcrumb(
+      'Filters',
+      clean(el.closest('.filter-section')?.querySelector('.header-card h4')?.textContent),
+      clean(el.closest('.filter-subgroup')?.querySelector('.sub-header-card h5')?.textContent)
+    );
+
+  for (const el of actionables(container)) {
+    if (el.closest('.filter-row')) continue;
+    out.push(command(el, trailFor(el), { glyph: '⛃' }));
+  }
+  // A property row is a destination, not a command: it holds a checkbox, a
+  // widget and two selection verbs, and none of them is "the" action.
+  for (const row of container.querySelectorAll('.filter-row')) {
+    const name = clean(row.querySelector('.checkboxLabel')?.textContent);
+    if (!name) continue;
+    out.push({ name, trail: trailFor(row), el: row, glyph: '⛃', accel: '', kind: 'reveal' });
+  }
+}
+
+/** The whole static index, deduped by name+location, in source order. */
+export function collectCommands(cache) {
+  const out = [];
+  collectRail(cache, out);
+  collectInspector(out);
+  collectWorkbench(cache, out);
+  collectFilters(out);
+  const seen = new Set();
+  return out.filter((cmd) => {
+    if (!cmd) return false;
+    const key = `${cmd.name}|${cmd.trail}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * Nodes and edges by ID or label, from the same maps the old Focus card used.
+ * Query-driven rather than indexed up front — a 6 000-node graph has no
+ * business being copied into a list on every ⌘K.
+ *
+ * ponytail: linear scan per keystroke, bounded only by MAX_ELEMENTS hits.
+ * Measured at 6k nodes + 12k edges: 1.1 ms for the worst case (a query that
+ * matches nothing, so no early exit) and 0.003 ms once it fills the slate —
+ * well inside a frame, so no debounce and no scan budget. Revisit above
+ * ~100k elements, where the miss case would reach ~10 ms.
+ */
+export function matchElements(cache, query) {
+  const found = [];
+  for (const [isNode, map, visible] of [
+    [true, cache.nodeIDOrLabelToNodeIDs, cache.nodeIDsToBeShown],
+    [false, cache.edgeIDOrLabelToEdgeIDs, cache.edgeIDsToBeShown],
+  ]) {
+    for (const [key, ids] of map ?? []) {
+      if (found.length >= MAX_ELEMENTS) break;
+      if (!String(key).toLowerCase().includes(query)) continue;
+      // Focusing something the filters hide moves the camera onto nothing. The
+      // visible sets are absent before the first render — then nothing is hidden.
+      if (visible && ![...ids].some((id) => visible.has(id))) continue;
+      found.push({
+        name: String(key),
+        trail: isNode ? 'node' : 'edge',
+        glyph: isNode ? '⬡' : '⟋',
+        accel: '',
+        kind: 'focus',
+        ids,
+        isNode,
+      });
+    }
+  }
+  return found;
+}
+
+/**
+ * Rank by where the query lands: a name that starts with it, then a name that
+ * contains it, then a location that contains it. Every token must appear
+ * somewhere, so "heat int" finds "Heatmap intensity".
+ */
+export function search(commands, query, limit = MAX_RESULTS) {
+  const tokens = query.split(/\s+/).filter(Boolean);
+  if (!tokens.length) return commands.slice(0, limit);
+  const scored = [];
+  for (const cmd of commands) {
+    const name = cmd.name.toLowerCase();
+    const trail = cmd.trail.toLowerCase();
+    if (!tokens.every((t) => name.includes(t) || trail.includes(t))) continue;
+    const rank = name.startsWith(tokens[0]) ? 0 : name.includes(tokens[0]) ? 1 : 2;
+    scored.push({ cmd, rank });
+  }
+  return scored
+    .map((entry, i) => ({ ...entry, i }))
+    .sort((a, b) => a.rank - b.rank || a.i - b.i)
+    .slice(0, limit)
+    .map((entry) => entry.cmd);
+}
+
+/** Put a control back on screen wherever it lives, and say so with a flash. */
+export function reveal(cache, cmd) {
+  const el = cmd.el;
+  if (!el) return;
+
+  const menu = (cache.rail?.menus ?? []).find((m) => m.el === el.closest?.('.rail-menu'));
+  if (menu) {
+    cache.rail.closeMenus();
+    menu.open();
+  }
+  if (cmd.tab) cache.workbench?.show(cmd.tab);
+  const panel = el.closest?.('.insp-panel');
+  if (panel) {
+    const entry = INSPECTOR_PANELS.find(([, id]) => id === panel.id);
+    if (entry) cache.inspector?.setContext(entry[0].toLowerCase());
+  }
+  // Unfold every collapsed ancestor, each through the owner of that state: a
+  // styling card via ui.expandStylingCard, a filter group via
+  // ui.setFilterGroupCollapsed (the class and the chevron glyph are two
+  // halves of one state, and re-deriving them here assumed the chevron's
+  // position in the header).
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    if (!node.classList?.contains('collapsed')) continue;
+    if (node.dataset?.label) cache.ui?.expandStylingCard(node.dataset.label);
+    else cache.ui?.setFilterGroupCollapsed(node, false);
+  }
+
+  // A filter row is `display: contents` — it has no box, so scrolling to it
+  // and ringing it both do nothing. Fall back to its first cell, which does.
+  const box = el.getBoundingClientRect?.().height ? el : (el.firstElementChild ?? el);
+  box.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+  el.classList?.add('cmdk-flash');
+  setTimeout(() => el.classList?.remove('cmdk-flash'), FLASH_MS);
+  const target = el.matches?.('input, select, button') ? el : el.querySelector?.('input, select, button');
+  target?.focus({ preventScroll: true });
+}
+
+class CommandPalette {
+  #commands = [];
+  #results = [];
+  #active = 0;
+
+  constructor(cache) {
+    this.cache = cache;
+    this.el = document.getElementById('cmdk');
+    this.input = document.getElementById('cmdkInput');
+    this.list = document.getElementById('cmdkResults');
+    this.countEl = document.getElementById('cmdkCount');
+
+    this.input?.addEventListener('input', () => this.#render());
+    this.input?.addEventListener('keydown', (e) => this.#onKey(e));
+    this.list?.addEventListener('click', (e) => {
+      const row = e.target.closest('[data-index]');
+      if (row) this.#activate(this.#results[Number(row.dataset.index)], false);
+    });
+    // <dialog> gives Escape, the backdrop and the focus trap for free; this is
+    // the one thing it does not: a click on the backdrop itself.
+    this.el?.addEventListener('click', (e) => {
+      if (e.target === this.el) this.close();
+    });
+  }
+
+  get isOpen() {
+    return !!this.el?.open;
+  }
+
+  toggle() {
+    this.isOpen ? this.close() : this.open();
+  }
+
+  open() {
+    if (!this.el || this.isOpen) return;
+    // Re-collected every time: contexts, selections and loaded data all change
+    // what exists, and a stale index is worse than no index.
+    this.#commands = collectCommands(this.cache);
+    this.input.value = '';
+    this.el.showModal();
+    this.#render();
+    this.input.focus();
+  }
+
+  close() {
+    if (this.isOpen) this.el.close();
+  }
+
+  #render() {
+    const query = (this.input?.value ?? '').trim().toLowerCase();
+    const elements = query.length >= 2 ? matchElements(this.cache, query) : [];
+    const matched = [...search(this.#commands, query, Infinity), ...elements];
+    this.#results = matched.slice(0, MAX_RESULTS);
+    this.#active = 0;
+    if (!this.list) return;
+
+    this.list.replaceChildren(...this.#results.map((cmd, i) => this.#row(cmd, i)));
+    this.#syncActive();
+    if (this.countEl) {
+      const shown = this.#results.length;
+      // Say when the list is truncated: "60 results" over a 147-match query
+      // reads as "that is everything", and the user stops narrowing. Element
+      // matches stop at MAX_ELEMENTS, so a full slate of them is a truncation
+      // too — of an unknown total, since the scan stops counting there.
+      const cappedElements = elements.length >= MAX_ELEMENTS;
+      this.countEl.textContent = !shown
+        ? 'no matches'
+        : shown < matched.length || cappedElements
+          ? `${shown} of ${cappedElements ? 'many' : matched.length} — keep typing`
+          : `${shown} result${shown === 1 ? '' : 's'}`;
+    }
+  }
+
+  #row(cmd, index) {
+    const row = document.createElement('li');
+    row.className = 'cmdk-row';
+    row.id = `cmdkRow${index}`;
+    row.dataset.index = String(index);
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', 'false');
+    if (cmd.disabled) row.classList.add('disabled');
+
+    const glyph = document.createElement('span');
+    glyph.className = 'cmdk-glyph';
+    glyph.setAttribute('aria-hidden', 'true');
+    glyph.textContent = cmd.glyph;
+    const name = document.createElement('span');
+    name.className = 'cmdk-name';
+    name.textContent = cmd.name;
+    // The breadcrumb is the point: the palette runs the command AND says where
+    // it lives, so the next time the user goes straight there.
+    const trail = document.createElement('span');
+    trail.className = 'cmdk-trail';
+    trail.textContent = cmd.trail;
+    row.append(glyph, name, trail);
+    if (cmd.accel) {
+      const kbd = document.createElement('kbd');
+      kbd.textContent = cmd.accel;
+      row.appendChild(kbd);
+    }
+    return row;
+  }
+
+  #syncActive() {
+    const rows = [...(this.list?.children ?? [])];
+    rows.forEach((row, i) => {
+      const active = i === this.#active;
+      row.classList.toggle('active', active);
+      row.setAttribute('aria-selected', String(active));
+      if (active) row.scrollIntoView({ block: 'nearest' });
+    });
+    // ↵ does three different things depending on the row; a static "run" was
+    // wrong for the two thirds of rows that reveal or focus instead.
+    const hint = document.getElementById('cmdkEnterHint');
+    if (hint) hint.textContent = ENTER_HINTS[this.#results[this.#active]?.kind] ?? 'run';
+    this.input?.setAttribute(
+      'aria-activedescendant',
+      rows.length ? `cmdkRow${this.#active}` : ''
+    );
+  }
+
+  #onKey(event) {
+    const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+    if (step !== undefined && this.#results.length) {
+      event.preventDefault();
+      this.#active = (this.#active + step + this.#results.length) % this.#results.length;
+      this.#syncActive();
+      return;
+    }
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      const cmd = this.#results[this.#active];
+      if (!cmd) return;
+      event.preventDefault();
+      // Tab is "show me where that is" — the same row, without firing it.
+      this.#activate(cmd, event.key === 'Tab');
+    }
+  }
+
+  #activate(cmd, revealOnly) {
+    if (!cmd) return;
+    this.close();
+    if (cmd.kind === 'focus') {
+      this.cache.gcm?.focusElements(cmd.ids, cmd.isNode);
+      return;
+    }
+    if (revealOnly || cmd.kind === 'reveal') reveal(this.cache, cmd);
+    else {
+      // A workbench toolbar control (＋ Node, ⤒ Import, ✔ Apply) acts on its
+      // own pane, so running it with the pane hidden lands the effect where the
+      // user cannot see it. `cmd.tab` used to be honoured on the reveal path
+      // only.
+      if (cmd.tab) this.cache.workbench?.show(cmd.tab);
+      cmd.el.click();
+    }
+  }
+}
+
+/**
+ * "⌘K" everywhere would be a lie on Linux and Windows, where the palette
+ * answers to Ctrl+K. One source for every rail pill, tooltip and keyboard-sheet
+ * row that names a modified key.
+ */
+export function hotkeyLabel(key) {
+  const platform = globalThis.navigator?.platform ?? '';
+  // "Ctrl Z" (space) parsed as neither an accelerator nor a shortcut, so the
+  // kbd chip vanished on Windows and Linux; "+" is what both readers expect.
+  return /Mac|iPhone|iPad/.test(platform) ? `⌘${key}` : `Ctrl+${key}`;
+}
+
+export function paletteAccelerator() {
+  return hotkeyLabel('K');
+}
+
+/** Safe in DOMs without the palette markup (unit tests): returns null. */
+export function initCommandPalette(cache) {
+  if (!document.getElementById('cmdk')) return null;
+  const palette = new CommandPalette(cache);
+
+  const accel = paletteAccelerator();
+  const btn = document.getElementById('cmdkBtn');
+  // The tooltip is where every other rail button names its key; printing it on
+  // the face made this the only one advertising a keycap.
+  if (btn) btn.title = `Search every control, node and property by name (${accel})`;
+  // Not part of registerHotkeyEvents: that handler deliberately ignores keys
+  // typed into inputs, and ⌘K has to work from the query editor too.
+  document.addEventListener('keydown', (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      // Mid-load the DOM is half-built, so the index would be wrong and running
+      // a command off it could hit a graph that is still settling.
+      if (cache.ui?.isBusy?.()) return;
+      event.preventDefault();
+      palette.toggle();
+    }
+  });
+  return palette;
+}

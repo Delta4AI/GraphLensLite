@@ -202,7 +202,6 @@ class GraphCoreManager {
       await new Promise((resolve) => requestAnimationFrame(resolve));
       this.registerHotkeyEvents();
       this.registerGlobalEventListeners();
-      await this.registerPluginStates();
 
       // to initially fill caches related to the query/filters, preRenderEvent is called without rendering afterwards
       await this.cache.ui.showLoading('Post-processing', 'Pre-render event ..');
@@ -239,6 +238,9 @@ class GraphCoreManager {
       }
 
       await this.applyHideDisconnectedState();
+
+      // The graph is now settled: this is the state undo winds back to.
+      this.cache.history?.reset();
     } catch (errorMsg) {
       this.cache.ui.error(`Error in initial AFTER_RENDER: ${errorMsg}`);
       this.cache.ui.error('Graph setup failed. Please check your input data.');
@@ -393,6 +395,13 @@ class GraphCoreManager {
     await this.focusElements(edgeIDs);
   }
 
+  /** Center and zoom to the whole selection (nodes and edges) — the rail chip's 🔍. */
+  async focusSelection() {
+    const ids = [...this.cache.selectedNodes, ...this.cache.selectedEdges];
+    if (ids.length === 0) return;
+    await this.focusElements(ids);
+  }
+
   async focusElements(elementIDs, isNode) {
     const zoom = await this.cache.graph.getZoom();
     if (zoom < 2) {
@@ -501,6 +510,7 @@ class GraphCoreManager {
     }
 
     await this.cache.style.handleStyleChangeLoadingEvent('Style', 'Updating Edge Styles');
+    if (this.cache.selectedEdges.length) this.cache.history?.commit('Edge style change');
   }
 
   async updateNodes(overrides = {}, commands = []) {
@@ -613,6 +623,7 @@ class GraphCoreManager {
     }
 
     await this.cache.style.handleStyleChangeLoadingEvent('Style', `Updating Node Styles`);
+    if (this.cache.selectedNodes.length) this.cache.history?.commit('Node style change');
   }
 
   getTargetNodes(propID) {
@@ -759,9 +770,9 @@ class GraphCoreManager {
     // isPositionsDirty = false;
     // syncPositionsDebounced.cancel?.();
 
-    const status = document.getElementById('sidebarStatusContainer');
-    status.innerHTML = '';
-    status.style.height = '0';
+    this.cache.ui?.clearLog?.();
+    // The snapshots describe a graph that no longer exists.
+    this.cache.history?.reset();
   }
 
   registerHotkeyEvents() {
@@ -785,6 +796,19 @@ class GraphCoreManager {
         return;
       }
 
+      // Undo/redo are the only modified hotkeys — handled before the switch,
+      // which matches on the bare key and would otherwise fire on Ctrl+Z too.
+      if ((event.ctrlKey || event.metaKey) && 'zZyY'.includes(event.key)) {
+        event.preventDefault();
+        const redo = event.shiftKey || event.key.toLowerCase() === 'y';
+        await (redo ? this.cache.history?.redo() : this.cache.history?.undo());
+        return;
+      }
+      // Every other chord belongs to the browser or the OS. The switch below
+      // matches the bare key, so Ctrl+A toggled the assistant, Ctrl+F fitted
+      // the view and Ctrl+S/Ctrl+P fired exports over the browser's own dialog.
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+
       switch (event.key) {
         case 'p':
           await this.cache.io.exportPNG();
@@ -805,7 +829,10 @@ class GraphCoreManager {
           this.cache.metrics.toggleUI();
           break;
         case 'y':
-          this.cache.ui.toggleStylingPanel();
+          this.cache.inspector?.showAppearance();
+          break;
+        case 'F':
+          this.cache.ui.togglePresentationMode();
           break;
         case 'l':
           await this.cache.ui.toggleLassoSelection();
@@ -816,6 +843,9 @@ class GraphCoreManager {
         case 'a':
           this.cache.assistant.togglePanel();
           break;
+        case '?':
+          this.cache.ui.toggleKeyboardSheet();
+          break;
         default:
           break;
       }
@@ -825,7 +855,7 @@ class GraphCoreManager {
   }
 
   registerGlobalEventListeners() {
-    // All targets (document, queryTextArea, innerGraphContainer, bottomBar)
+    // All targets (document, queryTextArea, innerGraphContainer, workbench)
     // are static DOM that survives file loads — same stacking hazard as hotkeys.
     if (globalEventsRegistered) return;
 
@@ -840,7 +870,6 @@ class GraphCoreManager {
       }
     });
 
-    this.cache.ui.makeBottomBarResizable();
     this.registerTooltipWheelHandler();
     this.registerTooltipExpandToggle();
     globalEventsRegistered = true;
@@ -947,15 +976,6 @@ class GraphCoreManager {
         once: true,
       });
     });
-  }
-
-  async registerPluginStates() {
-    this.cache.ui.debug('Registering bubble set plugin instances ..');
-    for (const group of this.cache.bs.traverseBubbleSets()) {
-      this.cache.INSTANCES.BUBBLE_GROUPS[group] = await this.cache.graph.getPluginInstance(
-        `bubbleSetPlugin-${group}`
-      );
-    }
   }
 }
 

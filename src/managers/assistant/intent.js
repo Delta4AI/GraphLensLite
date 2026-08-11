@@ -12,7 +12,6 @@
 // what the user is trying to filter/select.
 
 const SENTINEL_OPEN = '<<<QUERY_INTENT>>>'
-const SENTINEL_CLOSE = '<<<END>>>'
 const SENTINEL_RE = /<<<QUERY_INTENT>>>([\s\S]*?)<<<END>>>/
 const SENTINEL_RE_G = /<<<QUERY_INTENT>>>[\s\S]*?<<<END>>>/g
 

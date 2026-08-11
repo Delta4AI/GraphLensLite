@@ -50,7 +50,9 @@ Environment=PATH=${NODE_DIR}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/
 
 NoNewPrivileges=true
 ProtectSystem=full
-ReadWritePaths=${WORKING_DIR}
+# No ReadWritePaths: the service holds its graph in memory and never writes to
+# disk, so granting write over the whole checkout only widens what a
+# compromise of it could reach.
 PrivateTmp=true
 
 [Install]

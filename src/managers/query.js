@@ -1,6 +1,32 @@
 import { Popup } from '../utilities/popup.js';
 import { StaticUtilities } from '../utilities/static.js';
 
+// A filter is "narrowed" when it deviates from its default (loaded) state:
+// a categorical with fewer than all values selected, or a slider whose bounds
+// moved or was inverted. This is what decides whether a filter constrains an
+// AND join — one definition, shared with the panel's constraint census
+// (ui.js updateFilterConstraintHints) so the query and the hint can never
+// disagree about which filters are doing work. Without a recorded default
+// (e.g. in tests) a filter is treated as narrowed.
+function isFilterNarrowed(fo, def) {
+  if (!def) return true;
+  if (fo.isCategory) {
+    const cur = fo.categories;
+    const base = def.categories;
+    if (!cur || !base) return true;
+    if (cur.size !== base.size) return true;
+    for (const c of base) {
+      if (!cur.has(c)) return true;
+    }
+    return false;
+  }
+  return (
+    !!fo.isInverted !== !!def.isInverted ||
+    fo.lowerThreshold !== def.lowerThreshold ||
+    fo.upperThreshold !== def.upperThreshold
+  );
+}
+
 class QueryAST {
   constructor(instructions) {
     this.instructions = instructions;
@@ -100,6 +126,16 @@ class QueryAST {
       );
     }
 
+    // --- IS FOREIGN: type-scope filler used by the strict AND join. ------
+    // True only when the property belongs to the other element type. Wrapping
+    // each conjunct as "(cond) OR (prop IS FOREIGN)" judges a node on node
+    // filters alone and an edge on edge filters alone, WITHOUT the
+    // absent-value escape hatch that IS MISSING also grants — that one
+    // difference is exactly what "complete cases" means.
+    if (opTok?.value === 'IS FOREIGN') {
+      return propTok.main !== requestedMainGroup;
+    }
+
     const value = this.#readValue(element, propTok);
 
     if (value === undefined || value === null) return false;
@@ -138,6 +174,15 @@ class QueryAST {
             .filter((v) => v !== '')
         : [propVal];
       validated = values.some((val) => set.includes(val));
+    }
+
+    // --- IS TRUE / IS FALSE ----------------------------------------------
+    // Boolean predicate: matches every encoding of the wanted truth
+    // value (true/TRUE/1 vs false/FALSE/0, string or number) so it works on
+    // raw D4Data regardless of how the source file spelled its booleans.
+    if (op === 'IS TRUE' || op === 'IS FALSE') {
+      const want = op === 'IS TRUE' ? 'true' : 'false';
+      validated = StaticUtilities.booleanTokenValue(propVal) === want;
     }
 
     element.featureIsWithinThreshold.set(tokens[0].propID, validated);
@@ -193,7 +238,7 @@ class QueryManager {
     /* 4. Encode Property names (main group::sub group::property)                */
     /* ------------------------------------------------------------------ */
     asciiStr = asciiStr.replace(
-      /(Node filters|Edge filters)::([^:]+)::([^:]+)(?=\s(?:IN|BETWEEN|LOWER\sTHAN|IS\sMISSING|\)))/g,
+      /(Node filters|Edge filters)::([^:]+)::([^:]+)(?=\s(?:IN|BETWEEN|LOWER\sTHAN|IS\sMISSING|IS\sFOREIGN|IS\sTRUE|IS\sFALSE|\)))/g,
       (match, mainGroup, subGroup, prop) => {
         const mgok = mainGroup in this.cache.uniquePropHierarchy;
         const sgok = mgok && subGroup in this.cache.uniquePropHierarchy[mainGroup];
@@ -267,6 +312,19 @@ class QueryManager {
       // Single span with a literal inner space (not a nested q-space span,
       // which would break the non-greedy encoded-chunk splitter in step 10).
       () => `<span class='q-kw-ismissing' data-encoded>IS MISSING</span>`
+    );
+
+    /* 5-4b Type-scope predicate (strict AND filler): "IS FOREIGN" ------- */
+    asciiStr = asciiStr.replace(
+      /\bIS\s+FOREIGN\b/gi,
+      () => `<span class='q-kw-isforeign' data-encoded>IS FOREIGN</span>`
+    );
+
+    /* 5-5 Boolean predicates: "IS TRUE" / "IS FALSE" -------------------- */
+    asciiStr = asciiStr.replace(
+      /\bIS\s+(TRUE|FALSE)\b/gi,
+      (_m, word) =>
+        `<span class='q-kw-is${word.toLowerCase()}' data-encoded>IS ${word.toUpperCase()}</span>`
     );
 
     /* ------------------------------------------------------------------ */
@@ -377,20 +435,7 @@ class QueryManager {
       .join('');
 
     // ------------------------------------------------------------------
-    // 9. Check for instructions without filters (no "IN|BETWEEN|LOWER THAN after property)
-    // TODO: not working
-    // ------------------------------------------------------------------
-
-    // asciiStr = asciiStr.replace(
-    //   /\(([^)]+?::[^)]+?::[^)]+?)(?=\s*\))/g,
-    //   (match, prop) => {
-    //     this.cache.query.valid = false;
-    //     return `<span class="q-error-missing-filter" data-encoded>${match}</span>`;
-    //   }
-    // );
-
-    // ------------------------------------------------------------------
-    // 10. wrap everything not already in a <span class='q-…'>…</span> as an error
+    // 9. wrap everything not already in a <span class='q-…'>…</span> as an error
     // ------------------------------------------------------------------
     asciiStr = asciiStr
       // split out only the already-encoded chunks vs everything else
@@ -412,41 +457,24 @@ class QueryManager {
       })
       .join('');
 
-    const updateQueryBtn = document.getElementById('queryUpdateBtn');
-    const selectQueryBtn = document.getElementById('querySelectBtn');
-    if (this.cache.query.valid) {
-      updateQueryBtn.classList.remove('disabled');
-      selectQueryBtn.classList.remove('disabled');
-    } else {
-      updateQueryBtn.classList.add('disabled');
-      selectQueryBtn.classList.add('disabled');
+    // Both buttons keep their tooltip while dead — that is the only place the
+    // reason can go, and "Apply the query to filter the graph" on a greyed
+    // button describes something it will not do.
+    const INVALID_TT = 'Fix the highlighted syntax error first';
+    for (const id of ['queryUpdateBtn', 'querySelectBtn']) {
+      const btn = document.getElementById(id);
+      if (!btn) continue;
+      btn.dataset.baseTitle ??= btn.title || btn.dataset.tip || '';
+      btn.classList.toggle('disabled', !this.cache.query.valid);
+      btn.setAttribute('aria-disabled', String(!this.cache.query.valid));
+      btn.title = this.cache.query.valid ? btn.dataset.baseTitle : INVALID_TT;
     }
 
     return asciiStr;
   }
 
-  // A filter is "narrowed" when it deviates from its default (loaded) state:
-  // a categorical with fewer than all values selected, or a slider whose bounds
-  // moved or was inverted. Used to decide which filters constrain an AND join.
-  // Without a recorded default (e.g. in tests) a filter is treated as narrowed.
   #isFilterNarrowed(propID, fo) {
-    const def = this.cache.data.filterDefaults?.get(propID);
-    if (!def) return true;
-    if (fo.isCategory) {
-      const cur = fo.categories;
-      const base = def.categories;
-      if (!cur || !base) return true;
-      if (cur.size !== base.size) return true;
-      for (const c of base) {
-        if (!cur.has(c)) return true;
-      }
-      return false;
-    }
-    return (
-      !!fo.isInverted !== !!def.isInverted ||
-      fo.lowerThreshold !== def.lowerThreshold ||
-      fo.upperThreshold !== def.upperThreshold
-    );
+    return isFilterNarrowed(fo, this.cache.data.filterDefaults?.get(propID));
   }
 
   updateQueryTextArea() {
@@ -457,9 +485,19 @@ class QueryManager {
       const joinMode = layout.filterJoinMode === 'AND' ? 'AND' : 'OR';
       let queryEntries = [];
       for (const [propID, fo] of layout.filters.entries()) {
-        if (fo.active) {
+        if (fo.active && !fo.unusable) {
           let cond;
-          if (fo.isCategory) {
+          if (fo.isBoolean) {
+            // Three-state boolean segment. "Any" (both selected) still emits a
+            // condition — like a fully-selected categorical, it matches every
+            // carrier of the property under an OR join.
+            const wantTrue = fo.categories.has('true');
+            const wantFalse = fo.categories.has('false');
+            cond =
+              wantTrue && wantFalse
+                ? `(${propID} IS TRUE) OR (${propID} IS FALSE)`
+                : `${propID} IS ${wantTrue ? 'TRUE' : 'FALSE'}`;
+          } else if (fo.isCategory) {
             cond = `${propID} IN [${[...fo.categories].map((cat) => StaticUtilities.escapeQueryValue(cat)).join(',')}]`;
           } else if (fo.isInverted) {
             cond = `${propID} LOWER THAN ${fo.upperThreshold} OR GREATER THAN ${fo.lowerThreshold}`;
@@ -480,24 +518,23 @@ class QueryManager {
           const andEntries = queryEntries.filter((e) => e.narrowed);
           if (!andEntries.length) {
             queryStr = ''; // nothing narrowed → no constraint → full graph
-          } else if (layout.filterStrict === true) {
-            // Strict (complete cases): AND within each element type, OR between
-            // the two type groups, so a node is judged only on node filters (an
-            // edge only on edge filters) while a same-type absent value excludes.
-            const groups = [];
-            for (const main of ['Node filters', 'Edge filters']) {
-              const conds = andEntries
-                .filter((e) => e.propID.startsWith(`${main}::`))
-                .map((e) => `(${e.cond})`);
-              if (conds.length) groups.push(`(${conds.join(' AND ')})`);
-            }
-            queryStr = groups.join(' OR ');
           } else {
-            // Non-strict AND: each conjunct is OR-ed with an "IS MISSING" escape
-            // hatch, so a property an element lacks (or that belongs to the
-            // other element type) never disqualifies it.
+            // Each conjunct is OR-ed with an escape hatch, and the join's two
+            // modes differ only in which one:
+            //   non-strict  IS MISSING  — foreign OR absent value excuses it,
+            //                             so an element is judged only on the
+            //                             filters it actually carries.
+            //   strict      IS FOREIGN  — only the other element type excuses
+            //                             it, so a same-type absent value
+            //                             does exclude ("complete cases") but
+            //                             a type with no narrowed filter of
+            //                             its own stays unconstrained.
+            // The type-scope hatch is what keeps strict from wiping out a whole
+            // element type: without it, narrowing one node filter leaves edges
+            // judged against a node condition they can never satisfy.
+            const filler = layout.filterStrict === true ? 'IS FOREIGN' : 'IS MISSING';
             queryStr = andEntries
-              .map(({ propID, cond }) => `((${cond}) OR (${propID} IS MISSING))`)
+              .map(({ propID, cond }) => `((${cond}) OR (${propID} ${filler}))`)
               .join(' AND ');
           }
         } else {
@@ -508,10 +545,21 @@ class QueryManager {
 
     this.cache.query.text.textContent = queryStr;
     this.cache.query.overlay.innerHTML = this.encodeQuery(queryStr);
+    // Every filter change funnels through here (resetQuery -> this), so it is
+    // also where the panel's "which filters actually constrain" hint is kept
+    // honest: the hint and the query are then derived in the same pass.
+    this.cache.ui?.updateFilterConstraintHints?.();
   }
 
+  /**
+   * Empty the query BOX. It deliberately does not re-apply: the graph keeps
+   * whatever the last applied query did to it, and ⟳ Sync (resetQuery) is the
+   * control that hands filtering back to the filter panel. The button says
+   * "Clear text" for that reason — as plain "Clear" it read as "un-filter".
+   */
   clearQuery() {
     this.cache.query.text.textContent = '';
+    this.cache.query.overlay.innerHTML = '';
     this.handleQueryValidationEvent(true);
     this.cache.query.caret.style.display = 'none';
   }
@@ -529,7 +577,7 @@ class QueryManager {
 
   setCursorPosition(charIndex) {
     const root = this.cache.query.text;
-    charIndex = Math.max(0, Math.min(charIndex, root.textContent.length));
+    charIndex = StaticUtilities.clamp(charIndex, 0, root.textContent.length);
 
     const range = document.createRange();
     const sel = window.getSelection();
@@ -727,6 +775,9 @@ class QueryManager {
       'q-or-greater-than': () => ({ type: 'KW', value: 'OR GREATER THAN' }),
       'q-in-cat-bracket-open': () => ({ type: 'KW', value: 'IN [' }),
       'q-kw-ismissing': () => ({ type: 'KW', value: 'IS MISSING' }),
+      'q-kw-isforeign': () => ({ type: 'KW', value: 'IS FOREIGN' }),
+      'q-kw-istrue': () => ({ type: 'KW', value: 'IS TRUE' }),
+      'q-kw-isfalse': () => ({ type: 'KW', value: 'IS FALSE' }),
 
       // category strings
       'q-string': (el) => ({
@@ -821,6 +872,14 @@ class QueryManager {
       this.cache.propIDToInvertibleRangeSliders
         .get(obj[0].propID)
         .setTo(obj[2].value, obj[4].value, true);
+    }
+
+    // boolean predicate
+    else if (obj[1].type === 'KW' && (obj[1].value === 'IS TRUE' || obj[1].value === 'IS FALSE')) {
+      this.cache.ui.checkCheckbox(obj[0].propID, true);
+      this.cache.propIDToBooleanToggles
+        .get(obj[0].propID)
+        ?.applyFromQuery(obj[1].value === 'IS TRUE' ? 'true' : 'false');
     }
 
     // category
@@ -922,7 +981,7 @@ class QueryManager {
   <li><span class="tooltip-dummy-buttons green">🔍 Filter</span> - Apply the query to filter the graph</li>
   <li><span class="tooltip-dummy-buttons blue">🎯 Select</span> - Select all matching elements (without filtering)</li>
   <li><span class="tooltip-dummy-buttons pink">⟳ Sync</span> - Sync query with current UI panel settings</li>
-  <li><span class="tooltip-dummy-buttons red">✗ Clear</span> - Remove all query conditions</li>
+  <li><span class="tooltip-dummy-buttons red">✗ Clear text</span> - Empty the box; the graph keeps the last applied query until you press ⟳ Sync</li>
 </ul>
 <p><strong>Filtering panel:</strong></p>
 <ul>
@@ -972,6 +1031,8 @@ class QueryManager {
   <li><span class="q-lower-than">LOWER THAN</span>&nbsp;<span class="q-number">0.2</span>&nbsp;<span class="q-or-greater-than">OR GREATER THAN</span>&nbsp;<span class="q-number">0.8</span> - Keep numerical values ≤ 0.2 or ≥ 0.8</li>
   <li><span class="q-in-cat-bracket-open">IN&nbsp;[</span><span class="q-string">foo</span><span class="q-comma">,</span>&nbsp;<span class="q-string">bar</span><span class="q-cat-bracket-close">]</span> - Keep specific categorical values</li>
   <li><span class="q-kw-ismissing">IS MISSING</span> - True when the property is absent/empty or belongs to the other element type. Auto-added by the filter panel's AND join so a property an element lacks doesn't exclude it; rarely hand-written.</li>
+  <li><span class="q-kw-isforeign">IS FOREIGN</span> - True only when the property belongs to the other element type (a node property tested against an edge). Auto-added by the AND join's "complete cases only" mode, where an absent value must exclude but a foreign one must not; rarely hand-written.</li>
+  <li><span class="q-kw-istrue">IS TRUE</span> / <span class="q-kw-isfalse">IS FALSE</span> - Boolean test; matches every encoding (true/TRUE/1 vs false/FALSE/0)</li>
 </ul>
 
 <p><strong>3. Logical Operators</strong></p>
@@ -1057,4 +1118,4 @@ class QueryManager {
   }
 }
 
-export { QueryManager, QueryAST };
+export { QueryManager, QueryAST, isFilterNarrowed };

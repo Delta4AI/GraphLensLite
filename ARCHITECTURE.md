@@ -24,7 +24,7 @@ Sigma — which presents a stable facade over the `graphology` graph held in
 `src/graph/graph_model.js`. Managers talk to the adapter and the model, never to
 Sigma directly.
 
-### Graph layer (`src/graph/`, 27 files)
+### Graph layer (`src/graph/`)
 
 The rendering and graph-operation core. Key modules:
 
@@ -33,46 +33,113 @@ The rendering and graph-operation core. Key modules:
 - `core.js` — `GraphCoreManager`: render/draw cycles, event locks, behaviour wiring
 - `interactions.js` — drag, zoom, lasso, click, hover handlers
 - `style.js` — per-element style resolution with defaults, per-layout persistence
-- `layout.js` / `layout_algorithms.js` — workspace management; headless layouts
+- `layout.js` / `layout_algorithms.js` / `workspace_dialog.js` — workspace
+  management, the "Create New Workspace" dialog, and headless layouts
   (force via graphology forceAtlas2; circular/grid geometric; radial/concentric/mds
   via `@antv/layout` v2)
 - `filter.js` — range-slider + dropdown filtering
 - `selection.js` — selection state with undo/redo memory
 - `bubble_sets.js` / `bubble_layer.js` / `bubble_geometry.js` — bubble-set grouping
-  drawn on an owned canvas layer beneath the nodes
+  drawn on an owned canvas layer beneath the nodes. A workspace holds ANY number
+  of groups: the list is `Object.keys(layout.bubbleSetStyle)`, not a constant, so
+  every caller reads it through `traverseBubbleSets()` — which describes the
+  SELECTED workspace, and code touching a different layout (`io.parseLayouts`,
+  `layout.createDefaultLayout`) must key off that layout's own map instead.
+  Membership has two sources unioned by `getEffectiveGroupMembers`:
+  `${group}Props` (filters, resolved live) and `${group}ManualMembers` (node IDs,
+  a snapshot)
+- `bubble_tuning.js` / `bubble_smoothing.js` — the layout-aware initial group
+  settings behind ✨ Re-tune, and the Catmull-Rom ring painter/resampler both the
+  canvas layer and the SVG export draw through
+- `annotation_layer.js` / `annotation_geometry.js` — text notes: a DOM overlay
+  over the stage (place/drag/edit/style popover) plus the node-safe box metrics
+  the layer, the PNG export and the SVG export all measure with
 - `heatmap_layer.js` / `heatmap_geometry.js` — node-density heatmap overlay (off by
-  default; toggled from the workspace toolbar)
+  default; one row of the inspector's Overlays layer stack, which owns both its
+  switch and its parameters — see `UIManager.OVERLAYS`)
 - `edge_programs.js` / `edge_flow_programs.js` / `edge_flow_glsl.js` /
   `flow_animator.js` — custom WebGL edge programs and the animated source→target
   flow overlay (dash/pulse/comet/chevron)
+- `overlay_frame.js` — the one rAF/signature/teardown coalescer the three
+  owned-canvas overlays (bubbles, heatmap, notes) render through
+- `overlay_keys.js` — the "has the cached fit gone stale?" keys those layers
+  compare (member-id key, position checksum, style key)
+- `shortest_path.js` — shortest-path selection between two picked nodes
 - `label_renderers.js`, `pie_slices.js`, `shape_textures.js`, `minimap.js`,
   `visible_graph.js`, `lasso_geometry.js`, `communities.js`, `export_svg.js`,
-  `webgl_support.js`
+  `webgl_support.js`, `dpr_watch.js`
 
-### Functional managers (`src/managers/`, 7 files + `assistant/`)
+### Functional managers (`src/managers/`, plus `assistant/`)
 
 Business logic and UI:
 
 - `io.js` — `IOManager`: Excel/JSON loading, export (JSON / PNG / SVG), data
-  preprocessing, Excel template generation
-- `ui.js` — loading overlays, UI enable/disable, notifications
-- `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, comparisons)
-- `ui_components.js` — filter UI (dropdown checklists, invertible range sliders), tooltips
-- `ui_style_div.js` — the styling panel (node/edge styles, badges, edge flow, density heatmap)
-- `metrics.js` — `NetworkMetrics`: degree/betweenness/closeness/eigenvector centrality, PageRank
+  preprocessing; the Excel column schema lives in `excel_schema.js` and the
+  downloadable workbook in `excel_template.js`
+- `ui.js` — loading overlays, UI enable/disable, notifications, presentation mode,
+  and the inspector's overlay layer stack (`OVERLAYS`: one table row per thing
+  drawn over the graph, each layer answering `visible`/`setVisible`)
+- `rail.js` — the 52 px top rail and its dropdown menus (app, workspace, layout,
+  select, export)
+- `inspector.js` — the single right-hand panel's context router
+  (Filters / Overlays / Selection). `CONTEXTS` is the whole contract: the tab
+  roles, roving tabindex and arrow-key nav are generic over it, and panel and
+  pill ids are derived from the context name
+- `workbench.js` — the bottom surface over the stage; four non-destructive tabs
+  (Data, Query, Metrics, Assistant) with a remembered height each
+- `filter_search.js` — the property search over the inspector's filter list; the
+  box itself is built into `#filterContainer` by `ui.buildFilterUI`, so one
+  delegated listener here survives every rebuild
+- `command_palette.js` — `⌘K` / `Ctrl+K`: one search over every control, node and
+  edge. The index is scraped from the live DOM on each open, so it cannot drift
+  from the UI; rows print the control's breadcrumb and accelerator
+- `history.js` — global undo/redo (`Ctrl+Z` / `Ctrl+Y`). Snapshots the current
+  workspace's whole view state and restores it through `lm.changeLayout()`, so a
+  feature that stores something new on the layout is undoable for free
+- `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, IS FOREIGN,
+  comparisons)
+- `ui_components.js` — filter UI (dropdown checklists, invertible range sliders),
+  the per-row group chip, tooltips
+- `group_menu.js` — the one group checklist, opened by both assign sites (a filter
+  row assigns a property, the Selection panel assigns nodes); built on `RailMenu`
+- `community_menu.js` — the 🧩 Auto-detect configurator (Louvain weighting,
+  resolution, how many groups); also a `RailMenu`, so Escape, `aria-expanded`,
+  close-on-scroll and focus restore come for free
+- `group_list.js` — the Groups list under Overlays › Groups (rows, the ⋯ menu, the
+  ＋/－ selection buttons). DOM only: it is handed the bubble-set MANAGER rather
+  than reaching for it through the cache, and every state change routes back
+  through it. `bubble_sets` keeps `renderGroupList`/`syncGroupRows` delegators so
+  callers still have one entry point
+- `ui_style_div.js` — builds every config card (node/edge styles, badges, edge flow,
+  bubble sets, density heatmap, select/act/arrange); `ui.js` `CARD_MOUNTS` then
+  re-parents each card to its single home in the rail or the inspector. The Groups
+  card is a list (painted by `bubble_sets.renderGroupList`) over ONE settings pane
+  rebuilt for the selected row by `buildGroupStylePanel` — a pane per group would
+  be N × ~20 rows of DOM for a surface showing one group at a time
+- `metrics.js` — `NetworkMetrics`: degree/betweenness/closeness/eigenvector centrality, PageRank.
+  Computed lazily — only while its workbench tab is visible (`setWorkbenchVisible`)
 - `api_client.js` — client for the standalone ingest service
 - `assistant/` — the natural-language Graph Assistant (intent parsing, query
-  generation, settings, budget UI)
+  generation, settings, budget UI); rendered as a workbench tab, not a dock
 
-### Utilities (`src/utilities/`, 12 files)
+### Utilities (`src/utilities/`)
 
 - `static.js` — validation, colour math, deep-merge helpers
-- `popup.js` / `popover_position.js` — modal and popover positioning
+- `popup.js` / `popover_position.js` / `checklist_popup.js` / `fetch_popup.js` —
+  modal, popover positioning (anchor clamping plus the dropdown flip-up maths),
+  checklist dialogs, and the shared lifecycle of a "fetch into the graph" dialog
+  (abort on dismiss, spinner, inline-or-toast errors, submit locked across the
+  gates) that both Neo4j popups run on
+- `ui_tooltip.js` — the delegated tooltip layer: strips native `title`s and
+  renders them itself, and owns `splitShortcut`, the one parser for the trailing
+  "(F)" accelerator the command palette also reads
 - `data_editor.js` — spreadsheet-like data editor (`DataTable`), incl. Excel export
 - `demo_loader.js` — STRING DB protein-interaction demo data
+- `neo4j_loader.js` — Neo4j connector (HTTP transactional Cypher API, no driver dependency)
+- `neo4j_session.js` — Neo4j session extensions: expand selected nodes, merge additional queries
 - `tour.js` — guided tour with a sample dataset
 - `color_scale_picker.js` / `numeric_scale_picker.js` / `pie_chart_picker.js` — styling pickers
-- `selection_hud.js`, `theme.js`, `export_scale.js`
+- `excel_merge.js`, `theme.js`, `export_scale.js`
 
 ### Key files
 
@@ -99,7 +166,10 @@ mapping bidirectionally between properties and node/edge IDs.
 Maps on `cache` for O(1) lookups.
 
 **Workspaces** — each layout independently stores node positions, styles,
-filters, bubble groups, and queries.
+filters, bubble groups, and queries. A workspace's groups live in three keyed
+places — `bubbleSetStyle[group]`, `${group}Props`, `${group}ManualMembers` — and
+deleting a group must clear all three, or `io.savedLayoutGroupKeys` infers the
+group back from the orphan on the next load.
 
 ## Build & Run
 
@@ -126,9 +196,9 @@ src/
 ├── graph_lens_lite.html    # SPA page
 ├── style.css               # all CSS
 ├── lib/                    # vendored libs (sigma, graphology, exceljs, marked, purify)
-├── graph/                  # rendering + graph operations (27 files)
-├── managers/               # business-logic managers (7 files + assistant/)
-├── utilities/              # helpers (12 files)
+├── graph/                  # rendering + graph operations
+├── managers/               # business-logic managers + assistant/
+├── utilities/              # helpers
 └── package/                # Electron main process + build scripts
 server/                     # standalone ingest service + live viewer
 templates/                  # Excel input templates

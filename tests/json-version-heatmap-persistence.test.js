@@ -16,13 +16,13 @@ function makeHeatmapLayer(overrides = {}) {
     calls,
     heatmapEnabled: false,
     settings: {
-      opacity: 0.55,
-      intensity: 0.18,
-      gamma: 0.7,
+      opacity: 0.7,
+      intensity: 0.25,
+      gamma: 0.85,
       threshold: 0,
       bandwidthScale: 1,
       ramp: "default",
-      dimGraph: false,
+      fadeGraph: 0,
     },
     updateSettings(partial) {
       calls.push(["updateSettings", partial]);

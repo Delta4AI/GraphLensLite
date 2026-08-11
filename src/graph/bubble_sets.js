@@ -1,7 +1,100 @@
+import {bubbleGroupStyle} from "../config.js";
+import {suggestGroupGeometry} from "./bubble_tuning.js";
 import {StaticUtilities} from "../utilities/static.js";
 import {detectCommunities as computeCommunityAssignments} from "./communities.js";
-import {clampPopoverLeft} from "../utilities/popover_position.js";
 import {Popup} from "../utilities/popup.js";
+import {renderGroupList, syncGroupRows} from "../managers/group_list.js";
+
+// Community detection asks for a target group count. Two is the smallest split
+// worth drawing; the upper bound keeps a typo ("500") from minting hundreds of
+// bubbles nobody asked for.
+// Cost of fitting a hull that routes around non-members: ~6 µs per
+// (member × avoid) pair, measured 2026-08-07 — see the table in config.js
+// beside AVOID_FIT_CONFIRM_MS. Rough on purpose: the price of being wrong is
+// one extra confirm, never a freeze the user did not agree to.
+const AVOID_FIT_MS_PER_PAIR = 0.006;
+
+/**
+ * The per-group style controls, keyed by the human-readable label that travels
+ * in `data-property` ("Bubble Set <group> <label>").
+ *
+ * ONE map: the label strings used to be re-listed three times — a 20-case
+ * switch in updateBubbleSetStyle, a second run of sync calls in
+ * refreshBubbleStyleElements, and again in ui_style_div's builders — so adding
+ * a knob meant three edits and a knob that read back stale was the failure.
+ * ui_style_div still authors the DOM (each row has its own min/max/step), but
+ * both READERS derive from here.
+ *
+ * `kind` says which control renders it: color/slider/switch/text/select.
+ * `also` is a second field the same value writes (fill drives the label
+ * background so a recoloured group's label follows it).
+ * `read` maps the stored value to the control's state where they differ.
+ */
+const GROUP_STYLE_FIELDS = Object.freeze({
+  'Fill Color': { field: 'fill', kind: 'color', also: 'labelBackgroundFill' },
+  'Fill Opacity': { field: 'fillOpacity', kind: 'slider' },
+  'Stroke Color': { field: 'stroke', kind: 'color' },
+  'Stroke Opacity': { field: 'strokeOpacity', kind: 'slider' },
+  'Padding': { field: 'padding', kind: 'slider' },
+  'Corridor Width': { field: 'corridor', kind: 'slider' },
+  // Numeric 0/1 for JSON back-compat; any legacy value > 0 reads as ON.
+  'Avoidance': { field: 'avoidance', kind: 'switch', read: (v) => (v ?? 1) > 0 },
+  'Label': { field: 'label', kind: 'switch' },
+  'Label Text': { field: 'labelText', kind: 'text' },
+  'Label Background': { field: 'labelBackground', kind: 'switch' },
+  'Label Background Color': { field: 'labelBackgroundFill', kind: 'color' },
+  'Label Fill Color': { field: 'labelFill', kind: 'color' },
+  'Label Font Size': { field: 'labelFontSize', kind: 'slider' },
+  'Label Close To Path': { field: 'labelCloseToPath', kind: 'switch' },
+  'Label Auto Rotate': { field: 'labelAutoRotate', kind: 'switch' },
+  'Label Offset X': { field: 'labelOffsetX', kind: 'slider' },
+  'Label Offset Y': { field: 'labelOffsetY', kind: 'slider' },
+  'Label Placement': { field: 'labelPlacement', kind: 'select' },
+});
+
+// ponytail: the tuner only wants a nearest-bystander statistic, so it samples
+// rather than paying the full O(members × avoid). Take the nearest ones
+// instead if a suggestion ever looks wrong on a big graph.
+const TUNE_AVOID_SAMPLE = 2000;
+
+/**
+ * How long fitting `memberCount` members around `avoidCount` obstacles takes.
+ *
+ * @param {number} memberCount
+ * @param {number} avoidCount
+ * @returns {number} milliseconds
+ */
+function estimateAvoidFitMs(memberCount, avoidCount) {
+  return AVOID_FIT_MS_PER_PAIR * memberCount * avoidCount;
+}
+
+/** Coarse enough to stay honest about a ±2-3× estimate. */
+function describeDuration(ms) {
+  if (ms < 2000) return 'a moment';
+  if (ms < 60_000) return `about ${Math.round(ms / 1000)} seconds`;
+  return 'several minutes';
+}
+
+const DEFAULT_COMMUNITY_GROUPS = 4;
+const MIN_COMMUNITY_GROUPS = 2;
+const MAX_COMMUNITY_GROUPS = 50;
+
+/**
+ * The "Groups" count the community detector will honour: rounded into
+ * [MIN, MAX], with a non-numeric entry falling back to the default rather
+ * than to NaN (which would ask for NaN communities).
+ *
+ * @param {*} value
+ * @returns {number}
+ */
+function clampCommunityGroups(value) {
+  const n = Math.round(Number(value));
+  // Blank, non-numeric and zero all mean "no answer" — the box is free text,
+  // and Number('') is 0, which would otherwise read as a request for MIN.
+  if (!Number.isFinite(n) || n === 0) return DEFAULT_COMMUNITY_GROUPS;
+  return Math.min(MAX_COMMUNITY_GROUPS, Math.max(MIN_COMMUNITY_GROUPS, n));
+}
+
 
 class GraphBubbleSetManager {
   constructor(cache) {
@@ -9,8 +102,12 @@ class GraphBubbleSetManager {
     // Louvain detection prefs (transient UI state, not persisted/exported).
     // weightProperty: undefined until first resolved (then a numeric edge
     // prop hash, or null for topology-only); resolution: Louvain γ.
+    // Read and written by the 🧩 menu (managers/community_menu.js) and by
+    // detectCommunities; `weightProperty: undefined` means "not resolved yet".
     this.communityOptions = { weightProperty: undefined, resolution: 1 };
-    this.communityPopover = null;
+    // group → did the user agree to pay for avoidance on it. Transient: a new
+    // graph means new costs, so io clears it (see clearAvoidConsent).
+    this.avoidConsent = new Map();
     this.redrawBubbleSets = debounce(async () => {
       if (!this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED) return;
       if (this.cache.EVENT_LOCKS.BUBBLE_GROUP_REDRAW_RUNNING) return;
@@ -31,10 +128,159 @@ class GraphBubbleSetManager {
     }, 50);
   }
 
+  /**
+   * The current workspace's group keys, in creation order. A workspace owns its
+   * own set — there is no global list and no fixed count. Every caller that
+   * operates on a DIFFERENT layout must read that layout's `bubbleSetStyle`
+   * directly instead (see io.parseLayouts, layout.createDefaultLayout).
+   */
   * traverseBubbleSets() {
-    for (let group of Object.keys(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE)) {
+    const layout = this.cache.data?.layouts?.[this.cache.data?.selectedLayout];
+    for (let group of Object.keys(layout?.bubbleSetStyle ?? {})) {
       yield group;
     }
+  }
+
+  /** @returns {object|undefined} the selected workspace, if there is one */
+  #layout() {
+    return this.cache.data?.layouts?.[this.cache.data?.selectedLayout];
+  }
+
+  /**
+   * Mint an unused group key. `g1`, `g2`, … never collides with the legacy
+   * `groupOne`–`groupFour` a pre-1.17 model carries, so old and new groups can
+   * coexist in one workspace.
+   */
+  #freeGroupKey(layout) {
+    let n = 1;
+    while (layout.bubbleSetStyle[`g${n}`]) n++;
+    return `g${n}`;
+  }
+
+  /**
+   * Add a group to the current workspace.
+   * @param {{name?: string, color?: string, fromProp?: string}} [options]
+   *   `fromProp` seeds the group's property-derived membership with one filter.
+   * @returns {string|null} the new group's key, or null with no workspace
+   */
+  createGroup({ name, color, fromProp } = {}) {
+    const layout = this.#layout();
+    if (!layout) {
+      this.cache.ui.error('Load a graph first.');
+      return null;
+    }
+    if (!layout.bubbleSetStyle) layout.bubbleSetStyle = {};
+
+    const key = this.#freeGroupKey(layout);
+    const index = Object.keys(layout.bubbleSetStyle).length;
+    const style = bubbleGroupStyle(index, name);
+    if (color) {
+      style.fill = color;
+      style.labelBackgroundFill = color;
+    }
+
+    layout.bubbleSetStyle[key] = style;
+    layout[`${key}Props`] = new Set(fromProp ? [fromProp] : []);
+    layout[`${key}ManualMembers`] = new Set();
+    return key;
+  }
+
+  /**
+   * Remove a group and every trace of it: its style, both membership stores,
+   * the renderer's slot and the change-detection cache. Leaving any of them
+   * behind would resurrect the group on the next load
+   * (io.savedLayoutGroupKeys infers groups from stray `${group}Props` keys).
+   * @param {string} group
+   */
+  async deleteGroup(group) {
+    const layout = this.#layout();
+    if (!layout?.bubbleSetStyle?.[group]) return;
+
+    // Through #dropGroupState, not a second copy of its six deletes: two lists
+    // to keep in step is exactly the "one stray key resurrects the group"
+    // hazard the doc comment above warns about.
+    this.#dropGroupState(group);
+
+    this.cache.bubbleSetChanged = true;
+    await this.cache.graph?.draw();
+    this.cache.history?.commit(`Delete bubble group (${group})`);
+  }
+
+  /** What to call a group in prose: its label, falling back to its key. */
+  groupName(group) {
+    return this.#layout()?.bubbleSetStyle?.[group]?.labelText || group;
+  }
+
+  /**
+   * Create a group holding the current selection. The two-step "new empty
+   * group, then add the selection" is the common case, so it gets one button.
+   * @param {string} [name]
+   */
+  async createGroupFromSelection(name) {
+    const selected = [...(this.cache.selectedNodes ?? [])];
+    if (selected.length === 0) {
+      this.cache.ui.warning('Select some nodes first, then create a group from them');
+      return null;
+    }
+    const group = this.createGroup({ name });
+    if (!group) return null;
+    this.#layout()[`${group}ManualMembers`] = new Set(selected);
+    this.tuneGroupGeometry(group);
+    this.selectedGroup = group;
+    await this.afterMembershipChange(`New bubble group (${this.groupName(group)})`);
+    this.cache.ui.info(
+      `Created "${this.groupName(group)}" with ${selected.length} node${selected.length === 1 ? '' : 's'}`
+    );
+    return group;
+  }
+
+  /**
+   * Layout-aware initial settings: measure the group's surroundings in the
+   * same reference space the outline fit uses and write the suggested
+   * padding / corridor / avoidance into its style (bubble_tuning.js). Runs
+   * once per creation path and from the row menu's ✨ Re-tune — NEVER
+   * automatically on membership or layout changes, so values the user set
+   * stay theirs. The sliders show whatever was picked.
+   *
+   * @param {string} group
+   * @returns {{padding, corridor, avoidance}|null} null when there is nothing
+   *   to measure (fewer than 2 visible members, or no rendered layer yet)
+   */
+  tuneGroupGeometry(group) {
+    const style = this.#layout()?.bubbleSetStyle?.[group];
+    const layer = this.cache.graph?.bubbleLayer;
+    if (!style || !layer?.referenceRects) return null;
+    const members = this.getEffectiveGroupMembers(group);
+    if (members.size < 2) return null;
+    const suggestion = suggestGroupGeometry(
+      layer.referenceRects(members),
+      layer.referenceRects(this.getAvoidMembers(members).slice(0, TUNE_AVOID_SAMPLE))
+    );
+    if (suggestion) Object.assign(style, suggestion);
+    return suggestion;
+  }
+
+  /**
+   * The ⋯ menu's ✨ Re-tune: re-run the creation-time suggestion against the
+   * CURRENT layout, on demand. This is the one sanctioned way settings get
+   * recomputed after creation.
+   * @param {string} group
+   */
+  async retuneGroup(group) {
+    const name = this.groupName(group);
+    const suggestion = this.tuneGroupGeometry(group);
+    if (!suggestion) {
+      this.cache.ui.warning(`"${name}" needs at least two visible nodes to re-tune`);
+      return;
+    }
+    await this.#groupInstance(group).update({ ...this.#layout().bubbleSetStyle[group] });
+    await this.cache.gcm.decideToRenderOrDraw(true);
+    this.refreshBubbleStyleElements();
+    this.cache.history?.commit(`Re-tune group shape (${name})`);
+    this.cache.ui.info(
+      `Re-tuned "${name}": padding ${suggestion.padding}, corridor ${suggestion.corridor}, ` +
+        `avoidance ${suggestion.avoidance ? 'on' : 'off'}`
+    );
   }
 
   /**
@@ -81,156 +327,124 @@ class GraphBubbleSetManager {
 
     const bStyle = this.cache.data.layouts[this.cache.data.selectedLayout].bubbleSetStyle[group];
 
-    switch (propertyLabel) {
-      case "Fill Color":
-        bStyle.fill = value;
-        bStyle.labelBackgroundFill = value;
-        break;
-      case "Fill Opacity":
-        bStyle.fillOpacity = value;
-        break;
-      case "Stroke Color":
-        bStyle.stroke = value;
-        break;
-      case "Stroke Opacity":
-        bStyle.strokeOpacity = value;
-        break;
-      case "Padding":
-        bStyle.padding = value;
-        break;
-      case "Corridor Width":
-        bStyle.corridor = value;
-        break;
-      case "Avoidance":
-        bStyle.avoidance = value;
-        break;
-      case "Label":
-        bStyle.label = value;
-        break;
-      case "Label Text":
-        bStyle.labelText = value;
-        break;
-      case "Label Background Color":
-        bStyle.labelBackgroundFill = value;
-        break;
-      case "Label Background":
-        bStyle.labelBackground = value;
-        break;
-      case "Label Fill Color":
-        bStyle.labelFill = value;
-        break;
-      case "Label Font Size":
-        bStyle.labelFontSize = value;
-        break;
-      case "Label Close To Path":
-        bStyle.labelCloseToPath = value;
-        break;
-      case "Label Auto Rotate":
-        bStyle.labelAutoRotate = value;
-        break;
-      case "Label Offset X":
-        bStyle.labelOffsetX = value;
-        break;
-      case "Label Offset Y":
-        bStyle.labelOffsetY = value;
-        break;
-      case "Label Placement":
-        bStyle.labelPlacement = value;
-        break;
-      default:
-        break;
+    const spec = GROUP_STYLE_FIELDS[propertyLabel];
+    if (spec) {
+      bStyle[spec.field] = value;
+      if (spec.also) bStyle[spec.also] = value;
     }
-    await this.cache.INSTANCES.BUBBLE_GROUPS[group].update({ ...bStyle });
-    await this.cache.gcm.decideToRenderOrDraw(true);
+    // Turning avoidance ON has to hand the layer the obstacles as well: the
+    // list is otherwise only supplied on a membership change, so the switch
+    // had nothing to route around and appeared to do nothing.
+    const update = { ...bStyle };
+    let slowFit = false;
+    if (property.endsWith('Avoidance') && Number(value) > 0) {
+      const members = this.getEffectiveGroupMembers(group);
+      update.avoidMembers = await this.consentedAvoidMembers(group, members);
+      // Declining is an answer, not a no-op — leaving the switch on would
+      // promise routing that is not going to happen.
+      if (update.avoidMembers.length === 0 && members.size > 0) {
+        bStyle.avoidance = 0;
+        update.avoidance = 0;
+      } else {
+        slowFit = this.#avoidFitIsSlow(members.size, update.avoidMembers.length);
+      }
+    }
+    await this.#withFitOverlay(slowFit, this.groupName(group), async () => {
+      await this.#groupInstance(group).update(update);
+      await this.cache.gcm.decideToRenderOrDraw(true);
+    });
     this.refreshBubbleStyleElements();
+    // Every style write funnels through here, so this is the one place that
+    // can keep the filter rows' chips in step. They render a group's fill and
+    // stroke, so without this they hold stale colours until the row is rebuilt
+    // for some unrelated reason.
+    this.cache.uiComponents?.refreshGroupChips?.();
   }
 
+  /**
+   * Mirror the selected group's stored style onto the ONE settings pane below
+   * the group list. ONE pane, built on demand for `selectedGroup`, so this only
+   * has to sync that one: a panel per group would be N × 20 rows of DOM for a
+   * surface showing one group at a time.
+   */
   refreshBubbleStyleElements() {
-    let anyGroupActive = false;
-    for (const group of this.traverseBubbleSets()) {
-      const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
-      const bubbleStyle = currentLayout.bubbleSetStyle[group];
+    const card = document.getElementById('groupStylePanel');
+    const group = this.selectedGroup;
+    const bubbleStyle = this.#layout()?.bubbleSetStyle?.[group];
+    if (!card || !bubbleStyle) {
+      this.cache.ui?.syncOverlays?.();
+      return;
+    }
 
-      // Same union the outline renders (see getEffectiveGroupMembers).
-      const hasActiveMembers = this.getEffectiveGroupMembers(group).size > 0;
-      if (hasActiveMembers) anyGroupActive = true;
-      const labelConfigShouldBeEnabled = bubbleStyle.label;
+    // Same union the outline renders (see getEffectiveGroupMembers).
+    const hasActiveMembers = this.getEffectiveGroupMembers(group).size > 0;
+    hasActiveMembers ? card.classList.remove("disabled") : card.classList.add("disabled");
 
-      // toggle entire cards based on bubble group members
-      const card = document.getElementById(`bubbleSetStyleCard${group}`);
-      hasActiveMembers ? card.classList.remove("disabled") : card.classList.add("disabled");
-
-      // Update UI inputs to match current view's bubble style
-      const labelInput = document.querySelector(`input[placeholder*="${group} label text"]`);
-      if (labelInput && bubbleStyle.labelText !== undefined) {
-        labelInput.value = bubbleStyle.labelText;
-      }
-
-      // Sync color inputs by data-property attribute
-      const syncColorInput = (prop, val) => {
-        const el = card.querySelector(`input[data-property="Bubble Set ${group} ${prop}"]`);
-        if (el && val != null) el.value = val;
-      };
-      syncColorInput("Fill Color", bubbleStyle.fill);
-      syncColorInput("Stroke Color", bubbleStyle.stroke);
-      syncColorInput("Label Background Color", bubbleStyle.labelBackgroundFill);
-      syncColorInput("Label Fill Color", bubbleStyle.labelFill);
-
-      // Sync slider inputs by data-property attribute
-      const syncSliderInput = (prop, val) => {
-        const container = card.querySelector(`[data-property="Bubble Set ${group} ${prop}"]`);
-        if (!container || val === undefined) return;
-        const slider = container.querySelector('input[type="range"]');
-        const numInput = container.querySelector('input[type="number"]');
-        if (slider) slider.value = val;
-        if (numInput) numInput.value = val;
-      };
-      syncSliderInput("Padding", bubbleStyle.padding);
-      syncSliderInput("Corridor Width", bubbleStyle.corridor);
-      syncSliderInput("Label Font Size", bubbleStyle.labelFontSize);
-      syncSliderInput("Label Offset X", bubbleStyle.labelOffsetX);
-      syncSliderInput("Label Offset Y", bubbleStyle.labelOffsetY);
-
-      // Sync switch inputs by data-property attribute
-      const syncSwitch = (prop, val) => {
-        const el = card.querySelector(`[data-property="Bubble Set ${group} ${prop}"]`);
-        if (el && el.setChecked) el.setChecked(!!val);
-      };
-      syncSwitch("Label Close To Path", bubbleStyle.labelCloseToPath);
-      syncSwitch("Label Auto Rotate", bubbleStyle.labelAutoRotate);
-      // Numeric 0/1 (legacy values > 0 read as ON) → checked state.
-      syncSwitch("Avoidance", (bubbleStyle.avoidance ?? 1) > 0);
-
-      // Sync dropdown by data-property attribute
-      const placementDropdown = card.querySelector(`[data-property="Bubble Set ${group} Label Placement"]`);
-      if (placementDropdown && bubbleStyle.labelPlacement) placementDropdown.value = bubbleStyle.labelPlacement;
-
-      // toggle label-related properties
-      for (const elem of card.querySelectorAll(".bubbleSetOptionalLabelConfig")) {
-        labelConfigShouldBeEnabled ? elem.classList.remove("disabled") : elem.classList.add("disabled");
-      }
-
-      // override css properties to style round-button quadrants and tabs
-      const fillColor = bubbleStyle.fill || this.cache.DEFAULTS.BUBBLE_GROUP_STYLE[group].fill;
-      document.documentElement.style.setProperty(`--${group}-color`, fillColor);
-
-      const tab = document.querySelector(`.bubble-set-tab[data-group="${group}"]`);
-      if (tab) {
-        tab.style.setProperty("--tab-color", fillColor);
-        tab.style.setProperty("--tab-text-color", StaticUtilities.getReadableForegroundColor(fillColor));
+    // Every control derives from GROUP_STYLE_FIELDS, so a knob cannot be added
+    // to the pane and forgotten here (the failure this replaced: a control that
+    // read back stale after a load or a ✨ Re-tune).
+    for (const [label, spec] of Object.entries(GROUP_STYLE_FIELDS)) {
+      const stored = bubbleStyle[spec.field];
+      if (stored === undefined && spec.read === undefined) continue;
+      const value = spec.read ? spec.read(stored) : stored;
+      const el = card.querySelector(`[data-property="Bubble Set ${group} ${label}"]`);
+      if (!el) continue;
+      switch (spec.kind) {
+        case 'switch':
+          el.setChecked?.(!!value);
+          break;
+        case 'slider': {
+          // The slider row is a container holding the track and the number box.
+          const slider = el.querySelector('input[type="range"]');
+          const numInput = el.querySelector('input[type="number"]');
+          if (slider) slider.value = value;
+          if (numInput) numInput.value = value;
+          break;
+        }
+        default:
+          // color, text and select are all plain valued inputs.
+          if (value != null) el.value = value;
       }
     }
 
-    // Toggle the entire bubble sets card when no groups are active
-    const outerCard = document.querySelector(".bubble-set-config-card-header");
-    if (outerCard) {
-      anyGroupActive ? outerCard.classList.remove("disabled") : outerCard.classList.add("disabled");
+    // toggle label-related properties
+    for (const elem of card.querySelectorAll(".bubbleSetOptionalLabelConfig")) {
+      bubbleStyle.label ? elem.classList.remove("disabled") : elem.classList.add("disabled");
+    }
+
+    // Membership changed, so the layer row's "N sets" is stale.
+    this.cache.ui?.syncOverlays?.();
+  }
+
+  /**
+   * Drop every group the CURRENT workspace does not own. Renderer state and the
+   * change-detection baseline are global while groups are per-workspace, so a
+   * switch (or a fresh template workspace, which selects itself before clearing)
+   * otherwise leaves the outgoing workspace's outlines on the layer — refitted
+   * to the new positions, with nothing in the Groups panel to explain them.
+   * Dropping the baseline too, so switching back redraws them.
+   */
+  #evictForeignGroups() {
+    const own = new Set(this.traverseBubbleSets());
+    const known = new Set([
+      ...(this.cache.graph?.bubbleLayer?.groups?.keys() ?? []),
+      ...this.cache.lastBubbleSetMembers.keys(),
+    ]);
+    for (const group of known) {
+      if (own.has(group)) continue;
+      this.cache.graph?.bubbleLayer?.removeGroup(group);
+      delete this.cache.INSTANCES.BUBBLE_GROUPS[group];
+      this.cache.lastBubbleSetMembers.delete(group);
     }
   }
 
   async updateBubbleSetIfChanged() {
+    this.#evictForeignGroups();
     for (let group of this.traverseBubbleSets()) {
-      let lastSetMembers = this.cache.lastBubbleSetMembers.get(group);
+      // A group created at runtime has no baseline yet — the fixed four were
+      // always pre-seeded here by layout creation, which is no longer true.
+      // "Never drawn" is an empty set, so the first real membership is a change.
+      let lastSetMembers = this.cache.lastBubbleSetMembers.get(group) ?? new Set();
       let newSetMembers = this.getEffectiveGroupMembers(group);
 
       if (!StaticUtilities.setsAreEqual(lastSetMembers, newSetMembers)) {
@@ -241,20 +455,102 @@ class GraphBubbleSetManager {
     }
   }
 
+  /**
+   * The renderer handle for a group, created on first use. Groups now arrive
+   * after graph build — from a load or from createGroup — so binding them all
+   * up front at graph-build time is no longer possible; materialising
+   * here removes the ordering question entirely (the layer does the same with
+   * its own per-group state, see bubble_layer #groupState).
+   */
+  #groupInstance(group) {
+    this.cache.INSTANCES.BUBBLE_GROUPS[group] ??=
+      this.cache.graph.getPluginInstance(`bubbleSetPlugin-${group}`);
+    return this.cache.INSTANCES.BUBBLE_GROUPS[group];
+  }
+
+  /**
+   * The obstacles a group's hull should route around, once the cost of doing
+   * so has been accepted. A cheap fit just happens — which is most of them,
+   * including small groups on large graphs, where this used to be refused
+   * outright. An expensive one asks, naming the wait, and the answer is
+   * remembered for that group so a membership edit does not re-ask per change.
+   *
+   * @param {string} group
+   * @param {Set<string>|string[]} members
+   * @returns {Promise<string[]>} empty when the user would rather not wait
+   */
+  async consentedAvoidMembers(group, members) {
+    const candidates = this.getAvoidMembers(members);
+    if (candidates.length === 0) return candidates; // nothing to route around
+    const memberCount = members instanceof Set ? members.size : members.length;
+    const estimate = estimateAvoidFitMs(memberCount, candidates.length);
+    const budget = Number(this.cache.CFG?.AVOID_FIT_CONFIRM_MS);
+    if (!Number.isFinite(budget) || estimate < budget) return candidates;
+
+    const remembered = this.avoidConsent.get(group);
+    if (remembered !== undefined) return remembered ? candidates : [];
+
+    const name = this.groupName(group);
+    const accepted =
+      (await Popup.confirm(
+        `Routing "${name}" around the other ${candidates.length.toLocaleString()} nodes takes ` +
+          `${describeDuration(estimate)}, and the app cannot respond while it computes. ` +
+          'Compute it anyway?',
+        'Compute'
+      )) === true;
+    this.avoidConsent.set(group, accepted);
+    return accepted ? candidates : [];
+  }
+
+  /** Forget the per-group answers — a new graph is a new set of costs. */
+  clearAvoidConsent() {
+    this.avoidConsent.clear();
+  }
+
+  /** @returns {boolean} would fitting this many members around this many obstacles be slow */
+  #avoidFitIsSlow(memberCount, avoidCount) {
+    const budget = Number(this.cache.CFG?.AVOID_FIT_CONFIRM_MS);
+    return Number.isFinite(budget) && estimateAvoidFitMs(memberCount, avoidCount) >= budget;
+  }
+
+  /**
+   * Run `work` behind the loading overlay when it will trigger a fit the user
+   * agreed to wait for. Agreeing to wait is not agreeing to watch a dead app:
+   * the fit is synchronous inside the renderer's next frame, so the overlay
+   * has to be painted before we hand off, and released only once that frame
+   * has been through.
+   *
+   * @param {boolean} slow
+   * @param {string} name  the group's display name
+   * @param {() => Promise<void>} work
+   */
+  async #withFitOverlay(slow, name, work) {
+    if (!slow) return work();
+    const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+    await this.cache.ui?.showLoading?.('Fitting bubble group', `Routing "${name}" around the other nodes …`);
+    await frame();
+    try {
+      await work();
+      await frame();
+    } finally {
+      await this.cache.ui?.hideLoading?.();
+    }
+  }
+
   async updateBubbleSet(group, members) {
     let empty = !members || (members instanceof Set ? members.size === 0 : members.length === 0);
     const membersAsArray = members instanceof Set ? [...members] : members;
 
-    const avoidMembers = empty ? [] : this.getAvoidMembers(members);
+    const avoidMembers = empty ? [] : await this.consentedAvoidMembers(group, members);
 
-    if (StaticUtilities.arraysAreEqual(membersAsArray, [...this.cache.INSTANCES.BUBBLE_GROUPS[group].members.keys()])) {
+    if (StaticUtilities.arraysAreEqual(membersAsArray, [...this.#groupInstance(group).members.keys()])) {
       this.cache.ui.debug("BUBBLE GROUPS IN SYNC - SKIPPING UPDATE");
       return;
     }
 
     const bubbleStyle = this.cache.data.layouts[this.cache.data.selectedLayout].bubbleSetStyle[group];
 
-    await this.cache.INSTANCES.BUBBLE_GROUPS[group].update({
+    await this.#groupInstance(group).update({
       ...bubbleStyle,
       members: empty ? [] : membersAsArray,
       avoidMembers: avoidMembers,
@@ -262,17 +558,15 @@ class GraphBubbleSetManager {
       strokeOpacity: empty ? 0 : bubbleStyle.strokeOpacity,
       label: empty ? false : bubbleStyle.label,
     });
-    await this.cache.INSTANCES.BUBBLE_GROUPS[group].drawBubbleSets();
+    await this.#groupInstance(group).drawBubbleSets();
   }
 
+  /**
+   * Every node that is NOT in the group — the obstacles its hull would route
+   * around. Whether that is affordable is `consentedAvoidMembers`' question,
+   * not this one's.
+   */
   getAvoidMembers(members) {
-    // Flag is set by io.preProcessData when the network exceeds
-    // MAX_NODES_BEFORE_DISABLING_AVOID_MEMBERS_IN_BUBBLE_GROUPS: outlines
-    // then may span across non-members (bubblesets-js virtual-edge routing
-    // around obstacles is O(members × avoid) — see the threshold comment in
-    // config.js for the measured budget).
-    if (this.cache.CFG.AVOID_MEMBERS_IN_BUBBLE_GROUPS) return [];
-
     const checkMembership = members instanceof Set
       ? (nodeID) => members.has(nodeID)
       : (nodeID) => members.includes(nodeID);
@@ -280,24 +574,49 @@ class GraphBubbleSetManager {
     return [...this.cache.nodeRef.keys()].filter(nodeID => !checkMembership(nodeID));
   }
 
-  async clearBubbleSetInstanceMembers() {
-    for (const group of this.traverseBubbleSets()) {
-      await this.cache.INSTANCES.BUBBLE_GROUPS[group].update({
-        members: [],
-        fillOpacity: 0,
-        strokeOpacity: 0,
-        label: false,
-      });
-      await this.cache.INSTANCES.BUBBLE_GROUPS[group].drawBubbleSets();
-    }
+  /**
+   * The choreography every membership change runs: repaint the group UI, then
+   * resync and redraw the outlines, then commit one undo step. Every membership
+   * change goes through here, so the four steps cannot drift apart.
+   * @param {string} label undo-stack label
+   */
+  async afterMembershipChange(label) {
+    this.renderGroupList();
+    this.refreshBubbleStyleElements();
+    this.cache.uiComponents?.refreshGroupChips?.();
+
+    this.cache.bubbleSetChanged = true;
+    await this.updateBubbleSetIfChanged();
+    await this.cache.graph?.draw();
+    // Force bubble set redraw to fix positioning
+    await this.redrawBubbleSets();
+    this.cache.history?.commit(label);
+  }
+
+  /**
+   * Membership of `group` relative to the current selection: none, some or all.
+   * Drives the group row's ＋/－ button and the group menu's ✓ / – marks.
+   * @returns {'none'|'some'|'all'}
+   */
+  selectionMembership(group) {
+    const manualMembers = this.#layout()?.[`${group}ManualMembers`] ?? new Set();
+    // Iterated in place: syncGroupRows calls this once per group on every
+    // selection change, and spreading the selection into a fresh array there
+    // was one copy of the whole selection per group.
+    const selected = this.cache.selectedNodes ?? [];
+    if (selected.length === 0) return 'none';
+    let inGroup = 0;
+    for (const nodeId of selected) if (manualMembers.has(nodeId)) inGroup++;
+    if (inGroup === 0) return 'none';
+    return inGroup === selected.length ? 'all' : 'some';
   }
 
   async toggleSelectedNodesInManualGroup(group) {
-    if (!this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`]) {
-      this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`] = new Set();
-    }
+    const layout = this.#layout();
+    if (!layout) return;
+    if (!layout[`${group}ManualMembers`]) layout[`${group}ManualMembers`] = new Set();
 
-    const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`];
+    const manualMembers = layout[`${group}ManualMembers`];
     const selectedNodeIds = [...this.cache.selectedNodes];
 
     if (selectedNodeIds.length === 0) {
@@ -305,35 +624,26 @@ class GraphBubbleSetManager {
       return;
     }
 
-    // Check if all selected nodes are already in the group
+    const name = layout.bubbleSetStyle?.[group]?.labelText || group;
     const allInGroup = selectedNodeIds.every(nodeId => manualMembers.has(nodeId));
 
     if (allInGroup) {
-      // Remove all selected nodes from the group
       selectedNodeIds.forEach(nodeId => manualMembers.delete(nodeId));
-      this.cache.ui.info(`Removed ${selectedNodeIds.length} node(s) from manual ${group}`);
+      // A removed node that ALSO matches one of the group's filters comes
+      // straight back through the property layer. Nothing can stop that, so
+      // say it rather than let the click look like a no-op.
+      const stillIn = this.getEffectiveGroupMembers(group);
+      const returning = selectedNodeIds.filter((id) => stillIn.has(id)).length;
+      this.cache.ui.info(
+        `Removed ${selectedNodeIds.length} node(s) from "${name}"` +
+          (returning ? `; ${returning} still match its filters` : '')
+      );
     } else {
-      // Add all selected nodes to the group
       selectedNodeIds.forEach(nodeId => manualMembers.add(nodeId));
-      this.cache.ui.info(`Added ${selectedNodeIds.length} node(s) to manual ${group}`);
+      this.cache.ui.info(`Added ${selectedNodeIds.length} node(s) to "${name}"`);
     }
 
-    // Update the quadrant button visual state
-    this.updateManualGroupButtonState();
-
-    // Update status display
-    this.updateManualGroupStatus();
-
-    // Refresh bubble style UI elements (activate/deactivate configuration cards)
-    this.refreshBubbleStyleElements();
-
-    // Mark bubble sets as changed and redraw (don't re-layout)
-    this.cache.bubbleSetChanged = true;
-    await this.updateBubbleSetIfChanged();
-    await this.cache.graph.draw();
-
-    // Force bubble set redraw to fix positioning
-    await this.redrawBubbleSets();
+    await this.afterMembershipChange(`Bubble group membership (${name})`);
   }
 
   /**
@@ -356,278 +666,103 @@ class GraphBubbleSetManager {
     return props;
   }
 
-  // Default weight: STRING's "Combined Score" when present, else topology-only
-  // (null) so generic graphs keep the original unweighted behaviour.
-  #defaultWeightProperty(numericProps) {
-    const combined = numericProps.find((p) => /combined\s*score/i.test(p.prop));
-    return combined ? combined.propHash : null;
-  }
-
   async detectCommunities(options = {}) {
     const weightProperty = options.weightProperty !== undefined
       ? options.weightProperty
       : (this.communityOptions.weightProperty ?? null);
     const resolution = options.resolution ?? this.communityOptions.resolution ?? 1;
 
-    const groups = [...this.traverseBubbleSets()];
-    const result = computeCommunityAssignments(this.cache, groups, { weightProperty, resolution });
+    const wanted = clampCommunityGroups(
+      options.groupCount ?? this.communityOptions.groupCount ?? DEFAULT_COMMUNITY_GROUPS
+    );
+
+    // Detection needs somewhere to put its results, and groups no longer
+    // pre-exist. Mint throwaway keys to compute against, then keep only the
+    // ones a community actually landed in.
+    const currentLayout = this.#layout();
+    if (!currentLayout) return;
+    const created = [];
+    for (let i = 0; i < wanted; i++) {
+      const key = this.createGroup({ name: `Community ${i + 1}` });
+      if (key) created.push(key);
+    }
+
+    const result = computeCommunityAssignments(this.cache, created, { weightProperty, resolution });
 
     if (!result) {
+      for (const key of created) this.#dropGroupState(key);
       this.cache.ui.warning("Community detection needs at least one visible edge");
       return;
     }
 
-    // Auto-grouping overwrites every group's manual members. If the user has
-    // built manual groupings, confirm before discarding them (detection is
-    // already computed, so the graph is untouched if they cancel).
-    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
-    const hasManualGroups = groups.some(
-      (g) => (currentLayout[`${g}ManualMembers`]?.size ?? 0) > 0
-    );
-    if (hasManualGroups) {
-      const confirmed = await Popup.confirm(
-        "Auto-grouping replaces your existing manual bubble groups with the " +
-        "detected communities. Clear them and continue?"
-      );
-      if (!confirmed) return;
-    }
-
-    // Replace the manual members of all groups for the current layout with
-    // the detected communities (largest community → first group).
-    for (const group of groups) {
+    // Auto-grouping ADDS groups now instead of overwriting the fixed four, so
+    // nothing the user built is destroyed and there is nothing to confirm.
+    for (const group of created) {
       currentLayout[`${group}ManualMembers`] = result.assignments.get(group) ?? new Set();
     }
+    // A run that found fewer communities than asked leaves empty groups behind;
+    // an empty group is clutter, not a result.
+    for (const group of created) {
+      if ((currentLayout[`${group}ManualMembers`]?.size ?? 0) === 0) this.#dropGroupState(group);
+    }
+    for (const group of created) {
+      if (currentLayout.bubbleSetStyle[group]) this.tuneGroupGeometry(group);
+    }
 
-    // Same post-change choreography as toggleSelectedNodesInManualGroup
-    this.updateManualGroupButtonState();
-    this.updateManualGroupStatus();
-    this.refreshBubbleStyleElements();
+    await this.afterMembershipChange('Auto-group');
 
-    this.cache.bubbleSetChanged = true;
-    await this.updateBubbleSetIfChanged();
-    await this.cache.graph.draw();
-    await this.redrawBubbleSets();
-
-    const assignedText = result.communityCount <= groups.length
-      ? `all ${result.communityCount}`
-      : `largest ${groups.length}`;
+    const assigned = created.filter((g) => currentLayout.bubbleSetStyle[g]).length;
     const weightLabel = weightProperty
       ? (this.getNumericEdgeProperties().find((p) => p.propHash === weightProperty)?.label ?? "edge weight")
       : "topology";
     this.cache.ui.info(
       `Detected ${result.communityCount} communities ` +
       `(weight: ${weightLabel}, resolution ${resolution}, modularity ${result.modularity.toFixed(2)}); ` +
-      `assigned ${assignedText} to bubble groups`
+      `created ${assigned} group${assigned === 1 ? '' : 's'}`
     );
   }
 
-  /**
-   * Toggle the Louvain configurator anchored to the 🧩 button: pick a numeric
-   * edge property to weight by (or topology-only) and the resolution, then run
-   * detection. Built lazily and repopulated on each open so it reflects the
-   * currently loaded data.
-   */
-  toggleCommunityDetectionPopover() {
-    if (this.communityPopover && this.communityPopover.classList.contains("open")) {
-      this.#closeCommunityDetectionPopover();
-      return;
-    }
-    this.#openCommunityDetectionPopover();
+  /** Forget a group without the redraw/commit deleteGroup does (bulk paths). */
+  #dropGroupState(group) {
+    const layout = this.#layout();
+    if (!layout) return;
+    delete layout.bubbleSetStyle[group];
+    delete layout[`${group}Props`];
+    delete layout[`${group}ManualMembers`];
+    delete this.cache.INSTANCES.BUBBLE_GROUPS[group];
+    this.cache.lastBubbleSetMembers.delete(group);
+    this.cache.graph?.bubbleLayer?.removeGroup(group);
   }
 
-  #closeCommunityDetectionPopover() {
-    this.communityPopover?.classList.remove("open");
-    if (this._communityOutsideHandler) {
-      document.removeEventListener("pointerdown", this._communityOutsideHandler, true);
-      this._communityOutsideHandler = null;
-    }
+  // The Groups list is DOM; it lives in managers/group_list.js next to the
+  // group menu. These two delegate so every caller (selection.js, layout.js,
+  // io.js, the tests) keeps one entry point on the manager.
+  syncGroupRows() {
+    syncGroupRows(this);
   }
 
-  #openCommunityDetectionPopover() {
-    const anchor = document.getElementById("detectCommunitiesBtn");
-    if (!anchor) return;
-
-    const numericProps = this.getNumericEdgeProperties();
-    // Resolve the default weight on first open, and re-default whenever the
-    // stored property is gone (data was reloaded) so the dropdown selection
-    // and the stored option never drift out of sync.
-    const stored = this.communityOptions.weightProperty;
-    const storedExists = stored === null || numericProps.some((p) => p.propHash === stored);
-    if (stored === undefined || !storedExists) {
-      this.communityOptions.weightProperty = this.#defaultWeightProperty(numericProps);
-    }
-
-    const popover = this.#ensureCommunityDetectionPopover();
-    this.#populateCommunityDetectionPopover(numericProps);
-
-    // Open first so offsetWidth is measurable, then anchor below the button
-    // and clamp to the viewport so the right edge never truncates.
-    popover.classList.add("open");
-    const rect = anchor.getBoundingClientRect();
-    popover.style.top = `${rect.bottom + 6}px`;
-    popover.style.left = `${clampPopoverLeft(rect.left, popover.offsetWidth, window.innerWidth)}px`;
-
-    // Close on outside click (capture so it beats inner handlers).
-    this._communityOutsideHandler = (e) => {
-      if (!popover.contains(e.target) && e.target !== anchor) this.#closeCommunityDetectionPopover();
-    };
-    document.addEventListener("pointerdown", this._communityOutsideHandler, true);
+  renderGroupList() {
+    renderGroupList(this);
   }
 
-  #ensureCommunityDetectionPopover() {
-    if (this.communityPopover) return this.communityPopover;
-    const popover = document.createElement("div");
-    popover.className = "community-detection-popover";
-    popover.id = "communityDetectionPopover";
-    document.body.appendChild(popover);
-    this.communityPopover = popover;
-    return popover;
-  }
-
-  #populateCommunityDetectionPopover(numericProps) {
-    const popover = this.communityPopover;
-    popover.replaceChildren();
-
-    const title = document.createElement("div");
-    title.className = "community-popover-title";
-    title.textContent = "Detect communities (Louvain)";
-    popover.appendChild(title);
-
-    // Weight dropdown ------------------------------------------------------
-    const weightLabel = document.createElement("label");
-    weightLabel.className = "community-popover-row";
-    weightLabel.textContent = "Weight by";
-    const weightSelect = document.createElement("select");
-    weightSelect.className = "community-popover-select";
-    const topoOpt = document.createElement("option");
-    topoOpt.value = "";
-    topoOpt.textContent = "Unweighted (topology)";
-    weightSelect.appendChild(topoOpt);
-    for (const p of numericProps) {
-      const opt = document.createElement("option");
-      opt.value = p.propHash;
-      opt.textContent = p.label;
-      weightSelect.appendChild(opt);
-    }
-    weightSelect.value = this.communityOptions.weightProperty ?? "";
-    weightSelect.addEventListener("change", (e) => {
-      this.communityOptions.weightProperty = e.target.value || null;
-    });
-    weightLabel.appendChild(weightSelect);
-    popover.appendChild(weightLabel);
-
-    // Resolution slider ----------------------------------------------------
-    const resRow = document.createElement("label");
-    resRow.className = "community-popover-row";
-    const resText = document.createElement("span");
-    const setResText = (v) => { resText.textContent = `Resolution: ${Number(v).toFixed(2)}`; };
-    setResText(this.communityOptions.resolution);
-    const resSlider = document.createElement("input");
-    resSlider.type = "range";
-    resSlider.min = "0.25";
-    resSlider.max = "4";
-    resSlider.step = "0.05";
-    resSlider.value = String(this.communityOptions.resolution);
-    resSlider.className = "community-popover-slider";
-    resSlider.addEventListener("input", (e) => {
-      this.communityOptions.resolution = parseFloat(e.target.value);
-      setResText(e.target.value);
-    });
-    resRow.append(resText, resSlider);
-    popover.appendChild(resRow);
-
-    // Detect button --------------------------------------------------------
-    const detectBtn = document.createElement("button");
-    detectBtn.className = "community-popover-detect nw-button";
-    detectBtn.textContent = "Detect";
-    detectBtn.addEventListener("click", async () => {
-      this.#closeCommunityDetectionPopover();
-      await this.detectCommunities();
-    });
-    popover.appendChild(detectBtn);
-  }
-
-  updateManualGroupButtonState() {
-    const button = document.getElementById('manualBubbleGroupButton');
-    if (!button) return;
-
-    const selectedNodeIds = new Set(this.cache.selectedNodes);
-
-    for (let [group, quadrantPosition] of Object.entries(this.cache.DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS)) {
-      const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`] || new Set();
-      const quadrant = button.querySelector(`.quadrant.${quadrantPosition}.manual`);
-
-      if (quadrant) {
-        // Check if any selected node is in this manual group
-        const hasAnyMember = selectedNodeIds.size > 0 &&
-                              [...selectedNodeIds].some(nodeId => manualMembers.has(nodeId));
-
-        if (hasAnyMember) {
-          quadrant.classList.add("active");
-        } else {
-          quadrant.classList.remove("active");
-        }
-      }
-    }
-  }
-
-  updateManualGroupStatus() {
-    const statusSpan = document.getElementById('manualBubbleGroupStatus');
-    const clearButton = document.getElementById('clearManualGroupsBtn');
-    const separator = document.getElementById('manualGroupSeparator');
-    if (!statusSpan) return;
-
-    const activeGroups = [];
-
-    for (let [group] of Object.entries(this.cache.DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS)) {
-      // Count exactly what the outline renders (prop ∪ manual, one filter).
-      const visibleCount = this.getEffectiveGroupMembers(group).size;
-
-      if (visibleCount > 0) {
-        const color = this.cache.data.layouts[this.cache.data.selectedLayout].bubbleSetStyle[group].fill;
-        activeGroups.push(this.buildManualGroupBadge(group, visibleCount, color));
-      }
-    }
-
-    // Show/hide elements based on active groups
-    if (activeGroups.length > 0) {
-      statusSpan.replaceChildren(...activeGroups);
-      statusSpan.style.display = 'inline-flex';
-      if (clearButton) clearButton.style.display = 'inline-flex';
-      if (separator) separator.style.display = 'inline-block';
-      // A group now exists worth styling — surface the Bubble Sets card.
-      this.cache.ui?.expandStylingCard?.('Bubble Sets');
-    } else {
-      statusSpan.replaceChildren();
-      statusSpan.style.display = 'none';
-      if (clearButton) clearButton.style.display = 'none';
-      if (separator) separator.style.display = 'none';
-    }
-  }
-
-  // One clickable badge per active group: shows the colored ●count and clears
-  // just that group on click (✕ revealed on hover). Lets users drop a single
-  // group without nuking all of them via "Clear all".
-  buildManualGroupBadge(group, count, color) {
-    const badge = document.createElement('button');
-    badge.type = 'button';
-    badge.className = 'manual-group-badge';
-    badge.style.color = color;
-    badge.title = `Clear this group (${count} node${count === 1 ? '' : 's'})`;
-    const dot = document.createElement('span');
-    dot.textContent = `●${count}`;
-    const x = document.createElement('span');
-    x.className = 'mg-badge-x';
-    x.textContent = '✕';
-    badge.append(dot, x);
-    badge.addEventListener('click', () => this.clearManualGroup(group));
-    return badge;
+  /** Copy a group's style and both membership stores into a new group. */
+  async duplicateGroup(group) {
+    const layout = this.#layout();
+    const style = layout?.bubbleSetStyle?.[group];
+    if (!style) return;
+    const key = this.createGroup({ name: `${style.labelText || group} copy` });
+    if (!key) return;
+    layout.bubbleSetStyle[key] = { ...style, labelText: layout.bubbleSetStyle[key].labelText };
+    layout[`${key}Props`] = new Set(layout[`${group}Props`] ?? []);
+    layout[`${key}ManualMembers`] = new Set(layout[`${group}ManualMembers`] ?? []);
+    this.selectedGroup = key;
+    await this.afterMembershipChange(`Duplicate bubble group (${group})`);
   }
 
   /**
    * Remove all filter/property-based assignments for a group from the current
-   * layout, mirroring the change into each prop's per-filter member set so the
-   * filter-panel quadrant buttons render inactive on the next build.
+   * layout. `${group}Props` is the single store, so the filter-panel buttons
+   * read the cleared state on their next build.
    * @param {string} group
    * @returns {boolean} true if any prop assignment was actually cleared
    */
@@ -636,11 +771,6 @@ class GraphBubbleSetManager {
     const propsInGroup = currentLayout[`${group}Props`];
     if (!propsInGroup || propsInGroup.size === 0) return false;
 
-    for (const propID of propsInGroup) {
-      const filter = currentLayout.filters?.get(propID);
-      const groupMembers = filter?.[`${group}Members`];
-      if (groupMembers) groupMembers.delete(propID);
-    }
     propsInGroup.clear();
     return true;
   }
@@ -648,21 +778,15 @@ class GraphBubbleSetManager {
   async clearManualGroup(group) {
     const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`];
     if (manualMembers) manualMembers.clear();
-    // The badge spans both sources, so clearing the group clears both.
-    const propsCleared = this.clearGroupPropAssignments(group);
+    // A group's count spans both sources, so clearing it clears both.
+    this.clearGroupPropAssignments(group);
 
-    this.updateManualGroupButtonState();
-    this.updateManualGroupStatus();
-    if (propsCleared) this.cache.ui?.buildFilterUI?.();
-
-    this.cache.bubbleSetChanged = true;
-    await this.updateBubbleSetIfChanged();
-    await this.cache.graph.draw();
+    await this.afterMembershipChange(`Clear bubble group (${group})`);
   }
 
   cleanupManualGroupMembers() {
     // Remove nodes from manual groups that are no longer visible (filtered out)
-    for (let group of Object.keys(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE)) {
+    for (let group of this.traverseBubbleSets()) {
       const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`];
 
       if (manualMembers && manualMembers.size > 0) {
@@ -677,34 +801,34 @@ class GraphBubbleSetManager {
       }
     }
 
-    this.updateManualGroupStatus();
+    this.renderGroupList();
   }
 
   async clearAllManualGroups() {
+    // "Cleared all bubble groups" with nothing in any of them described work
+    // that never happened. Counted first, so the message can be true — and
+    // counted over what this button CLEARS (manual members and prop
+    // assignments), not over what currently draws: a property assignment whose
+    // nodes are all filtered out is still an assignment to clear.
+    const layout = this.#layout();
+    let emptied = 0;
+    for (const group of this.traverseBubbleSets()) {
+      const manual = layout?.[`${group}ManualMembers`]?.size ?? 0;
+      const props = layout?.[`${group}Props`]?.size ?? 0;
+      if (manual > 0 || props > 0) emptied += 1;
+    }
+    if (emptied === 0) {
+      this.cache.ui.info('No group has any members.');
+      return;
+    }
     // Clear every group's contribution from both sources (manual + props).
-    let propsCleared = false;
-    for (let group of Object.keys(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE)) {
-      const manualMembers = this.cache.data.layouts[this.cache.data.selectedLayout][`${group}ManualMembers`];
-      if (manualMembers) {
-        manualMembers.clear();
-      }
-      if (this.clearGroupPropAssignments(group)) propsCleared = true;
+    for (let group of this.traverseBubbleSets()) {
+      layout?.[`${group}ManualMembers`]?.clear();
+      this.clearGroupPropAssignments(group);
     }
 
-    // Update UI
-    this.updateManualGroupButtonState();
-    this.updateManualGroupStatus();
-    if (propsCleared) this.cache.ui?.buildFilterUI?.();
-
-    // Mark bubble sets as changed and redraw (don't re-layout)
-    this.cache.bubbleSetChanged = true;
-    await this.updateBubbleSetIfChanged();
-    await this.cache.graph.draw();
-
-    // Force bubble set redraw to fix positioning
-    await this.redrawBubbleSets();
-
-    this.cache.ui.info('Cleared all bubble groups');
+    await this.afterMembershipChange('Clear all bubble groups');
+    this.cache.ui.info(`Emptied ${emptied} group${emptied === 1 ? '' : 's'}`);
   }
 }
 
@@ -720,4 +844,11 @@ const debounce = (func, wait) => {
   };
 };
 
-export { GraphBubbleSetManager };
+export {
+  GraphBubbleSetManager,
+  clampCommunityGroups,
+  estimateAvoidFitMs,
+  MIN_COMMUNITY_GROUPS,
+  MAX_COMMUNITY_GROUPS,
+  DEFAULT_COMMUNITY_GROUPS,
+};

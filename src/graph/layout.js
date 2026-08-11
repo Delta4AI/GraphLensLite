@@ -1,4 +1,5 @@
 import { Popup } from '../utilities/popup.js';
+import { openWorkspaceCreationDialog } from './workspace_dialog.js';
 import { applyNoverlap, layoutSelectionSubgraph } from './layout_algorithms.js';
 
 class GraphLayoutManager {
@@ -13,9 +14,22 @@ class GraphLayoutManager {
     this.cache.ui.debug(`Graph updated after layout event with message ${header} ${text}`);
   }
 
-  async changeLayout() {
+  /**
+   * Apply the selected workspace's stored state to the screen. `message`
+   * overrides the closing status line — undo/redo re-use this path and say what
+   * they restored rather than claiming a workspace switch. `busy` does the same
+   * for the loading overlay: a full-screen "Switching Workspace" over an undone
+   * slider tweak announces a switch that never happened.
+   *
+   * @param {string|null} message
+   * @param {{header: string, text: string}|null} busy
+   */
+  async changeLayout(message = null, busy = null) {
     this.cache.data.selectedLayout = document.getElementById('selectView').value;
-    await this.cache.ui.showLoading('Switching Workspace', this.cache.data.selectedLayout);
+    await this.cache.ui.showLoading(
+      busy?.header ?? 'Switching Workspace',
+      busy?.text ?? this.cache.data.selectedLayout
+    );
     // Pin the overlay up across the whole switch so the inner render's
     // #postRefresh hideLoading() can't drop it before bubble-sync and
     // hide-disconnected finish. Released right before the position tween (which
@@ -70,8 +84,7 @@ class GraphLayoutManager {
       await this.cache.bs.updateBubbleSetIfChanged();
 
       // Update manual bubble group status after layout change
-      this.cache.bs.updateManualGroupStatus();
-      this.cache.bs.updateManualGroupButtonState();
+      this.cache.bs.renderGroupList();
       this.cache.bs.refreshBubbleStyleElements();
 
       // Everything that mutates the graph is done — drop the overlay now so the
@@ -85,7 +98,10 @@ class GraphLayoutManager {
         await this.cache.graph.runLayoutTransition(currentLayout.positions);
       }
 
-      this.cache.ui.info(`Switched to workspace: ${this.cache.data.selectedLayout}`);
+      this.cache.ui.info(message ?? `Switched to workspace: ${this.cache.data.selectedLayout}`);
+      // Snapshots describe one workspace's state; a real switch invalidates
+      // them. A restore drives this same path and re-baselines itself.
+      if (!message) this.cache.history?.reset();
     } finally {
       // Defensive: if a step above threw before the release, drop the hold and
       // the overlay here so a failed switch never strands a blocked UI.
@@ -186,7 +202,7 @@ class GraphLayoutManager {
 
   async addLayout() {
     // Show dialog with clone vs template options
-    const result = await Popup.layoutCreationDialog(this.cache.DEFAULTS.LAYOUT_INTERNALS);
+    const result = await openWorkspaceCreationDialog(this.cache.DEFAULTS.LAYOUT_INTERNALS);
     if (!result) {
       this.cache.ui.info('Creating workspace canceled');
       return;
@@ -231,6 +247,7 @@ class GraphLayoutManager {
         nodeStyles: nodeStyles,
         edgeStyles: edgeStyles,
         bubbleSetStyle: structuredClone(currentLayout.bubbleSetStyle),
+        annotations: structuredClone(currentLayout.annotations ?? []),
       };
 
       // Copy query if it exists
@@ -238,10 +255,14 @@ class GraphLayoutManager {
         this.cache.data.layouts[result.name]['query'] = currentLayout['query'];
       }
 
-      // Copy bubble group props and manual members
-      for (let group of this.cache.bs.traverseBubbleSets()) {
+      // Copy bubble group props and manual members. The group list comes from
+      // the SOURCE layout's own bubbleSetStyle, not from traverseBubbleSets():
+      // that reads the selected layout, which is only the source by accident of
+      // ordering here and would silently copy the wrong set of groups if this
+      // ever moved after the switch.
+      for (let group of Object.keys(currentLayout.bubbleSetStyle ?? {})) {
         this.cache.data.layouts[result.name][`${group}Props`] = structuredClone(
-          currentLayout[`${group}Props`]
+          currentLayout[`${group}Props`] || new Set()
         );
         this.cache.data.layouts[result.name][`${group}ManualMembers`] = structuredClone(
           currentLayout[`${group}ManualMembers`] || new Set()
@@ -292,11 +313,18 @@ class GraphLayoutManager {
         // Start with default styles
         nodeStyles: new Map(),
         edgeStyles: new Map(),
-        bubbleSetStyle: structuredClone(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE),
+        // A new workspace starts with NO groups. Four always-present empty
+        // groups were the main reason the feature read as decoration; the
+        // Groups panel now shows an empty state that says what a group is.
+        bubbleSetStyle: {},
       };
 
-      // Initialize empty bubble group props (no groups selected)
-      for (let group of this.cache.bs.traverseBubbleSets()) {
+      // Initialize empty bubble group props (no groups selected). Keyed off the
+      // NEW layout's own bubbleSetStyle — traverseBubbleSets() would describe
+      // the workspace being left behind.
+      for (let group of Object.keys(
+        this.cache.data.layouts[result.name].bubbleSetStyle ?? {}
+      )) {
         this.cache.data.layouts[result.name][`${group}Props`] = new Set();
         this.cache.data.layouts[result.name][`${group}ManualMembers`] = new Set();
       }
@@ -328,13 +356,6 @@ class GraphLayoutManager {
       this.cache.qm.updateQueryTextArea();
       this.cache.ui.updateFilterLockState();
       this.cache.ui.clearActivePropsCacheOnLayoutChange();
-
-      // Clear bubble groups completely
-      await this.cache.bs.clearBubbleSetInstanceMembers();
-      this.cache.lastBubbleSetMembers.clear();
-      for (let group of this.cache.bs.traverseBubbleSets()) {
-        this.cache.lastBubbleSetMembers.set(group, new Set());
-      }
 
       // Process filters to determine which nodes should be visible
       await this.cache.gcm.preRenderEvent();
@@ -391,8 +412,7 @@ class GraphLayoutManager {
 
         // Update metrics and bubble group status
         await this.cache.metrics.updateMetricUI();
-        this.cache.bs.updateManualGroupStatus();
-        this.cache.bs.updateManualGroupButtonState();
+        this.cache.bs.renderGroupList();
         this.cache.bs.refreshBubbleStyleElements();
 
         // Graph mutations done — drop the overlay so the tween animates clear.
@@ -418,6 +438,33 @@ class GraphLayoutManager {
     }
   }
 
+  /** Rename the current workspace (the Default workspace keeps its name). */
+  async renameSelectedLayout() {
+    const current = this.cache.data.selectedLayout;
+    if (current === 'Default') {
+      this.cache.ui.error('Cannot rename the Default workspace.');
+      return;
+    }
+
+    const name = await Popup.prompt(`Rename workspace "${current}" to:`, current);
+    if (name === null || name === current) return;
+    if (!name) {
+      this.cache.ui.error('A workspace name cannot be empty.');
+      return;
+    }
+    if (Object.keys(this.cache.data.layouts).includes(name)) {
+      this.cache.ui.error(`Workspace with name "${name}" already exists.`);
+      return;
+    }
+
+    this.cache.data.layouts[name] = this.cache.data.layouts[current];
+    delete this.cache.data.layouts[current];
+    this.cache.data.selectedLayout = name;
+    this.cache.uiComponents.buildDropdownOptions();
+    this.cache.rail?.refresh();
+    this.cache.ui.info(`Renamed workspace "${current}" to "${name}"`);
+  }
+
   async removeSelectedLayout() {
     // Protect the "Default" layout from deletion
     if (this.cache.data.selectedLayout === 'Default') {
@@ -425,8 +472,14 @@ class GraphLayoutManager {
       return;
     }
 
+    // Deletion is permanent and it also strands every undo entry taken in that
+    // workspace (history.js drops entries whose workspace is gone), so the
+    // confirm has to name both — "are you sure" named neither.
     const confirmed = await Popup.confirm(
-      `Are you sure you want to delete view "${this.cache.data.selectedLayout}"?`
+      `Delete workspace "${this.cache.data.selectedLayout}" permanently? Its node positions, ` +
+        'styles, bubble groups and notes go with it, and its undo history becomes unusable. ' +
+        'This cannot be undone.',
+      'Delete workspace'
     );
     if (!confirmed) return false;
 
@@ -545,6 +598,7 @@ class GraphLayoutManager {
 
     await this.persistNodePositions();
     await this.handleLayoutChangeLoadingEvent(action, eventLabels[action]);
+    this.cache.history?.commit(`Arrange selection (${action})`);
   }
 
   /**
@@ -567,6 +621,7 @@ class GraphLayoutManager {
       'Remove overlaps',
       'Spread overlapping nodes apart minimally'
     );
+    this.cache.history?.commit('Remove overlaps');
   }
 
   /**
@@ -578,28 +633,32 @@ class GraphLayoutManager {
    * Styles, filters, query and bubble-group membership are untouched — only
    * positions change. Mirrors the template branch of addLayout (setLayout →
    * layout → persist → animated transition) but stays on the current workspace
-   * instead of creating a new one. Defaults the picker to the workspace's
-   * original layout type so it doubles as "redo the layout I started with".
+   * instead of creating a new one. The algorithm comes from the rail's Layout
+   * menu, which marks the workspace's current type.
    */
-  async relayoutWorkspace() {
+  async relayoutWorkspace(layoutType) {
     const currentName = this.cache.data.selectedLayout;
     const currentLayout = this.cache.data.layouts[currentName];
-    if (!currentLayout) return;
+    if (!currentLayout || !layoutType) return;
 
     const nodeCount = this.cache.graphData?.order ?? this.cache.nodeRef.size;
-    const result = await Popup.layoutSelectDialog(this.cache.DEFAULTS.LAYOUT_INTERNALS, {
-      defaultType: currentLayout.layoutType || this.cache.DEFAULTS.LAYOUT,
-      hasPositions: currentLayout.positions?.size > 0,
-      nodeCount,
-      expensiveLayouts: this.cache.DEFAULTS.EXPENSIVE_LAYOUTS,
-      warningThreshold: this.cache.DEFAULTS.LAYOUT_NODE_WARNING_THRESHOLD,
-    });
-    if (!result) {
-      this.cache.ui.info('Re-layout canceled');
-      return;
-    }
 
-    const layoutType = result.templateType;
+    // Chosen from the rail's Layout menu — the expensive-layout guard mirrors
+    // the addLayout template branch.
+    if (
+      this.cache.DEFAULTS.EXPENSIVE_LAYOUTS.includes(layoutType) &&
+      nodeCount > this.cache.DEFAULTS.LAYOUT_NODE_WARNING_THRESHOLD
+    ) {
+      const proceed = await Popup.confirm(
+        `The "${layoutType}" layout is computationally intensive and may ` +
+          `take several minutes on ${nodeCount.toLocaleString()} nodes. The UI stays ` +
+          `blocked until it finishes. Continue?`
+      );
+      if (!proceed) {
+        this.cache.ui.info('Re-layout canceled');
+        return;
+      }
+    }
 
     await this.cache.ui.showLoading('Re-layouting Workspace', `Applying ${layoutType} layout`);
     // Pin the overlay up across the whole re-layout so the inner render's
@@ -660,6 +719,7 @@ class GraphLayoutManager {
       }
 
       this.cache.ui.info(`Re-layouted workspace: ${currentName} (${layoutType})`);
+      this.cache.history?.commit(`Re-layout (${layoutType})`);
     } finally {
       // Defensive: release the hold + drop the overlay on any failure so a
       // half-applied re-layout never strands a blocked UI; clear the tween flag.
@@ -714,7 +774,11 @@ class GraphLayoutManager {
       // Per-view styles
       nodeStyles: new Map(),
       edgeStyles: new Map(),
-      bubbleSetStyle: structuredClone(this.cache.DEFAULTS.BUBBLE_GROUP_STYLE),
+      // A new workspace starts with NO groups. Four always-present empty
+        // groups were the main reason the feature read as decoration; the
+        // Groups panel now shows an empty state that says what a group is.
+        bubbleSetStyle: {},
+      annotations: [],
     };
 
     if (overridePositionsFromExcel) {
@@ -725,7 +789,9 @@ class GraphLayoutManager {
       defLayout.layoutType = this.cache.DEFAULTS.LAYOUT;
     }
 
-    for (let group of this.cache.bs.traverseBubbleSets()) {
+    // Keyed off this layout's own style map: createDefaultLayout can run before
+    // any layout is selected, so traverseBubbleSets() has nothing to describe.
+    for (let group of Object.keys(defLayout.bubbleSetStyle ?? {})) {
       defLayout[`${group}Props`] = new Set();
     }
 

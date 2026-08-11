@@ -6,6 +6,11 @@ readme = "README.md"
 requires-python = ">=3.13.1"
 dependencies = [
     "openpyxl>=3.1.5",
-    "pandas>=2.2.3",
-    "playwright>=1.58.0",
+    # Capped: uv.lock pins 2.2.3 and PyPI is a full major ahead (3.x), which
+    # nothing here has been run against. Lift the cap as its own tested bump.
+    "pandas>=2.2.3,<3",
+    # Same floor as the npm devDependency: both ecosystems drive a browser
+    # (scripts/screenshot_tool.py here, the perf scripts there) and a version
+    # split between them is a difference in behaviour nobody is tracking.
+    "playwright>=1.60.0",
 ]

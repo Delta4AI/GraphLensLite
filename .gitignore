@@ -17,6 +17,9 @@ src/gll.bundle.js.map
 # Perf benchmark artifacts (regenerate via npm run perf:fixture / npm run perf)
 scripts/fixtures/
 
+# Release audit worksheets (/audit-sweep output, working docs — not release artifacts)
+AUDIT-*.md
+
 # Compiled Java class files
 *.class
 

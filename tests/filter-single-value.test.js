@@ -54,7 +54,7 @@ describe('InvertibleRangeSlider — single-value fallback', () => {
 
     slider.appendTo(parent);
 
-    expect(parent.querySelector('.filter-input-row')).toBeNull();
+    expect(parent.querySelector('.filter-range-row')).toBeNull();
     expect(parent.querySelector('input[type="range"]')).toBeNull();
   });
 
@@ -67,7 +67,7 @@ describe('InvertibleRangeSlider — single-value fallback', () => {
     slider.appendTo(parent);
 
     expect(parent.querySelector('.filter-single-value')).toBeNull();
-    expect(parent.querySelector('.filter-input-row')).not.toBeNull();
+    expect(parent.querySelector('.filter-range-row')).not.toBeNull();
     expect(parent.querySelectorAll('input[type="range"]').length).toBe(2);
     expect(slider.isValidSlider).toBe(true);
   });

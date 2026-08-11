@@ -15,7 +15,6 @@
 //
 // Pure DOM APIs only, no innerHTML for user/model-provided strings.
 import {Popup} from '../../utilities/popup.js'
-import {computeBudget} from './budget_meter.js'
 
 // Returns the options the user picked (or null if cancelled):
 //   {excludeHistory?, minimalSelection?, overrideBudget?, openSettings?}

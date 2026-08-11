@@ -13,9 +13,13 @@ class GraphFilterManager {
       this.cache.ui.checkCheckbox(propID, true);
       const slider = this.cache.propIDToInvertibleRangeSliders.get(propID);
       const dropdown = this.cache.propIDToDropdownChecklists.get(propID);
+      const boolToggle = this.cache.propIDToBooleanToggles.get(propID);
 
       if (slider) await slider.reset();
       if (dropdown) await dropdown.selectAllCategories(true);
+      // A narrowed True/False segment constrains the graph under AND exactly
+      // like a narrowed slider, so it has to widen back to Any here too.
+      if (boolToggle) boolToggle.resetToAny();
     }
 
     await this.handleFilterEvent(
@@ -61,6 +65,9 @@ class GraphFilterManager {
         this.cache.EVENT_LOCKS.QUERY_UPDATE_EVENT = false;
       }
     }
+    // The funnel for every filter change: single rows, section toggles, resets
+    // and an applied query all end here, and `header` already names which.
+    this.cache.history?.commit(header);
   }
 
   resetFeatureIsWithinThresholdMaps() {

@@ -4,6 +4,28 @@ class StaticUtilities {
   }
 
   /**
+   * Strip characters the query DSL's AST cannot handle from property names
+   * and categorical values.
+   */
+  static sanitizeForAST(str) {
+    if (typeof str !== 'string') return str;
+    return str
+      .replace(/\(/g, '{')
+      .replace(/\)/g, '}')
+      .replace(/\[/g, '{')
+      .replace(/]/g, '}')
+      .replace(/:/g, '-')
+      .replace(/,/g, ' ')
+      .replace(/&/g, 'and')
+      .replace(/</g, 'less')
+      .replace(/>/g, 'greater')
+      .replace(/"/g, '')
+      .replace(/'/g, '')
+      .replace(/\\/g, '')
+      .replace(/\//g, ' or ');
+  }
+
+  /**
    * Escape a value for safe interpolation into an HTML string. Use at every
    * boundary where untrusted text (node/edge/property names, layout names,
    * query fragments loaded from files) is concatenated into innerHTML.
@@ -17,6 +39,33 @@ class StaticUtilities {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  /**
+   * Bound a value to [min, max]. Hand-inlined as Math.max(min, Math.min(...))
+   * in roughly nineteen files; this is the established home for it.
+   *
+   * @param {number} value
+   * @param {number} min
+   * @param {number} max
+   * @returns {number}
+   */
+  static clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  /**
+   * Shorten to `max` characters, marking the cut with an ellipsis. The
+   * ellipsis counts toward the budget, so the result is never longer than
+   * asked for — the off-by-one the two hand-rolled copies disagreed about.
+   *
+   * @param {*} value
+   * @param {number} max
+   * @returns {string}
+   */
+  static truncate(value, max) {
+    const text = String(value ?? '');
+    return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1))}…`;
   }
 
   static isNumber(value) {
@@ -40,6 +89,20 @@ class StaticUtilities {
       return value === 1 || value === 0;
     }
     return false;
+  }
+
+  /**
+   * Canonical boolean value of a user-data token, per the Excel template's
+   * stated encoding ("true or TRUE or 1, false or FALSE or 0"): returns
+   * 'true', 'false', or null when the value is not a boolean encoding.
+   * Unlike isBoolean above (reserved style columns), this also accepts the
+   * string forms '1'/'0', which is how spreadsheet cells usually arrive.
+   */
+  static booleanTokenValue(value) {
+    const norm = String(value).trim().toLowerCase();
+    if (norm === 'true' || norm === '1') return 'true';
+    if (norm === 'false' || norm === '0') return 'false';
+    return null;
   }
 
   static isHexColor(value) {
@@ -179,24 +242,6 @@ class StaticUtilities {
     }
     out.push(cur);
     return out;
-  }
-
-  // Decide where a dropdown panel should open relative to its anchor: flip
-  // upward when there is more room above than below, and cap the height (with
-  // scroll) to the chosen side so it never spills past the window edge.
-  // Pure function of measured geometry so the flip logic stays unit-testable.
-  static computeDropdownPlacement({anchorRect, dropdownHeight, viewportHeight, margin = 4}) {
-    const spaceBelow = viewportHeight - anchorRect.bottom - margin;
-    const spaceAbove = anchorRect.top - margin;
-    const openUp = dropdownHeight > spaceBelow && spaceAbove > spaceBelow;
-    const available = Math.max(0, openUp ? spaceAbove : spaceBelow);
-    const height = Math.min(dropdownHeight, available);
-    return {
-      openUp,
-      left: anchorRect.left - 3,
-      top: openUp ? anchorRect.top - height : anchorRect.bottom,
-      maxHeight: dropdownHeight > available ? available : null,
-    };
   }
 
   static setsAreEqual(setA, setB) {

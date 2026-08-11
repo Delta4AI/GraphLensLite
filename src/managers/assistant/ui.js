@@ -115,7 +115,7 @@ export const ACTION_GLYPHS = Object.freeze({
   '📝': {action: 'query-editor', label: 'Toggle query editor'},
   '➰': {action: 'lasso', label: 'Toggle lasso selection'},
   '📊': {action: 'metrics', label: 'Toggle metrics panel'},
-  '🎨': {action: 'style', label: 'Toggle styling panel'},
+  '🎨': {action: 'style', label: 'Show the appearance settings'},
   '🔢': {action: 'data-editor', label: 'Toggle data editor'},
   '↩': {action: 'undo', label: 'Undo selection'},
   '↪': {action: 'redo', label: 'Redo selection'},

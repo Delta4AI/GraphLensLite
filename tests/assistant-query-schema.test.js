@@ -24,9 +24,9 @@ describe("QUERY_RESPONSE_SCHEMA", () => {
     expect(re.test("Node filters::only_two")).toBe(false);
   });
 
-  it("enumerates only the three permitted operators", () => {
+  it("enumerates only the five permitted operators", () => {
     expect(QUERY_RESPONSE_SCHEMA.$defs.Expr.properties.op.enum)
-      .toEqual(["BETWEEN", "LT_OR_GT", "IN"]);
+      .toEqual(["BETWEEN", "LT_OR_GT", "IN", "IS_TRUE", "IS_FALSE"]);
   });
 
   it("enumerates only the three permitted binary connectors", () => {

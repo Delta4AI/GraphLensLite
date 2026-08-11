@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global window, document, requestAnimationFrame, Image, Node */ // browser globals run inside page.evaluate() callbacks
+/* global window, document, requestAnimationFrame */ // browser globals run inside page.evaluate() callbacks
 // Renderer performance benchmark (MIGRATION.md Phase 0 acceptance gates).
 // Boots the app in headless chromium against the benchmark fixture and
 // measures: load time, first-interaction stall, wheel-zoom FPS, drag-pan FPS

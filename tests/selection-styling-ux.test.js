@@ -116,7 +116,7 @@ describe("UIManager.syncStylingCardsToSelection", () => {
   });
 });
 
-// --- bubble group: per-group badge + clear ---------------------------------
+// --- bubble group: clearing one group --------------------------------------
 
 function bsInstance(layout) {
   const bs = Object.create(GraphBubbleSetManager.prototype);
@@ -127,36 +127,12 @@ function bsInstance(layout) {
   };
   // Stop the redraw pipeline at the manager boundary.
   bs.updateBubbleSetIfChanged = vi.fn().mockResolvedValue(undefined);
+  bs.redrawBubbleSets = vi.fn().mockResolvedValue(undefined);
+  bs.refreshBubbleStyleElements = vi.fn();
+  bs.syncGroupRows = vi.fn();
+  bs.renderGroupList = vi.fn();
   return bs;
 }
-
-describe("GraphBubbleSetManager.buildManualGroupBadge", () => {
-  beforeEach(() => { document.body.innerHTML = ""; });
-
-  it("renders ●count in the group colour with a hover ✕ affordance", () => {
-    const bs = bsInstance({});
-    const badge = bs.buildManualGroupBadge("groupA", 3, "rgb(10, 20, 30)");
-    expect(badge.tagName).toBe("BUTTON");
-    expect(badge.textContent).toContain("●3");
-    expect(badge.querySelector(".mg-badge-x").textContent).toBe("✕");
-    expect(badge.style.color).toBe("rgb(10, 20, 30)");
-    expect(badge.title).toContain("3 nodes");
-  });
-
-  it("singularises the node count in the title", () => {
-    const badge = bsInstance({}).buildManualGroupBadge("groupA", 1, "#fff");
-    expect(badge.title).toContain("1 node");
-    expect(badge.title).not.toContain("1 nodes");
-  });
-
-  it("clears only its own group when clicked", () => {
-    const bs = bsInstance({});
-    const spy = vi.spyOn(bs, "clearManualGroup").mockResolvedValue(undefined);
-    const badge = bs.buildManualGroupBadge("groupB", 2, "#000");
-    badge.click();
-    expect(spy).toHaveBeenCalledWith("groupB");
-  });
-});
 
 describe("GraphBubbleSetManager.clearManualGroup", () => {
   beforeEach(() => { document.body.innerHTML = ""; });
@@ -167,8 +143,6 @@ describe("GraphBubbleSetManager.clearManualGroup", () => {
       groupBManualMembers: new Set(["n3"]),
     };
     const bs = bsInstance(layout);
-    bs.updateManualGroupButtonState = vi.fn();
-    bs.updateManualGroupStatus = vi.fn();
 
     await bs.clearManualGroup("groupA");
 
@@ -179,8 +153,6 @@ describe("GraphBubbleSetManager.clearManualGroup", () => {
   it("marks bubble sets changed and redraws", async () => {
     const layout = { groupAManualMembers: new Set(["n1"]) };
     const bs = bsInstance(layout);
-    bs.updateManualGroupButtonState = vi.fn();
-    bs.updateManualGroupStatus = vi.fn();
 
     await bs.clearManualGroup("groupA");
 
@@ -191,8 +163,6 @@ describe("GraphBubbleSetManager.clearManualGroup", () => {
 
   it("tolerates a group that has no member set", async () => {
     const bs = bsInstance({});
-    bs.updateManualGroupButtonState = vi.fn();
-    bs.updateManualGroupStatus = vi.fn();
     await expect(bs.clearManualGroup("ghost")).resolves.toBeUndefined();
     expect(bs.cache.graph.draw).toHaveBeenCalled();
   });

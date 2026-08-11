@@ -169,6 +169,35 @@ function handleEvents(req, res, { store }, url) {
 }
 
 /**
+ * The hostnames this service answers to: the configured bind address, plus
+ * the loopback aliases that reach a loopback bind. The port is not part of
+ * the check — a rebinding attacker controls the NAME, not the port, and the
+ * service is routinely reached on an ephemeral one.
+ *
+ * A bind to 0.0.0.0 (or an empty host) is deliberately reachable by any name,
+ * so it opts out of the check entirely.
+ *
+ * @returns {Set<string>|null} lowercased hostnames, or null for "allow any"
+ */
+function allowedHostSet(config) {
+  const host = String(config.host || "").toLowerCase();
+  if (!host || host === "0.0.0.0" || host === "::") return null;
+  const names = new Set([host]);
+  if (host === "127.0.0.1" || host === "::1" || host === "localhost") {
+    names.add("127.0.0.1").add("localhost").add("[::1]").add("::1");
+  }
+  return names;
+}
+
+/** The hostname half of a Host header, with the port and IPv6 brackets off. */
+function hostnameOf(headerValue) {
+  const raw = String(headerValue || "").toLowerCase().trim();
+  if (raw.startsWith("[")) return raw.slice(1, raw.indexOf("]"));
+  const colon = raw.lastIndexOf(":");
+  return colon === -1 ? raw : raw.slice(0, colon);
+}
+
+/**
  * Build the HTTP request handler for the ingest service.
  *
  * @param {Object} deps
@@ -180,12 +209,21 @@ function handleEvents(req, res, { store }, url) {
  * @returns {(req: import('http').IncomingMessage, res: import('http').ServerResponse) => void}
  */
 function createHandler({ store, config, staticDir, version, serveStatic = defaultServeStatic }) {
+  const allowedHosts = allowedHostSet(config);
   return function handler(req, res) {
     let url;
     try {
       url = new URL(req.url, "http://localhost");
     } catch {
       sendJson(res, 400, { success: false, error: "Malformed request URL." });
+      return;
+    }
+    // DNS rebinding: the service is loopback-bound, but a page on any site the
+    // user visits can point a hostname it controls at 127.0.0.1 and then read
+    // the graph, since GET /api/graph and /api/events need no token. The
+    // browser sends that hostname in Host, so checking it is what closes it.
+    if (allowedHosts && !allowedHosts.has(hostnameOf(req.headers.host))) {
+      sendJson(res, 403, { success: false, error: "Host not allowed." });
       return;
     }
     const pathname = url.pathname;

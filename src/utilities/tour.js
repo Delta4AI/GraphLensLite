@@ -134,24 +134,32 @@ const TOUR_STEPS = [
     target: null,
   },
   {
-    title: 'App Header & Toolbar',
-    text: `The <strong>header</strong> shows the app name plus three actions:
+    title: 'The Rail',
+    text: `Everything session-level lives on the <strong>rail</strong> at the top:
            <br><br>
-           📷 <strong>Save Image</strong> — export the current view as <strong>PNG</strong> or <strong>SVG</strong>; click to pick the format and resolution
-           <br>💾 <strong>Save Model</strong> — export the full graph (data + styles + layouts) as JSON
-           <br>🌙 <strong>Dark mode</strong> — toggle between the light and dark themes
+           <strong>The logo</strong>, far left — the app menu: load data (Excel, JSON, or the STRING
+           database), download the Excel template, take this tour, start over, or open the project
+           on GitHub
+           <br><strong>Workspace chip</strong> — which workspace you're in, plus live shown/total counts
+           <br><strong>↶ ↷</strong> — undo / redo the last change to the workspace
+           (<strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong>). The selection has its own pair, further along
+           <br><strong>⊡ Fit · ↻ Layout · ➰ Lasso · ✨ Hover · ◈ Select · ✎ Note</strong>
+           — the everyday canvas verbs
+           <br><strong>⌕ Search</strong> (<strong>Ctrl+K</strong>) — find any control, node or
+           property by name. Each result tells you where it lives, so you only have to look it up once
+           <br><strong>Selection chip</strong> — what's selected, with focus, clear and undo/redo
            <br><br>
-           <em>Clicking the app name reloads the application.</em>
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           The <strong>toolbar pills</strong> below open the main panels:
+           The <strong>tab strip</strong> opens the main panels:
            <br><br>
-           📊 <strong>Metrics</strong> — compute network metrics
-           <br>🔢 <strong>Data</strong> — view and edit your graph data in a spreadsheet
+           🔢 <strong>Data</strong> — view and edit your graph data in a spreadsheet
            <br>📝 <strong>Query</strong> — write filter/selection queries using our query language
-           <br>🤖 <strong>Assistant</strong> — ask natural-language questions about your graph
+           <br>📊 <strong>Metrics</strong> — compute network metrics
+           <br>🤖 <strong>Assist</strong> — ask natural-language questions about your graph
            <br><br>
-           Each pill stays highlighted while its panel is open.`,
-    targets: [{ selector: '.app-toolbar' }, { selector: '.header-row' }],
+           On the right: <strong>⤓ Export</strong> (PNG, SVG, JSON model, Excel data),
+           <strong>⛶ presentation mode</strong>, the theme toggle, and the <strong>?</strong> keyboard
+           cheat sheet. Each tab stays highlighted while its panel is open.`,
+    targets: [{ selector: '#rail' }],
     position: 'below',
   },
   {
@@ -165,46 +173,46 @@ const TOUR_STEPS = [
            <br>• Bubble groups
            <br>• Visual styles applied per workspace
            <br><br>
-           Use the <strong class="tour-green">✚</strong> button to create a new workspace (clone or template-based), and the <strong class="tour-red">✗</strong> button to delete the current one.
+           Click the <strong>workspace chip</strong> to switch workspaces or to create
+           (<strong class="tour-green">✚</strong> clone or template-based), rename, or delete one.
+           Its second line always shows how many nodes and edges the current filters leave visible.
            <br><br>
-           A row of icon buttons acts on the current workspace:
-           <br>• <strong>⛶</strong> — fit the graph to the screen
-           <br>• <strong>↔️</strong> — nudge overlapping nodes apart
-           <br>• <strong>🔄</strong> — re-layout: recompute every node's position with a chosen layout algorithm (overwrites manual positions)
-           <br>• <strong>🚫</strong> — hide disconnected nodes
-           <br>• <strong>✨</strong> — toggle the hover highlight effect`,
-    target: '#workspaceContainer',
+           Next to it, <strong>↻ Layout</strong> is labelled with this workspace's current layout
+           algorithm — its menu re-layouts the whole workspace with a chosen algorithm
+           (overwrites manual positions), nudges overlapping nodes apart (<strong>↔️</strong>),
+           and hides disconnected elements (<strong>🚫</strong>).`,
+    target: '#workspaceChip',
     position: 'below',
   },
   {
     title: 'Filtering Panel',
     text: `Every property from your data becomes a <strong>filter</strong>.
-           <div style="margin:8px 0;padding:8px 10px;background:#f8f7fb;border-radius:6px;border:1px solid #dddbe2;">
+           <div style="margin:8px 0;padding:8px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border-soft);">
              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">
-               <span style="display:inline-block;width:14px;height:14px;border:1px solid #015C0C;border-radius:3px;box-sizing:border-box;text-align:center;line-height:12px;font-size:12px;color:#015C0C;flex-shrink:0;margin-top:2px;">✔</span>
-               <span style="font-size:12px;color:#403C53;font-weight:600;padding-top:2px;">Expression Level</span>
+               <span style="display:inline-block;width:14px;height:14px;border:1px solid var(--success-text);border-radius:3px;box-sizing:border-box;text-align:center;line-height:12px;font-size:12px;color:var(--success-text);flex-shrink:0;margin-top:2px;">✔</span>
+               <span style="font-size:12px;color:var(--brand-text);font-weight:600;padding-top:2px;">Expression Level</span>
                <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
-                 <div style="position:relative;height:8px;border-radius:10px;background:#CCC;margin-top:4px;">
-                   <div style="position:absolute;left:20%;right:30%;height:100%;border-radius:10px;background:#403C53;"></div>
-                   <div style="position:absolute;left:calc(20% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:#EEE;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
-                   <div style="position:absolute;left:calc(70% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:#EEE;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
+                 <div style="position:relative;height:8px;border-radius:10px;background:var(--border);margin-top:4px;">
+                   <div style="position:absolute;left:20%;right:30%;height:100%;border-radius:10px;background:var(--brand-text);"></div>
+                   <div style="position:absolute;left:calc(20% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:var(--surface-3);box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
+                   <div style="position:absolute;left:calc(70% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:var(--surface-3);box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
                  </div>
                  <div style="display:flex;gap:6px;">
-                   <input disabled value="20" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid #aaa;border-radius:3px;background:white;color:#403C53;box-sizing:border-box;">
-                   <input disabled value="70" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid #aaa;border-radius:3px;background:white;color:#403C53;box-sizing:border-box;">
+                   <input disabled value="20" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--input-bg);color:var(--brand-text);box-sizing:border-box;">
+                   <input disabled value="70" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--input-bg);color:var(--brand-text);box-sizing:border-box;">
                  </div>
                </div>
-               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;overflow:hidden;position:relative;flex-shrink:0;background:#E4E3EA;margin-top:2px;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;background:#E4E3EA;flex-shrink:0;margin-top:2px;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
+               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:2px solid var(--brand-text);background:var(--brand-text);flex-shrink:0;margin-top:2px;"></span>
+               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;background:var(--surface-3);flex-shrink:0;margin-top:2px;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid var(--brand-text);">−</span></span>
              </div>
              <div style="display:flex;align-items:center;gap:8px;">
-               <span style="display:inline-block;width:14px;height:14px;border:1px solid #C33D35;border-radius:3px;box-sizing:border-box;flex-shrink:0;"></span>
-               <span style="font-size:12px;color:#403C53;font-weight:600;">Type</span>
-               <select disabled style="flex:1;font-size:11px;padding:1px 4px;border:1px solid #aaa;border-radius:3px;background:white;">
+               <span style="display:inline-block;width:14px;height:14px;border:1px solid var(--accent-text);border-radius:3px;box-sizing:border-box;flex-shrink:0;"></span>
+               <span style="font-size:12px;color:var(--brand-text);font-weight:600;">Type</span>
+               <select disabled style="flex:1;font-size:11px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--input-bg);">
                  <option>Enzyme ✓, Receptor ✓, ...</option>
                </select>
-               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;overflow:hidden;position:relative;flex-shrink:0;background:#E4E3EA;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;background:#E4E3EA;flex-shrink:0;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
+               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:1.5px dashed var(--text-faint);background:transparent;flex-shrink:0;"></span>
+               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;background:var(--surface-3);flex-shrink:0;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid var(--brand-text);">−</span></span>
              </div>
            </div>
            • <strong>Numeric properties</strong> get two-thumbed range sliders — drag the left thumb to set
@@ -212,19 +220,29 @@ const TOUR_STEPS = [
            <br>• <strong>Categorical properties</strong> get dropdown checklists — check/uncheck values
            <br>• The <strong>checkbox</strong> toggles whether that filter is active.
            Active filters are combined with <strong>OR</strong> logic by default — nodes/edges matching <em>any</em> active filter are shown.
-           Under <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;font-size:11px;font-weight:600;color:#403C53;background:#E4E3EA;border:1px solid #dddbe2;border-radius:12px;vertical-align:middle;">⚙ Details</span>, an
-           <span style="display:inline-flex;align-items:stretch;border:1px solid #dddbe2;border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:#E4E3EA;color:#403C53;">OR</span><span style="padding:2px 9px;background:#C33D35;color:#fff;border-left:1px solid #dddbe2;">AND</span></span>
-           toggle switches to requiring <em>all</em> the filters you've narrowed (AND); its <strong>Complete cases only</strong> option additionally hides elements missing any of those filters.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <span style="display:inline-block;width:16px;height:16px;border-radius:50%;overflow:hidden;position:relative;vertical-align:middle;background:#E4E3EA;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
-           <strong>Bubble group button</strong> — click a quadrant to assign that filter's matching nodes to one of four colored <strong>bubble set</strong> groups. These are <em>filter-driven</em> and update automatically as filters change (unlike the <em>manual</em> bubble groups in the selection panel).
+           The
+           <span style="display:inline-flex;align-items:stretch;border:1px solid var(--border-soft);border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:var(--surface-3);color:var(--brand-text);">OR</span><span style="padding:2px 9px;background:#C33D35;color:#fff;border-left:1px solid var(--border-soft);">AND</span></span>
+           toggle at the top of the panel switches to requiring <em>all</em> the filters you've narrowed (AND); its <strong>Complete cases only</strong> option additionally hides elements missing any of those filters.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           <span style="display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:middle;background:var(--brand-text);"></span>
+           <strong>Bubble group chip</strong> — click it to put that filter's matching nodes into a
+           <strong>group</strong>, or to make a new group from the filter. The dot is hollow when the
+           property is in no group, filled with the group's colour when it is in one, and ringed when
+           it is in several (hover it to read the names). Groups fed this way are <em>filter-driven</em>:
+           they update as the filter changes. Manage them all under <strong>Overlays › Groups</strong>.
            <br><br>
-           <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid black;border-radius:50%;font-size:11px;vertical-align:middle;background:#E4E3EA;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid #403C53;">−</span></span>
+           <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;vertical-align:middle;background:var(--surface-3);"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid var(--brand-text);">−</span></span>
            <strong>Selection button</strong> — <strong>+</strong> add or <strong>−</strong> remove all nodes matching that filter property to/from the current selection.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;font-size:11px;font-weight:600;color:#403C53;background:#E4E3EA;border:1px solid #dddbe2;border-radius:12px;vertical-align:middle;">⚙ Details</span> — the panel stays compact by default. Toggle it to reveal each numeric property's <strong>exact min/max input boxes</strong> (shown under the slider above) together with the per-row <strong>bubble group</strong> and <strong>selection</strong> buttons. The mock-up above is in Details mode. Your preference is remembered between sessions.`,
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           Every numeric property also carries <strong>exact min/max input boxes</strong> under its slider, so you can type a threshold instead of dragging for it. When the list gets long, fold a whole property group — <em>Classification</em>, <em>Annotation</em>, whatever your spreadsheet calls them — away with the <strong>▾</strong> chevron on its heading.
+           <br><br>
+           <span style="display:inline-flex;align-items:stretch;border:1px solid var(--border-soft);border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:#C33D35;color:#fff;">Node&nbsp;5</span><span style="padding:2px 9px;background:var(--surface-3);color:var(--brand-text);border-left:1px solid var(--border-soft);">Edge&nbsp;2</span></span>
+           The <strong>Node / Edge</strong> segment in the section header picks which half of your filters
+           the panel shows — one at a time, each labelled with how many filters it holds.
+           <br><br>
+           With a lot of properties, the <strong>search box</strong> at the top of the panel jumps straight to one — it matches on the section and group names too. While a search is running both sections are shown, so a hit in the half you are not looking at is still visible.`,
     target: '#filterContainer',
-    position: 'right',
+    position: 'left',
   },
   {
     title: 'Graph Canvas',
@@ -237,93 +255,115 @@ const TOUR_STEPS = [
            <br>• <strong>Click + drag a node</strong> — moves that node
            <br>• <strong>Click + drag selected nodes</strong> — moves the entire selection
            <br><br>
-           The <strong>minimap</strong> (bottom-right corner) shows an overview of the entire graph. Click or drag inside it to quickly navigate to different parts of the network.`,
+           The <strong>minimap</strong> (bottom-right corner) shows an overview of the entire graph. Click or drag inside it to quickly navigate to different parts of the network — the inspector's <strong>Overlays</strong> tab hides it, along with everything else drawn over the graph. For a chrome-free screenshot, <strong>⛶ presentation mode</strong> (⇧F) hides the rail and the inspector.`,
     targets: [{ selector: '#innerGraphContainer' }, { selector: '.gll-minimap' }],
     position: 'left',
-    action: 'collapseSelectionPanel',
   },
   {
-    title: 'Selection Panel',
-    text: `A floating panel pinned to a corner of the canvas — drag its header to move it and it snaps to the nearest corner. It tracks whatever you've selected and gathers every action you can take on that selection, top to bottom:
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Header</strong>
-           <br>• <strong>Tools ▾</strong> — expand the advanced selection tools (next step)
-           <br>• <strong>✕</strong> — tuck the panel away; a <strong>▸ Selection</strong> tab brings it back
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Toolbar</strong>
-           <br>• <strong>➰ Lasso</strong> — toggle the lasso tool to draw a freeform selection area; while active, <strong>Shift+click</strong> adds individual nodes/edges
-           <br>• <strong>🎨 Style</strong> — open the styling panel to restyle the selection
-           <br>• <strong>↩</strong> / <strong>↪</strong> — undo / redo selection changes (up to 25 states)
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Counts</strong> — live <strong>node</strong> and <strong>edge</strong> totals, each with <strong>🔍</strong> (zoom to fit the selection) and <strong class="tour-red">×</strong> (clear that selection).
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Add to group</strong> — the quadrant button
-           <span style="display:inline-block;width:14px;height:14px;border-radius:50%;overflow:hidden;position:relative;vertical-align:middle;background:#E4E3EA;border:1px solid black;box-sizing:border-box;"><span style="position:absolute;width:50%;height:50%;top:0;left:0;border-top:2px solid var(--groupOne-color);border-left:2px solid var(--groupOne-color);box-sizing:border-box;border-top-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:0;left:50%;border-top:2px solid var(--groupTwo-color);border-right:2px solid var(--groupTwo-color);box-sizing:border-box;border-top-right-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:0;border-bottom:2px solid var(--groupThree-color);border-left:2px solid var(--groupThree-color);box-sizing:border-box;border-bottom-left-radius:100%;"></span><span style="position:absolute;width:50%;height:50%;top:50%;left:50%;border-bottom:2px solid var(--groupFour-color);border-right:2px solid var(--groupFour-color);box-sizing:border-box;border-bottom-right-radius:100%;"></span></span>
-           assigns or removes the selected nodes to/from one of four colored <strong>bubble set</strong> groups (visual overlays on the canvas). <strong>⟳ Reset style</strong> reverts the selection's styles to defaults.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Groups</strong> — manage every manual group at once:
-           <br>• <strong>🧩 Auto</strong> — auto-detect communities with <strong>Louvain</strong> clustering and assign the largest to groups; choose the edge weighting and resolution (higher = more, smaller clusters)
-           <br>• a size readout (e.g. <span style="color:var(--groupOne-color);font-weight:bold;">●3</span> <span style="color:var(--groupTwo-color);font-weight:bold;">●2</span>) and <strong class="tour-red">Clear all</strong> to remove them`,
-    target: '#selectedElementsContainer',
+    title: 'Making a Selection',
+    text: `The rail's <strong>selection chip</strong> always shows the live
+           <strong>node</strong> and <strong>edge</strong> counts, with <strong>🔍</strong> (zoom to the selection),
+           <strong class="tour-red">×</strong> (clear it) and <strong>↶</strong> / <strong>↷</strong>
+           (undo / redo selection changes, up to 25 states). It also warns when active filters are hiding
+           part of what you have selected.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           Three ways to build one:
+           <br>• <strong>Click</strong> an element on the canvas, <strong>Shift+click</strong> to add more
+           <br>• <strong>➰ Lasso</strong> (L) — drag a freeform area around what you want
+           <br>• <strong>◈ Select ⌄</strong> — all/no nodes, all/no edges, or select by
+           <strong>Node/Edge IDs</strong> or <strong>Labels</strong> with an include/exclude switch
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           The <strong>query editor</strong> can also turn any predicate into a selection with 🎯 Select.`,
+    targets: [{ selector: '#selectionChip' }, { selector: '#selectMenuBtn' }],
     position: 'below',
   },
   {
-    title: 'Selection Panel — Advanced Tools',
-    text: `Expand the selection panel with <strong>Tools ▾</strong> to reveal three tool sections:
-           <br><br>
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Focus Elements</strong> — search for a node or edge by ID/label and zoom to it.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Select Elements</strong> — bulk selection controls:
-           <br>• Select/deselect all nodes or edges
-           <br>• <strong>Expand/Reduce Edges</strong> — add or remove edges connected to selected nodes
-           <br>• <strong>Expand/Reduce Neighbors</strong> — grow or shrink the selection by one hop
-           <br>• Select by <strong>Node/Edge IDs</strong> or <strong>Labels</strong> with include/exclude toggle
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Arrange Selection</strong> — reposition selected nodes:
-           <br>• <strong>Shrink/Expand</strong> — pull nodes closer or push them apart
-           <br>• <strong>Circle/Force/Grid/Random</strong> — apply a sub-layout to the selection only`,
-    targets: [
-      { selector: '#selectedElementsContainer' },
-      { selector: '#selectionEditorToggleBtn' },
-    ],
-    position: 'below',
-    action: 'expandSelectionEditor',
+    title: 'Inspector — Selection',
+    text: `The <strong>inspector</strong> on the right is the app's single panel. Its
+           <strong>Filters</strong> / <strong>Overlays</strong> / <strong>Selection</strong> pills switch
+           what it shows. Nothing switches on its own — when a selection changes while you are in
+           another context, the Selection pill flashes and waits for you.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           <strong>Act on selection</strong>
+           <br>• <strong>＋ Add to group</strong> — opens a list of your bubble groups and drops the
+           selected nodes into one (or takes them out again); the same menu makes a new group from the
+           selection. Groups themselves live under <strong>Overlays › Groups</strong>
+           <br>• <strong>⟳ Reset style</strong> — revert the selection's styles to defaults
+           <br>• <strong>Expand/Reduce Edges</strong> and <strong>Expand/Reduce Neighbors</strong> — grow or shrink the selection by one hop
+           <br>• <strong>Shortest Path</strong> — with exactly two nodes selected, add the path between them
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           <strong>Arrange Selection</strong> — <strong>Shrink/Expand</strong> pull nodes together or apart;
+           <strong>Circle/Force/Grid/Random</strong> apply a sub-layout to the selection only.`,
+    targets: [{ selector: '#inspectorSelection' }, { selector: '#inspectorPillSelection' }],
+    position: 'left',
+    action: 'openSelectionContext',
   },
   {
-    title: 'Styling Panel 🎨',
-    text: `The styling panel lets you customize the visual appearance of your graph.
-           Styles are applied <strong>only to selected elements</strong> — select nodes/edges first, then adjust.
-           All styles are <strong>per-workspace</strong>.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+    title: 'Inspector — Appearance 🎨',
+    text: `Appearance lives at the bottom of the inspector's <strong>Selection</strong> context
+           (<strong>Y</strong> jumps straight to it). Styles apply <strong>only to selected elements</strong> —
+           select nodes/edges first, then adjust. All styles are <strong>per-workspace</strong>.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Node Configuration</strong>
            <br>• Shape, size, fill color, border size &amp; color
            <br>• Label text, font size, placement, color &amp; background
            <br>• <strong>Badges</strong> — small text markers at any corner of a node
            <br>• <strong>Pie-chart nodes</strong> — render a node as a multi-slice pie driven by category data
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Edge Configuration</strong>
            <br>• Type (line/quadratic/cubic), width, dash pattern, color
            <br>• Label text, font size, placement, rotation, offset &amp; color
            <br>• <strong>Arrows</strong> — start/end arrows with configurable size and type
            <br>• <strong>Halos</strong> — colored glow around edges with adjustable width
            <br>• <strong>Edge flow</strong> — animated directional motion along edges (comet or chevron), with adjustable opacity and density
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Bubble Set Configuration</strong>
-           <br>Each of the four groups has fill/stroke color &amp; opacity, plus optional labels.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           <strong>Density Heatmap</strong>
-           <br>A workspace-level overlay that shades the densest regions of the graph — configure radius, intensity and color ramp.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Scale tools</strong> — map any data property or computed network metric to a visual property:
-           <br>• <span style="display:inline-block;width:20px;height:16px;border:1px solid black;border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> <strong>Numeric scale</strong> — e.g. scale node size by PageRank
-           <br>• <span style="display:inline-block;width:24px;height:16px;border:1px solid black;border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> <strong>Color scale</strong> — continuous gradient or discrete colors per category
-           <hr style="margin:6px 0;border-color:#dddbe2;">
-           💡 Color inputs accept any hex code — type it in the text field and press <strong>Enter</strong> to apply.`,
-    targets: [{ selector: '#rightSidebar' }, { selector: '#styleToggleBtn' }],
+           <br>• <span style="display:inline-block;width:20px;height:16px;border:1px solid var(--border-strong);border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> <strong>Numeric scale</strong> — e.g. scale node size by PageRank
+           <br>• <span style="display:inline-block;width:24px;height:16px;border:1px solid var(--border-strong);border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> <strong>Color scale</strong> — continuous gradient or discrete colors per category
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           💡 Color inputs accept any hex code — type it in the text field and press <strong>Enter</strong> to apply.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           Anything drawn over the whole graph rather than over your selection — groups, the density
+           heatmap, notes, the minimap — lives in the <strong>Overlays</strong> context instead. That is
+           the next step.`,
+    targets: [{ selector: '#inspectorAppearanceMount' }],
     position: 'left',
     positionOffset: { y: 120 },
-    action: 'openStylingPanel',
+    action: 'showAppearance',
+  },
+  {
+    title: 'Inspector — Overlays',
+    text: `<strong>Overlays</strong> is the stack of everything drawn <em>over</em> the graph. Every row
+           owns its own switch, a row with nothing to draw is greyed out, and the two rows with
+           settings open onto them. These are <strong>workspace-level</strong>, not per-selection.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           <strong>Groups</strong> — one row per bubble group: its colour, its name, how many nodes it
+           holds, and a <strong>＋</strong> that drops the current selection into it
+           (<strong>－</strong> takes it back out). Build them with <strong>＋ New group</strong>,
+           <strong>＋ From selection</strong>, or <strong>🧩 Auto-detect</strong>, which turns the graph's
+           communities into groups. Click a row for its fill, outline, padding, corridor and label
+           settings; <strong>⋯</strong> renames, duplicates, clears or deletes it. Make as many as you
+           like — there is no cap.
+           <br><br>
+           A group fed from a filter row is marked <strong>⚙</strong> and follows that filter as it
+           changes. The two sources add up, so a row can read <em>⚙ Type · +8 manual</em>: eight nodes
+           you put there by hand, on top of everything the filter matches.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           <strong>Density heatmap</strong> — a continuous density field under the graph, showing where
+           nodes crowd together whatever their styling. <strong>Fade graph</strong> dims nodes, labels
+           and edges so the field reads through; <strong>Intensity</strong>, <strong>Opacity</strong>,
+           <strong>Radius</strong>, <strong>Contrast</strong> and <strong>Threshold</strong> shape it.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           <strong>Notes</strong> — free text pinned to graph coordinates, so it pans and zooms with the
+           network. Place one with <strong>✎ Note</strong> on the rail, then click the canvas. Drag to
+           move it, double-click (or <strong>Enter</strong>) to edit the text, single-click for its style
+           popover — font size and colour, border, background, shadow, and <strong>✗ Delete note</strong>.
+           Notes are per workspace and come along in PNG and SVG exports.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           <strong>Minimap</strong> — the overview thumbnail in the bottom-right corner.`,
+    targets: [{ selector: '#inspectorOverlays' }, { selector: '#inspectorPillOverlays' }],
+    position: 'left',
+    action: 'openOverlaysContext',
   },
   {
     title: 'Network Metrics 📊',
@@ -335,38 +375,40 @@ const TOUR_STEPS = [
            <br>• <strong>Closeness Centrality</strong> — average distance to all other nodes
            <br>• <strong>Eigenvector Centrality</strong> — influence based on neighbor importance
            <br>• <strong>PageRank</strong> — iterative ranking algorithm
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Results appear as a <strong>ranked node list</strong> — select entries and use
            <strong>Add to Selection</strong> / <strong>Remove from Selection</strong> to update the graph selection.
            <br><br>
            Below the list, <strong>graph-level metrics</strong> (density, avg degree, etc.) are shown in a summary table.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Computed metrics become available as mapping sources in the styling panel's
-           <span style="display:inline-block;width:20px;height:16px;border:1px solid black;border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> numeric scale and
-           <span style="display:inline-block;width:24px;height:16px;border:1px solid black;border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> color scale tools.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <span style="display:inline-block;width:20px;height:16px;border:1px solid var(--border-strong);border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> numeric scale and
+           <span style="display:inline-block;width:24px;height:16px;border:1px solid var(--border-strong);border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> color scale tools.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button next to the metric dropdown for a detailed explanation of the selected metric.`,
     targets: [{ selector: '#metricsContainer' }, { selector: '#metricsToggleBtn' }],
-    position: 'right',
+    position: 'left',
     action: 'openMetricsPanel',
   },
   {
     title: 'Data Editor 🔢',
     text: `The data editor is a <strong>spreadsheet view</strong> of all nodes and edges.
            You can edit property values directly in cells, add new elements, or export the data.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">✔ Apply</span> — push all changes to the graph
            <br>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#EFB0AA;border:1px solid rgba(0,0,0,0.3);">⟳ Reset</span> — discard changes and revert to current graph state
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Node</span>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Edge</span>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Column</span> — add new nodes, edges, or property columns to the table
            <br>
+           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">⤒ Import</span> — merge a second Excel file into the current graph. You get a preview of what would change first, and you choose whether new nodes and edges are added or only the existing ones extended
+           <br>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">⤓ Export</span> — export the data table and styling properties as Excel
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the header for usage details.`,
-    targets: [{ selector: '#bottomBar' }, { selector: '#dataToggleBtn' }],
+    targets: [{ selector: '#workbench' }, { selector: '#dataToggleBtn' }],
     position: 'above-lower-left',
     action: 'openDataEditor',
   },
@@ -389,19 +431,19 @@ const TOUR_STEPS = [
            </div>
            The query <strong>syncs with the filter panel</strong> — changing filters updates the query text, and vice versa.
            When you manually edit the query, filters get <strong>locked</strong> (🔒) to prevent conflicts.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">🔍 Filter</span> — apply the query to filter the graph (hide non-matching elements)
            <br>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">🎯 Select</span> — apply the query to select matching elements without filtering
            <br>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#EFB0AA;border:1px solid rgba(0,0,0,0.3);">⟳ Sync</span> — reset the query to match the current filter panel state
            <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#C33D35;border:1px solid rgba(0,0,0,0.3);">✗ Clear</span> — clear the query entirely
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#C33D35;border:1px solid rgba(0,0,0,0.3);">✗ Clear text</span> — empty the box (⟳ Sync is what hands filtering back to the panel)
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            When the query editor is open, a <span class="add-to-query-button show tt">📝</span> button appears next to each filter checkbox in the filtering panel. Click it to <strong>append</strong> that filter's current range or category selection as a query fragment — a quick way to build complex queries from existing filters.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the query editor header for a full syntax reference.`,
-    targets: [{ selector: '#bottomBar' }, { selector: '#queryToggleBtn' }],
+    targets: [{ selector: '#workbench' }, { selector: '#queryToggleBtn' }],
     position: 'above-center-left',
     action: 'openQueryEditor',
   },
@@ -410,29 +452,35 @@ const TOUR_STEPS = [
     text: `Ask natural-language questions about your graph and get answers grounded in the current workspace. The assistant can also suggest queries you run with one click:
            <br>• <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">🎯 Select</span> applies the query immediately
            <br>• <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">📝 Open in query editor</span> drops it into the editor for review
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Setup &amp; privacy</strong>
-           <br>The assistant talks to an <strong>Ollama</strong> server you control, local by default. Every message ships a snapshot of the current graph state, so use a local endpoint for sensitive data. Click <strong>⚙</strong> in the panel header to configure the endpoint and pick a model. Results vary by model. Tested with <code>qwen3.5:9b</code>.
-           <hr style="margin:6px 0;border-color:#dddbe2;">
+           <br>The assistant talks to an <strong>Ollama</strong> server you control, local by default. Every message ships a snapshot of the current graph state, so use a local endpoint for sensitive data. Click <strong>⚙ Settings</strong> in the workbench toolbar to configure the endpoint and pick a model. Results vary by model. Tested with <code>qwen3.5:9b</code>.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
            The <strong>budget pill</strong> at the bottom shows how much of the model's context window the next request will consume. Click it for a per-section breakdown.`,
-    targets: [{ selector: '#assistantSidebar' }, { selector: '#assistantToggleBtn' }],
+    targets: [{ selector: '#workbench' }, { selector: '#assistantToggleBtn' }],
     position: 'left',
     action: 'openAssistantPanel',
   },
   {
     title: "You're all set! 🎉",
-    text: `That covers the main features. Here are some <strong>keyboard shortcuts</strong> to remember:
+    text: `That covers the main features. Here are the <strong>keyboard shortcuts</strong> — the
+           <strong>?</strong> button on the rail shows this list any time:
            <br><br>
-           <strong>P</strong> — Export as PNG
+           <strong>Ctrl+K</strong> — Find any control, node or property by name
+           <br><strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong> — Undo / redo the last change to the workspace
+           <br><strong>P</strong> — Export as PNG
            <br><strong>S</strong> — Save as JSON
-           <br><strong>M</strong> — Toggle metrics panel
+           <br><strong>F</strong> — Fit graph to screen
            <br><strong>D</strong> — Toggle data editor
            <br><strong>Q</strong> — Toggle query editor
+           <br><strong>M</strong> — Toggle metrics panel
            <br><strong>A</strong> — Toggle Graph Assistant
-           <br><strong>F</strong> — Fit graph to screen
-           <br><strong>H</strong> — Toggle hover highlight effect
+           <br><strong>Y</strong> — Jump to the inspector's appearance controls
            <br><strong>L</strong> — Toggle lasso selection
-           <br><strong>Y</strong> — Toggle styling panel
+           <br><strong>H</strong> — Toggle hover highlight effect
+           <br><strong>⇧F</strong> — Presentation mode (hide the rail and inspector)
+           <br><strong>Esc</strong> — Exit lasso or presentation mode
+           <br><strong>?</strong> — Show the shortcut sheet
            <br><br>
            Try loading your own data from an <strong>Excel file</strong> or <strong>JSON export</strong>, or fetch protein networks from the <strong>STRING database</strong>.
            <br><br>
@@ -464,11 +512,6 @@ class GuidedTour {
     }
 
     const step = TOUR_STEPS[this.currentStep];
-
-    // Re-expand the selection panel once we leave the step that collapsed it.
-    if (step.action !== 'collapseSelectionPanel') {
-      this.restoreSelectionPanel();
-    }
 
     // execute pre-step action
     if (step.action) {
@@ -504,7 +547,7 @@ class GuidedTour {
 
     if (this.currentStep > 0) {
       const prevBtn = document.createElement('button');
-      prevBtn.className = 'p-button tour-btn-prev';
+      prevBtn.className = 'p-button p-button-secondary';
       prevBtn.textContent = '← Back';
       prevBtn.addEventListener('click', () => {
         this.currentStep--;
@@ -523,6 +566,20 @@ class GuidedTour {
     leftGroup.appendChild(nextBtn);
 
     footer.appendChild(leftGroup);
+
+    // The only way out used to be the popup's × titled "Close popup", on a
+    // 14-step tour that replaced the user's graph with sample data to start.
+    if (!isLast) {
+      const skipBtn = document.createElement('button');
+      skipBtn.className = 'p-button p-button-secondary tour-btn-skip';
+      skipBtn.textContent = 'Skip tour';
+      skipBtn.title = 'End the tour here';
+      skipBtn.addEventListener('click', () => {
+        this.cleanup();
+        this.finish();
+      });
+      footer.insertBefore(skipBtn, leftGroup);
+    }
 
     content.appendChild(footer);
 
@@ -545,6 +602,7 @@ class GuidedTour {
       width: '460px',
       showFullscreenButton: false,
       closeOnClickOutside: false,
+      closeTitle: 'Exit tour',
       onClose: () => {
         // Popup.close() fires onClose unconditionally — including when we
         // programmatically close mid-transition. cleanup() sets this flag
@@ -720,147 +778,52 @@ class GuidedTour {
 
   async executeAction(action) {
     switch (action) {
+      // Workbench tabs never close each other, so every "open X" step is one
+      // call — the old close-the-other-editor dances are gone with the
+      // exclusive bottom-bar slot.
       case 'openMetricsPanel': {
-        // Styling now precedes metrics in the tour; close its right sidebar so
-        // it doesn't linger over the panels demoed in the later steps.
-        const rightSidebar = document.getElementById('rightSidebar');
-        if (rightSidebar && rightSidebar.classList.contains('active')) {
-          this.cache.ui.toggleStylingPanel();
-          await this.sleep(350);
-        }
-        const metricsPanel = document.getElementById('networkMetricsContainer');
-        if (metricsPanel && !metricsPanel.classList.contains('open')) {
-          this.cache.metrics.toggleUI();
-        }
+        this.cache.workbench?.show('metrics');
         await this.sleep(350);
         break;
       }
       case 'openQueryEditor': {
-        // close metrics panel if open
-        const metricsPanel2 = document.getElementById('networkMetricsContainer');
-        if (metricsPanel2 && metricsPanel2.classList.contains('open')) {
-          this.cache.metrics.toggleUI();
-          await this.sleep(350);
-        }
-        // close data editor first if open
-        const dataBtn = document.getElementById('dataToggleBtn');
-        if (dataBtn && dataBtn.classList.contains('highlight')) {
-          await this.cache.ui.toggleDataEditor();
-          await this.sleep(350);
-        }
-        const queryBtn = document.getElementById('queryToggleBtn');
-        if (queryBtn && !queryBtn.classList.contains('highlight')) {
-          this.cache.ui.toggleQueryEditor();
-        }
+        this.cache.workbench?.show('query');
         await this.sleep(350);
         break;
       }
       case 'openDataEditor': {
-        // close metrics panel if open
-        const metricsPanel3 = document.getElementById('networkMetricsContainer');
-        if (metricsPanel3 && metricsPanel3.classList.contains('open')) {
-          this.cache.metrics.toggleUI();
-          await this.sleep(350);
-        }
-        // close query editor first if open
-        const queryBtn = document.getElementById('queryToggleBtn');
-        if (queryBtn && queryBtn.classList.contains('highlight')) {
-          this.cache.ui.toggleQueryEditor();
-          await this.sleep(350);
-        }
-        const dataBtn = document.getElementById('dataToggleBtn');
-        if (dataBtn && !dataBtn.classList.contains('highlight')) {
-          await this.cache.ui.toggleDataEditor();
-        }
+        this.cache.workbench?.show('data');
         await this.sleep(350);
         break;
       }
       case 'openAssistantPanel': {
-        // Bottom-bar editors compete visually with the right sidebar, so
-        // close them first to give the assistant panel a clean stage.
-        const queryBtn = document.getElementById('queryToggleBtn');
-        if (queryBtn && queryBtn.classList.contains('highlight')) {
-          this.cache.ui.toggleQueryEditor();
-          await this.sleep(350);
-        }
-        const dataBtn = document.getElementById('dataToggleBtn');
-        if (dataBtn && dataBtn.classList.contains('highlight')) {
-          await this.cache.ui.toggleDataEditor();
-          await this.sleep(350);
-        }
-        const panel = document.getElementById('assistantSidebar');
-        if (panel && !panel.classList.contains('active')) {
-          // suppressSetup avoids firing the first-run modal mid-tour — users
-          // who skipped setup still get to see the panel UI here.
+        // suppressSetup avoids firing the first-run modal mid-tour — users who
+        // skipped setup still get to see the tab.
+        if (!this.cache.workbench?.isTabOpen('assistant')) {
           this.cache.assistant.togglePanel({ suppressSetup: true });
         }
         await this.sleep(350);
         break;
       }
-      case 'expandSelectionEditor': {
-        const container = document.getElementById('selectedElementsContainer');
-        if (container && !container.classList.contains('expanded')) {
-          this.cache.ui.toggleSelectionEditor();
-        }
+      case 'openSelectionContext': {
+        this.cache.inspector?.setContext('selection');
         await this.sleep(350);
         break;
       }
-      case 'openStylingPanel': {
-        // collapse selection editor if open
-        const selContainer = document.getElementById('selectedElementsContainer');
-        if (selContainer && selContainer.classList.contains('expanded')) {
-          this.cache.ui.toggleSelectionEditor();
-          await this.sleep(350);
-        }
-        // close data editor first if open
-        const dataBtn = document.getElementById('dataToggleBtn');
-        if (dataBtn && dataBtn.classList.contains('highlight')) {
-          await this.cache.ui.toggleDataEditor();
-          await this.sleep(350);
-        }
-        // close assistant panel — both panels compete for the right sidebar
-        // real estate; only one should be visible at a time.
-        const assistantBtn = document.getElementById('assistantToggleBtn');
-        if (assistantBtn && assistantBtn.classList.contains('highlight')) {
-          this.cache.assistant.togglePanel({ suppressSetup: true });
-          await this.sleep(350);
-        }
-        const styleBtn = document.getElementById('styleToggleBtn');
-        const rightSidebar = document.getElementById('rightSidebar');
-        if (rightSidebar && !rightSidebar.classList.contains('active')) {
-          this.cache.ui.toggleStylingPanel();
-        }
+      case 'openOverlaysContext': {
+        this.cache.inspector?.setContext('overlays');
         await this.sleep(350);
         break;
       }
-      case 'collapseSelectionPanel': {
-        // Collapse the selection HUD so the canvas step reads cleanly. Toggle
-        // the class directly (not the HUD's hide()) so we don't persist the
-        // hidden preference, and remember the pre-tour state to restore it.
-        const container = document.getElementById('selectedElementsContainer');
-        const restore = document.getElementById('selHudRestoreBtn');
-        if (container) {
-          this._selPanelWasHidden = container.classList.contains('hidden');
-          this._selPanelCollapsedByTour = true;
-          container.classList.add('hidden');
-          restore?.classList.add('visible');
-        }
-        await this.sleep(250);
+      case 'showAppearance': {
+        // The workbench covers the lower stage, not the inspector, so it can
+        // stay open — but a tall one crowds the step's popup.
+        this.cache.workbench?.close();
+        this.cache.inspector?.showAppearance();
+        await this.sleep(350);
         break;
       }
     }
-  }
-
-  // Re-expand the selection panel if the tour collapsed it, honoring whatever
-  // state the user had it in before the tour started.
-  restoreSelectionPanel() {
-    if (!this._selPanelCollapsedByTour) return;
-    this._selPanelCollapsedByTour = false;
-    if (this._selPanelWasHidden) return;
-    const container = document.getElementById('selectedElementsContainer');
-    const restore = document.getElementById('selHudRestoreBtn');
-    container?.classList.remove('hidden');
-    restore?.classList.remove('visible');
   }
 
   sleep(ms) {
@@ -893,33 +856,10 @@ class GuidedTour {
 
   finish() {
     this.cleanup();
-    this.restoreSelectionPanel();
 
-    // close any open panels
-    const metricsPanel = document.getElementById('networkMetricsContainer');
-    if (metricsPanel && metricsPanel.classList.contains('open')) {
-      this.cache.metrics.toggleUI();
-    }
-    const dataBtn = document.getElementById('dataToggleBtn');
-    if (dataBtn && dataBtn.classList.contains('highlight')) {
-      this.cache.ui.toggleDataEditor();
-    }
-    const queryBtn = document.getElementById('queryToggleBtn');
-    if (queryBtn && queryBtn.classList.contains('highlight')) {
-      this.cache.ui.toggleQueryEditor();
-    }
-    const rightSidebar = document.getElementById('rightSidebar');
-    if (rightSidebar && rightSidebar.classList.contains('active')) {
-      this.cache.ui.toggleStylingPanel();
-    }
-    const selContainer = document.getElementById('selectedElementsContainer');
-    if (selContainer && selContainer.classList.contains('expanded')) {
-      this.cache.ui.toggleSelectionEditor();
-    }
-    const assistantBtn = document.getElementById('assistantToggleBtn');
-    if (assistantBtn && assistantBtn.classList.contains('highlight')) {
-      this.cache.assistant.togglePanel({ suppressSetup: true });
-    }
+    // Put the shell back the way a fresh load leaves it.
+    this.cache.workbench?.close();
+    this.cache.inspector?.setContext('filters');
   }
 }
 

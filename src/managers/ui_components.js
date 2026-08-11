@@ -1,5 +1,6 @@
-import { DEFAULTS } from '../config.js';
+import { attachGroupMenu } from './group_menu.js';
 import { StaticUtilities } from '../utilities/static.js';
+import { computeDropdownPlacement } from '../utilities/popover_position.js';
 
 class DropdownChecklist {
   constructor(propID, cache) {
@@ -122,7 +123,7 @@ class DropdownChecklist {
         : this.selectedCategories.delete(ev.target.value);
       this.anchor.textContent = `${this.selectedCategories.size}/${this.categories.size} selected`;
       await this.cache.fm.handleFilterEvent(
-        ev.target.checked ? 'Showing' : 'Hiding' + ' Elements',
+        `${ev.target.checked ? 'Showing' : 'Hiding'} Elements`,
         `Nodes and related edges for ${this.propID} ${ev.target.value}`,
         this.propID
       );
@@ -142,7 +143,7 @@ class DropdownChecklist {
       this.itemsList.style.display = '';
       this.itemsList.style.visibility = '';
 
-      const { left, top, maxHeight } = StaticUtilities.computeDropdownPlacement({
+      const { left, top, maxHeight } = computeDropdownPlacement({
         anchorRect: this.anchor.getBoundingClientRect(),
         dropdownHeight,
         viewportHeight: window.innerHeight,
@@ -248,6 +249,108 @@ class DropdownChecklist {
   }
 }
 
+/**
+ * Three-state Any / True / False segment for boolean-classified properties.
+ * State lives in the layout filter's `categories` Set (mutated in
+ * place, like DropdownChecklist): Any = {'true','false'}, True = {'true'},
+ * False = {'false'} — so query generation, narrowing checks, and JSON
+ * persistence reuse the categorical machinery unchanged.
+ */
+class BooleanToggle {
+  static STATES = [
+    ['any', 'Any', ['true', 'false']],
+    ['true', 'True', ['true']],
+    ['false', 'False', ['false']],
+  ];
+
+  constructor(propID, cache) {
+    this.propID = propID;
+    this.cache = cache;
+    this.selectedCategories =
+      this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID).categories;
+    this.cache.propIDToBooleanToggles.set(propID, this);
+  }
+
+  state() {
+    const hasTrue = this.selectedCategories.has('true');
+    const hasFalse = this.selectedCategories.has('false');
+    if (hasTrue && !hasFalse) return 'true';
+    if (hasFalse && !hasTrue) return 'false';
+    return 'any';
+  }
+
+  appendTo(parent) {
+    this.container = document.createElement('div');
+    this.container.id = this.propID + '-bool-toggle';
+    this.container.className = 'filter-join-toggle filter-bool-toggle';
+    this.container.setAttribute('role', 'group');
+    this.container.setAttribute('aria-label', 'Filter by boolean value');
+    this.segments = new Map();
+
+    for (const [key, label] of BooleanToggle.STATES) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'filter-join-segment';
+      btn.textContent = label;
+      btn.title = `Show elements where this property is ${key === 'any' ? 'true or false' : key}`;
+      btn.addEventListener('click', async () => await this.handleSelection(key));
+      this.segments.set(key, btn);
+      this.container.appendChild(btn);
+    }
+
+    this.updateSegments();
+    parent.appendChild(this.container);
+  }
+
+  // Interface parity with DropdownChecklist / InvertibleRangeSlider —
+  // BooleanToggle wires its listeners in appendTo.
+  appendListeners() {}
+
+  updateSegments() {
+    if (!this.segments) return; // not rendered (e.g. sync before appendTo)
+    const current = this.state();
+    for (const [key, btn] of this.segments.entries()) {
+      const active = key === current;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    }
+  }
+
+  #setState(key) {
+    const values = BooleanToggle.STATES.find(([k]) => k === key)[2];
+    this.selectedCategories.clear();
+    for (const value of values) this.selectedCategories.add(value);
+    this.updateSegments();
+  }
+
+  async handleSelection(key) {
+    if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
+    if (key === this.state()) return;
+    this.#setState(key);
+    await this.cache.fm.handleFilterEvent(
+      'Filtering Elements',
+      `${this.propID} is ${key === 'any' ? 'true or false' : key}`
+    );
+  }
+
+  // Sync from a manual query (no filter event — the query drives rendering).
+  // Called once per IS TRUE / IS FALSE leaf; two leaves for the same property
+  // union to Any. resetToAny() runs before each sync pass, so the sequence
+  // any → first leaf narrows → second leaf widens back is always correct.
+  applyFromQuery(value) {
+    const current = this.state();
+    if (current === 'any') {
+      this.#setState(value);
+    } else if (current !== value) {
+      this.#setState('any');
+    }
+  }
+
+  resetToAny() {
+    this.#setState('any');
+  }
+}
+
 class InvertibleRangeSlider {
   constructor(propID, cache) {
     this.propID = propID;
@@ -256,7 +359,7 @@ class InvertibleRangeSlider {
     this.readCurrentFilterSettings();
     this.sliderMin = defaultFilterData.lowerThreshold;
     this.sliderMax = defaultFilterData.upperThreshold;
-    const allInteger =
+    this.allInteger =
       StaticUtilities.isInteger(this.sliderMin) &&
       StaticUtilities.isInteger(this.sliderMax) &&
       !defaultFilterData.hasFloatValues;
@@ -265,7 +368,20 @@ class InvertibleRangeSlider {
     // any high-decimal value) stays exactly selectable via both the slider and
     // the number box, at any column magnitude. A fixed absolute step floored
     // the reachable max below the true max and broke selection of the top node.
-    this.stepSize = allInteger ? this.cache.CFG.FILTER_STEP_SIZE_INTEGER : 'any';
+    this.stepSize = this.allInteger ? this.cache.CFG.FILTER_STEP_SIZE_INTEGER : 'any';
+    // One fixed box width per slider, sized to the widest value it can show.
+    // Sizing the box to the CURRENT value made the track (a flex sibling)
+    // shrink and grow mid-drag, so the thumb jumped under the cursor — worst
+    // near 0 on float columns, where "0" ↔ "0.050" oscillated every frame.
+    // The endpoints bound every in-range value's formatted length: the sign
+    // comes from min, integer digits from the larger magnitude, and decimals
+    // are fixed-width. +1 because `size` counts average character widths and
+    // digits are narrower than average, so an exact count clips the last glyph.
+    this.boxSize = Math.max(
+      3,
+      String(this.formatThreshold(this.sliderMin)).length + 1,
+      String(this.formatThreshold(this.sliderMax)).length + 1
+    );
     this.initializeIds();
     this.inputStart = null;
     this.inputEnd = null;
@@ -283,8 +399,6 @@ class InvertibleRangeSlider {
     this.rangeId = `${this.sliderId}-range`;
     this.thumbStartId = `${this.sliderId}-thumb-start`;
     this.thumbEndId = `${this.sliderId}-thumb-end`;
-    this.labelStartId = `${this.sliderIdStart}-label`;
-    this.labelEndId = `${this.sliderIdEnd}-label`;
   }
 
   readCurrentFilterSettings() {
@@ -328,54 +442,80 @@ class InvertibleRangeSlider {
     this.range = document.getElementById(this.rangeId);
     this.thumbStart = document.getElementById(this.thumbStartId);
     this.thumbEnd = document.getElementById(this.thumbEndId);
-    this.labelStart = document.getElementById(this.labelStartId);
-    this.labelEnd = document.getElementById(this.labelEndId);
-    // The value bubbles ([sign]) and their track parent — positioned with
-    // position:fixed (see positionSigns) so they can extend past the sidebar's
-    // clipped edges into the canvas; z-index alone cannot escape overflow.
-    this.signLeft = this.labelStart ? this.labelStart.parentElement : null;
-    this.signRight = this.labelEnd ? this.labelEnd.parentElement : null;
-    this.track = this.range ? this.range.parentElement : null;
   }
 
-  // Pins the hover value bubbles to the track ends in viewport coordinates so
-  // they render above everything and are not clipped by the sidebar's
-  // overflow. Recomputed on hover and on scroll/resize while hovered.
-  positionSigns() {
-    if (!this.track || !this.signLeft || !this.signRight) return;
-    const r = this.track.getBoundingClientRect();
-    if (r.width === 0) return; // not laid out yet
-    const midY = r.top + r.height / 2;
-    const lw = this.signLeft.offsetWidth,
-      lh = this.signLeft.offsetHeight;
-    const rw = this.signRight.offsetWidth,
-      rh = this.signRight.offsetHeight;
-    this.signLeft.style.top = `${midY - lh / 2}px`;
-    this.signLeft.style.left = `${Math.max(2, r.left - lw - 8)}px`;
-    this.signRight.style.top = `${midY - rh / 2}px`;
-    this.signRight.style.left = `${Math.min(window.innerWidth - rw - 2, r.right + 8)}px`;
+  /**
+   * Rounded for display; the raw value comes back while the box has focus.
+   * Float columns pad integer-valued numbers to the same fixed precision
+   * ("0" → "0.000") so a slider's two boxes always read — and measure — alike.
+   */
+  formatThreshold(value) {
+    const precision = this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION;
+    return this.allInteger
+      ? StaticUtilities.formatNumber(value, precision)
+      : parseFloat(value).toFixed(precision);
   }
 
-  createSliderInput(id, initialValue, relatedSliderId) {
+  createSliderInput(id, initialValue, relatedSliderId, readExact) {
     const input = document.createElement('input');
     input.id = id;
-    input.value = initialValue;
+    input.size = this.boxSize;
+    input.value = this.formatThreshold(initialValue);
+    // A column of raw floats ("-51.82279968") is what made this row need a
+    // line of its own. Rounded at rest, exact the moment you go to edit it —
+    // nothing is hidden and the true value stays reachable. The exact value
+    // comes from the widget's own state rather than the range input, which
+    // holds the same number but only as a string the browser may re-round.
+    // Growing for the exact value is safe here: focus never coincides with a
+    // thumb drag, so the track can't shift under the cursor.
+    input.addEventListener('focus', () => {
+      const exact = String(readExact());
+      input.value = exact;
+      input.size = Math.max(this.boxSize, exact.length + 1);
+      input.select();
+    });
+    // Enter and blur apply the same way: a typed number that stays on screen
+    // but never reaches the filter is the one outcome nobody can read.
+    const applyTyped = () => {
+      if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
+      const typed = parseFloat(input.value);
+      // Non-numeric text has no value to apply — the caller restores the real
+      // one rather than rendering "NaN". Silently, until now: the invalid text
+      // stayed on screen, the filter never moved, and only a blur put it back.
+      if (isNaN(typed)) {
+        if (input.value.trim() !== '') {
+          this.cache.ui.warning(`"${input.value.trim()}" is not a number — threshold unchanged.`);
+        }
+        return;
+      }
+      // Equal once rounded means nothing changed at display precision. Skipping
+      // keeps a plain focus-and-leave (and a blur right after Enter) from
+      // re-firing the filter or rounding the exact value down behind the user.
+      if (this.formatThreshold(typed) === this.formatThreshold(readExact())) return;
+      // Out of range is corrected rather than silently reverted, matching what
+      // setTo() does for the same value arriving from a query.
+      const clamped = StaticUtilities.clamp(typed, this.sliderMin, this.sliderMax);
+      if (clamped !== typed) {
+        this.cache.ui.warning(
+          `Threshold for ${this.propID} corrected to ${this.formatThreshold(clamped)} (from ${typed})`
+        );
+      }
+      const sliderElem = document.getElementById(relatedSliderId);
+      sliderElem.value = clamped;
+      sliderElem.dispatchEvent(new Event('input'));
+      sliderElem.dispatchEvent(new Event('change'));
+    };
+    input.addEventListener('blur', () => {
+      applyTyped();
+      input.value = this.formatThreshold(readExact());
+      input.size = this.boxSize;
+    });
     input.addEventListener('keydown', (ev) => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
         ev.preventDefault();
         return;
       }
-      if (ev.key === 'Enter') {
-        let newValue = parseFloat(input.value);
-        const sliderElem = document.getElementById(relatedSliderId);
-        if (isNaN(newValue) || newValue < this.sliderMin || newValue > this.sliderMax) {
-          input.value = sliderElem.value;
-        } else {
-          sliderElem.value = newValue;
-          sliderElem.dispatchEvent(new Event('input'));
-          sliderElem.dispatchEvent(new Event('change'));
-        }
-      }
+      if (ev.key === 'Enter') applyTyped();
     });
     return input;
   }
@@ -407,28 +547,39 @@ class InvertibleRangeSlider {
     slider.style.width = '100%';
     slider.title = `Set the thresholds for the numeric property: ${StaticUtilities.formatPropsAsTree(this.propID)}\n---\n  - Move handles to set min/max (≥ min ∧ ≤ max).\n  - Swap handles to invert (≤ min ∨ ≥ max).\n  - Double-click to reset.`;
 
-    // Min/max number boxes are always visible directly under the slider, so
-    // exact thresholds can be typed without a hidden "edit mode". They stay in
-    // sync with the handles via handleThresholdOnInputEvent (writes their values).
-    const inputRow = document.createElement('div');
-    inputRow.className = 'filter-input-row';
+    // The exact-value boxes sit at the two ends of the track, on the slider's
+    // own line. They used to be a second row under it, while a pair of
+    // position:fixed bubbles showed the SAME two numbers on hover — one value,
+    // drawn twice, one of the copies needing hover/scroll/resize listeners to
+    // stay pinned. Merging them halves the row height (~40px to ~22px) and
+    // deletes the whole fixed-positioning apparatus.
+    const row = document.createElement('div');
+    row.className = 'filter-range-row';
     this.inputStart = this.createSliderInput(
       this.sliderIdStartInput,
       this.currentMin,
-      this.sliderIdStart
+      this.sliderIdStart,
+      () => this.currentMin
     );
     this.inputStart.title = 'Lower threshold — type an exact value and press Enter';
+    this.inputStart.setAttribute('aria-label', `${this.propLabel()} — lower threshold`);
     this.inputEnd = this.createSliderInput(
       this.sliderIdEndInput,
       this.currentMax,
-      this.sliderIdEnd
+      this.sliderIdEnd,
+      () => this.currentMax
     );
     this.inputEnd.title = 'Upper threshold — type an exact value and press Enter';
-    inputRow.appendChild(this.inputStart);
-    inputRow.appendChild(this.inputEnd);
+    this.inputEnd.setAttribute('aria-label', `${this.propLabel()} — upper threshold`);
+    row.append(this.inputStart, slider, this.inputEnd);
 
-    parent.appendChild(slider);
-    parent.appendChild(inputRow);
+    parent.appendChild(row);
+    this.rangeRow = row;
+  }
+
+  /** Bare property name, for the inputs' accessible names. */
+  propLabel() {
+    return StaticUtilities.decodePropHashId(this.propID).slice(-1)[0];
   }
 
   createSingleValueIndicator() {
@@ -450,6 +601,11 @@ class InvertibleRangeSlider {
   }
 
   createDivInnerHTML() {
+    // Both thumbs are bare range inputs; without a name a screen reader
+    // announces two anonymous sliders and no way to tell them apart.
+    const prop = StaticUtilities.escapeHtml(
+      StaticUtilities.decodePropHashId(this.propID).slice(-1)[0]
+    );
     return `
       <div slider id="${this.sliderId}">
         <div>
@@ -459,17 +615,11 @@ class InvertibleRangeSlider {
                  right:${100 - this.calcPercentage(this.currentMax)}%;"></div>
           <span id="${this.thumbStartId}" thumb style="left:${this.calcPercentage(this.currentMin)}%;"></span>
           <span id="${this.thumbEndId}" thumb style="left:${this.calcPercentage(this.currentMax)}%;"></span>
-          <div sign class="left">
-            <span id="${this.labelStartId}">${StaticUtilities.formatNumber(this.currentMin, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION)}</span>
-          </div>
-          <div sign class="right">
-            <span id="${this.labelEndId}">${StaticUtilities.formatNumber(this.currentMax, this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION)}</span>
-          </div>
         </div>
-        <input type="range" tabindex="0" value="${this.currentMin}" max="${this.sliderMax}" min="${this.sliderMin}" 
-          step="${this.stepSize}" id="${this.sliderIdStart}" />
-        <input type="range" tabindex="0" value="${this.currentMax}" max="${this.sliderMax}" min="${this.sliderMin}" 
-          step="${this.stepSize}" id="${this.sliderIdEnd}" />
+        <input type="range" tabindex="0" value="${this.currentMin}" max="${this.sliderMax}" min="${this.sliderMin}"
+          step="${this.stepSize}" id="${this.sliderIdStart}" aria-label="${prop} — lower threshold" />
+        <input type="range" tabindex="0" value="${this.currentMax}" max="${this.sliderMax}" min="${this.sliderMin}"
+          step="${this.stepSize}" id="${this.sliderIdEnd}" aria-label="${prop} — upper threshold" />
       </div>
     `;
   }
@@ -477,19 +627,6 @@ class InvertibleRangeSlider {
   appendListeners() {
     if (!this.isValidSlider) return;
     this.getDOMReferences();
-
-    // Position the fixed value bubbles on hover; keep them pinned while the
-    // sidebar scrolls or the window resizes during the hover.
-    const reposition = () => this.positionSigns();
-    this.slider.addEventListener('mouseenter', () => {
-      this.positionSigns();
-      window.addEventListener('scroll', reposition, true);
-      window.addEventListener('resize', reposition);
-    });
-    this.slider.addEventListener('mouseleave', () => {
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    });
 
     this.slider.addEventListener('dblclick', () => {
       this.reset();
@@ -553,29 +690,11 @@ class InvertibleRangeSlider {
       this.range.style.left = '50%';
       this.inverseLeft.style.backgroundColor = '#C33D35';
       this.inverseRight.style.backgroundColor = '#C33D35';
-      if (isLower) {
-        this.labelEnd.innerHTML = StaticUtilities.formatNumber(
-          primaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-        this.labelStart.innerHTML = StaticUtilities.formatNumber(
-          secondaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-      } else {
-        this.labelStart.innerHTML = StaticUtilities.formatNumber(
-          primaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-        this.labelEnd.innerHTML = StaticUtilities.formatNumber(
-          secondaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-      }
-
-      this.labelStart.parentElement.classList.add('flipped');
-      this.labelEnd.parentElement.classList.add('flipped');
-
+      // Inverted means sliderStart holds the HIGHER value, so its box belongs
+      // at the right-hand end of the track. Each box still drives its own
+      // handle; only the visual order swaps, which is what the retired bubbles
+      // used their own `flipped` class for.
+      this.rangeRow?.classList.add('flipped');
       this.inputStart.classList.add('red');
       this.inputEnd.classList.add('red');
     } else {
@@ -587,47 +706,28 @@ class InvertibleRangeSlider {
       this.inverseRight.style.width = rightPos + '%';
       this.inverseLeft.style.backgroundColor = 'grey';
       this.inverseRight.style.backgroundColor = 'grey';
-      if (isLower) {
-        this.labelStart.innerHTML = StaticUtilities.formatNumber(
-          primaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-        this.labelEnd.innerHTML = StaticUtilities.formatNumber(
-          secondaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-      } else {
-        this.labelStart.innerHTML = StaticUtilities.formatNumber(
-          secondaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-        this.labelEnd.innerHTML = StaticUtilities.formatNumber(
-          primaryValue,
-          this.cache.CFG.FILTER_VISUAL_FLOAT_PRECISION
-        );
-      }
-
-      this.labelStart.parentElement.classList.remove('flipped');
-      this.labelEnd.parentElement.classList.remove('flipped');
-
+      this.rangeRow?.classList.remove('flipped');
       this.inputStart.classList.remove('red');
       this.inputEnd.classList.remove('red');
     }
 
+    const box = isLower ? this.sliderStartInput : this.sliderEndInput;
     if (isLower) {
       this.thumbStart.style.left = this.calcPercentage(primaryValue) + '%';
-      this.sliderStartInput.value = primaryValue;
       this.currentMin = primaryValue;
     } else {
       this.thumbEnd.style.left = this.calcPercentage(primaryValue) + '%';
-      this.sliderEndInput.value = primaryValue;
       this.currentMax = primaryValue;
+    }
+    // Never overwrite the box being typed into; its own blur reformats it.
+    if (box && document.activeElement !== box) {
+      box.value = this.formatThreshold(primaryValue);
     }
   }
 
   setTo(min, max, inverted) {
-    const clampedMin = Math.min(Math.max(min, this.sliderMin), this.sliderMax);
-    const clampedMax = Math.min(Math.max(max, this.sliderMin), this.sliderMax);
+    const clampedMin = StaticUtilities.clamp(min, this.sliderMin, this.sliderMax);
+    const clampedMax = StaticUtilities.clamp(max, this.sliderMin, this.sliderMax);
 
     if (!inverted && min > max) {
       this.cache.ui.error(
@@ -687,6 +787,13 @@ class UIComponentManager {
         ? 'group: ' + '\n └─ ' + section + '\n        └─ ' + subSection
         : 'section: ' + '\n └─ ' + section
     }`;
+    // The rendered text is a bare ✔/✗ glyph, so the group has to be spelled out
+    // for screen readers — and for the command palette, which indexes controls
+    // by their accessible name.
+    btn.setAttribute(
+      'aria-label',
+      `${enable ? 'Enable' : 'Disable'} all filters: ${subSection ? `${section} › ${subSection}` : section}`
+    );
     btn.onclick = async () => {
       subSection
         ? await this.cache.ui.toggleSubSection(enable, section, subSection)
@@ -705,94 +812,142 @@ class UIComponentManager {
         ? 'group to their default values: ' + '\n └─ ' + section + '\n        └─ ' + subSection
         : 'section to their default values: ' + '\n └─ ' + section
     }`;
+    btn.setAttribute(
+      'aria-label',
+      `Reset all filters: ${subSection ? `${section} › ${subSection}` : section}`
+    );
     btn.onclick = async () => {
       await this.cache.fm.resetFilters(section, subSection);
     };
     return btn;
   }
 
-  createCircleGroupButtonWithQuadrants(propID) {
-    const circleButton = document.createElement('div');
-    circleButton.className = `circle-button`;
+  /**
+   * The per-filter-row group control. One dot that opens the shared group
+   * checklist, replacing a 2×2 quadrant pie that could only ever address four
+   * groups and never said which four.
+   *
+   * ponytail: at 18px in `filter-row-col3` the dot shows ONE colour plus a ring
+   * meaning "and others" — N colours are not legible at this size, and a conic
+   * pie would just rebuild the wedges this replaced. Exact membership is in the
+   * tooltip and the menu. Give it more room and it could show a colour stack.
+   *
+   * @param {string} propID
+   */
+  createGroupChip(propID) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'group-chip';
+    chip.dataset.prop = propID;
 
-    for (let [group, quadrantPosition] of Object.entries(
-      DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS
-    )) {
-      const quadrant = document.createElement('button');
-      quadrant.classList.add('quadrant');
-      quadrant.classList.add(quadrantPosition);
-      this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID)[`${group}Members`]
-        .size === 0
-        ? quadrant.classList.remove('active')
-        : quadrant.classList.add('active');
+    attachGroupMenu(chip, this.cache, () => ({
+      isChecked: (group) => this.#propsOf(group).has(propID),
+      onToggle: async (group) => {
+        const props = this.#propsOf(group);
+        props.has(propID) ? props.delete(propID) : props.add(propID);
+        this.refreshGroupChips();
+        await this.cache.gcm.decideToRenderOrDraw();
+        // Awaited: unawaited, a rejection here was an unhandled promise with no
+        // error toast, and rapid toggles interleaved redraw and history.commit.
+        await this.cache.bs.afterMembershipChange(`Bubble group membership (${group})`);
+      },
+      onNew: async () => {
+        const label = this.#groupNameForProp(propID);
+        const group = this.cache.bs.createGroup({ name: label, fromProp: propID });
+        if (!group) return;
+        this.cache.bs.tuneGroupGeometry?.(group);
+        this.refreshGroupChips();
+        await this.cache.gcm.decideToRenderOrDraw();
+        await this.cache.bs.afterMembershipChange(`New bubble group (${label})`);
+        const count = this.cache.bs.getEffectiveGroupMembers(group).size;
+        this.cache.ui.info(
+          `Created group "${label}" (${count} node${count === 1 ? '' : 's'}) — ` +
+            `style it under Overlays › Groups`
+        );
+      },
+      newLabel: 'New group from this filter',
+      emptyHint: 'A group draws a coloured bubble around the nodes you put in it.',
+    }));
 
-      quadrant.addEventListener('click', async () => {
-        try {
-          let shouldShowRemove = quadrant.classList.contains('active');
-          let members =
-            this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID)[
-              `${group}Members`
-            ];
-
-          if (shouldShowRemove) {
-            this.cache.data.layouts[this.cache.data.selectedLayout][`${group}Props`].delete(propID);
-            quadrant.title = `Remove ${propID} from ${group}.`;
-            members.delete(propID);
-            quadrant.classList.remove('active');
-            await this.cache.gcm.decideToRenderOrDraw();
-          } else {
-            this.cache.data.layouts[this.cache.data.selectedLayout][`${group}Props`].add(propID);
-            quadrant.title = `Highlight ${propID} and add to bubble-group (${group})`;
-            members.add(propID);
-            quadrant.classList.add('active');
-            await this.cache.gcm.decideToRenderOrDraw();
-          }
-        } catch (err) {
-          this.cache.ui.error(`Failed to update bubble set group: ${err.message}`);
-        }
-      });
-
-      quadrant.title = `Highlight ${propID} and add to bubble-group (${group})`;
-      circleButton.appendChild(quadrant);
-    }
-
-    return circleButton;
+    this.paintGroupChip(chip);
+    return chip;
   }
 
-  createManualBubbleGroupButton() {
-    const circleButton = document.createElement('div');
-    circleButton.className = `circle-button-compact`;
-    circleButton.id = 'manualBubbleGroupButton';
+  /** "Node filters › Topology › degree" — the full path, for tooltips. */
+  #readableProp(propID) {
+    const [section, subSection, prop] = StaticUtilities.decodePropHashId(propID);
+    return [section, subSection, prop].filter(Boolean).join(' › ');
+  }
 
-    for (let [group, quadrantPosition] of Object.entries(
-      DEFAULTS.BUBBLE_GROUP_QUADRANT_POSITIONS
-    )) {
-      const quadrant = document.createElement('button');
-      quadrant.classList.add('quadrant');
-      quadrant.classList.add(quadrantPosition);
-      quadrant.classList.add('manual');
-      quadrant.classList.add('compact');
+  /**
+   * The same path without its section. A group made from a filter is named
+   * with this: the section is always "Node filters"/"Edge filters", which is
+   * noise inside a group list where every entry would carry it.
+   */
+  #groupNameForProp(propID) {
+    const [, subSection, prop] = StaticUtilities.decodePropHashId(propID);
+    return [subSection, prop].filter(Boolean).join(' › ') || propID;
+  }
 
-      quadrant.addEventListener('click', async () => {
-        try {
-          await this.cache.bs.toggleSelectedNodesInManualGroup(group);
-        } catch (err) {
-          this.cache.ui.error(`Failed to update manual bubble group: ${err.message}`);
-        }
-      });
+  /** `${group}Props` for the selected workspace, the single membership store. */
+  #propsOf(group) {
+    const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
+    if (!layout[`${group}Props`]) layout[`${group}Props`] = new Set();
+    return layout[`${group}Props`];
+  }
 
-      quadrant.title = `Toggle selected nodes in manual ${group}`;
-      circleButton.appendChild(quadrant);
+  /**
+   * Paint one chip from current membership: hairline when unassigned, the
+   * group's colour when in one, plus a ring when in several. The full list of
+   * groups goes in the accessible name, which is where it stays legible.
+   */
+  paintGroupChip(chip) {
+    const propID = chip.dataset.prop;
+    const styles =
+      this.cache.data?.layouts?.[this.cache.data?.selectedLayout]?.bubbleSetStyle ?? {};
+    const inGroups = [];
+    for (const group of this.cache.bs.traverseBubbleSets()) {
+      if (this.#propsOf(group).has(propID)) inGroups.push(group);
     }
 
-    return circleButton;
+    chip.classList.toggle('assigned', inGroups.length > 0);
+    chip.classList.toggle('multi', inGroups.length > 1);
+    chip.style.removeProperty('--chip-color');
+    chip.style.removeProperty('--chip-border');
+    if (inGroups.length > 0) {
+      // Fill AND stroke, so the chip is a miniature of the bubble it stands
+      // for rather than a flat dot that only carries half the group's look.
+      const style = styles[inGroups[0]] ?? {};
+      chip.style.setProperty('--chip-color', style.fill ?? 'currentColor');
+      chip.style.setProperty('--chip-border', style.stroke || style.fill || 'currentColor');
+    }
+
+    const names = inGroups.map((g) => styles[g]?.labelText || g);
+    const readable = this.#readableProp(propID);
+    chip.title = names.length
+      ? `Assign nodes matching ${readable} to a group — currently in ${names.join(', ')}`
+      : `Assign nodes matching ${readable} to a group`;
+    chip.setAttribute('aria-label', chip.title);
+  }
+
+  /**
+   * Repaint every chip in the filter panel. Membership changes from four other
+   * places (the group list, clears, auto-detect, undo), and rebuilding the
+   * whole filter UI to reflect a colour is far more than the change deserves.
+   */
+  refreshGroupChips() {
+    for (const chip of document.querySelectorAll('#filterContainer .group-chip')) {
+      this.paintGroupChip(chip);
+    }
   }
 
   buildToolTipText(nodeOrEdgeID, isEdge) {
     function initAndAddHeader() {
       const hasLabel = item.label && item.label !== item.id;
-      const title = hasLabel ? item.label : item.id;
-      const subtitle = hasLabel ? `<div class="tooltip-header-id">ID: ${item.id}</div>` : '';
+      const title = StaticUtilities.escapeHtml(hasLabel ? item.label : item.id);
+      const subtitle = hasLabel
+        ? `<div class="tooltip-header-id">ID: ${StaticUtilities.escapeHtml(item.id)}</div>`
+        : '';
 
       return `<div class="tooltip-header">
       <div class="tooltip-header-text">
@@ -814,7 +969,7 @@ class UIComponentManager {
 
     function addDescription() {
       if (item.description) {
-        tooltip += `<p class="tooltip-description">${item.description}</p>`;
+        tooltip += `<p class="tooltip-description">${StaticUtilities.escapeHtml(item.description)}</p>`;
       }
     }
 
@@ -945,11 +1100,13 @@ class UIComponentManager {
               tooltip += `</ul>`;
               startedList = false;
             }
-            tooltip += `<h5 class="tooltip-sub-section">${block.text}</h5><ul>`;
+            tooltip += `<h5 class="tooltip-sub-section">${StaticUtilities.escapeHtml(block.text)}</h5><ul>`;
             startedList = true;
             // Properties for this subSection
             for (const propItem of block.props) {
-              tooltip += `<li>${propItem.key}: <span class="red"><b>${propItem.value}</b></span></li>`;
+              const key = StaticUtilities.escapeHtml(propItem.key);
+              const value = StaticUtilities.escapeHtml(propItem.value);
+              tooltip += `<li>${key}: <span class="red"><b>${value}</b></span></li>`;
             }
           }
         }
@@ -983,6 +1140,9 @@ class UIComponentManager {
     const displayField = document.createElement('span');
     displayField.className = 'checkboxLabel';
     displayField.textContent = prop;
+    // No own title: the label clamps at two lines, but the wrapper tooltip
+    // (getCheckboxTT) already ends its └─ tree with the full property name —
+    // a second title here would swap tooltips mid-row.
 
     const updateCheckbox = () => {
       customCheckbox.textContent = input.checked ? '✔' : '';
@@ -1049,9 +1209,18 @@ class UIComponentManager {
       e.stopPropagation();
       const slider = this.cache.propIDToInvertibleRangeSliders.get(propID);
       const dropdown = this.cache.propIDToDropdownChecklists.get(propID);
+      const boolToggle = this.cache.propIDToBooleanToggles.get(propID);
 
       let queryFragment;
-      if (slider) {
+      if (boolToggle) {
+        // Same shape the query generator emits for a boolean filter
+        // (query.js): "Any" is both leaves ORed, not a missing condition.
+        const state = boolToggle.state();
+        queryFragment =
+          state === 'any'
+            ? `(${propID} IS TRUE) OR (${propID} IS FALSE)`
+            : `${propID} IS ${state === 'true' ? 'TRUE' : 'FALSE'}`;
+      } else if (slider) {
         if (this.cache.CFG.QUERY_BTN_USE_CURRENT_FILTER) {
           queryFragment = slider.isInverted
             ? `${propID} LOWER THAN ${slider.currentMax} OR GREATER THAN ${slider.currentMin}`
@@ -1085,6 +1254,12 @@ class UIComponentManager {
 
   getCheckboxTT(enable, propID) {
     return `Click to ${enable ? 'hide' : 'show'} elements with the property:${StaticUtilities.formatPropsAsTree(propID)}`;
+  }
+
+  /** An active-but-unnarrowed filter under AND: on, dimmed, and constraining
+   * nothing. The normal "click to hide elements" reads as a lie there. */
+  getInertCheckboxTT(propID) {
+    return `Not narrowed, so under AND it excludes nothing — narrow it, or switch to OR:${StaticUtilities.formatPropsAsTree(propID)}`;
   }
 
   createAddOrRemoveToSelectionGroup(propID) {
@@ -1130,4 +1305,4 @@ class UIComponentManager {
   }
 }
 
-export { DropdownChecklist, InvertibleRangeSlider, UIComponentManager };
+export { BooleanToggle, DropdownChecklist, InvertibleRangeSlider, UIComponentManager };

@@ -1,4 +1,5 @@
 import {Popup} from './popup.js';
+import {StaticUtilities} from './static.js';
 
 class NumericScalePicker {
   constructor(cache) {
@@ -37,7 +38,7 @@ class NumericScalePicker {
 
     const outputLabel = document.createElement('div');
     outputLabel.className = 'picker-range-label';
-    outputLabel.innerHTML = `Set <strong>${this.propertyName || 'output'}</strong> range:`;
+    outputLabel.innerHTML = `Set <strong>${StaticUtilities.escapeHtml(this.propertyName || 'output')}</strong> range:`;
     this.dom.outputLabel = outputLabel;
     rangeConfig.appendChild(outputLabel);
 
@@ -190,7 +191,7 @@ class NumericScalePicker {
 
       element?.features.forEach(f => {
         const filterObj = filters.get(f);
-        if (filterObj && !filterObj.isCategory) {
+        if (filterObj && !filterObj.isCategory && !filterObj.unusable) {
           available.add(f);
         }
       });
@@ -276,13 +277,15 @@ class NumericScalePicker {
 
     const totalElements = selectedElements.length;
     const elementTypeLabel = this.elementType === 'nodes' ? 'nodes' : 'edges';
-    const propertyDisplayName = metricSource
-      ? `${metricSource.label} (${metricSource.valueLabel})`
-      : (property.includes('::') ? property.split('::').pop() : property);
+    const propertyDisplayName = StaticUtilities.escapeHtml(
+      metricSource
+        ? `${metricSource.label} (${metricSource.valueLabel})`
+        : (property.includes('::') ? property.split('::').pop() : property)
+    );
 
     this.dom.infoSection.innerHTML = `
       <div class="picker-info-summary">
-        Scaling <strong>${this.propertyName || 'property'}</strong> for <strong>${elementsWithProperty}</strong> of <strong>${totalElements}</strong> ${elementTypeLabel}
+        Scaling <strong>${StaticUtilities.escapeHtml(this.propertyName || 'property')}</strong> for <strong>${elementsWithProperty}</strong> of <strong>${totalElements}</strong> ${elementTypeLabel}
       </div>
       <div class="picker-info-range">
         <strong>${propertyDisplayName}</strong> min: ${this.minValue.toFixed(2)}
@@ -293,7 +296,7 @@ class NumericScalePicker {
     this.dom.infoSection.style.display = '';
 
     if (this.dom.outputLabel) {
-      this.dom.outputLabel.innerHTML = `Set <strong>${this.propertyName || 'output'}</strong> range:`;
+      this.dom.outputLabel.innerHTML = `Set <strong>${StaticUtilities.escapeHtml(this.propertyName || 'output')}</strong> range:`;
     }
 
     this.dom.rangeConfig.style.display = '';

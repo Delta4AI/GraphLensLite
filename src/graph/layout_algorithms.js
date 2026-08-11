@@ -1,5 +1,5 @@
 /**
- * Node-safe layout execution (MIGRATION.md Phase 5).
+ * Node-safe layout execution.
  *
  * Maps the app's layout vocabulary (config LAYOUT_INTERNALS: force, circular,
  * circlepack, radial, concentric, grid, random, mds, dagre) onto graphology
@@ -260,6 +260,64 @@ export function layoutSelectionSubgraph(nodes, edges, type, center) {
     positions.set(id, { x: center.x + (attrs.x - avgX), y: center.y + (attrs.y - avgY) });
   });
   return positions;
+}
+
+// Pinned settle: FA2 iterations run per animation tick; a few per frame read
+// as motion without hogging the frame at the sizes merges target.
+const SETTLE_ITERATIONS_PER_TICK = 2;
+
+/**
+ * Animated force settle for a subset of nodes: FA2 runs over the FULL graph,
+ * so the free nodes feel every attraction/repulsion in the network, but all
+ * other nodes are pinned — their coordinates are restored after every single
+ * iteration, so only the free nodes end up moving. Used after a Neo4j
+ * expand/join merge to float the newly added nodes into place without
+ * disturbing the existing arrangement.
+ *
+ * The bundled FA2 has no native pinning, hence the iterate-and-restore loop.
+ * Runs on the live graph in rAF ticks (sigma is bound to the instance, so
+ * every tick paints) within the same bounded time window as the whole-graph
+ * animated path.
+ *
+ * @param {import('graphology').default} graph  live graphology instance
+ * @param {Iterable<string>} freeIds  the only nodes allowed to move
+ * @param {{durationMs?: number, raf?: Function}} [opts]  test seams
+ * @returns {Promise<void>} resolves once the window elapses
+ */
+export async function settlePinnedForce(graph, freeIds, opts = {}) {
+  const free = new Set(freeIds);
+  if (graph.order < 2 || free.size === 0 || free.size >= graph.order) return;
+
+  const pinned = new Map();
+  graph.forEachNode((id, attrs) => {
+    if (!free.has(id)) pinned.set(id, { x: attrs.x, y: attrs.y });
+  });
+
+  const settings = forceAtlas2.inferSettings(graph);
+  const durationMs =
+    opts.durationMs ??
+    Math.min(FORCE_ANIMATE_MAX_MS, FORCE_ANIMATE_BASE_MS + graph.order * FORCE_ANIMATE_PER_NODE_MS);
+  // jsdom lacks rAF unless pretendToBeVisual; a timeout tick is equivalent here.
+  const raf = opts.raf ?? globalThis.requestAnimationFrame ?? ((cb) => setTimeout(cb, 16));
+  const deadline = Date.now() + durationMs;
+
+  // ponytail: each tick runs SETTLE_ITERATIONS_PER_TICK full-graph FA2 passes
+  // and then restores every pinned node one mergeNodeAttributes at a time, so a
+  // big merge can exceed a frame. Upgrade path if merge-settle jank ever shows:
+  // restore through updateEachNodeAttributes (one pass), and drop to a single
+  // iteration per tick above a node threshold. Not done blind — the current
+  // shape is fine at the sizes this app renders.
+  await new Promise((resolve) => {
+    const tick = () => {
+      for (let i = 0; i < SETTLE_ITERATIONS_PER_TICK; i++) {
+        forceAtlas2.assign(graph, { iterations: 1, settings });
+        for (const [id, pos] of pinned) graph.mergeNodeAttributes(id, pos);
+      }
+      if (Date.now() < deadline) raf(tick);
+      else resolve();
+    };
+    raf(tick);
+  });
 }
 
 /**

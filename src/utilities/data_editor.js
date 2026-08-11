@@ -4,7 +4,6 @@ import { StaticUtilities } from './static.js';
 import { EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from '../managers/io.js';
 import { computeMergePlan, showMergePreview } from './excel_merge.js';
 
-let dataTable;
 
 class DataTable {
   constructor(cache, containerId = 'dataTableContainer') {
@@ -358,21 +357,27 @@ class DataTable {
     this.tableData = this.tableDataBackup.map((row) => [...row]);
     this.sortState = {};
     this.originalOrder = this.tableData.map((_, index) => index);
+    // The table alone is not the state — Apply replays pendingChanges, so
+    // leaving them behind would rebuild the graph from the very edits and row
+    // deletions the user just discarded.
+    this.pendingChanges.clear();
+    this.notifyPendingChanges();
     this.render();
   }
 
+  /** @returns {string} HTML — imported header text is escaped, the markup is ours. */
   formatHeaderForDisplay(header) {
     // Check if header contains the property structure (e.g., "Node filters::GROUP::PROPERTY")
     if (!header.includes('::')) {
-      return header;
+      return StaticUtilities.escapeHtml(header);
     }
 
     const parts = header.split('::');
     if (parts.length !== 3) {
-      return header;
+      return StaticUtilities.escapeHtml(header);
     }
 
-    const [typePrefix, group, property] = parts;
+    const [, group, property] = parts;
 
     // Determine scaling class based on property text length
     // Longer text gets smaller font (size-xs = 9px smallest)
@@ -392,7 +397,7 @@ class DataTable {
     // Strip "Node filters" or "Edge filters" prefix since Type column already indicates this
     // Display group as a styled badge and property as main text with dynamic scaling
     // Always break into two lines: badge on first line, property on second line
-    return `<span class="data-table-header-group-badge">${group}</span><br><span class="${sizeClass}">${property}</span>`;
+    return `<span class="data-table-header-group-badge">${StaticUtilities.escapeHtml(group)}</span><br><span class="${sizeClass}">${StaticUtilities.escapeHtml(property)}</span>`;
   }
 
   render() {
@@ -441,7 +446,11 @@ class DataTable {
         td.dataset.col = colIndex;
 
         if (colIndex === 0) {
-          td.innerHTML = `<button class="data-table-delete-row-btn" title="Delete row ${rowIndex + 1} (${rowData[2]} ${rowData[3]})">×</button>`;
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'data-table-delete-row-btn';
+          deleteBtn.title = `Delete row ${rowIndex + 1} (${rowData[2]} ${rowData[3]})`;
+          deleteBtn.textContent = '×';
+          td.appendChild(deleteBtn);
           td.classList.add('data-table-delete-row-column');
         } else {
           // Explicitly check for null/undefined to preserve 0 values
@@ -964,7 +973,6 @@ class DataTable {
 
       await this.rebuildGraph(updatedFileData);
 
-      console.log('DATA TABLE UPDATE DONE!');
     } catch (err) {
       this.cache.ui.error(`Error updating graph: ${err}`);
     } finally {
@@ -981,17 +989,14 @@ class DataTable {
     await this.cache.graph?.destroy();
     this.cache.graph = null;
 
-    const status = document.getElementById('sidebarStatusContainer');
-    status.innerHTML = '';
-    status.style.height = '0';
-
+    // The log is cleared by destroyGraphAndRollBackUI below.
     await this.cache.gcm.destroyGraphAndRollBackUI();
     this.cache.gcm.resetEventLocks();
 
-    // Reset lasso wrapper visual state to match default behavior (no lasso mode)
-    const lassoWrapper = document.getElementById('lassoWrapper');
-    if (lassoWrapper) {
-      lassoWrapper.classList.remove('active');
+    // Reset lasso button visual state to match default behavior (no lasso mode)
+    const lassoBtn = document.getElementById('lassoToggleBtn');
+    if (lassoBtn) {
+      lassoBtn.classList.remove('active');
     }
     this.cache.io.preProcessData(updatedFileData);
 
@@ -1527,10 +1532,5 @@ function buildDataTable(fileData) {
   const resetBtn = document.getElementById('resetDataTableBtn');
   if (applyBtn) applyBtn.disabled = true;
   if (resetBtn) resetBtn.disabled = true;
-
-  // this.cache.dataTable.onChange((rowIndex, colIndex, newValue) => {
-  //   console.log(`Data changed at row ${rowIndex}, column ${colIndex}:`, newValue);
-  //   // add logic, trigger graph refresh, ..
-  // });
 }
 export { DataTable, buildDataTable };

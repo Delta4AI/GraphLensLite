@@ -1385,6 +1385,20 @@ describe("hover layer (Phase 3) — hoverNeighborhood + reducer composition", ()
     expect(ids.has("d")).toBe(false);
   });
 
+  it("a filtered-out edge is not a path to its neighbor", () => {
+    const { cache } = hoverFixture();
+    cache.graphData.setEdgeAttribute("e2", "hidden", true);
+
+    expect(hoverNeighborhood(cache.graphData, "b", false)).toEqual(new Set(["a", "b", "e1"]));
+  });
+
+  it("a filtered-out neighbor is excluded even when the edge is visible", () => {
+    const { cache } = hoverFixture();
+    cache.graphData.setNodeAttribute("c", "hidden", true);
+
+    expect(hoverNeighborhood(cache.graphData, "b", false)).toEqual(new Set(["a", "b", "e1"]));
+  });
+
   it("edge neighborhood is the edge plus its two endpoints", () => {
     const { cache } = hoverFixture();
 
@@ -1460,16 +1474,16 @@ describe("hover layer (Phase 3) — hoverNeighborhood + reducer composition", ()
   });
 });
 
-describe("heatmap dim-graph companion — reducer integration", () => {
+describe("heatmap graph fade — reducer integration", () => {
   // Reducers read the live layer state off cache.graph.heatmapLayer (the
   // toolbar toggles trigger sigma.refresh); the stub mirrors that shape.
-  function heatmapFixture({ heatmapEnabled = true, dimGraph = true, layer } = {}) {
+  function heatmapFixture({ heatmapEnabled = true, fadeGraph = 0.7, layer } = {}) {
     const nodes = [makeNode("a"), makeNode("b")];
     const edges = [makeEdge("e1", "a", "b")];
     const cache = createMockCache({ nodes, edges });
     cache.graphData = buildGraphologyGraph(cache);
     cache.graph =
-      layer === null ? {} : { heatmapLayer: { heatmapEnabled, settings: { dimGraph } } };
+      layer === null ? {} : { heatmapLayer: { heatmapEnabled, settings: { fadeGraph } } };
     const elementStates = new Map();
     const hoverIds = new Set();
     return {
@@ -1481,28 +1495,127 @@ describe("heatmap dim-graph companion — reducer integration", () => {
     };
   }
 
-  it("dims stateless nodes and edges while heatmap + dimGraph are on", () => {
-    const { nodeReducer, edgeReducer } = heatmapFixture();
+  const alphaOf = (hex) => parseInt(hex.slice(7, 9), 16);
+
+  it("fades stateless nodes toward transparent, keeping their hue", () => {
+    // The retired boolean swapped color for an opaque grey, which occluded the
+    // density field exactly as much as the original color did.
+    const { nodeReducer } = heatmapFixture({ fadeGraph: 0.5 });
 
     const node = nodeReducer("a", { color: "#403C53", size: 10, hidden: false });
-    expect(node.color).toBe(STATE_DIM_COLOR);
-    expect(node.size).toBe(10);
 
-    const edge = edgeReducer("e1", { color: "#403C5390", hidden: false });
-    expect(edge.color).toBe(STATE_DIM_COLOR);
+    expect(node.color.slice(0, 7)).toBe("#403c53");
+    expect(alphaOf(node.color)).toBeLessThan(255);
+    expect(node.size).toBe(10);
   });
 
-  it("does not mutate the incoming edge data when dimming", () => {
+  it("cuts edges out rather than fading them — a faded edge blends additively", () => {
+    // sigma blends premultiplied (ONE, ONE_MINUS_SRC_ALPHA) while the shaders
+    // emit straight alpha, so a low-alpha edge BRIGHTENS what is under it and
+    // paints white hairballs over the field. Verified live; nodes are immune
+    // because they fade through a baked texture.
+    const { edgeReducer } = heatmapFixture({ fadeGraph: 0.3 });
+    const gentle = edgeReducer("e1", { color: "#403C5390", hidden: false });
+    expect(gentle.hidden).toBeFalsy();
+    expect(gentle.color).toBe("#403C5390");
+
+    const cut = heatmapFixture({ fadeGraph: 0.6 }).edgeReducer("e1", {
+      color: "#403C5390", hidden: false,
+    });
+    expect(cut.hidden).toBe(true);
+  });
+
+  it("fades further as the slider rises, and clears the graph at 1", () => {
+    const light = heatmapFixture({ fadeGraph: 0.2 }).nodeReducer("a", {
+      color: "#403C53", hidden: false,
+    });
+    const heavy = heatmapFixture({ fadeGraph: 0.8 }).nodeReducer("a", {
+      color: "#403C53", hidden: false,
+    });
+    const full = heatmapFixture({ fadeGraph: 1 }).nodeReducer("a", {
+      color: "#403C53", hidden: false,
+    });
+
+    expect(alphaOf(heavy.color)).toBeLessThan(alphaOf(light.color));
+    expect(alphaOf(full.color)).toBe(0);
+  });
+
+  it("quantizes the fade so a drag cannot thrash the texture cache", () => {
+    // Texture keys carry the fill color, so a continuous alpha would mint a
+    // bake per slider tick per node color.
+    const a = heatmapFixture({ fadeGraph: 0.5 }).nodeReducer("a", {
+      color: "#403C53", hidden: false,
+    });
+    const b = heatmapFixture({ fadeGraph: 0.51 }).nodeReducer("a", {
+      color: "#403C53", hidden: false,
+    });
+
+    expect(a.color).toBe(b.color);
+  });
+
+  it("cuts labels out past the cutoff, on nodes and edges alike", () => {
+    // Labels are the largest occluder and the only thing the old boolean never
+    // touched. They cut rather than fade: label_renderers treats a baked
+    // "#000000" as "no explicit choice" so dark mode can flip it.
+    const gentle = heatmapFixture({ fadeGraph: 0.3 });
+    expect(gentle.nodeReducer("a", { color: "#403C53", label: "A", hidden: false }).label).toBe("A");
+
+    const strong = heatmapFixture({ fadeGraph: 0.6 });
+    expect(strong.nodeReducer("a", { color: "#403C53", label: "A", hidden: false }).label).toBe("");
+    expect(strong.edgeReducer("e1", { color: "#403C53", label: "e", hidden: false }).label).toBe("");
+    expect(gentle.edgeReducer("e1", { color: "#403C53", label: "e", hidden: false }).label).toBe("e");
+  });
+
+  it("fades a textured shape through its bake, not its color", () => {
+    // Hexagons and friends draw from a baked SVG with a TRANSPARENT color, so
+    // an alpha on `color` would do nothing; it goes into the fill instead.
+    const { nodeReducer } = heatmapFixture({ fadeGraph: 0.5 });
+    const data = {
+      type: "shape", shape: "hexagon", color: "#00000000", fillColor: "#403C53",
+      borderColor: "#000000", borderSize: 1, size: 10, image: "stale", hidden: false,
+    };
+
+    const res = nodeReducer("a", data);
+
+    expect(res.color).toBe("#00000000");
+    expect(res.image).not.toBe("stale");
+    expect(decodeURIComponent(res.image)).toContain("#403c5380");
+  });
+
+  it("fades a bordered circle's border with its fill", () => {
+    const { nodeReducer } = heatmapFixture({ fadeGraph: 0.5 });
+
+    const res = nodeReducer("a", {
+      type: "borderCircle", color: "#403C53", borderColor: "#000000", hidden: false,
+    });
+
+    expect(alphaOf(res.color)).toBeLessThan(255);
+    expect(alphaOf(res.borderColor)).toBeLessThan(255);
+  });
+
+  it("leaves a pie node's slices alone but still cuts its label", () => {
+    // The slice colors carry the data, so there is no flat fill to fade
+    // (same limitation as the dim state). The label occludes like any other.
+    const { nodeReducer } = heatmapFixture({ fadeGraph: 0.8 });
+    const data = { type: "pie", color: "#403C53", label: "A", hidden: false };
+
+    const res = nodeReducer("a", data);
+
+    expect(res.color).toBe("#403C53");
+    expect(res.label).toBe("");
+  });
+
+  it("does not mutate the incoming edge data when cutting it out", () => {
     const { edgeReducer } = heatmapFixture();
     const data = { color: "#403C5390", hidden: false };
 
     const res = edgeReducer("e1", data);
 
     expect(res).not.toBe(data);
-    expect(data.color).toBe("#403C5390");
+    expect(data.hidden).toBe(false);
   });
 
-  it("does not mutate the incoming node data when dimming", () => {
+  it("does not mutate the incoming node data when fading", () => {
     const { nodeReducer } = heatmapFixture();
     const data = { color: "#403C53", size: 10, hidden: false };
 
@@ -1512,7 +1625,7 @@ describe("heatmap dim-graph companion — reducer integration", () => {
     expect(data.color).toBe("#403C53");
   });
 
-  it("selection wins over the heatmap dim", () => {
+  it("selection wins over the heatmap fade", () => {
     const { nodeReducer, edgeReducer, elementStates } = heatmapFixture();
     elementStates.set("a", ["selected"]);
     elementStates.set("e1", ["selected"]);
@@ -1525,7 +1638,14 @@ describe("heatmap dim-graph companion — reducer integration", () => {
     expect(edge.color).toBe(STATE_ACCENT_COLOR);
   });
 
-  it("hover highlight wins over the heatmap dim", () => {
+  it("keeps a selected element's label while the rest of the graph loses theirs", () => {
+    const { nodeReducer, elementStates } = heatmapFixture({ fadeGraph: 0.9 });
+    elementStates.set("a", ["selected"]);
+
+    expect(nodeReducer("a", { color: "#403C53", label: "A", hidden: false }).label).toBe("A");
+  });
+
+  it("hover highlight wins over the heatmap fade", () => {
     const { nodeReducer, hoverIds } = heatmapFixture();
     hoverIds.add("a");
 
@@ -1551,8 +1671,8 @@ describe("heatmap dim-graph companion — reducer integration", () => {
     expect(edgeReducer("e1", edgeData)).toBe(edgeData);
   });
 
-  it("passes data through when dimGraph is off", () => {
-    const { nodeReducer, edgeReducer } = heatmapFixture({ dimGraph: false });
+  it("passes data through at fade 0 — switching the heatmap on never restyles", () => {
+    const { nodeReducer, edgeReducer } = heatmapFixture({ fadeGraph: 0 });
     const nodeData = { color: "#403C53", hidden: false };
     const edgeData = { color: "#403C5390", hidden: false };
 
