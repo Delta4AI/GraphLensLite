@@ -1,6 +1,6 @@
 {
   "name": "graph-lens-lite",
-  "version": "1.17.0",
+  "version": "1.17.1",
   "main": "src/package/electron_app.js",
   "description": "Visualise and explore property graphs in a lightweight desktop app.",
   "homepage": "https://github.com/Delta4AI/GraphLensLite",
