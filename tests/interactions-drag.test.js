@@ -123,6 +123,23 @@ describe("drag label pinning", () => {
   });
 });
 
+describe("drag normalization pin", () => {
+  it("pins the bbox on downNode and releases it on mouseup (even without movement)", async () => {
+    const { sigma } = makeManager();
+    const calls = [];
+    sigma.setCustomBBox = (v) => calls.push(v);
+
+    sigma.handlers.downNode({ node: "a" });
+    expect(calls).toEqual([{ x: [0, 1], y: [0, 1] }]);
+
+    // The pin's lifetime is exactly the gesture: left in place it froze
+    // sigma's normalization and rendered workspaces whose coordinates live
+    // in a different range off-screen.
+    await sigma.captorHandlers.mouseup();
+    expect(calls[calls.length - 1]).toBe(null);
+  });
+});
+
 describe("node drag movement", () => {
   it("does not persist anything on mouseup without movement", async () => {
     const { sigma, cache } = makeManager();

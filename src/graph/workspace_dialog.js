@@ -24,6 +24,9 @@ function openWorkspaceCreationDialog(layoutInternals) {
     nameInput.style.width = '100%';
     nameInput.style.marginBottom = '20px';
     nameInput.style.padding = '8px';
+    // Clears the "name required" validity mark from handleCreate as soon as
+    // the user starts typing again.
+    nameInput.addEventListener('input', () => nameInput.setCustomValidity(''));
     container.appendChild(nameInput);
 
     // Mode selection
@@ -147,7 +150,12 @@ function openWorkspaceCreationDialog(layoutInternals) {
     const handleCreate = () => {
       const name = nameInput.value.trim();
       if (!name) {
-        alert('Please enter a name for the layout');
+        // Native constraint bubble, not window.alert(): alert blocks the
+        // renderer thread outright (automation hangs with no diagnostic) and
+        // was the last native dialog in a codebase that uses Popup everywhere.
+        nameInput.setCustomValidity('Please enter a name for the workspace');
+        nameInput.reportValidity();
+        nameInput.focus();
         return;
       }
 

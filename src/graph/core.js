@@ -76,7 +76,13 @@ class GraphCoreManager {
         }
         await this.cache.ui.showLoading('Loading', 'Rendering graph ..');
         await new Promise((resolve) => requestAnimationFrame(resolve));
-        return await this.cache.graph.render();
+        const rendered = await this.cache.graph.render();
+        // Consume the flag only after the render succeeded (a failed render
+        // keeps it up so the next call re-renders). Left un-reset, the first
+        // Arrange/Re-layout of a session forced the full re-indexing render
+        // branch on every later style- or filter-only update.
+        this.cache.layoutChanged = false;
+        return rendered;
       } else {
         await this.cache.ui.showLoading('Loading', 'Redrawing graph ..');
         await new Promise((resolve) => requestAnimationFrame(resolve));

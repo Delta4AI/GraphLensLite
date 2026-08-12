@@ -136,7 +136,11 @@ class InteractionManager {
       }
     }
     // Pin the normalization bbox: without it every x/y write re-normalizes
-    // the coordinate space and the graph swims under the cursor.
+    // the coordinate space and the graph swims under the cursor. Released on
+    // mouseup (the pin's lifetime is exactly the gesture); full renders
+    // (SigmaAdapter.render) and fitView clear it too — a pin left in place
+    // froze normalization across workspace switches and rendered workspaces
+    // with a different coordinate range off-screen.
     const sigma = this.adapter.sigma;
     if (!sigma.getCustomBBox()) sigma.setCustomBBox(sigma.getBBox());
   }
@@ -176,6 +180,12 @@ class InteractionManager {
       if (graph.hasNode(id)) graph.mergeNodeAttributes(id, { forceLabel: false });
     }
     this.pinnedLabels = null;
+    // Release the normalization pin taken in #onDownNode: its lifetime is
+    // exactly the gesture. Left in place, a full render fired mid-drag by
+    // something else (a filter event, an expand) would release it under the
+    // cursor instead — and until that render the frozen bbox distorts every
+    // extent-changing update.
+    this.adapter.sigma.setCustomBBox(null);
     if (!moved) return;
     // Set synchronously before any await: sigma emits clickNode right after
     // mouseup with no microtask boundary, so the flag must already be up.

@@ -167,3 +167,48 @@ describe('BubbleSetLayer — canvas CSS display size (non-primary DPR bug)', () 
     expect(canvas.style.height).toBe('600px');
   });
 });
+
+describe('BubbleSetLayer — setFaded (workspace switch)', () => {
+  it('hides instantly and reveals with an eased fade', () => {
+    const { sigma, canvas, labelCanvas } = makeSigma(1, { width: 800, height: 600 });
+    const layer = new BubbleSetLayer({ sigma, graph: makeGraph(TRI) }, makeCache());
+
+    // Hiding must be instant: an eased fade-out would still show the incoming
+    // groups' colors repainted onto the outgoing shape.
+    layer.setFaded(true);
+    expect(canvas.style.opacity).toBe('0');
+    expect(labelCanvas.style.opacity).toBe('0');
+    expect(canvas.style.transition).toBe('none');
+
+    layer.setFaded(false);
+    expect(canvas.style.opacity).toBe('1');
+    expect(labelCanvas.style.opacity).toBe('1');
+    expect(canvas.style.transition).toContain('opacity');
+  });
+
+  it('refits a hull the deferral left at stale positions BEFORE revealing', () => {
+    const { sigma } = makeSigma(1, { width: 800, height: 600 });
+    const graph = makeGraph(TRI);
+    const layer = new BubbleSetLayer({ sigma, graph }, makeCache());
+    layer.getGroupHandle('groupOne').update({
+      members: ['a', 'b', 'c'],
+      label: false,
+      avoidance: 0,
+    });
+    flushRaf();
+    const staleKey = layer.outlines.get('groupOne').key;
+
+    layer.setFaded(true);
+    // Pretend fits are expensive, then move a member: the paint loop coasts
+    // on the cached (now stale) hull instead of refitting.
+    layer.fitDurations.set('groupOne', 500);
+    graph.getNodeAttributes('a').x = 400;
+    layer.scheduleRedraw();
+    flushRaf();
+    expect(layer.outlines.get('groupOne').key).toBe(staleKey);
+
+    // Reveal must never show that stale hull — it refits synchronously first.
+    layer.setFaded(false);
+    expect(layer.outlines.get('groupOne').key).not.toBe(staleKey);
+  });
+});

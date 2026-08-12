@@ -434,6 +434,13 @@ class SigmaAdapter {
   async render() {
     if (this.killed) return false;
     if (this.pendingLayout) await this.layout();
+    // Release the normalization bbox pinned by node drags (InteractionManager
+    // pins it on mousedown; only fitView used to release it). A full render
+    // must re-derive normalization from the CURRENT node extent: workspace
+    // templates put coordinates in very different ranges (grid [0, cols·100]
+    // vs circular [-r, r]), so a bbox frozen in one workspace rendered the
+    // next one off-screen — "switched and the graph is gone".
+    this.sigma.setCustomBBox(null);
     await this.#applyPersistedPositions();
     this.#syncLabelVisibility();
 
@@ -842,31 +849,58 @@ class SigmaAdapter {
       snap();
       this.sigma.refresh({ skipIndexation: true });
     } else {
+      // Bubble hulls can't track the tween (position refits defer while nodes
+      // are in motion), so they'd trail the nodes and snap at the end. Fade
+      // them out for the tween; faded back in after the settled redraw below.
+      this.bubbleLayer?.setFaded(true);
       // A prior tween still running (rapid switches): cancel before starting a
       // new one so they don't fight over the same node attributes.
       this.layoutTransitionCancel?.();
+      let cancelled = false;
+      let myCancel;
       await new Promise((resolve) => {
-        this.layoutTransitionCancel = animateNodes(
+        const cancel = animateNodes(
           this.graph,
           targets,
           { duration: LAYOUT_TRANSITION_MS, easing: 'cubicInOut' },
           resolve
         );
+        // animateNodes never calls back on cancel, so resolve explicitly — a
+        // cancelled switch (rapid re-switch, destroy) used to strand its
+        // caller awaiting forever (changeLayout skipped history.reset and its
+        // finally block).
+        myCancel = () => {
+          cancelled = true;
+          cancel();
+          resolve();
+        };
+        this.layoutTransitionCancel = myCancel;
       });
-      this.layoutTransitionCancel = null;
+      // Only clear our own handle: a newer transition may have installed its
+      // cancel while we were suspended.
+      if (this.layoutTransitionCancel === myCancel) this.layoutTransitionCancel = null;
+      // Cancelled means a newer transition (or destroy) took over mid-tween;
+      // it owns the node positions, the nodeRef mirror and the bubble fade now.
+      if (cancelled) return;
     }
 
-    // Mirror the settled positions back into the nodeRef cache (the app-model
-    // store the rest of the code reads), then redraw bubble hulls at the
-    // final positions (they were last drawn at the outgoing view's layout).
-    for (const [id, pos] of positionsMap) {
-      const ref = this.cache.nodeRef.get(id);
-      if (ref && Number.isFinite(pos?.style?.x) && Number.isFinite(pos?.style?.y)) {
-        ref.style.x = pos.style.x;
-        ref.style.y = pos.style.y;
+    try {
+      // Mirror the settled positions back into the nodeRef cache (the app-model
+      // store the rest of the code reads), then redraw bubble hulls at the
+      // final positions (they were last drawn at the outgoing view's layout).
+      for (const [id, pos] of positionsMap) {
+        const ref = this.cache.nodeRef.get(id);
+        if (ref && Number.isFinite(pos?.style?.x) && Number.isFinite(pos?.style?.y)) {
+          ref.style.x = pos.style.x;
+          ref.style.y = pos.style.y;
+        }
       }
+      if (!this.killed) await this.cache.bs?.redrawBubbleSets?.();
+    } finally {
+      // Fade back in over the fresh hulls (no-op on the snap path, which
+      // never faded out).
+      this.bubbleLayer?.setFaded(false);
     }
-    if (!this.killed) await this.cache.bs?.redrawBubbleSets?.();
   }
 
   // ------------------------------------------------------------- interactions

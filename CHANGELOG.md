@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.17.1 — 2026-08-12
+
+### Fixes
+
+* **Switching workspaces always lands on a visible graph.** Clicking or dragging any node pinned the renderer's coordinate normalization to the workspace on screen at that moment, and nothing released the pin except ⊡ Fit — so switching to a workspace whose layout lives in a different coordinate range (a grid template versus a circular one, say) could render it entirely off-screen or collapsed into a corner, and only a Fit or a lucky second switch brought it back. The pin now lives exactly as long as the drag gesture, and every full re-render re-derives the coordinate frame from the nodes actually present.
+* **Bubble groups no longer glitch through a workspace switch.** Switching between workspaces with different groups flashed the incoming groups' colours on the outgoing hull shape, let the hull trail behind the moving nodes, and briefly showed the stale shape again before it snapped into place. The hulls now hide the instant a switch starts, stay hidden while the nodes animate over, and fade back in only after they have been refitted around the settled positions — so the target workspace's groups appear fully formed, in their own colours.
+* **Switching workspaces in quick succession no longer strands the first switch.** A switch started while the previous one was still animating cancelled that animation in a way its caller never noticed, leaving the older switch waiting forever — its cleanup, status message and undo-history reset never ran. A cancelled switch now finishes immediately and hands everything over to the newer one.
+* **A failed switch can no longer freeze the loading overlay.** A narrow window at the start of every workspace switch, creation and re-layout sat outside the error handling that releases the overlay hold; an error there (for instance the selector naming a workspace that no longer exists) left the overlay up for good, with every later action unable to dismiss it short of a reload.
+* **The workspace-name prompt validates inline.** Creating a workspace with an empty name popped a native browser alert — the only one left in the app, and one that blocks the whole window. The dialog now marks the name field with a standard validation bubble and clears it as you type.
+
+### Performance
+
+* **Style and filter updates stay cheap after an Arrange or Re-layout.** The first arrange of a session raised an internal "layout changed" flag that was never lowered, silently upgrading every later style- or filter-only update to a full re-indexing render for the rest of the session.
+
 ## 1.17.0 — 2026-08-07
 
 Saved graph files, workspaces, filters, styles and bubble groups all load unchanged, including files written before this release — but **the interface is rearranged**, so it is worth reading the first section below before looking for a control where it used to be. The short version: the filter sidebar, styling sidebar, selection HUD and workspace bar are now a **rail** across the top, one **inspector** on the right with Filters / Overlays / Selection contexts, and a **workbench** of tabs (Data, Query, Metrics, Assistant) at the foot of the stage. `⌘K` / `Ctrl+K` finds any control by name and tells you where it lives, which is the fastest way to relearn the layout.

@@ -35,24 +35,33 @@ class GraphLayoutManager {
     // hide-disconnected finish. Released right before the position tween (which
     // is meant to animate with the overlay clear) and again in finally.
     this.cache.ui.holdLoading();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
 
-    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
-
-    // Animate node positions from the outgoing workspace to this one when it
-    // carries persisted positions. The adapter leaves positions in place
-    // through the render (pendingLayoutTransition) and tweens them once the
-    // loading overlay clears (runLayoutTransition, last step below). A
-    // position-less view (fresh template) has nothing to tween from/to and
-    // takes the normal snap path.
-    const animatePositions = currentLayout.positions?.size > 0;
-    this.cache.graph.pendingLayoutTransition = animatePositions;
-
-    // finally: never leave pendingLayoutTransition stuck on. If any step below
-    // throws before runLayoutTransition consumes it, every later render would
-    // otherwise skip #applyPersistedPositions and freeze nodes at the outgoing
-    // workspace for the adapter's lifetime.
+    // The try starts HERE, immediately after the hold: a throw anywhere below
+    // (e.g. #selectView naming a workspace that no longer exists) must reach
+    // the finally, or the leaked hold blocks every hideLoading() forever and
+    // bricks the UI until reload. The finally also clears
+    // pendingLayoutTransition — left on, every later render would skip
+    // #applyPersistedPositions and freeze nodes at the outgoing workspace.
     try {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+
+      // The incoming workspace's styles, visibility flips and group set all
+      // repaint the bubble hulls in place below — the new groups' colors on the
+      // OLD shape, visible through the overlay. Hide the hulls for the whole
+      // switch; revealed (refit + fade-in) by runLayoutTransition or finally.
+      this.cache.graph?.bubbleLayer?.setFaded(true);
+
+      const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
+
+      // Animate node positions from the outgoing workspace to this one when it
+      // carries persisted positions. The adapter leaves positions in place
+      // through the render (pendingLayoutTransition) and tweens them once the
+      // loading overlay clears (runLayoutTransition, last step below). A
+      // position-less view (fresh template) has nothing to tween from/to and
+      // takes the normal snap path.
+      const animatePositions = currentLayout.positions?.size > 0;
+      this.cache.graph.pendingLayoutTransition = animatePositions;
+
       // Apply per-view node and edge styles (positions held at the outgoing
       // view's when animating, so the tween starts from what's on screen).
       await this.applyLayoutStyles(currentLayout, animatePositions);
@@ -108,6 +117,13 @@ class GraphLayoutManager {
       this.cache.ui.releaseLoading();
       await this.cache.ui.hideLoading();
       if (this.cache.graph) this.cache.graph.pendingLayoutTransition = false;
+      // Reveal the hulls hidden at the top (refit + fade-in; no-op when
+      // runLayoutTransition already revealed them) — UNLESS a newer switch
+      // cancelled this one mid-tween and is still animating: it owns the
+      // fade now (layoutTransitionCancel is its live cancel handle).
+      if (!this.cache.graph?.layoutTransitionCancel) {
+        this.cache.graph?.bubbleLayer?.setFaded(false);
+      }
     }
   }
 
@@ -344,38 +360,39 @@ class GraphLayoutManager {
       // still running. Released right before the position tween, and in finally.
       this.cache.ui.holdLoading();
 
-      // Clear the filter lock since this is a fresh template with no query
-      this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;
-
-      // Clear selection FIRST before doing anything else
-      await this.cache.sm.toggleSelectionForAllNodes(false);
-      await this.cache.sm.toggleSelectionForAllEdges(false);
-
-      // Update UI to show the new layout's filters and query
-      this.cache.ui.buildFilterUI();
-      this.cache.qm.updateQueryTextArea();
-      this.cache.ui.updateFilterLockState();
-      this.cache.ui.clearActivePropsCacheOnLayoutChange();
-
-      // Process filters to determine which nodes should be visible
-      await this.cache.gcm.preRenderEvent();
-
-      // Snapshot the on-screen (outgoing-workspace) positions so the new
-      // template layout animates IN from them instead of snapping — same
-      // effect as switching between existing workspaces. graphData is y-up
-      // graphology, which is exactly what runLayoutTransition tweens toward.
-      const fromPositions = new Map();
-      this.cache.graphData?.forEachNode((id, attrs) => {
-        if (Number.isFinite(attrs.x) && Number.isFinite(attrs.y)) {
-          fromPositions.set(id, { x: attrs.x, y: attrs.y });
-        }
-      });
-
-      // setLayout/layout (possibly the off-thread worker), the full render
-      // pipeline and the position tween all run under one try so any failure —
-      // including the layout worker rejecting — releases the loading hold,
-      // drops the overlay and clears pendingLayoutTransition.
+      // The try starts immediately after the hold: any failure below —
+      // selection clears, the filter pass, the layout worker rejecting —
+      // must release the hold, drop the overlay and clear
+      // pendingLayoutTransition, or the leaked hold blocks every
+      // hideLoading() until reload.
       try {
+        // Clear the filter lock since this is a fresh template with no query
+        this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;
+
+        // Clear selection FIRST before doing anything else
+        await this.cache.sm.toggleSelectionForAllNodes(false);
+        await this.cache.sm.toggleSelectionForAllEdges(false);
+
+        // Update UI to show the new layout's filters and query
+        this.cache.ui.buildFilterUI();
+        this.cache.qm.updateQueryTextArea();
+        this.cache.ui.updateFilterLockState();
+        this.cache.ui.clearActivePropsCacheOnLayoutChange();
+
+        // Process filters to determine which nodes should be visible
+        await this.cache.gcm.preRenderEvent();
+
+        // Snapshot the on-screen (outgoing-workspace) positions so the new
+        // template layout animates IN from them instead of snapping — same
+        // effect as switching between existing workspaces. graphData is y-up
+        // graphology, which is exactly what runLayoutTransition tweens toward.
+        const fromPositions = new Map();
+        this.cache.graphData?.forEachNode((id, attrs) => {
+          if (Number.isFinite(attrs.x) && Number.isFinite(attrs.y)) {
+            fromPositions.set(id, { x: attrs.x, y: attrs.y });
+          }
+        });
+
         // Apply the layout algorithm once
         await this.cache.graph.setLayout({
           type: result.templateType,
@@ -667,16 +684,19 @@ class GraphLayoutManager {
     // before the position tween, and again in finally.
     this.cache.ui.holdLoading();
 
-    // Snapshot the on-screen positions so the new layout animates IN from them
-    // instead of snapping (same approach as the addLayout template branch).
-    const fromPositions = new Map();
-    this.cache.graphData?.forEachNode((id, attrs) => {
-      if (Number.isFinite(attrs.x) && Number.isFinite(attrs.y)) {
-        fromPositions.set(id, { x: attrs.x, y: attrs.y });
-      }
-    });
-
+    // Try starts immediately after the hold (a throw before the finally would
+    // leak it and block every hideLoading() until reload).
     try {
+      // Snapshot the on-screen positions so the new layout animates IN from
+      // them instead of snapping (same approach as the addLayout template
+      // branch).
+      const fromPositions = new Map();
+      this.cache.graphData?.forEachNode((id, attrs) => {
+        if (Number.isFinite(attrs.x) && Number.isFinite(attrs.y)) {
+          fromPositions.set(id, { x: attrs.x, y: attrs.y });
+        }
+      });
+
       await this.cache.graph.setLayout({
         type: layoutType,
         ...this.cache.DEFAULTS.LAYOUT_INTERNALS[layoutType],
