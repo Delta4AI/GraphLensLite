@@ -51,6 +51,9 @@ const CHEAP_FIT_MS = 8;
 // re-fit once motion stops. The hull lags the node mid-drag and snaps true on
 // release, which is the trade the alternative cannot buy: a locked UI.
 const REFIT_SETTLE_MS = 90;
+// Workspace-switch tween: the adapter fades the canvases out for the position
+// tween (hulls can't track animated nodes) and back in over the settled refit.
+const TRANSITION_FADE_MS = 200;
 
 class BubbleSetLayer {
   /**
@@ -151,6 +154,42 @@ class BubbleSetLayer {
     this.labelCanvas?.remove();
   }
 
+  /**
+   * Hide both canvases for a workspace switch and reveal them afterwards
+   * (GraphLayoutManager.changeLayout / SigmaAdapter.runLayoutTransition).
+   * Hiding is INSTANT — an eased fade-out would still show the incoming
+   * groups' colors repainted onto the outgoing shape. The reveal refits
+   * first (never show a hull the deferral left at stale positions), then
+   * eases the fresh one in. Pure CSS on top of the paint loop: the layer
+   * keeps painting underneath, and exports re-paint from the cached
+   * outlines regardless of canvas opacity.
+   */
+  setFaded(faded) {
+    if (!faded) this.refitNow();
+    for (const canvas of [this.canvas, this.labelCanvas]) {
+      if (!canvas) continue;
+      canvas.style.transition = faded ? 'none' : `opacity ${TRANSITION_FADE_MS}ms ease`;
+      canvas.style.opacity = faded ? '0' : '1';
+    }
+  }
+
+  /**
+   * Fit + paint every deferred outline immediately (no settle wait). Shared
+   * by the settle timer and the reveal path above; cheap when nothing moved
+   * (unchanged identity/position keys skip the fit).
+   */
+  refitNow() {
+    if (this.killed) return;
+    clearTimeout(this.settleHandle);
+    this.settleHandle = null;
+    this.forceRefit = true;
+    try {
+      this.#paint();
+    } finally {
+      this.forceRefit = false;
+    }
+  }
+
   /** Show or hide every bubble, on screen and in both export paths. */
   setVisible(visible) {
     if (this.visible === visible) return;
@@ -177,13 +216,7 @@ class BubbleSetLayer {
     clearTimeout(this.settleHandle);
     this.settleHandle = setTimeout(() => {
       this.settleHandle = null;
-      if (this.killed) return;
-      this.forceRefit = true;
-      try {
-        this.#paint();
-      } finally {
-        this.forceRefit = false;
-      }
+      this.refitNow();
     }, REFIT_SETTLE_MS);
   }
 
