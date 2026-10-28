@@ -33,6 +33,26 @@ Open the viewer URL in a browser. POST a graph (see [API.md](API.md)) and it
 renders immediately; subsequent pushes replace the current graph live via
 Server-Sent Events.
 
+## Deploying as a systemd service
+
+On a Linux host, from the checkout, as your normal user (commands that need
+root use `sudo` themselves; requires [`just`](https://github.com/casey/just)):
+
+```bash
+just deploy   # pull (ff-only), pin node, install/refresh the unit, restart
+just status   # systemctl status
+just logs     # follow the journal
+just down     # stop the service
+just uninstall  # disable and remove the unit; code and .env stay
+```
+
+The unit is versioned at [`deploy/graph-lens-lite.service`](deploy/graph-lens-lite.service).
+`just deploy` renders it with the deploying user and checkout path, and runs
+the server with a copy of that user's `node` (the nvm default, if nvm is
+installed) kept at `deploy/bin/node`. After upgrading node, run `just deploy`
+again to repin it. The service needs no `npm install`: it uses only node
+builtins and the committed `src/` tree. Rerunning `just deploy` is safe.
+
 ## Configuration
 
 All configuration is environment-based (see [`.env.example`](.env.example)).

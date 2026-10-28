@@ -1,0 +1,26 @@
+# Rendered by `just deploy`: @USER@, @GROUP@ and @DIR@ are filled from the
+# deploying user and this checkout, so the repo carries no host specifics.
+[Unit]
+Description=Graph Lens Lite Ingest Service
+After=network.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@GROUP@
+WorkingDirectory=@DIR@
+# Pinned copy made by `just deploy`, so nvm upgrades can't break the unit.
+ExecStart="@DIR@/deploy/bin/node" --env-file-if-exists=.env server/index.js
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+
+NoNewPrivileges=true
+ProtectSystem=full
+# No ReadWritePaths: the service holds its graph in memory and never writes to
+# disk, so granting write over the whole checkout only widens what a
+# compromise of it could reach.
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
