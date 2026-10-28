@@ -32,6 +32,9 @@ AUDIT-*.md
 # Local service configuration (token, port). Commit .env.example instead.
 .env
 
+# Node binary pinned by `just deploy`
+/deploy/bin/
+
 # Log files
 *.log
 

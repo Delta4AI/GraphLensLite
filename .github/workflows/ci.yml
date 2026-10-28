@@ -28,6 +28,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The deployed service serves src/ as committed, without npm, so the
+      # vendored files must match what vendor-libs regenerates.
+      - name: Vendored files in sync
+        run: npm run vendor-libs && git diff --exit-code
+
       - name: Lint
         run: npm run lint
 
