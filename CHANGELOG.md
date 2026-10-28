@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+* **The ingest service deploys with `just` instead of shell scripts.** `install-service.sh` and `update-service.sh` are gone; `just deploy` replaces both, and `just status`, `logs`, `down` and `uninstall` cover the rest (see [SERVICE.md](SERVICE.md)). The service no longer needs `npm install` on the server, and node upgrades are picked up on the next deploy.
+
 ## 1.17.1 — 2026-08-12
 
 ### Fixes
