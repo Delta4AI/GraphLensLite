@@ -75,6 +75,36 @@ function drawBackground(context, color, x, y, width, height, radius = BACKGROUND
   context.fill();
 }
 
+/**
+ * Text styles a label, group label or note can choose. Each is a valid prefix
+ * of the CSS `font` shorthand, so a canvas font is just "<style> <size> <family>".
+ */
+const FONT_STYLES = ["normal", "bold", "italic", "bold italic"];
+
+/**
+ * The style+weight prefix of a canvas font: the element's own choice, else the
+ * renderer-wide weight. Anything not in FONT_STYLES (a hand-edited file) falls
+ * back rather than reaching the canvas.
+ */
+function fontStylePrefix(fontStyle, fallbackWeight = "normal") {
+  return FONT_STYLES.includes(fontStyle) ? fontStyle : String(fallbackWeight ?? "normal");
+}
+
+/** A complete CSS/canvas font for a style choice; plain text keeps the bare "<size>px <family>". */
+function styledFont(fontStyle, size, family) {
+  const prefix = fontStylePrefix(fontStyle);
+  return prefix === "normal" ? `${size}px ${family}` : `${prefix} ${size}px ${family}`;
+}
+
+/** The same choice as SVG's separate font-weight and font-style attributes. */
+function svgFontAttributes(fontStyle, fallbackWeight = "normal") {
+  if (!FONT_STYLES.includes(fontStyle)) return { fontWeight: String(fallbackWeight ?? "normal"), fontStyle: "normal" };
+  return {
+    fontWeight: fontStyle.includes("bold") ? "bold" : "normal",
+    fontStyle: fontStyle.includes("italic") ? "italic" : "normal",
+  };
+}
+
 // G6 v5 badge parity: a badge is a small colored pill with white text,
 // anchored on the node perimeter. Fallbacks mirror DEFAULTS.NODE.BADGE
 // (config is intentionally not imported — this module stays dependency-free;
@@ -152,7 +182,7 @@ function drawNodeLabel(context, data, settings) {
 
   const size = finiteSize(data.labelSize, settings.labelSize);
   const font = settings.labelFont;
-  const weight = settings.labelWeight;
+  const weight = fontStylePrefix(data.labelFontStyle, settings.labelWeight);
   const color = resolveElementLabelColor(data.labelColor, settings.labelColor, data);
   const padding = data.labelPadding ?? 2;
 
@@ -201,7 +231,7 @@ function drawEdgeLabel(context, edgeData, sourceData, targetData, settings) {
 
   const size = finiteSize(edgeData.labelSize, settings.edgeLabelSize);
   const font = settings.edgeLabelFont;
-  const weight = settings.edgeLabelWeight;
+  const weight = fontStylePrefix(edgeData.labelFontStyle, settings.edgeLabelWeight);
   const color = resolveElementLabelColor(edgeData.labelColor, settings.edgeLabelColor, edgeData);
   const padding = edgeData.labelPadding ?? 1;
 
@@ -241,4 +271,13 @@ function drawEdgeLabel(context, edgeData, sourceData, targetData, settings) {
   context.restore();
 }
 
-export { drawNodeLabel, drawEdgeLabel, placementVector, BAKED_DEFAULT_LABEL_COLOR };
+export {
+  drawNodeLabel,
+  drawEdgeLabel,
+  placementVector,
+  BAKED_DEFAULT_LABEL_COLOR,
+  FONT_STYLES,
+  fontStylePrefix,
+  styledFont,
+  svgFontAttributes,
+};

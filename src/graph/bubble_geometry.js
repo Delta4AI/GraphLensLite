@@ -10,6 +10,7 @@
 import { bubblesets, polygonClipping } from "../lib/graphology.bundle.mjs";
 import { pointInPolygon } from "./lasso_geometry.js";
 import { sampleSmoothedRing } from "./bubble_smoothing.js";
+import { fontStylePrefix, styledFont } from "./label_renderers.js";
 
 // PointPath post-processing per the bubblesets-js README: sample the raw
 // marching-squares outline, B-spline it and drop collinear points. 8 is the
@@ -909,7 +910,8 @@ function resolveBubbleLabel(anchor, opts = {}, defaults = {}, measureText) {
   const standoff = closeToPath ? 0 : fontSize / 2 + padding + LABEL_STANDOFF_PX;
   const x = anchor.x + anchor.nx * standoff + (opts.labelOffsetX ?? 0);
   const y = anchor.y + anchor.ny * standoff + (opts.labelOffsetY ?? 0);
-  const font = `${fontSize}px ${BUBBLE_LABEL_FONT_FAMILY}`;
+  const fontStyle = opts.labelFontStyle ?? defaults.labelFontStyle;
+  const font = styledFont(fontStyle, fontSize, BUBBLE_LABEL_FONT_FAMILY);
   const textWidth = measureText(text, font);
 
   // Rotation only makes sense hugging the path; "center" has no tangent.
@@ -934,6 +936,7 @@ function resolveBubbleLabel(anchor, opts = {}, defaults = {}, measureText) {
     text,
     font,
     fontSize,
+    fontStyle: fontStylePrefix(fontStyle),
     x,
     y,
     lx,

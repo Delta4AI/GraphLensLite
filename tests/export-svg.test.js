@@ -435,6 +435,13 @@ describe("labels", () => {
     expect(up).not.toContain("rotate(-90)");
   });
 
+  it("exports a label's bold/italic choice as font-weight and font-style", () => {
+    const svg = build(
+      makeScene({ nodes: [{ id: "a", x: 0, y: 0, label: "Styled", labelFontStyle: "bold italic" }] }),
+    );
+    expect(svg).toMatch(/font-weight="bold" font-style="italic"[^>]*>Styled</);
+  });
+
   it("renders badges as colored pills with white text on the node perimeter", () => {
     const scene = makeScene({
       nodes: [

@@ -1,6 +1,7 @@
 import {StaticUtilities} from "../utilities/static.js";
 import {attachCommunityMenu} from "./community_menu.js";
 import {BADGE_SLOTS, summarizeBadges} from "../graph/badges.js";
+import {FONT_STYLES} from "../graph/label_renderers.js";
 
 // ----------------------------------------------------------- DOM primitives
 // The style div's generic control builders. They only ever needed their
@@ -201,6 +202,9 @@ function createStyleDiv(cache) {
       case "Node Label Placement":
         await cache.gcm.updateNodes({style: {labelPlacement: value}}, commands);
         break;
+      case "Node Label Font Style":
+        await cache.gcm.updateNodes({style: {labelFontStyle: value}}, commands);
+        break;
       case "Node Badge Font Size":
         await cache.gcm.updateNodes({style: {badgeFontSize: value}}, commands);
         break;
@@ -230,6 +234,9 @@ function createStyleDiv(cache) {
         break;
       case "Edge Label Placement":
         await cache.gcm.updateEdges({style: {labelPlacement: value}}, commands);
+        break;
+      case "Edge Label Font Style":
+        await cache.gcm.updateEdges({style: {labelFontStyle: value}}, commands);
         break;
       case "Edge Label Font Color":
         await cache.gcm.updateEdges({style: {labelFill: value}}, commands);
@@ -955,6 +962,11 @@ function createStyleDiv(cache) {
     createCategoricalControls(rowEight, "Node Label Placement", cache.DEFAULTS.NODE.LABEL.PLACEMENT,
       cache.DEFAULTS.STYLES.NODE_LABEL_PLACEMENTS, "Defines the placement of the selected nodes labels.");
 
+    const rowEightB = createNewRow(nodeDiv);
+    appendLabel(rowEightB, "Label Font Style", "Bold and/or italic labels for the selected nodes.");
+    createCategoricalControls(rowEightB, "Node Label Font Style", "normal", FONT_STYLES,
+      "Bold and/or italic labels for the selected nodes.");
+
     const rowNine = createNewRow(nodeDiv);
     appendLabel(rowNine, "Label Color",
       "Defines the foreground (text) color of the selected nodes labels.");
@@ -1029,6 +1041,11 @@ function createStyleDiv(cache) {
     appendLabel(rowSeven, "Label Placement", "Defines the placement of the selected edges labels.");
     createCategoricalControls(rowSeven, "Edge Label Placement", cache.DEFAULTS.EDGE.LABEL.PLACEMENT,
       cache.DEFAULTS.STYLES.EDGE_LABEL_PLACEMENTS, "Defines the placement of the selected edges labels.");
+
+    const rowSevenB = createNewRow(edgeDiv);
+    appendLabel(rowSevenB, "Label Font Style", "Bold and/or italic labels for the selected edges.");
+    createCategoricalControls(rowSevenB, "Edge Label Font Style", "normal", FONT_STYLES,
+      "Bold and/or italic labels for the selected edges.");
 
     const rowEight = createNewRow(edgeDiv);
     appendLabel(rowEight, "Label Auto Rotate", "Enable/Disable label rotation.");
@@ -1420,6 +1437,19 @@ function createStyleDiv(cache) {
       await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Placement`, placementDropdown.value);
     };
     rowPlacement.appendChild(placementDropdown);
+
+    const rowFontStyle = createNewRow(panel);
+    appendLabel(rowFontStyle, "Label Font Style", undefined, undefined, optionalCSSClass);
+    const fontStyleDropdown = document.createElement("select");
+    fontStyleDropdown.className = "style-inner-button";
+    fontStyleDropdown.dataset.property = `Bubble Set ${group} Label Font Style`;
+    fontStyleDropdown.classList.add(optionalCSSClass);
+    for (const v of FONT_STYLES) fontStyleDropdown.appendChild(new Option(v, v));
+    fontStyleDropdown.value = bs.labelFontStyle ?? "normal";
+    fontStyleDropdown.onchange = async () => {
+      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Font Style`, fontStyleDropdown.value);
+    };
+    rowFontStyle.appendChild(fontStyleDropdown);
 
     // Label Close To Path
     const rowClosePath = createNewRow(panel);

@@ -24,7 +24,6 @@ import { flipY } from './graph_model.js';
 import {
   ANNOTATION_DEFAULTS,
   ANNOTATION_SHADOW,
-  ANNOTATION_FONT_FAMILY,
   ANNOTATION_LINE_HEIGHT,
   ANNOTATION_PADDING_PX,
   MAX_TEXT_LENGTH,
@@ -33,7 +32,9 @@ import {
   MAX_BORDER_WIDTH,
   MAX_BORDER_RADIUS,
   annotationLayout,
+  annotationFont,
 } from './annotation_geometry.js';
+import { FONT_STYLES } from './label_renderers.js';
 import { clampPopoverLeft, clampPopoverTop } from '../utilities/popover_position.js';
 import { FrameCoalescer } from './overlay_frame.js';
 
@@ -73,6 +74,17 @@ function popoverColorInput(value, onChange, after) {
   input.type = 'color';
   input.value = value;
   input.addEventListener('input', () => {
+    onChange(input.value);
+    after();
+  });
+  return input;
+}
+
+function popoverSelectInput(options, value, onChange, after) {
+  const input = document.createElement('select');
+  for (const option of options) input.appendChild(new Option(option, option));
+  input.value = value;
+  input.addEventListener('change', () => {
     onChange(input.value);
     after();
   });
@@ -369,7 +381,7 @@ class AnnotationLayer {
   /** Restyle only when the note's content/style signature changed. */
   #applyStyle(ann, el) {
     const signature =
-      `${ann.text}|${ann.fontSize}|${ann.fontColor}|${ann.borderColor}|${ann.borderWidth}` +
+      `${ann.text}|${ann.fontSize}|${ann.fontStyle}|${ann.fontColor}|${ann.borderColor}|${ann.borderWidth}` +
       `|${ann.borderRadius ?? 0}|${ann.bgColor ?? ''}|${ann.shadow ? 1 : 0}`;
     if (el.dataset.signature === signature) return;
     el.dataset.signature = signature;
@@ -377,7 +389,7 @@ class AnnotationLayer {
     if (this.editingId !== ann.id) el.textContent = ann.text;
     const shadow = ann.shadow && ann.bgColor; // ring shadows are unreproducible in exports
     Object.assign(el.style, {
-      font: `${ann.fontSize}px ${ANNOTATION_FONT_FAMILY}`,
+      font: annotationFont(ann),
       lineHeight: String(ANNOTATION_LINE_HEIGHT),
       color: ann.fontColor,
       padding: `${ANNOTATION_PADDING_PX}px`,
@@ -594,6 +606,7 @@ class AnnotationLayer {
         'Font size',
         numberInput(ann.fontSize, MIN_FONT_SIZE, MAX_FONT_SIZE, 1, (v) => (ann.fontSize = v))
       ),
+      popoverRow('Font style', popoverSelectInput(FONT_STYLES, ann.fontStyle, (v) => (ann.fontStyle = v), after)),
       popoverRow('Font color', colorInput(ann.fontColor, (v) => (ann.fontColor = v))),
       popoverRow('Border color', colorInput(ann.borderColor, (v) => (ann.borderColor = v))),
       popoverRow(

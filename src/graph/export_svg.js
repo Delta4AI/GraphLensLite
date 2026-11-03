@@ -43,7 +43,12 @@ import {
   BUBBLE_LABEL_FONT_FAMILY,
 } from "./bubble_geometry.js";
 import { smoothClosedPath } from "./bubble_smoothing.js";
-import { placementVector, BAKED_DEFAULT_LABEL_COLOR } from "./label_renderers.js";
+import {
+  placementVector,
+  BAKED_DEFAULT_LABEL_COLOR,
+  fontStylePrefix,
+  svgFontAttributes,
+} from "./label_renderers.js";
 
 // Conservative paint-value allowlist (shape_textures.js SAFE_PAINT_RE):
 // hex/rgb()/hsl()/named colors pass; anything that could break out of an
@@ -460,8 +465,8 @@ function nodePrimitives(node) {
 
 // --- label primitives ------------------------------------------------------------
 
-function textPrimitive(x, y, text, fill, fontSize, fontFamily, fontWeight) {
-  return { kind: "text", x, y, text, fill, fontSize, fontFamily, fontWeight };
+function textPrimitive(x, y, text, fill, fontSize, fontFamily, fontWeight, fontStyle = "normal") {
+  return { kind: "text", x, y, text, fill, fontSize, fontFamily, fontWeight, fontStyle };
 }
 
 /** drawNodeBadges parity: colored pill + white text on the node perimeter. */
@@ -503,7 +508,8 @@ function nodeLabelPrimitives(node, env) {
   const { data, x, y, r } = node;
   if (!data.label) return [];
   const size = finiteSize(data.labelSize, env.labelSize);
-  const font = `${env.labelWeight} ${size}px ${env.labelFont}`;
+  const font = `${fontStylePrefix(data.labelFontStyle, env.labelWeight)} ${size}px ${env.labelFont}`;
+  const { fontWeight, fontStyle } = svgFontAttributes(data.labelFontStyle, env.labelWeight);
   const color = safeColor(resolveElementLabelColor(data.labelColor, env.labelColor, data));
   const padding = data.labelPadding ?? 2;
   const boxWidth = env.measureText(data.label, font) + 2 * padding;
@@ -525,7 +531,9 @@ function nodeLabelPrimitives(node, env) {
       fill: safeColor(data.labelBackgroundColor),
     });
   }
-  prims.push(textPrimitive(cx, cy + size * ALPHABETIC_BASELINE_SHIFT, data.label, color, size, env.labelFont, env.labelWeight));
+  prims.push(
+    textPrimitive(cx, cy + size * ALPHABETIC_BASELINE_SHIFT, data.label, color, size, env.labelFont, fontWeight, fontStyle),
+  );
   prims.push(...badgePrimitives(node, env)); // badges follow label visibility
   return prims;
 }
@@ -556,7 +564,8 @@ function edgeLabelPrimitives(edge, env) {
   const data = edge.data;
   if (!data.label) return [];
   const size = finiteSize(data.labelSize, env.edgeLabelSize);
-  const font = `${env.edgeLabelWeight} ${size}px ${env.edgeLabelFont}`;
+  const font = `${fontStylePrefix(data.labelFontStyle, env.edgeLabelWeight)} ${size}px ${env.edgeLabelFont}`;
+  const { fontWeight, fontStyle } = svgFontAttributes(data.labelFontStyle, env.edgeLabelWeight);
   const color = safeColor(resolveElementLabelColor(data.labelColor, env.edgeLabelColor, data));
   const padding = data.labelPadding ?? 1;
   const width = env.measureText(data.label, font);
@@ -582,7 +591,9 @@ function edgeLabelPrimitives(edge, env) {
       fill: safeColor(data.labelBackgroundColor),
     });
   }
-  children.push(textPrimitive(0, size * ALPHABETIC_BASELINE_SHIFT, data.label, color, size, env.edgeLabelFont, env.edgeLabelWeight));
+  children.push(
+    textPrimitive(0, size * ALPHABETIC_BASELINE_SHIFT, data.label, color, size, env.edgeLabelFont, fontWeight, fontStyle),
+  );
   return [
     {
       kind: "group",
@@ -666,7 +677,8 @@ function bubbleLabelPrimitives({ points, opts = {}, defaults = {} }, measureText
       safeColor(label.fill),
       label.fontSize,
       BUBBLE_LABEL_FONT_FAMILY,
-      "normal",
+      svgFontAttributes(label.fontStyle).fontWeight,
+      svgFontAttributes(label.fontStyle).fontStyle,
     ),
   );
   if (!label.rotated) return prims;
@@ -756,7 +768,8 @@ function annotationPrimitives({ ann, x, y, k }, measureText) {
         safeColor(ann.fontColor),
         ann.fontSize,
         ANNOTATION_FONT_FAMILY,
-        "normal",
+        svgFontAttributes(ann.fontStyle).fontWeight,
+        svgFontAttributes(ann.fontStyle).fontStyle,
       ),
       textAnchor: "start",
     });
@@ -852,7 +865,9 @@ function serializePrimitive(p) {
     return (
       `<text x="${fmt(p.x)}" y="${fmt(p.y)}" fill="${escapeXml(p.fill)}"` +
       ` font-size="${fmt(p.fontSize)}" font-family="${escapeXml(p.fontFamily)}"` +
-      ` font-weight="${escapeXml(p.fontWeight)}" text-anchor="${escapeXml(p.textAnchor ?? "middle")}">${escapeXml(p.text)}</text>`
+      ` font-weight="${escapeXml(p.fontWeight)}"` +
+      (p.fontStyle === "italic" ? ` font-style="italic"` : "") +
+      ` text-anchor="${escapeXml(p.textAnchor ?? "middle")}">${escapeXml(p.text)}</text>`
     );
   }
   if (p.kind === "group") {

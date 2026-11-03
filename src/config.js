@@ -217,6 +217,7 @@ const DEFAULTS = {
     label: true,
     labelFill: '#fff',
     labelFontSize: 12,
+    labelFontStyle: 'normal',
     labelPadding: 2,
     labelBackground: true,
     labelBackgroundRadius: 5,

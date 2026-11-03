@@ -200,6 +200,7 @@ function nodeProgramAttributes(style = {}, type) {
 function labelStyleAttributes(style) {
   const attrs = {};
   if (style.labelFontSize !== undefined) attrs.labelSize = style.labelFontSize;
+  if (style.labelFontStyle !== undefined) attrs.labelFontStyle = style.labelFontStyle;
   if (style.labelFill !== undefined) attrs.labelColor = style.labelFill;
   if (style.labelBackground !== undefined) attrs.labelBackground = style.labelBackground;
   if (style.labelBackgroundFill !== undefined) attrs.labelBackgroundColor = style.labelBackgroundFill;

@@ -59,6 +59,7 @@ const STYLE_KEY_FIELDS = [
   "labelText",
   "labelFill",
   "labelFontSize",
+  "labelFontStyle",
   "labelPadding",
   "labelBackground",
   "labelBackgroundFill",

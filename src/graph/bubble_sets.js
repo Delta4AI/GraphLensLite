@@ -45,6 +45,7 @@ const GROUP_STYLE_FIELDS = Object.freeze({
   'Label Background Color': { field: 'labelBackgroundFill', kind: 'color' },
   'Label Fill Color': { field: 'labelFill', kind: 'color' },
   'Label Font Size': { field: 'labelFontSize', kind: 'slider' },
+  'Label Font Style': { field: 'labelFontStyle', kind: 'select' },
   'Label Close To Path': { field: 'labelCloseToPath', kind: 'switch' },
   'Label Auto Rotate': { field: 'labelAutoRotate', kind: 'switch' },
   'Label Offset X': { field: 'labelOffsetX', kind: 'slider' },

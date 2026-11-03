@@ -42,7 +42,12 @@ import {
   buildLayoutTransitionTargets,
 } from './graph_model.js';
 import { executeLayout } from './layout_algorithms.js';
-import { drawNodeLabel, drawEdgeLabel, BAKED_DEFAULT_LABEL_COLOR } from './label_renderers.js';
+import {
+  drawNodeLabel,
+  drawEdgeLabel,
+  BAKED_DEFAULT_LABEL_COLOR,
+  fontStylePrefix,
+} from './label_renderers.js';
 import { InteractionManager } from './interactions.js';
 import { BubbleSetLayer } from './bubble_layer.js';
 import { HeatmapLayer } from './heatmap_layer.js';
@@ -100,6 +105,9 @@ function guardHoverDrawer(drawer, getDraggedNode) {
     drawer(context, data, {
       ...settings,
       labelColor: { attribute: 'labelColor', color: '#000' },
+      // Sigma's hover drawer reads only the renderer-wide weight; hand it this
+      // node's bold/italic so the hover label matches the drawn one.
+      labelWeight: fontStylePrefix(data.labelFontStyle, settings.labelWeight),
     });
   };
 }
@@ -251,12 +259,15 @@ function drawCurvedEdgeLabelWithSize(context, edgeData, sourceData, targetData, 
     edgeData.labelColor && edgeData.labelColor !== BAKED_DEFAULT_LABEL_COLOR
       ? edgeData.labelColor
       : null;
+  // @sigma/edge-curve writes `${edgeLabelWeight} ${size}px ${font}`, so the
+  // style prefix ("bold italic") rides in through the weight.
   const effective =
-    edgeData.labelSize != null || explicitColor != null
+    edgeData.labelSize != null || explicitColor != null || edgeData.labelFontStyle != null
       ? {
           ...settings,
           edgeLabelSize: edgeData.labelSize ?? settings.edgeLabelSize,
           edgeLabelColor: explicitColor ? { color: explicitColor } : settings.edgeLabelColor,
+          edgeLabelWeight: fontStylePrefix(edgeData.labelFontStyle, settings.edgeLabelWeight),
         }
       : settings;
   drawCurvedEdgeLabelBase(context, edgeData, sourceData, targetData, effective);

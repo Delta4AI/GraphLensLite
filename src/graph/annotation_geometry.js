@@ -10,6 +10,7 @@
  * graph space (y-down, same frame as layout.positions), sized at camera
  * ratio 1 — the whole box scales with zoom like the rest of the drawing.
  */
+import { FONT_STYLES, styledFont } from './label_renderers.js';
 
 // Font metrics shared by the DOM note (CSS), the canvas painter and the SVG
 // serializer. line-height 1.25 is set explicitly on the DOM element so the
@@ -38,6 +39,7 @@ const MAX_BORDER_RADIUS = 40;
 const ANNOTATION_DEFAULTS = Object.freeze({
   text: 'Text',
   fontSize: 14,
+  fontStyle: 'normal', // one of FONT_STYLES: normal / bold / italic / bold italic
   fontColor: '#C33D35',
   borderColor: '#C33D35',
   borderWidth: 1.5,
@@ -101,6 +103,7 @@ function normalizeAnnotation(raw) {
       MIN_FONT_SIZE,
       MAX_FONT_SIZE
     ),
+    fontStyle: FONT_STYLES.includes(raw.fontStyle) ? raw.fontStyle : ANNOTATION_DEFAULTS.fontStyle,
     fontColor: colorOr(raw.fontColor, ANNOTATION_DEFAULTS.fontColor),
     borderColor: colorOr(raw.borderColor, ANNOTATION_DEFAULTS.borderColor),
     borderWidth: clamp(finiteOr(raw.borderWidth, ANNOTATION_DEFAULTS.borderWidth), 0, MAX_BORDER_WIDTH),
@@ -148,8 +151,13 @@ function sanitizeAnnotations(list) {
  *     radius: number, strokeWidth: number},
  *   textLines: Array<{text: string, x: number, y: number}>}}
  */
+/** The note's CSS/canvas font; one string so the DOM, canvas and measuring agree. */
+function annotationFont(ann) {
+  return styledFont(ann.fontStyle, ann.fontSize, ANNOTATION_FONT_FAMILY);
+}
+
 function annotationLayout(ann, measureText) {
-  const font = `${ann.fontSize}px ${ANNOTATION_FONT_FAMILY}`;
+  const font = annotationFont(ann);
   const lines = String(ann.text).split('\n');
   const lineHeight = ann.fontSize * ANNOTATION_LINE_HEIGHT;
   let contentW = 0;
@@ -212,4 +220,5 @@ export {
   normalizeAnnotation,
   sanitizeAnnotations,
   annotationLayout,
+  annotationFont,
 };

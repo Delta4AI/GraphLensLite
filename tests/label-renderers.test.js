@@ -112,6 +112,16 @@ describe("drawNodeLabel", () => {
     expect(ctx2.fillStyle).toBe("#C33D35");
   });
 
+  it("draws a node's own bold/italic choice, and ignores unknown styles", () => {
+    const ctx = stubContext();
+    drawNodeLabel(ctx, { ...NODE, labelFontStyle: "bold italic" }, SETTINGS);
+    expect(ctx.font).toBe("bold italic 12px Arial");
+
+    const junk = stubContext();
+    drawNodeLabel(junk, { ...NODE, labelFontStyle: "900; injected" }, SETTINGS);
+    expect(junk.font).toBe("normal 12px Arial");
+  });
+
   it("treats the baked #000000 default as themeable (settings fallback wins)", () => {
     // io.js bakes labelFill #000000 into every labelled element; the
     // renderer must let the theme-driven settings fallback replace it.

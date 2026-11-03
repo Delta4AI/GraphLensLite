@@ -22,6 +22,7 @@ describe('normalizeAnnotation', () => {
       x: 10.5,
       y: -3,
       fontSize: 22,
+      fontStyle: 'bold italic',
       fontColor: '#112233',
       borderColor: '#445566',
       borderWidth: 3,
@@ -30,6 +31,11 @@ describe('normalizeAnnotation', () => {
       shadow: true,
     };
     expect(normalizeAnnotation(ann)).toEqual(ann);
+  });
+
+  it('keeps a known font style and drops anything else to normal', () => {
+    expect(normalizeAnnotation({ x: 0, y: 0, fontStyle: 'italic' }).fontStyle).toBe('italic');
+    expect(normalizeAnnotation({ x: 0, y: 0, fontStyle: '900 oblique' }).fontStyle).toBe('normal');
   });
 
   it('defaults the card fields: radius 6, transparent background, no shadow', () => {

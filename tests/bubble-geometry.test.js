@@ -779,6 +779,12 @@ describe("resolveBubbleLabel", () => {
     expect(fromDefaults.font).toBe("20px Arial, sans-serif");
   });
 
+  it("draws a group label bold or italic", () => {
+    const label = resolveBubbleLabel(anchor, { labelText: "grp", labelFontStyle: "italic" }, {}, measure);
+    expect(label.font).toBe("italic 12px Arial, sans-serif");
+    expect(label.fontStyle).toBe("italic");
+  });
+
   it("applies the user's label offsets on top", () => {
     const label = resolveBubbleLabel(
       anchor,
