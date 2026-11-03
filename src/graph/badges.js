@@ -48,10 +48,35 @@ function withoutSlot(style, slot) {
   return { badges, badgePalette };
 }
 
-/** The style's badges with `badge` in its slot, replacing whatever was there. */
-function withBadge(style, badge, color) {
-  const { badges, badgePalette } = withoutSlot(style, badgeSlot(badge.placement));
-  return { badges: [...badges, badge], badgePalette: [...badgePalette, color] };
+/**
+ * A node style's badge fields after `badge_set` or `badge_remove`.
+ *
+ * badge_set fills the slot — with the typed text, or with this node's value
+ * in `badge.property` — replacing what was there. A node with no value for
+ * that column gets an empty slot (missingValue), so a stale badge never
+ * passes for the column's value.
+ *
+ * @param {object} style  the node's current style
+ * @param {'badge_set'|'badge_remove'} command
+ * @param {{placement: string, color?: string, text?: string, property?: string}} badge
+ * @param {Map<string, unknown>} [featureValues]  the node's property values
+ * @returns {{badge: boolean, badges: object[], badgePalette: string[], missingValue: boolean}}
+ */
+function applyBadgeCommand(style, command, badge, featureValues) {
+  if (!badge?.placement) throw new Error(`${command} needs a badge placement`);
+  const slot = badgeSlot(badge.placement);
+  const kept = withoutSlot(style, slot);
+  const result = (fields, missingValue) => ({ ...fields, badge: fields.badges.length > 0, missingValue });
+  if (command === 'badge_remove') return result(kept, false);
+
+  const text = badge.property ? badgeTextFromValue(featureValues?.get(badge.property)) : badge.text;
+  if (!text) return result(kept, true);
+  const placed = { text, placement: slot };
+  if (badge.property) placed.property = badge.property;
+  return result(
+    { badges: [...kept.badges, placed], badgePalette: [...kept.badgePalette, badge.color] },
+    false
+  );
 }
 
 /**
@@ -107,4 +132,4 @@ function summarizeBadges(styles) {
   });
 }
 
-export { BADGE_SLOTS, BADGE_MAX_CHARS, badgeSlot, withoutSlot, withBadge, badgeTextFromValue, summarizeBadges };
+export { BADGE_SLOTS, BADGE_MAX_CHARS, badgeSlot, applyBadgeCommand, badgeTextFromValue, summarizeBadges };

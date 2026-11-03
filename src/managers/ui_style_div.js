@@ -146,6 +146,170 @@ function createInput(widthInPx = 80, placeholder = undefined, title = undefined,
   return input;
 }
 
+// One badge per perimeter slot: Set fills (or replaces) the chosen slot on
+// every selected node, and the list below shows what the selection carries
+// so each slot can be edited or removed on its own.
+/**
+ * The node card's badge row and the per-slot list under it.
+ * @returns {{refresh: () => void}} re-reads the selection (call on every
+ *   selection change, so the list and the column choices describe the nodes
+ *   the buttons act on)
+ */
+function createNodeBadgeControls(cache, parent, listParent) {
+  const sourceSelect = document.createElement("select");
+  sourceSelect.className = "style-inner-button";
+  sourceSelect.title = "Badge text: typed here, or each node's value in a column.";
+  parent.appendChild(sourceSelect);
+
+  const badgeInput = createInput(90, "Badge text",
+    "The text of the badge to set on the selected nodes.", undefined, undefined);
+  parent.appendChild(badgeInput);
+
+  const badgeColorPicker = createColorPicker(cache.DEFAULTS.NODE.BADGE.COLOR, "Set the color of the badge.");
+  parent.appendChild(badgeColorPicker);
+
+  const placementSelect = document.createElement("select");
+  placementSelect.className = "style-inner-button";
+  placementSelect.title = "Where on the node's edge the badge sits. Each spot holds one badge.";
+  for (const slot of BADGE_SLOTS) {
+    const option = document.createElement("option");
+    option.value = slot;
+    option.textContent = slot.replace("-", " ");
+    placementSelect.appendChild(option);
+  }
+  placementSelect.value = "top-right";
+  parent.appendChild(placementSelect);
+
+  const syncSourceInput = () => {
+    badgeInput.hidden = sourceSelect.value !== "";
+  };
+  sourceSelect.addEventListener("change", syncSourceInput);
+
+  parent.appendChild(createButton("Set", "Set this badge on the selected nodes, replacing any badge already in that spot.",
+    async () => {
+      const property = sourceSelect.value || undefined;
+      const text = badgeInput.value.trim();
+      if (!property && !text) {
+        cache.ui.error("Type the badge text, or pick a column to take it from.");
+        return;
+      }
+      await cache.gcm.updateNodes({}, ["badge_set"], {
+        badge: {placement: placementSelect.value, color: badgeColorPicker.value, text, property},
+      });
+    }, "badgeSetBtn"));
+  parent.appendChild(createButton("Clear", "Remove every badge from the selected nodes.",
+    async () => await cache.gcm.updateNodes({}, ["badge_clear"]), "badgeClearBtn"));
+
+  const list = document.createElement("div");
+  list.className = "badge-list";
+  listParent.appendChild(list);
+
+  const columnName = (propId) => StaticUtilities.decodePropHashId(propId).at(-1);
+
+  function refreshColumnOptions(nodes) {
+    const filters = cache.data?.layouts?.[cache.data.selectedLayout]?.filters;
+    const columns = new Set();
+    for (const node of nodes) {
+      node.features?.forEach((propId) => {
+        if (!filters?.get(propId)?.unusable) columns.add(propId);
+      });
+    }
+    const previous = sourceSelect.value;
+    sourceSelect.replaceChildren(new Option("Custom text", ""));
+    const nameCounts = new Map();
+    for (const propId of columns) {
+      const name = columnName(propId);
+      nameCounts.set(name, (nameCounts.get(name) ?? 0) + 1);
+    }
+    for (const propId of [...columns].sort((a, b) => columnName(a).localeCompare(columnName(b)))) {
+      const name = columnName(propId);
+      // Two groups can share a column name; only then is the group shown.
+      const clash = nameCounts.get(name) > 1;
+      const option = new Option(clash ? `${name} (${StaticUtilities.decodePropHashId(propId).at(-2)})` : name, propId);
+      option.title = propId;
+      sourceSelect.appendChild(option);
+    }
+    sourceSelect.value = columns.has(previous) ? previous : "";
+    syncSourceInput();
+  }
+
+  function editSlot(entry) {
+    placementSelect.value = entry.slot;
+    if (entry.colors[0]) badgeColorPicker.value = entry.colors[0];
+    if (entry.property && [...sourceSelect.options].some((o) => o.value === entry.property)) {
+      sourceSelect.value = entry.property;
+    } else {
+      sourceSelect.value = "";
+      badgeInput.value = entry.texts.length === 1 ? entry.texts[0] : "";
+    }
+    syncSourceInput();
+    (badgeInput.hidden ? sourceSelect : badgeInput).focus();
+  }
+
+  function renderList(nodes) {
+    const entries = summarizeBadges(nodes.map((node) => node.style));
+    list.replaceChildren();
+    list.hidden = entries.length === 0;
+    for (const entry of entries) {
+      const row = document.createElement("div");
+      row.className = "badge-list-row";
+
+      const swatch = document.createElement("span");
+      swatch.className = "badge-list-swatch";
+      // Colours come from the loaded file: only plain colour syntax reaches CSS.
+      swatch.style.background = entry.colors.length === 1 ? safePaint(entry.colors[0], "transparent") : "transparent";
+      if (entry.colors.length > 1) swatch.classList.add("mixed");
+      swatch.setAttribute("role", "img");
+      swatch.setAttribute("aria-label", entry.colors.length > 1 ? "mixed colours" : `colour ${entry.colors[0]}`);
+      swatch.title = entry.colors.join(", ");
+
+      const slot = document.createElement("span");
+      slot.className = "badge-list-slot";
+      slot.textContent = entry.slot.replace("-", " ");
+
+      const text = document.createElement("span");
+      text.className = "badge-list-text";
+      if (entry.property) {
+        text.textContent = `from ${columnName(entry.property)}`;
+      } else if (entry.texts.length === 1) {
+        text.textContent = `“${entry.texts[0]}”`;
+      } else {
+        text.textContent = `${entry.texts.length} different texts`;
+      }
+      text.title = entry.texts.join("\n");
+
+      const count = document.createElement("span");
+      count.className = "badge-list-count";
+      count.textContent = nodes.length > 1 ? `${entry.nodes}/${nodes.length}` : "";
+      count.title = `${entry.nodes} of the ${nodes.length} selected nodes have a badge here`;
+
+      const edit = createButton("✎", "Load this badge into the controls above to change it, then press Set.",
+        () => editSlot(entry), `badgeEdit-${entry.slot}`);
+      const remove = createButton("×", "Remove this badge from the selected nodes.",
+        async () => await cache.gcm.updateNodes({}, ["badge_remove"], {badge: {placement: entry.slot}}),
+        `badgeRemove-${entry.slot}`);
+      remove.classList.add("red");
+      const slotName = entry.slot.replace("-", " ");
+      edit.setAttribute("aria-label", `Edit the ${slotName} badge`);
+      remove.setAttribute("aria-label", `Remove the ${slotName} badge`);
+
+      row.append(swatch, slot, text, count, edit, remove);
+      list.appendChild(row);
+    }
+  }
+
+  const refresh = () => {
+    // selectedNodes starts as a Set and becomes an array once something is selected.
+    const nodes = [...(cache.selectedNodes ?? [])]
+      .map((id) => cache.nodeRef.get(id))
+      .filter(Boolean);
+    refreshColumnOptions(nodes);
+    renderList(nodes);
+  };
+  refresh();
+  return { refresh };
+}
+
 function createStyleDiv(cache) {
   reportButtonFailure = (err) => cache.ui.error(`That did not work: ${err?.message ?? err}`);
   const root = document.createElement("div");
@@ -571,161 +735,6 @@ function createStyleDiv(cache) {
     }
   }
 
-  // One badge per perimeter slot: Set fills (or replaces) the chosen slot on
-  // every selected node, and the list below shows what the selection carries
-  // so each slot can be edited or removed on its own.
-  function createNodeBadgeControls(parent, listParent) {
-    const sourceSelect = document.createElement("select");
-    sourceSelect.className = "style-inner-button";
-    sourceSelect.title = "Badge text: typed here, or each node's value in a column.";
-    parent.appendChild(sourceSelect);
-
-    const badgeInput = createInput(90, "Badge text",
-      "The text of the badge to set on the selected nodes.", undefined, undefined);
-    parent.appendChild(badgeInput);
-
-    const badgeColorPicker = createColorPicker(cache.DEFAULTS.NODE.BADGE.COLOR, "Set the color of the badge.");
-    parent.appendChild(badgeColorPicker);
-
-    const placementSelect = document.createElement("select");
-    placementSelect.className = "style-inner-button";
-    placementSelect.title = "Where on the node's edge the badge sits. Each spot holds one badge.";
-    for (const slot of BADGE_SLOTS) {
-      const option = document.createElement("option");
-      option.value = slot;
-      option.textContent = slot.replace("-", " ");
-      placementSelect.appendChild(option);
-    }
-    placementSelect.value = "top-right";
-    parent.appendChild(placementSelect);
-
-    const syncSourceInput = () => {
-      badgeInput.hidden = sourceSelect.value !== "";
-    };
-    sourceSelect.addEventListener("change", syncSourceInput);
-
-    parent.appendChild(createButton("Set", "Set this badge on the selected nodes, replacing any badge already in that spot.",
-      async () => {
-        const property = sourceSelect.value || undefined;
-        const text = badgeInput.value.trim();
-        if (!property && !text) {
-          cache.ui.error("Type the badge text, or pick a column to take it from.");
-          return;
-        }
-        await cache.gcm.updateNodes({}, ["badge_set"], {
-          badge: {placement: placementSelect.value, color: badgeColorPicker.value, text, property},
-        });
-      }, "badgeSetBtn"));
-    parent.appendChild(createButton("Clear", "Remove every badge from the selected nodes.",
-      async () => await cache.gcm.updateNodes({}, ["badge_clear"]), "badgeClearBtn"));
-
-    const list = document.createElement("div");
-    list.className = "badge-list";
-    listParent.appendChild(list);
-
-    const columnName = (propId) => StaticUtilities.decodePropHashId(propId).at(-1);
-
-    function refreshColumnOptions(nodes) {
-      const filters = cache.data?.layouts?.[cache.data.selectedLayout]?.filters;
-      const columns = new Set();
-      for (const node of nodes) {
-        node.features?.forEach((propId) => {
-          if (!filters?.get(propId)?.unusable) columns.add(propId);
-        });
-      }
-      const previous = sourceSelect.value;
-      sourceSelect.replaceChildren(new Option("Custom text", ""));
-      const names = [...columns].map(columnName);
-      for (const propId of [...columns].sort((a, b) => columnName(a).localeCompare(columnName(b)))) {
-        const name = columnName(propId);
-        // Two groups can share a column name; only then is the group shown.
-        const clash = names.filter((n) => n === name).length > 1;
-        const option = new Option(clash ? `${name} (${StaticUtilities.decodePropHashId(propId).at(-2)})` : name, propId);
-        option.title = propId;
-        sourceSelect.appendChild(option);
-      }
-      sourceSelect.value = columns.has(previous) ? previous : "";
-      syncSourceInput();
-    }
-
-    function editSlot(entry) {
-      placementSelect.value = entry.slot;
-      if (entry.colors[0]) badgeColorPicker.value = entry.colors[0];
-      if (entry.property && [...sourceSelect.options].some((o) => o.value === entry.property)) {
-        sourceSelect.value = entry.property;
-      } else {
-        sourceSelect.value = "";
-        badgeInput.value = entry.texts.length === 1 ? entry.texts[0] : "";
-      }
-      syncSourceInput();
-      (badgeInput.hidden ? sourceSelect : badgeInput).focus();
-    }
-
-    function renderList(nodes) {
-      const entries = summarizeBadges(nodes.map((node) => node.style));
-      list.replaceChildren();
-      list.hidden = entries.length === 0;
-      for (const entry of entries) {
-        const row = document.createElement("div");
-        row.className = "badge-list-row";
-
-        const swatch = document.createElement("span");
-        swatch.className = "badge-list-swatch";
-        // Colours come from the loaded file: only plain colour syntax reaches CSS.
-        swatch.style.background = entry.colors.length === 1 ? safePaint(entry.colors[0], "transparent") : "transparent";
-        if (entry.colors.length > 1) swatch.classList.add("mixed");
-        swatch.setAttribute("role", "img");
-        swatch.setAttribute("aria-label", entry.colors.length > 1 ? "mixed colours" : `colour ${entry.colors[0]}`);
-        swatch.title = entry.colors.join(", ");
-
-        const slot = document.createElement("span");
-        slot.className = "badge-list-slot";
-        slot.textContent = entry.slot.replace("-", " ");
-
-        const text = document.createElement("span");
-        text.className = "badge-list-text";
-        if (entry.property) {
-          text.textContent = `from ${columnName(entry.property)}`;
-        } else if (entry.texts.length === 1) {
-          text.textContent = `“${entry.texts[0]}”`;
-        } else {
-          text.textContent = `${entry.texts.length} different texts`;
-        }
-        text.title = entry.texts.join("\n");
-
-        const count = document.createElement("span");
-        count.className = "badge-list-count";
-        count.textContent = nodes.length > 1 ? `${entry.nodes}/${nodes.length}` : "";
-        count.title = `${entry.nodes} of the ${nodes.length} selected nodes have a badge here`;
-
-        const edit = createButton("✎", "Load this badge into the controls above to change it, then press Set.",
-          () => editSlot(entry), `badgeEdit-${entry.slot}`);
-        const remove = createButton("×", "Remove this badge from the selected nodes.",
-          async () => await cache.gcm.updateNodes({}, ["badge_remove"], {badge: {placement: entry.slot}}),
-          `badgeRemove-${entry.slot}`);
-        remove.classList.add("red");
-        const slotName = entry.slot.replace("-", " ");
-        edit.setAttribute("aria-label", `Edit the ${slotName} badge`);
-        remove.setAttribute("aria-label", `Remove the ${slotName} badge`);
-
-        row.append(swatch, slot, text, count, edit, remove);
-        list.appendChild(row);
-      }
-    }
-
-    // Called on every selection change (selection.js), so the list and the
-    // column choices always describe the nodes the buttons will act on.
-    cache.ui.refreshBadgeControls = () => {
-      // selectedNodes starts as a Set and becomes an array once something is selected.
-      const nodes = [...(cache.selectedNodes ?? [])]
-        .map((id) => cache.nodeRef.get(id))
-        .filter(Boolean);
-      refreshColumnOptions(nodes);
-      renderList(nodes);
-    };
-    cache.ui.refreshBadgeControls();
-  }
-
   // Two cards, split by what they need to already have: "Select Elements"
   // *creates* a selection out of the visible graph (rail ◈ menu), while
   // "Act on Selection" *grows or walks* one you already have, so it lives in
@@ -1004,7 +1013,8 @@ function createStyleDiv(cache) {
 
     const rowEleven = createNewRow(nodeDiv);
     appendLabel(rowEleven, "Badges", "Set badges on the selected nodes, one per spot on the node's edge.");
-    createNodeBadgeControls(rowEleven, nodeDiv);
+    // selection.js refreshes it on every selection change.
+    cache.ui.refreshBadgeControls = createNodeBadgeControls(cache, rowEleven, nodeDiv).refresh;
 
     const rowTwelve = createNewRow(nodeDiv);
     appendLabel(rowTwelve, "Badge Size", "Defines the font size (and pill size) of the selected nodes badges.");

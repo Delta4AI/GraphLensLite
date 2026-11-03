@@ -3,7 +3,7 @@ import { replaceColorScale } from '../utilities/color_scale_picker.js';
 import { replaceNumericScale } from '../utilities/numeric_scale_picker.js';
 import { initTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
 import { buildGraphologyGraph, makeNodeReducer, makeEdgeReducer } from './graph_model.js';
-import { badgeSlot, withoutSlot, withBadge, badgeTextFromValue } from './badges.js';
+import { applyBadgeCommand } from './badges.js';
 import { visibilityRule, edgeShown, propertylessShown } from './visibility_rule.js';
 // NOTE: sigma_adapter.js is imported lazily in createGraphInstance(), never
 // statically: the sigma vendor bundle probes WebGL at module scope
@@ -572,26 +572,14 @@ class GraphCoreManager {
           node.style.badgePalette = [];
         }
         if (command === 'badge_set' || command === 'badge_remove') {
-          if (!badge?.placement) throw new Error(`${command} needs a badge placement`);
-          const slot = badgeSlot(badge.placement);
-          let next = withoutSlot(node.style, slot);
-          if (command === 'badge_set') {
-            const text = badge.property
-              ? badgeTextFromValue(node.featureValues?.get(badge.property))
-              : badge.text;
-            // A node with no value for the column gets no badge in the slot,
-            // so a stale one never passes for this column's value.
-            if (text) {
-              const placed = { text, placement: slot };
-              if (badge.property) placed.property = badge.property;
-              next = withBadge(next, placed, badge.color);
-            } else {
-              nodesWithoutBadgeValue += 1;
-            }
-          }
-          node.style.badges = next.badges;
-          node.style.badgePalette = next.badgePalette;
-          node.style.badge = next.badges.length > 0;
+          const { missingValue, ...fields } = applyBadgeCommand(
+            node.style,
+            command,
+            badge,
+            node.featureValues
+          );
+          Object.assign(node.style, fields);
+          if (missingValue) nodesWithoutBadgeValue += 1;
         }
 
         if (command === 'label_set_to_id') {
