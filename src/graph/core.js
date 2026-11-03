@@ -249,8 +249,7 @@ class GraphCoreManager {
 
       // The graph is now settled: this is the state undo winds back to, and
       // the one "Reset to as loaded" restores.
-      this.cache.history?.reset();
-      this.cache.history?.markOrigin();
+      this.cache.history?.reset({ origin: 'mark' });
     } catch (errorMsg) {
       this.cache.ui.error(`Error in initial AFTER_RENDER: ${errorMsg}`);
       this.cache.ui.error('Graph setup failed. Please check your input data.');
@@ -796,8 +795,7 @@ class GraphCoreManager {
 
     this.cache.ui?.clearLog?.();
     // The snapshots describe a graph that no longer exists.
-    this.cache.history?.reset();
-    this.cache.history?.forgetOrigins();
+    this.cache.history?.reset({ origin: 'forget' });
   }
 
   registerHotkeyEvents() {

@@ -139,8 +139,18 @@ class History {
   /**
    * Forget everything and re-baseline. Called when the graph or the workspace
    * underneath the snapshots changes, which makes all of them meaningless.
+   *
+   * `origin` says what this point means for "Reset to as loaded":
+   * - 'mark': the workspace has settled (first render of a graph, first switch
+   *   into a workspace); record it as the origin unless it already has one;
+   * - 'replace': a new workspace just finished building; this is its origin;
+   * - 'rebase': the graph itself changed and has settled (a merge): forget
+   *   every origin, this one is the new start;
+   * - 'forget': the graph is being torn down; no origin describes anything.
+   *
+   * @param {{origin?: 'mark'|'replace'|'rebase'|'forget'}} [options]
    */
-  reset() {
+  reset({ origin } = {}) {
     // The restore path re-runs the app's initial-render choreography, which
     // resets the history — obeying that would wipe the redo branch mid-undo.
     if (this.restoring) return;
@@ -148,6 +158,13 @@ class History {
     this.future = [];
     this.baseline = snapshot(this.cache);
     this.syncButtons();
+
+    if (origin === 'forget' || origin === 'rebase') this.origins.clear();
+    const current = currentLayout(this.cache);
+    if (!current || !origin || origin === 'forget') return;
+    if (origin === 'replace' || origin === 'rebase' || !this.origins.has(current.name)) {
+      this.origins.set(current.name, this.baseline);
+    }
   }
 
   /**
@@ -178,23 +195,6 @@ class History {
     this.future = [];
     this.baseline = after;
     this.syncButtons();
-  }
-
-  /**
-   * Remember the current workspace's state as its origin, unless it already
-   * has one. Call right after reset() at a point where the workspace has
-   * settled: the first render of a graph, or the first switch into a workspace
-   * (which is when an untouched workspace computes its positions).
-   */
-  markOrigin() {
-    const current = currentLayout(this.cache);
-    if (!current || this.origins.has(current.name)) return;
-    this.origins.set(current.name, this.baseline ?? snapshot(this.cache));
-  }
-
-  /** The graph itself changed (data edit, merge): no origin describes it any more. */
-  forgetOrigins() {
-    this.origins.clear();
   }
 
   hasOrigin(name) {

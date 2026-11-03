@@ -394,9 +394,7 @@ async function mergeAndApply(cache, newNodes, newRels, deps = {}) {
       await cache.lm.persistNodePositions();
     }
     // A merge is structural: earlier snapshots describe a smaller graph.
-    cache.history?.reset();
-    cache.history?.forgetOrigins();
-    cache.history?.markOrigin();
+    cache.history?.reset({ origin: 'rebase' });
   }
   return rendered;
 }

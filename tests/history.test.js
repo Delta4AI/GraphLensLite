@@ -278,15 +278,13 @@ describe('History origins ("Reset to as loaded")', () => {
     cache = makeCache();
     history = new History(cache);
     cache.history = history;
-    history.reset();
-    history.markOrigin();
+    history.reset({ origin: 'mark' });
   });
 
   it('keeps the first settled state, not a later one', async () => {
     layoutOf(cache).filters.get('p1').active = false;
     history.commit('Filter change');
-    history.reset(); // e.g. switching away and back
-    history.markOrigin();
+    history.reset({ origin: 'mark' }); // e.g. switching away and back
 
     await history.resetToOrigin();
     expect(layoutOf(cache).filters.get('p1').active).toBe(true);
@@ -314,7 +312,7 @@ describe('History origins ("Reset to as loaded")', () => {
     history.renameOrigin('Default', 'Renamed');
     expect(history.hasOrigin('Renamed')).toBe(true);
 
-    history.forgetOrigins();
+    history.reset({ origin: 'forget' });
     expect(await history.resetToOrigin()).toBe(false);
   });
 });

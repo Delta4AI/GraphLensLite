@@ -50,7 +50,7 @@ function createCache(calls) {
       renderGroupList: noop,
       refreshBubbleStyleElements: noop,
     },
-    history: { reset: noop, markOrigin: noop },
+    history: { reset: noop },
     graph,
   };
 }

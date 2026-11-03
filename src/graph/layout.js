@@ -111,8 +111,7 @@ class GraphLayoutManager {
       // Snapshots describe one workspace's state; a real switch invalidates
       // them. A restore drives this same path and re-baselines itself.
       if (!message) {
-        this.cache.history?.reset();
-        this.cache.history?.markOrigin();
+        this.cache.history?.reset({ origin: 'mark' });
       }
     } finally {
       // Defensive: if a step above threw before the release, drop the hold and
@@ -388,9 +387,7 @@ class GraphLayoutManager {
         this.cache.ui.info(`Created Workspace: ${result.name} (${result.templateType})`);
         // A new workspace starts its own history, and this — fully settled —
         // is its origin (the render above may have marked a half-synced one).
-        this.cache.history?.dropOrigin(result.name);
-        this.cache.history?.reset();
-        this.cache.history?.markOrigin();
+        this.cache.history?.reset({ origin: 'replace' });
       } finally {
         // Defensive: release the hold + drop the overlay on any failure so a
         // half-created workspace never strands a blocked UI; clear the tween flag.
