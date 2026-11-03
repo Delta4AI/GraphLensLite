@@ -73,14 +73,14 @@ beforeEach(() => window.localStorage.clear());
 describe('Links toggle', () => {
   it('sets the workspace links and re-renders', async () => {
     const { ui, cache, handleFilterEvent } = makeUI();
-    const toggle = ui.createFilterLinksToggle();
-    const only = toggle.querySelector('[data-links="ticked"]');
-    expect(toggle.querySelector('[data-links="all"]').classList.contains('active')).toBe(true);
+    const select = ui.createFilterLinksToggle().querySelector('select');
+    expect(select.value).toBe('all');
 
-    only.click();
+    select.value = 'ticked';
+    select.dispatchEvent(new Event('change'));
     await Promise.resolve();
     expect(cache.data.layouts.L.filterLinks).toBe('ticked');
-    expect(only.getAttribute('aria-pressed')).toBe('true');
+    expect(select.value).toBe('ticked');
     expect(handleFilterEvent).toHaveBeenCalled();
   });
 });
@@ -90,7 +90,7 @@ describe('Elements without properties', () => {
     const { ui, cache, handleFilterEvent } = makeUI();
     const box = ui.createPropertylessCheckbox();
     expect(box.hidden).toBe(false);
-    expect(box.textContent).toBe('Include 1 without properties');
+    expect(box.textContent).toBe('Include 1 element without properties');
 
     const input = box.querySelector('input');
     input.checked = false;
@@ -110,10 +110,19 @@ describe('Build up with links on All', () => {
     expect(dimmed).toEqual([EDGE_P]);
     expect(document.querySelector(`[data-prop-id="${EDGE_P}"] .checkboxWrapper`).title).toBe('idle edge row');
   });
+
+  it('does not count a ticked edge filter as contributing', () => {
+    const { ui } = makeUI();
+    rows([NODE_P, EDGE_P]);
+    ui.updateFilterConstraintHints();
+    expect(document.getElementById('filterConstraintCount').textContent).toBe(
+      '1 of 2 filters contribute to the graph'
+    );
+  });
 });
 
 describe('Empty stage while building up', () => {
-  it('appears with nothing ticked, and Show everything ticks every row', async () => {
+  it('appears with nothing ticked, and Tick all filters ticks every row', async () => {
     const { ui, cache, handleFilterEvent } = makeUI();
     for (const filter of cache.data.layouts.L.filters.values()) filter.active = false;
     rows([NODE_P, EDGE_P]);

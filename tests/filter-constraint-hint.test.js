@@ -118,7 +118,7 @@ describe('filter constraint census', () => {
     expect(inertIds()).toEqual(['N::g::type', 'N::g::zone']);
   });
 
-  it('counts under build up too, as rows that add elements', () => {
+  it('counts under build up too, as filters that contribute', () => {
     // Hidden under OR, the panel was silent about the one thing that explains an
     // empty graph — and the active filter may sit in the section that is not on
     // screen, so "active means constraining" does not make the count redundant.
@@ -126,18 +126,18 @@ describe('filter constraint census', () => {
     ui.updateFilterConstraintHints();
 
     expect(census().hidden).toBe(false);
-    expect(census().textContent).toMatch(/rows ticked — each adds what it matches/);
+    expect(census().textContent).toBe('3 of 3 filters contribute to the graph');
     expect(inertIds()).toEqual([]);
   });
 
-  it('says nothing was added yet when building up with no row ticked', () => {
+  it('says no filter contributes when building up with none ticked', () => {
     const { ui } = makeUI({
       mode: 'OR',
       defaults: THREE.defaults,
       filters: THREE.filters.map(([id, filter]) => [id, { ...filter, active: false }]),
     });
     ui.updateFilterConstraintHints();
-    expect(census().textContent).toBe('No row ticked — nothing added yet');
+    expect(census().textContent).toBe('No filter contributes to the graph');
   });
 
   it('clears the dimming when the join switches back to OR', () => {
@@ -271,6 +271,6 @@ describe('scope segment badges', () => {
     expect(scopeCount('Node filters').classList.contains('filter-scope-count-active')).toBe(false);
     expect(scopeCount('Edge filters').textContent).toBe('1/1');
     expect(scopeCount('Edge filters').classList.contains('filter-scope-count-active')).toBe(true);
-    expect(scopeCount('Edge filters').closest('button').title).toContain('1 of them are ticked');
+    expect(scopeCount('Edge filters').closest('button').title).toContain('1 of them contribute to the graph');
   });
 });

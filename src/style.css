@@ -941,9 +941,23 @@ body {
 }
 
 .filter-links {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
+}
+
+.filter-links-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 22px;
+    padding: 0 4px;
+    font: inherit;
+    font-size: 11px;
+    color: var(--text-strong);
+    background: var(--input-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    cursor: pointer;
 }
 
 .filter-links[hidden],
@@ -2353,10 +2367,64 @@ h5 {
 }
 
 .filter-toolbar-join {
+    flex-basis: 100%;
+    padding: 3px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+}
+
+/* The mode is a setting, not a call to action: a neutral track whose chosen
+   half is lifted, so it does not compete with the red scope and inspector
+   pills around it. Full width, halves equal. */
+.filter-mode-switch.filter-join-toggle {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 8px;
+    padding: 2px;
+    gap: 2px;
+    border: none;
+    border-radius: 6px;
+    background: var(--surface-3);
+}
+
+.filter-mode-switch .filter-join-segment {
+    flex: 1 1 0;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    background: transparent;
+    border-radius: 5px;
+}
+
+.filter-mode-switch .filter-join-segment + .filter-join-segment {
+    border-left: none;
+}
+
+.filter-mode-switch .filter-join-segment:hover {
+    background: var(--row-hover);
+}
+
+.filter-mode-switch .filter-join-segment.active,
+[data-theme="dark"] .filter-mode-switch .filter-join-segment.active {
+    font-weight: 700;
+    color: var(--text-strong);
+    background: var(--bg);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.filter-mode-switch .filter-join-segment.active:focus-visible {
+    outline-color: var(--accent-text);
+}
+
+/* The glyph carries the brand colour; the words stay at full contrast. */
+.filter-mode-switch .filter-join-segment.active [aria-hidden] {
+    color: var(--accent-text);
+}
+
+/* The chosen mode's options, inside the same card. */
+.filter-mode-options {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 6px 5px 3px;
 }
 
 .filter-strict-checkbox {

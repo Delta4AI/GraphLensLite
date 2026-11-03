@@ -1259,13 +1259,13 @@ class UIComponentManager {
   /** An active-but-unnarrowed filter while narrowing down: on, dimmed, and
    * constraining nothing. The normal "click to hide elements" reads as a lie there. */
   getInertCheckboxTT(propID) {
-    return `Not narrowed, so narrowing down it excludes nothing — narrow it, or switch to build up:${StaticUtilities.formatPropsAsTree(propID)}`;
+    return `No effect — Still at its loaded range or values, so it removes nothing. Narrow it, or switch to Build up:${StaticUtilities.formatPropsAsTree(propID)}`;
   }
 
-  /** An edge row while building up with links set to All or None: its tick
-   * changes nothing until links are "Only ticked". */
+  /** An edge row while building up with links set to "All between shown nodes"
+   * or "None": its tick changes nothing until links are edge-filter matches. */
   getIdleEdgeRowTT(propID) {
-    return `Links are set to All or None, so this edge row changes nothing — set Links to Only ticked to pick links by it:${StaticUtilities.formatPropsAsTree(propID)}`;
+    return `No effect — Edge filters act only while Links is set to "Only edge-filter matches":${StaticUtilities.formatPropsAsTree(propID)}`;
   }
 
   createAddOrRemoveToSelectionGroup(propID) {

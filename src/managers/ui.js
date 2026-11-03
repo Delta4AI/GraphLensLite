@@ -19,23 +19,36 @@ const FILTER_JOIN_KEY = 'gll.filterJoinMode';
 // same-type filter.
 const FILTER_STRICT_KEY = 'gll.filterStrict';
 
+// Tooltips are "Name — description": the tooltip layer sets the name as a
+// bold first line (ui_tooltip.js parseTip).
 const NARROW_DOWN_CENSUS_TITLE =
-  'Narrowing down, a filter only constrains the graph once you narrow it from ' +
-  'the range or values it loaded with.\n' +
-  'Filters still at their defaults mean "don\'t care" — they are shown ' +
-  'dimmed, and switching them on or off changes nothing.';
+  'Narrow down — A filter constrains the graph once its range or values differ ' +
+  'from those it loaded with. Filters still at their defaults are dimmed: ' +
+  'ticking them changes nothing.';
 const BUILD_UP_CENSUS_TITLE =
-  'Building up, the graph starts empty and every ticked row adds the elements ' +
-  'it matches. Untick everything and nothing is shown.';
+  'Build up — The graph holds the elements matched by at least one ticked ' +
+  'filter. Edge filters count only while Links is set to edge-filter matches.';
 
 // What the join toggle's two modes are called on screen. Stored as OR/AND.
 const JOIN_MODE_LABELS = {
-  OR: { glyph: '＋', label: 'Build up' },
-  AND: { glyph: '−', label: 'Narrow down' },
+  OR: {
+    glyph: '＋',
+    label: 'Build up',
+    title: 'Build up — Start from an empty graph. Each ticked filter adds the elements it matches (OR).',
+  },
+  AND: {
+    glyph: '−',
+    label: 'Narrow down',
+    title:
+      'Narrow down — Start from the full graph. Each narrowed filter removes the elements ' +
+      'outside its range or values (AND).',
+  },
 };
+// The option text names the whole choice, so the closed dropdown reads as a
+// sentence: "Links  All between shown nodes".
 const FILTER_LINK_LABELS = [
-  ['all', 'All'],
-  ['ticked', 'Only ticked'],
+  ['all', 'All between shown nodes'],
+  ['ticked', 'Only edge-filter matches'],
   ['none', 'None'],
 ];
 
@@ -838,21 +851,21 @@ class UIManager {
     // Each mode reveals its own modifier to the RIGHT of the toggle, so
     // switching never shifts the toggle: Complete cases narrows down, Links
     // builds up.
+    // One card holds the mode and the options that belong to it, so an option
+    // never reads as a peer of the mode it modifies.
     const strictCheckbox = this.createFilterStrictCheckbox();
     const linksToggle = this.createFilterLinksToggle();
     const joinToggle = this.createFilterJoinToggle((mode) => {
       strictCheckbox.hidden = mode !== 'AND';
       linksToggle.hidden = mode === 'AND';
     });
+    const options = document.createElement('div');
+    options.className = 'filter-mode-options';
+    options.append(linksToggle, strictCheckbox, this.createPropertylessCheckbox());
     const joinCluster = document.createElement('div');
     joinCluster.className = 'filter-toolbar-join';
-    joinCluster.append(joinToggle, strictCheckbox, linksToggle);
-    toolbar.append(
-      joinCluster,
-      this.createPropertylessCheckbox(),
-      this.createFilterSearch(),
-      this.createFilterConstraintCount()
-    );
+    joinCluster.append(joinToggle, options);
+    toolbar.append(joinCluster, this.createFilterSearch(), this.createFilterConstraintCount());
     return toolbar;
   }
 
@@ -1108,15 +1121,17 @@ class UIManager {
       const tally = perSection.get(section) ?? { constraining: 0, total: 0 };
       tally.total += 1;
       perSection.set(section, tally);
-      // Under OR every active filter contributes a disjunct; under AND it has
-      // to be narrowed as well. Same rule the query derivation applies.
+      // Under OR every active filter contributes a disjunct — unless it is an
+      // idle edge row; under AND it has to be narrowed as well. Same rule the
+      // query derivation and visibility_rule.js apply.
+      const idleEdgeRow = edgeRowsIdle && row.dataset.propId.startsWith(edgePrefix);
       const counts =
-        !!fo.active && (!andMode || isFilterNarrowed(fo, defaults?.get(row.dataset.propId)));
+        !!fo.active &&
+        (andMode ? isFilterNarrowed(fo, defaults?.get(row.dataset.propId)) : !idleEdgeRow);
       if (counts) {
         constraining += 1;
         tally.constraining += 1;
       }
-      const idleEdgeRow = edgeRowsIdle && row.dataset.propId.startsWith(edgePrefix);
       const inert = (andMode && !!fo.active && !counts) || idleEdgeRow;
       row.classList.toggle('filter-row-inert', inert);
       // The row is dimmed but its checkbox still offered to "hide elements".
@@ -1158,8 +1173,8 @@ class UIManager {
       includePropertyless &&
       [...(this.cache.nodeRef?.values() ?? [])].some((node) => node.features?.size === 0);
     card.querySelector('.build-up-empty-body').textContent =
-      'You are building up: tick a filter row to add the elements it matches.' +
-      (bareShown ? ' Only the elements without properties show until then.' : '');
+      'Build up shows only the elements matched by a ticked filter.' +
+      (bareShown ? ' Elements without properties are shown regardless.' : '');
     card.hidden = false;
   }
 
@@ -1170,15 +1185,14 @@ class UIManager {
 
     const title = document.createElement('strong');
     title.className = 'build-up-empty-title';
-    title.textContent = 'Nothing added yet';
+    title.textContent = 'No filter ticked';
     const body = document.createElement('p');
     body.className = 'build-up-empty-body';
 
     const everything = document.createElement('button');
     everything.type = 'button';
     everything.className = 'p-button';
-    everything.textContent = 'Show everything';
-    everything.title = 'Tick every filter row';
+    everything.textContent = 'Tick all filters';
     everything.addEventListener('click', async () => {
       if (this.#filtersLocked()) return;
       this.toggleCheckboxesForSetOfPropIDs(true, '');
@@ -1193,8 +1207,8 @@ class UIManager {
     const narrow = document.createElement('button');
     narrow.type = 'button';
     narrow.className = 'p-button p-button-secondary';
-    narrow.textContent = 'Narrow down instead';
-    narrow.title = 'Start from everything and remove what the narrowed rows rule out';
+    narrow.textContent = 'Switch to Narrow down';
+    narrow.title = JOIN_MODE_LABELS.AND.title;
     narrow.addEventListener('click', () => {
       // The real segment, so the toggle's own state and persistence follow.
       const segment = document.querySelector('.filter-join-segment[data-mode="AND"]');
@@ -1231,8 +1245,8 @@ class UIManager {
     } else {
       el.title = BUILD_UP_CENSUS_TITLE;
       text = constraining
-        ? `${constraining} of ${total} rows ticked — each adds what it matches`
-        : 'No row ticked — nothing added yet';
+        ? `${constraining} of ${total} filters contribute to the graph`
+        : 'No filter contributes to the graph';
     }
     // A live region: rewriting the same words would announce them again.
     if (el.textContent !== text) el.textContent = text;
@@ -1251,7 +1265,7 @@ class UIManager {
       count.textContent = constraining ? `${constraining}/${total}` : String(total);
       count.classList.toggle('filter-scope-count-active', constraining > 0);
       const name = btn.dataset.section?.toLowerCase() ?? 'filters';
-      const verb = andMode ? 'constrain the graph' : 'are ticked';
+      const verb = andMode ? 'constrain the graph' : 'contribute to the graph';
       btn.title = constraining
         ? `Show the ${total} ${name} — ${constraining} of them ${verb}`
         : `Show the ${total} ${name}`;
@@ -1303,11 +1317,12 @@ class UIManager {
     group.className = 'filter-join-toggle';
     group.setAttribute('role', 'group');
     group.setAttribute('aria-label', ariaLabel);
-    const buttons = options.map(({ value, label, glyph, dataKey }) => {
+    const buttons = options.map(({ value, label, glyph, title, dataKey }) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'filter-join-segment';
       btn.dataset[dataKey] = value;
+      if (title) btn.title = title;
       if (glyph) {
         // The glyph is decoration; the words are the name.
         const mark = document.createElement('span');
@@ -1357,10 +1372,10 @@ class UIManager {
       toggle.sync();
       onModeChange?.(current());
     };
-    // The segments carry no own titles: the group tooltip explains both modes,
-    // and per-segment titles made the tooltip swap across one small control.
+    // Each segment explains only itself: one tooltip describing both modes
+    // was a paragraph nobody reads on hover.
     toggle = this.#segmentedToggle({
-      ariaLabel: 'How the filter rows choose what is shown',
+      ariaLabel: 'How the filters choose what is shown',
       options: ['OR', 'AND'].map((mode) => ({ value: mode, dataKey: 'mode', ...JOIN_MODE_LABELS[mode] })),
       current,
       onPick: async (mode) => {
@@ -1377,51 +1392,51 @@ class UIManager {
         );
       },
     });
-    toggle.group.title =
-      'Build up: start from nothing — every ticked row adds the elements it ' +
-      'matches (any of them, OR).\n' +
-      'Narrow down: start from everything — every narrowed row removes what it ' +
-      'does not match (all of them, AND; a property an element lacks does not ' +
-      'remove it).';
+    toggle.group.classList.add('filter-mode-switch');
     refresh();
     return toggle.group;
   }
 
   /**
    * Build up's links choice (visibility_rule.js): which links show between
-   * the nodes the ticked rows added. Starts hidden; the join toggle reveals it
-   * under build up.
+   * the nodes the ticked filters added. A dropdown, not a third row of pills:
+   * it is an option of the mode above it, and its option text can say what
+   * each choice means. Starts hidden; the join toggle reveals it under build up.
    */
   createFilterLinksToggle() {
-    const wrapper = document.createElement('div');
+    const wrapper = document.createElement('label');
     wrapper.className = 'filter-links';
     wrapper.hidden = true;
     wrapper.title =
-      'Which links show between the nodes your rows added.\n' +
-      'All: every link between them.\n' +
-      'Only ticked: just the links an edge row matches — their end nodes come along.\n' +
-      'None: no links.';
+      'Links — Which edges show between the nodes the filters added. ' +
+      '"Only edge-filter matches" also adds the end nodes of every matched edge.';
 
     const label = document.createElement('span');
     label.className = 'filter-links-label';
     label.textContent = 'Links';
-    label.setAttribute('aria-hidden', 'true'); // the group's aria-label says it
 
+    const select = document.createElement('select');
+    select.className = 'filter-links-select';
+    for (const [value, text] of FILTER_LINK_LABELS) select.add(new Option(text, value));
     const current = () => visibilityRule(this.#layout(), this.cache.CFG?.EXCEL_EDGE_HEADER).links;
-    let toggle;
-    toggle = this.#segmentedToggle({
-      ariaLabel: 'Links between shown nodes',
-      options: FILTER_LINK_LABELS.map(([value, text]) => ({ value, label: text, dataKey: 'links' })),
-      current,
-      onPick: (value) =>
-        this.#applyFilterSetting(
-          'filterLinks',
-          value,
-          `Links between shown nodes: ${FILTER_LINK_LABELS.find(([v]) => v === value)[1]}`,
-          () => toggle.sync()
-        ),
+    const sync = () => {
+      select.value = current();
+    };
+    sync();
+    select.addEventListener('change', async () => {
+      if (this.#filtersLocked()) {
+        sync();
+        return;
+      }
+      const value = select.value;
+      await this.#applyFilterSetting(
+        'filterLinks',
+        value,
+        `Links between shown nodes: ${select.selectedOptions[0].text}`,
+        sync
+      );
     });
-    wrapper.append(label, toggle.group);
+    wrapper.append(label, select);
     return wrapper;
   }
 
@@ -1438,9 +1453,11 @@ class UIManager {
     const wrapper = document.createElement('label');
     wrapper.className = 'filter-strict-checkbox filter-propertyless-checkbox';
     wrapper.hidden = count === 0;
+    const elements = `${count} element${count === 1 ? '' : 's'}`;
     wrapper.title =
-      `${count} element${count === 1 ? '' : 's'} (nodes and edges) carry no property any filter ` +
-      'could match. On: they always show (edges still need both end nodes). Off: they never do.';
+      `Elements without properties — ${elements} (nodes and edges) carry no property a ` +
+      'filter could match. Ticked, they are always shown (an edge also needs both end ' +
+      'nodes); unticked, never.';
 
     const included = () =>
       visibilityRule(this.#layout(), this.cache.CFG?.EXCEL_EDGE_HEADER).includePropertyless;
@@ -1463,7 +1480,7 @@ class UIManager {
     });
 
     const text = document.createElement('span');
-    text.textContent = `Include ${count} without properties`;
+    text.textContent = `Include ${elements} without properties`;
     wrapper.append(input, text);
     return wrapper;
   }
@@ -1490,11 +1507,8 @@ class UIManager {
     wrapper.className = 'filter-strict-checkbox';
     wrapper.hidden = true;
     wrapper.title =
-      'Complete cases only.\n' +
-      "On: an element must have a value for every filter you've set — elements " +
-      'missing any of those properties are hidden.\n' +
-      'Off: elements are judged only on the properties they have, so a missing ' +
-      'property never hides them.';
+      'Complete cases only — Also remove elements that lack a value for any ' +
+      'narrowed filter. Off: an element is judged only on the properties it has.';
 
     const input = document.createElement('input');
     input.type = 'checkbox';

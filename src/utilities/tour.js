@@ -233,12 +233,12 @@ const TOUR_STEPS = [
            <br>• <strong>Categorical properties</strong> get dropdown checklists — check/uncheck values
            <br>• The <strong>checkbox</strong> toggles whether that filter is active.
            The
-           <span style="display:inline-flex;align-items:stretch;border:1px solid var(--border-soft);border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:#C33D35;color:#fff;">＋ Build up</span><span style="padding:2px 9px;background:var(--surface-3);color:var(--brand-text);border-left:1px solid var(--border-soft);">− Narrow down</span></span>
-           toggle at the top of the panel picks how the rows work. <strong>Build up</strong> (the default) starts from nothing:
-           every ticked row adds the nodes and edges it matches (<em>any</em> of them, OR) — untick everything and the stage is empty,
-           ready to build a view one property at a time. Its <strong>Links</strong> choice decides which links show between those nodes:
-           <em>All</em>, <em>Only ticked</em> (just the ones an edge row matches, which bring their end nodes along) or <em>None</em>.
-           <strong>Narrow down</strong> starts from everything and keeps only what matches <em>all</em> the rows you've narrowed (AND);
+           <span style="display:inline-flex;gap:2px;padding:2px;border-radius:6px;vertical-align:middle;background:var(--surface-3);font-size:11px;"><span style="padding:1px 9px;border-radius:5px;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,0.18);font-weight:700;color:var(--text-strong);"><span style="color:var(--accent-text);">＋</span> Build up</span><span style="padding:1px 9px;color:var(--text-strong);">− Narrow down</span></span>
+           switch at the top of the panel picks how the filters work. <strong>Build up</strong> (the default) starts from an empty graph:
+           every ticked filter adds the nodes and edges it matches (<em>any</em> of them, OR) — untick everything and the stage is empty,
+           ready to build a view one property at a time. Its <strong>Links</strong> option decides which edges show between those nodes:
+           <em>All between shown nodes</em>, <em>Only edge-filter matches</em> (which bring their end nodes along) or <em>None</em>.
+           <strong>Narrow down</strong> starts from the full graph and keeps only what matches <em>all</em> the filters you've narrowed (AND);
            its <strong>Complete cases only</strong> option additionally hides elements missing any of those filters.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            <span style="display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:middle;background:var(--brand-text);"></span>
