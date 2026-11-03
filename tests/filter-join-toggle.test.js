@@ -67,8 +67,9 @@ describe('UIManager.createFilterJoinToggle', () => {
     expect(handleFilterEvent).toHaveBeenCalledOnce();
   });
 
-  it('does nothing when filters are locked by a manual query', () => {
+  it('changes nothing when filters are locked by a manual query, and says why', () => {
     cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
+    ui.warning = vi.fn();
     const group = ui.createFilterJoinToggle();
     const andBtn = group.querySelectorAll('.filter-join-segment')[1];
 
@@ -76,6 +77,21 @@ describe('UIManager.createFilterJoinToggle', () => {
 
     expect(cache.data.layouts.L.filterJoinMode).toBe('OR');
     expect(handleFilterEvent).not.toHaveBeenCalled();
+    expect(ui.warning).toHaveBeenCalledWith(expect.stringContaining('edited query'));
+  });
+
+  it('puts the mode back and reports it when the re-render fails', async () => {
+    handleFilterEvent.mockRejectedValueOnce(new Error('render broke'));
+    ui.error = vi.fn();
+    const group = ui.createFilterJoinToggle();
+    const [orBtn, andBtn] = group.querySelectorAll('.filter-join-segment');
+
+    andBtn.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(cache.data.layouts.L.filterJoinMode).toBe('OR');
+    expect(orBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(ui.error).toHaveBeenCalledWith(expect.stringContaining('render broke'));
   });
 
   it('looks as dead as it behaves under the lock', () => {

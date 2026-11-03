@@ -18,6 +18,7 @@ const NUM = (lo, hi) => ({ isCategory: false, isInverted: false, lowerThreshold:
 /** A filter row in the shape buildFilterUI produces, plus the toolbar span. */
 function dom(propIDs) {
   document.body.innerHTML = `
+    <div id="outerGraphContainer"></div>
     <div id="filterContainer">
       <div class="filter-toolbar"></div>
       ${propIDs

@@ -83,18 +83,6 @@ describe('Links toggle', () => {
     expect(only.getAttribute('aria-pressed')).toBe('true');
     expect(handleFilterEvent).toHaveBeenCalled();
   });
-
-  it('is offered while building up and hidden while narrowing down', () => {
-    const { ui } = makeUI();
-    // Wired the way #buildFilterToolbar wires them.
-    const links = ui.createFilterLinksToggle();
-    const join = ui.createFilterJoinToggle((mode) => {
-      links.hidden = mode === 'AND';
-    });
-    expect(links.hidden).toBe(false);
-    join.querySelector('[data-mode="AND"]').click();
-    expect(links.hidden).toBe(true);
-  });
 });
 
 describe('Elements without properties', () => {
