@@ -1,6 +1,10 @@
-import { describe, it, expect } from "vitest";
+// @vitest-environment jsdom
+import { describe, it, expect, vi } from "vitest";
 import { NumericScalePicker } from "../src/utilities/numeric_scale_picker.js";
 import { DEFAULTS } from "../src/config.js";
+
+vi.mock("../src/graph/sigma_adapter.js", () => ({ SigmaAdapter: class {} }));
+const { GraphCoreManager } = await import("../src/graph/core.js");
 
 // setDefaultOutputRange is pure logic: it maps the (elementType, propertyName)
 // pair to the picker's default output range. The render layer (applyHexOpacity)
@@ -30,5 +34,87 @@ describe("NumericScalePicker.setDefaultOutputRange", () => {
   it("falls back to the 0–100 default for unknown properties", () => {
     expect(rangeFor("nodes", "Unknown")).toEqual({ min: 0, max: 100 });
     expect(rangeFor("edges", "Unknown")).toEqual({ min: 0, max: 100 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Map by data → node size, through the real picker popup and updateNodes.
+const P = "Data::g::P";
+
+function cacheWith(values) {
+  const nodeRef = new Map();
+  for (const [id, v] of Object.entries(values)) {
+    const featureValues = new Map(v === undefined ? [] : [[P, v]]);
+    nodeRef.set(id, { id, type: "circle", style: { size: DEFAULTS.NODE.SIZE }, features: new Set(featureValues.keys()), featureValues });
+  }
+  const cache = {
+    DEFAULTS,
+    nodeRef,
+    selectedNodes: [],
+    data: { selectedLayout: "L", layouts: { L: { nodeStyles: new Map(), filters: new Map([[P, { isCategory: false }]]) } } },
+    style: { handleStyleChangeLoadingEvent: async () => {} },
+    history: { commit() {} },
+    ui: { warning: vi.fn(), info: vi.fn() },
+    metrics: { getMetricScaleOptions: () => [], getMetricScaleValues: () => null },
+  };
+  cache.numericPicker = new NumericScalePicker(cache);
+  cache.gcm = new GraphCoreManager(cache);
+  return cache;
+}
+
+/** Select `ids`, open the picker on P, Apply with the default output range. */
+async function mapSize(cache, ids, { missing } = {}) {
+  cache.selectedNodes = ids;
+  cache.numericPicker.currentProperty = "Node Size";
+  const open = cache.numericPicker.pickNumericScale.bind(cache.numericPicker);
+  cache.numericPicker.pickNumericScale = async (...args) => {
+    const result = open(...args);
+    cache.numericPicker.dom.dropdown.value = P;
+    await cache.numericPicker.selectProperty(P);
+    if (missing !== undefined) {
+      const input = cache.numericPicker.dom.missingOutputInput;
+      input.value = String(missing);
+      input.oninput();
+    }
+    cache.numericPicker.apply();
+    return result;
+  };
+  await cache.gcm.updateNodes({ style: { size: "set_numeric_scale" } }, ["set_numeric_scale"]);
+}
+
+const sizeOf = (cache, id) => cache.nodeRef.get(id).style.size;
+
+describe("Map by data: elements without a value", () => {
+  it("overwrites an earlier manual size with the scale minimum", async () => {
+    const cache = cacheWith({ A: undefined, B: 10, C: 20 });
+    cache.selectedNodes = ["A"];
+    await cache.gcm.updateNodes({ style: { size: 30 } }, []);
+
+    await mapSize(cache, ["A", "B", "C"]);
+
+    expect(sizeOf(cache, "A")).toBe(DEFAULTS.NODE.SIZE);
+    expect(sizeOf(cache, "B")).toBe(DEFAULTS.NODE.SIZE);
+    expect(sizeOf(cache, "C")).toBe(50);
+  });
+
+  it("uses the value the user sets for them", async () => {
+    const cache = cacheWith({ A: undefined, B: 10, C: 20 });
+    await mapSize(cache, ["A", "B", "C"], { missing: 5 });
+    expect(sizeOf(cache, "A")).toBe(5);
+  });
+
+  it("treats null and blank as no value, not as 0", async () => {
+    const cache = cacheWith({ A: null, D: "", B: 10, C: 20 });
+    await mapSize(cache, ["A", "D", "B", "C"]);
+    // B is the data minimum; a 0 would have pulled it up the scale.
+    expect(sizeOf(cache, "B")).toBe(DEFAULTS.NODE.SIZE);
+    expect(sizeOf(cache, "A")).toBe(DEFAULTS.NODE.SIZE);
+  });
+
+  it("gives a single shared value the maximum instead of NaN", async () => {
+    const cache = cacheWith({ A: undefined, B: 10 });
+    await mapSize(cache, ["A", "B"]);
+    expect(sizeOf(cache, "B")).toBe(50);
+    expect(sizeOf(cache, "A")).toBe(DEFAULTS.NODE.SIZE);
   });
 });

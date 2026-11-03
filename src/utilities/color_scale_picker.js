@@ -221,21 +221,14 @@ class ColorScalePicker {
 
     const values = [];
     const elementsWithProperty = Array.from(selectedElements).filter((id) => {
-      if (metricSource) {
-        const value = metricSource.values.get(id);
-        if (value !== undefined) {
-          values.push(value);
-          return true;
-        }
-        return false;
-      }
-      const element = elementRef.get(id);
-      const value = element?.featureValues.get(property);
-      if (value !== undefined) {
-        values.push(value);
-        return true;
-      }
-      return false;
+      const raw = metricSource
+        ? metricSource.values.get(id)
+        : elementRef.get(id)?.featureValues.get(property);
+      // A continuous scale needs a number; null or "" from JSON is no value.
+      const value = filterObj.isCategory ? raw : StaticUtilities.numericValue(raw);
+      if (value === undefined || value === null) return false;
+      values.push(value);
+      return true;
     });
 
     const totalElements = selectedElements.length;
@@ -260,8 +253,8 @@ class ColorScalePicker {
       Coloring <strong>${targetProperty}</strong> for <strong>${elementsWithPropertyCount}</strong> of <strong>${totalElements}</strong> ${elementTypeLabel}`;
 
     if (!filterObj.isCategory) {
-      const minVal = Math.min(...values);
-      const maxVal = Math.max(...values);
+      const minVal = values.reduce((a, b) => Math.min(a, b));
+      const maxVal = values.reduce((a, b) => Math.max(a, b));
       infoHTML += `</div><div class="picker-info-range">
         <strong>${propertyDisplayName}</strong> min: ${minVal.toFixed(2)}
         &nbsp;&nbsp;
@@ -329,16 +322,18 @@ class ColorScalePicker {
     const selectedElements =
       this.elementType === 'nodes' ? this.cache.selectedNodes : this.cache.selectedEdges;
     const elementRef = this.elementType === 'nodes' ? this.cache.nodeRef : this.cache.edgeRef;
-    const values = this.activeMetricSource
-      ? Array.from(selectedElements)
-          .map((id) => this.activeMetricSource.values.get(id))
-          .filter((v) => v !== undefined)
-      : Array.from(selectedElements)
-          .map((id) => elementRef.get(id)?.featureValues.get(property))
-          .filter((v) => v !== undefined);
+    const values = Array.from(selectedElements)
+      .map((id) =>
+        StaticUtilities.numericValue(
+          this.activeMetricSource
+            ? this.activeMetricSource.values.get(id)
+            : elementRef.get(id)?.featureValues.get(property),
+        ),
+      )
+      .filter((v) => v !== undefined);
 
-    this.minValue = Math.min(...values);
-    this.maxValue = Math.max(...values);
+    this.minValue = values.reduce((a, b) => Math.min(a, b));
+    this.maxValue = values.reduce((a, b) => Math.max(a, b));
 
     this.handles = [
       { pos: 0, color: this.defaultColors.min, value: this.minValue, fixed: true },
@@ -493,22 +488,25 @@ class ColorScalePicker {
         const valueSet = element?.featureValues.get(dropdown.value);
         const value = valueSet instanceof Set ? Array.from(valueSet)[0] : valueSet;
 
-        if (value !== undefined && categoryColorMap.has(value)) {
-          colorMap.set(elementId, categoryColorMap.get(value));
-        }
+        colorMap.set(
+          elementId,
+          categoryColorMap.has(value) ? categoryColorMap.get(value) : this.defaultColorForMissing,
+        );
       });
     } else {
       Array.from(selectedElements).forEach((elementId) => {
         const element = elementRef.get(elementId);
-        const value = metricSource
-          ? metricSource.values.get(elementId)
-          : element?.featureValues.get(dropdown.value);
+        const value = StaticUtilities.numericValue(
+          metricSource ? metricSource.values.get(elementId) : element?.featureValues.get(dropdown.value),
+        );
 
-        if (value !== undefined) {
-          const normalizedValue = ((value - this.minValue) / (this.maxValue - this.minValue)) * 100;
-          const color = this.getColorForValue(normalizedValue);
-          colorMap.set(elementId, color);
+        if (value === undefined) {
+          colorMap.set(elementId, this.defaultColorForMissing);
+          return;
         }
+        const span = this.maxValue - this.minValue;
+        const normalizedValue = span === 0 ? 100 : ((value - this.minValue) / span) * 100;
+        colorMap.set(elementId, this.getColorForValue(normalizedValue));
       });
     }
 
