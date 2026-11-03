@@ -266,13 +266,21 @@ class IOManager {
   keepPreBuildUpWorkspacesFull(jsonContent) {
     const version = typeof jsonContent.version === 'string' ? jsonContent.version : null;
     if (version && !StaticUtilities.isVersionNewer(BUILD_UP_EMPTY_SINCE, version)) return;
-    for (const layout of Object.values(jsonContent.layouts ?? {})) {
+    const ticked = [];
+    for (const [name, layout] of Object.entries(jsonContent.layouts ?? {})) {
       if (!layout || layout.filterJoinMode === 'AND' || layout.query) continue;
       const filters =
         layout.filters instanceof Map ? [...layout.filters.values()] : Object.values(layout.filters ?? {});
       const usable = filters.filter((filter) => filter && typeof filter === 'object' && !filter.unusable);
       if (usable.length === 0 || usable.some((filter) => filter.active)) continue;
       for (const filter of usable) filter.active = true;
+      ticked.push(name);
+    }
+    if (ticked.length > 0) {
+      this.cache.ui?.info(
+        `Saved by an older version: every filter row in ${ticked.map((n) => `"${n}"`).join(', ')} ` +
+          'is ticked, so it shows the full graph it showed then.'
+      );
     }
   }
 

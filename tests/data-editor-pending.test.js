@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { DataTable } from '../src/utilities/data_editor.js';
 
 const CFG = { EXCEL_NODE_HEADER: 'Node filters', EXCEL_EDGE_HEADER: 'Edge filters' };
@@ -29,6 +29,7 @@ function makeTable() {
       },
       showLoading: async () => {},
       hideLoading: async () => {},
+      warning: vi.fn(),
     },
     selectedNodes: [],
     selectedEdges: [],
@@ -113,7 +114,41 @@ describe('DataTable pending changes', () => {
     t.dt.handleDeleteRow(0);
     await t.dt.refreshCurrentTab();
     expect(rows(t.dt)).toEqual(['Node:n2']);
-    expect(t.dt.getUpdatedFileData().nodes.map((n) => n.id)).toEqual(['n2']);
+    const out = t.dt.getUpdatedFileData();
+    expect(out.nodes.map((n) => n.id)).toEqual(['n2']);
+    // Its edge goes with it, and the user is told.
+    expect(out.edges).toEqual([]);
+    expect(t.cache.ui.warning).toHaveBeenCalledWith(expect.stringContaining('1 edge removed'));
+  });
+
+  it('an emptied label cell clears the label on apply', async () => {
+    const t = makeTable();
+    t.cache.selectedNodes = ['n1'];
+    await t.dt.refreshCurrentTab();
+    typeInto(t, 0, 'Label', '');
+    const n1 = t.dt.getUpdatedFileData().nodes.find((n) => n.id === 'n1');
+    expect(n1.label).toBeUndefined();
+    expect(n1.style.label).toBe(false);
+  });
+
+  it('an ID added and then deleted again leaves nothing pending', async () => {
+    const t = makeTable();
+    await t.dt.addRow('Node', 'n3');
+    expect(t.dt.hasElement('Node', 'n3')).toBe(true);
+    t.dt.handleDeleteRow(0);
+    expect(t.dt.pendingChanges.size).toBe(0);
+    expect(t.dt.hasElement('Node', 'n3')).toBe(false);
+  });
+
+  it('keeps a column sort across edits and redraws', async () => {
+    const t = makeTable();
+    await t.dt.switchTab('allNodes');
+    t.dt.handleHeaderClick(4); // Label ascending
+    t.dt.handleHeaderClick(4); // descending
+    expect(rows(t.dt)).toEqual(['Node:n2', 'Node:n1']);
+    typeInto(t, 1, NODE_P, '9');
+    await t.dt.refreshCurrentTab();
+    expect(rows(t.dt)).toEqual(['Node:n2', 'Node:n1']);
   });
 
   it('lists an added row while it is not selected and requires a property to apply', async () => {

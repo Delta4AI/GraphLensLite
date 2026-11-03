@@ -424,6 +424,7 @@ class GraphLayoutManager {
       edgeStyles.set(edgeID, { type: edge.type, style: structuredClone(edge.style) });
     }
 
+    const sourceName = this.cache.data.selectedLayout;
     this.cache.data.layouts[name] = {
       ...clone,
       internals: null,
@@ -434,8 +435,17 @@ class GraphLayoutManager {
 
     this.cache.uiComponents.buildDropdownOptions();
     document.getElementById('selectView').value = name;
-    // Applies styles and positions, syncs the groups, refreshes the UI.
-    await this.changeLayout();
+    try {
+      // Applies styles and positions, syncs the groups, refreshes the UI.
+      await this.changeLayout();
+    } catch (err) {
+      // Never leave a half-built copy registered and selected.
+      delete this.cache.data.layouts[name];
+      this.cache.data.selectedLayout = sourceName;
+      this.cache.uiComponents.buildDropdownOptions();
+      document.getElementById('selectView').value = sourceName;
+      throw err;
+    }
   }
 
   /** One-click copy of the current workspace, named "<name> (copy)". */
@@ -452,9 +462,12 @@ class GraphLayoutManager {
   /** Put the current workspace back the way it was when it was loaded or created. */
   async resetSelectedLayout() {
     const name = this.cache.data.selectedLayout;
-    const done = await this.cache.history?.resetToOrigin();
-    if (!done) {
+    if (!this.cache.history?.hasOrigin(name)) {
       this.cache.ui.error(`There is no loaded state of "${name}" to go back to.`);
+      return;
+    }
+    if (!(await this.cache.history.resetToOrigin())) {
+      this.cache.ui.error(`"${name}" could not be reset: the graph is not ready. Try again once it has loaded.`);
       return;
     }
     this.cache.rail?.refresh();

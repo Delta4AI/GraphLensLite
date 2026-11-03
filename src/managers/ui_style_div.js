@@ -95,6 +95,11 @@ function createColorPicker(defaultColor, title) {
   return colorPicker;
 }
 
+// Where a failed button action goes. createStyleDiv points it at the UI's
+// error toast; button actions are mostly async, and a dropped rejection
+// would otherwise reach only the devtools console.
+let reportButtonFailure = (err) => console.error(err);
+
 function createButton(label, tooltip, callback, id = undefined) {
   const btn = document.createElement("button");
   btn.textContent = label;
@@ -107,8 +112,12 @@ function createButton(label, tooltip, callback, id = undefined) {
     btn.id = label;
   }
   btn.onclick = () => {
-    callback();
-  }
+    try {
+      Promise.resolve(callback()).catch((err) => reportButtonFailure(err));
+    } catch (err) {
+      reportButtonFailure(err);
+    }
+  };
   return btn;
 }
 
@@ -138,6 +147,7 @@ function createInput(widthInPx = 80, placeholder = undefined, title = undefined,
 }
 
 function createStyleDiv(cache) {
+  reportButtonFailure = (err) => cache.ui.error(`That did not work: ${err?.message ?? err}`);
   const root = document.createElement("div");
 
   function createCard(label, parent = undefined, additionalCSSClass = undefined) {

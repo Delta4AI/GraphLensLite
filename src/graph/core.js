@@ -572,6 +572,7 @@ class GraphCoreManager {
           node.style.badgePalette = [];
         }
         if (command === 'badge_set' || command === 'badge_remove') {
+          if (!badge?.placement) throw new Error(`${command} needs a badge placement`);
           const slot = badgeSlot(badge.placement);
           let next = withoutSlot(node.style, slot);
           if (command === 'badge_set') {

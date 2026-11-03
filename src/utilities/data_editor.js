@@ -115,15 +115,16 @@ class DataTable {
     });
 
     this.sortState = {};
-    this.loadTabData();
-
-    await this.cache.ui.hideLoading();
+    try {
+      this.loadTabData();
+    } finally {
+      await this.cache.ui.hideLoading();
+    }
   }
 
   loadTabData() {
     if (!this.fileData) {
-      this.cache.ui.error('No fileData available');
-      return;
+      throw new Error('The data editor has no graph data loaded.');
     }
 
     this.headers = [...BASIC_HEADERS];
@@ -1155,18 +1156,23 @@ class DataTable {
       cleanElem.D4Data = structuredClone(this.#elementFor(change.type, change.id)?.D4Data ?? {});
 
       for (const [header, value] of Object.entries(change.values)) {
+        // An emptied Label or Description cell clears the field: the table
+        // shows it empty, so Apply must not quietly keep the old text.
         if (header === 'Label') {
           if (value) {
             cleanElem.label = value;
-            if (isNode) {
-              cleanElem.style.label = true;
-              cleanElem.style.labelText = value;
-            }
+          } else {
+            delete cleanElem.label;
+          }
+          if (isNode) {
+            cleanElem.style.label = Boolean(value);
+            cleanElem.style.labelText = value;
           }
           continue;
         }
         if (header === 'Description') {
           if (value) cleanElem.description = value;
+          else delete cleanElem.description;
           continue;
         }
         const [group, subGroup, prop] = StaticUtilities.decodePropHashId(header);
@@ -1201,17 +1207,14 @@ class DataTable {
     }
 
     const nodeIds = new Set(result.nodes.map((n) => n.id));
-    result.edges = result.edges.filter((edge) => {
-      if (!nodeIds.has(edge.source)) {
-        console.warn(`Edge ${edge.id} references non-existent source node: ${edge.source}`);
-        return false;
-      }
-      if (!nodeIds.has(edge.target)) {
-        console.warn(`Edge ${edge.id} references non-existent target node: ${edge.target}`);
-        return false;
-      }
-      return true;
-    });
+    const dropped = result.edges.filter((edge) => !nodeIds.has(edge.source) || !nodeIds.has(edge.target));
+    if (dropped.length > 0) {
+      result.edges = result.edges.filter((edge) => !dropped.includes(edge));
+      this.cache.ui.warning(
+        `${dropped.length} edge${dropped.length === 1 ? '' : 's'} removed because a node ` +
+          `${dropped.length === 1 ? 'it connects' : 'they connect'} was deleted.`
+      );
+    }
 
     return result;
   }

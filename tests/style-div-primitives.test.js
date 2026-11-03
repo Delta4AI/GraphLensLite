@@ -63,6 +63,17 @@ describe('createButton and createColorPicker', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
+  it('reports a failed action instead of dropping it', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const btn = createButton('Set', 'Set it', async () => {
+      throw new Error('nope');
+    });
+    btn.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(consoleError).toHaveBeenCalledWith(expect.objectContaining({ message: 'nope' }));
+    consoleError.mockRestore();
+  });
+
   it('seeds the colour input with the given value', () => {
     expect(createColorPicker('#403C53').value).toBe('#403c53');
   });

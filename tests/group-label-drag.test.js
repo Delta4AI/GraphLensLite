@@ -156,11 +156,23 @@ describe("InteractionManager label drag", () => {
     expect(cache.sm.selectElements).not.toHaveBeenCalled();
   });
 
-  it("a click on a label that never moves changes nothing about the label", async () => {
-    const { captorHandlers, cache } = makeManager();
+  it("a drop that cannot be kept puts the label back and is reported", async () => {
+    const { captorHandlers, bubbleLayer, cache } = makeManager();
+    cache.bs.setLabelShift.mockRejectedValueOnce(new Error("group gone"));
+    captorHandlers.mousedown(at(50, 50));
+    captorHandlers.mousemovebody(at(80, 50));
+    captorHandlers.mouseup();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(bubbleLayer.previewLabelShift).toHaveBeenLastCalledWith("g", { x: 1, y: 2 });
+    expect(cache.ui.error).toHaveBeenCalledWith(expect.stringContaining("group gone"));
+  });
+
+  it("a click on a label that never moves leaves the click to the click handlers", async () => {
+    const { manager, captorHandlers, cache } = makeManager();
     captorHandlers.mousedown(at(50, 50));
     captorHandlers.mouseup();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(cache.bs.setLabelShift).not.toHaveBeenCalled();
+    expect(manager.suppressNextClick).toBe(false);
   });
 });

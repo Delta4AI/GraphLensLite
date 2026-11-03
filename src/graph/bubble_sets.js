@@ -469,10 +469,10 @@ class GraphBubbleSetManager {
    */
   async setLabelShift(group, x, y) {
     const bStyle = this.#layout().bubbleSetStyle[group];
-    if (!bStyle) return;
+    if (!bStyle) throw new Error(`Group "${group}" no longer exists, so its label position was not kept.`);
+    await this.#groupInstance(group).update({ labelShiftX: x, labelShiftY: y });
     bStyle.labelShiftX = x;
     bStyle.labelShiftY = y;
-    await this.#groupInstance(group).update({ labelShiftX: x, labelShiftY: y });
     this.cache.history?.commit(x === 0 && y === 0 ? 'Reset group label position' : 'Move group label');
   }
 

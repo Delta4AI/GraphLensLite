@@ -228,7 +228,14 @@ class Rail {
   #closeAnd(action) {
     return () => {
       this.closeMenus();
-      action();
+      // Menu actions are mostly async; a rejection here would otherwise reach
+      // only the devtools console while the user waits for nothing.
+      const report = (err) => this.cache.ui.error(`That did not work: ${err?.message ?? err}`);
+      try {
+        Promise.resolve(action()).catch(report);
+      } catch (err) {
+        report(err);
+      }
     };
   }
 

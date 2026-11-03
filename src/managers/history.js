@@ -299,7 +299,13 @@ class History {
 
       const select = document.getElementById('selectView');
       if (select) select.value = entry.name;
-      await this.cache.lm.changeLayout(message, busy);
+      try {
+        await this.cache.lm.changeLayout(message, busy);
+      } catch (err) {
+        // The screen never switched; keep the data matching it.
+        layouts[entry.name] = live;
+        throw err;
+      }
       this.baseline = snapshot(this.cache);
     } finally {
       this.restoring = false;

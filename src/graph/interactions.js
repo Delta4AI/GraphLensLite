@@ -362,12 +362,18 @@ class InteractionManager {
   }
 
   async #finishLabelDrag() {
-    const { group, shift, moved } = this.labelDrag;
+    const { group, shift, from, moved } = this.labelDrag;
     this.labelDrag = null;
     this.container.classList?.remove(DRAGGING_GROUP_LABEL_CLASS);
     if (!moved) return; // a click on a label: the click handlers own it
     this.suppressNextClick = true; // before any await (see #onMouseUp)
-    await this.cache.bs.setLabelShift(group, shift.x, shift.y);
+    try {
+      await this.cache.bs.setLabelShift(group, shift.x, shift.y);
+    } catch (err) {
+      // Put the preview back where the saved state has it; #guard reports.
+      this.adapter.bubbleLayer.previewLabelShift(group, from);
+      throw err;
+    }
   }
 
   // ----------------------------------------------------- modifier lasso
