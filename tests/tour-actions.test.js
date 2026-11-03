@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { GuidedTour, generateTourData } from '../src/utilities/tour.js';
+import { GuidedTour, generateTourData, fitAbove } from '../src/utilities/tour.js';
 
 // ==========================================================================
 // The guided tour's action dispatch. Each step can ask the shell to put
@@ -154,5 +154,21 @@ describe('generateTourData', () => {
       expect(ids.has(edge.source), edge.source).toBe(true);
       expect(ids.has(edge.target), edge.target).toBe(true);
     }
+  });
+});
+
+// Steps over the workbench put their popup above it: covering the panel a step
+// introduces hides the very thing it explains.
+describe('fitAbove', () => {
+  it('ends a short popup just above the target', () => {
+    const { top } = fitAbove(600, 16);
+    expect(top(200)).toBe(384);
+  });
+
+  it('caps a tall popup to the room above, so it never reaches the target', () => {
+    const { maxHeight, top } = fitAbove(600, 16);
+    expect(maxHeight).toBe(568);
+    expect(top(900)).toBe(16);
+    expect(top(900) + maxHeight).toBeLessThanOrEqual(600 - 16);
   });
 });

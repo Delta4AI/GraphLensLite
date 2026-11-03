@@ -1,5 +1,18 @@
 import { Popup } from './popup.js';
 
+// Gap between a tour popup and the viewport edge or the element it explains.
+const POPUP_MARGIN = 16;
+
+/**
+ * The room above a target for a popup that must not cover it: the tallest the
+ * popup may be, and its top for a given rendered height.
+ * @returns {{maxHeight: number, top: (height: number) => number}}
+ */
+function fitAbove(targetTop, margin = POPUP_MARGIN) {
+  const maxHeight = Math.max(0, targetTop - 2 * margin);
+  return { maxHeight, top: (height) => targetTop - margin - Math.min(height, maxHeight) };
+}
+
 function generateTourData() {
   const categories = ['Protein', 'Enzyme', 'Receptor', 'Transporter', 'Kinase'];
   const compartments = ['Nucleus', 'Cytoplasm', 'Membrane', 'Mitochondria', 'ER'];
@@ -390,8 +403,8 @@ const TOUR_STEPS = [
            <span style="display:inline-block;width:24px;height:16px;border:1px solid var(--border-strong);border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> color scale tools.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button next to the metric dropdown for a detailed explanation of the selected metric.`,
-    targets: [{ selector: '#metricsContainer' }, { selector: '#metricsToggleBtn' }],
-    position: 'left',
+    targets: [{ selector: '#workbench' }, { selector: '#metricsToggleBtn' }],
+    position: 'above',
     action: 'openMetricsPanel',
   },
   {
@@ -413,7 +426,7 @@ const TOUR_STEPS = [
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the header for usage details.`,
     targets: [{ selector: '#workbench' }, { selector: '#dataToggleBtn' }],
-    position: 'above-lower-left',
+    position: 'above',
     action: 'openDataEditor',
   },
   {
@@ -448,7 +461,7 @@ const TOUR_STEPS = [
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the query editor header for a full syntax reference.`,
     targets: [{ selector: '#workbench' }, { selector: '#queryToggleBtn' }],
-    position: 'above-center-left',
+    position: 'above',
     action: 'openQueryEditor',
   },
   {
@@ -462,7 +475,7 @@ const TOUR_STEPS = [
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            The <strong>budget pill</strong> at the bottom shows how much of the model's context window the next request will consume. Click it for a per-section breakdown.`,
     targets: [{ selector: '#workbench' }, { selector: '#assistantToggleBtn' }],
-    position: 'left',
+    position: 'above',
     action: 'openAssistantPanel',
   },
   {
@@ -621,9 +634,10 @@ class GuidedTour {
     popupOpts.title = titleEl;
 
     const primaryTarget = targets[0];
+    let rect = null;
     if (primaryTarget && this.highlightEls.length) {
       const el = document.querySelector(primaryTarget.selector);
-      const rect = el ? this.getClippedRect(el) : null;
+      rect = el ? this.getClippedRect(el) : null;
       if (rect) {
         const pos = this.computePopupPosition(rect, step.position || 'below');
         if (step.positionOffset) {
@@ -638,11 +652,23 @@ class GuidedTour {
     if (this.popup.overlay) {
       this.popup.overlay.style.background = 'transparent';
     }
+    if (rect && step.position === 'above') this.placeAbove(this.popup.popup, rect.top);
+  }
+
+  /**
+   * Sit the popup's bottom edge just above the target, so a panel along the
+   * bottom of the stage (the workbench) stays in view below it. Its height is
+   * only known once rendered; what does not fit scrolls inside the popup.
+   */
+  placeAbove(popupEl, targetTop) {
+    const { top, maxHeight } = fitAbove(targetTop, POPUP_MARGIN);
+    popupEl.style.maxHeight = `${maxHeight}px`;
+    popupEl.style.top = `${top(popupEl.offsetHeight)}px`;
   }
 
   computePopupPosition(targetRect, position) {
     const popupWidth = 504;
-    const margin = 16;
+    const margin = POPUP_MARGIN;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
@@ -655,14 +681,9 @@ class GuidedTour {
       x = targetRect.right + margin;
       y = targetRect.top;
     } else if (position === 'above') {
+      // A first guess only: showStep moves it once the popup's height is known.
       x = targetRect.left;
-      y = targetRect.top - margin - 300;
-    } else if (position === 'above-center-left') {
-      x = margin;
-      y = (vh - 400) / 2;
-    } else if (position === 'above-lower-left') {
-      x = margin;
-      y = (vh - 400) / 2 + 100;
+      y = margin;
     } else if (position === 'left') {
       x = targetRect.left - margin - popupWidth;
       y = targetRect.top;
@@ -867,4 +888,4 @@ class GuidedTour {
   }
 }
 
-export { generateTourData, GuidedTour };
+export { generateTourData, GuidedTour, fitAbove };
