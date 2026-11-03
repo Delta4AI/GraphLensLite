@@ -345,6 +345,23 @@ class Rail {
         onClick: this.#closeAnd(() => this.cache.lm.addLayout()),
       }),
       menuItem({
+        icon: '⧉',
+        label: 'Duplicate workspace',
+        title: `Copy "${current}" as it is now and switch to the copy`,
+        onClick: this.#closeAnd(() => this.cache.lm.duplicateSelectedLayout()),
+      }),
+      menuItem({
+        icon: '⟲',
+        label: 'Reset to as loaded',
+        disabled: !this.cache.history?.hasOrigin(current),
+        title: this.cache.history?.hasOrigin(current)
+          ? `Put "${current}" back the way it was when the file was loaded (or the workspace ` +
+            'created, or the data last changed): positions, styles, filters, groups and notes. ' +
+            'Undo takes it back.'
+          : `"${current}" has no loaded state to go back to yet`,
+        onClick: this.#closeAnd(() => this.cache.lm.resetSelectedLayout()),
+      }),
+      menuItem({
         icon: '✎',
         label: 'Rename workspace…',
         disabled: current === 'Default',

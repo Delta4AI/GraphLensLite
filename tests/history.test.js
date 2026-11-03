@@ -269,3 +269,51 @@ describe('History', () => {
     expect(history.canUndo).toBe(true);
   });
 });
+
+describe('History origins ("Reset to as loaded")', () => {
+  let cache;
+  let history;
+
+  beforeEach(() => {
+    cache = makeCache();
+    history = new History(cache);
+    cache.history = history;
+    history.reset();
+    history.markOrigin();
+  });
+
+  it('keeps the first settled state, not a later one', () => {
+    layoutOf(cache).filters.get('p1').active = false;
+    history.commit('Filter change');
+    history.reset(); // e.g. switching away and back
+    history.markOrigin();
+
+    expect(history.origins.get('Default').state.filters.get('p1').active).toBe(true);
+  });
+
+  it('restores the origin as one undoable step, including uncommitted edits', async () => {
+    layoutOf(cache).filters.get('p1').active = false;
+    history.commit('Filter change');
+    layoutOf(cache).positions.get('n1').style.x = 99; // never committed
+
+    expect(await history.resetToOrigin()).toBe(true);
+    expect(layoutOf(cache).filters.get('p1').active).toBe(true);
+    expect(layoutOf(cache).positions.get('n1').style.x).toBe(1);
+    expect(history.undoLabel).toBe('Reset workspace');
+
+    await history.undo();
+    expect(layoutOf(cache).positions.get('n1').style.x).toBe(99);
+    expect(layoutOf(cache).filters.get('p1').active).toBe(false);
+  });
+
+  it('follows a rename, and has nothing once the data changed', async () => {
+    cache.data.layouts.Renamed = cache.data.layouts.Default;
+    delete cache.data.layouts.Default;
+    cache.data.selectedLayout = 'Renamed';
+    history.renameOrigin('Default', 'Renamed');
+    expect(history.hasOrigin('Renamed')).toBe(true);
+
+    history.forgetOrigins();
+    expect(await history.resetToOrigin()).toBe(false);
+  });
+});

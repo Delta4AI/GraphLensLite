@@ -113,6 +113,10 @@ class History {
     this.future = [];
     this.baseline = null;
     this.restoring = false;
+    // Workspace name → the snapshot taken when that workspace first settled
+    // after the graph was built: what "Reset to as loaded" goes back to. Kept
+    // apart from cache.data, which the JSON export saves wholesale.
+    this.origins = new Map();
   }
 
   get canUndo() {
@@ -174,6 +178,61 @@ class History {
     this.future = [];
     this.baseline = after;
     this.syncButtons();
+  }
+
+  /**
+   * Remember the current workspace's state as its origin, unless it already
+   * has one. Call right after reset() at a point where the workspace has
+   * settled: the first render of a graph, or the first switch into a workspace
+   * (which is when an untouched workspace computes its positions).
+   */
+  markOrigin() {
+    const current = currentLayout(this.cache);
+    if (!current || this.origins.has(current.name)) return;
+    this.origins.set(current.name, this.baseline ?? snapshot(this.cache));
+  }
+
+  /** The graph itself changed (data edit, merge): no origin describes it any more. */
+  forgetOrigins() {
+    this.origins.clear();
+  }
+
+  hasOrigin(name) {
+    return this.origins.has(name);
+  }
+
+  renameOrigin(from, to) {
+    const origin = this.origins.get(from);
+    this.origins.delete(from);
+    if (origin) this.origins.set(to, { ...origin, name: to });
+  }
+
+  dropOrigin(name) {
+    this.origins.delete(name);
+  }
+
+  /**
+   * Put the current workspace back the way it was when it first settled, as
+   * one undoable step.
+   * @returns {Promise<boolean>} false when there is no origin to go back to
+   */
+  async resetToOrigin() {
+    const current = currentLayout(this.cache);
+    const origin = current && this.origins.get(current.name);
+    if (!origin) return false;
+    // The live state, not the baseline: edits that never committed (the group
+    // panel's knobs) must come back on undo as well.
+    const before = snapshot(this.cache);
+    const done = await this.#install(origin, 'Workspace reset to how it was loaded', {
+      header: 'Resetting workspace',
+      text: current.name,
+    });
+    if (!done) return false;
+    this.past.push({ label: 'Reset workspace', before, after: this.baseline });
+    while (this.past.length > this.#depth()) this.past.shift();
+    this.future = [];
+    this.syncButtons();
+    return true;
   }
 
   async undo() {

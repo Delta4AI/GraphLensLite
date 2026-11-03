@@ -110,7 +110,10 @@ class GraphLayoutManager {
       this.cache.ui.info(message ?? `Switched to workspace: ${this.cache.data.selectedLayout}`);
       // Snapshots describe one workspace's state; a real switch invalidates
       // them. A restore drives this same path and re-baselines itself.
-      if (!message) this.cache.history?.reset();
+      if (!message) {
+        this.cache.history?.reset();
+        this.cache.history?.markOrigin();
+      }
     } finally {
       // Defensive: if a step above threw before the release, drop the hold and
       // the overlay here so a failed switch never strands a blocked UI.
@@ -231,71 +234,9 @@ class GraphLayoutManager {
       return;
     }
 
-    const currentLayout = this.cache.data.layouts[this.cache.data.selectedLayout];
-
     if (result.mode === 'clone') {
-      // Clone current view - copy everything including CURRENT visual state
-      // Capture ALL node and edge styles and types as they currently appear
-      const nodeStyles = new Map();
-      for (const [nodeID, node] of this.cache.nodeRef.entries()) {
-        nodeStyles.set(nodeID, {
-          type: node.type,
-          style: structuredClone(node.style),
-        });
-      }
-
-      const edgeStyles = new Map();
-      for (const [edgeID, edge] of this.cache.edgeRef.entries()) {
-        edgeStyles.set(edgeID, {
-          type: edge.type,
-          style: structuredClone(edge.style),
-        });
-      }
-
-      this.cache.data.layouts[result.name] = {
-        internals: null,
-        layoutType: currentLayout.layoutType, // inherit origin type for re-layout default
-        positions: structuredClone(currentLayout.positions),
-        filters: structuredClone(currentLayout.filters),
-        isCustom: true,
-        hideDisconnectedNodes: currentLayout.hideDisconnectedNodes || false,
-        // Capture complete current visual state
-        nodeStyles: nodeStyles,
-        edgeStyles: edgeStyles,
-        bubbleSetStyle: structuredClone(currentLayout.bubbleSetStyle),
-        annotations: structuredClone(currentLayout.annotations ?? []),
-      };
-
-      // Copy query if it exists
-      if (currentLayout['query']) {
-        this.cache.data.layouts[result.name]['query'] = currentLayout['query'];
-      }
-
-      // Copy bubble group props and manual members. The group list comes from
-      // the SOURCE layout's own bubbleSetStyle, not from traverseBubbleSets():
-      // that reads the selected layout, which is only the source by accident of
-      // ordering here and would silently copy the wrong set of groups if this
-      // ever moved after the switch.
-      for (let group of Object.keys(currentLayout.bubbleSetStyle ?? {})) {
-        this.cache.data.layouts[result.name][`${group}Props`] = structuredClone(
-          currentLayout[`${group}Props`] || new Set()
-        );
-        this.cache.data.layouts[result.name][`${group}ManualMembers`] = structuredClone(
-          currentLayout[`${group}ManualMembers`] || new Set()
-        );
-      }
-
+      await this.#cloneSelectedLayout(result.name);
       this.cache.ui.info(`Cloned view: ${result.name}`);
-
-      // Switch to the new layout
-      this.cache.uiComponents.buildDropdownOptions();
-      document.getElementById('selectView').value = result.name;
-
-      // The changeLayout call will handle:
-      // - Applying styles and positions
-      // - Syncing bubble groups via updateBubbleSetIfChanged
-      // - Refreshing all UI elements
-      await this.cache.lm.changeLayout();
     } else {
       // Warn before kicking off a super-linear layout (dagre/mds) on a large
       // graph: even off the main thread it can run for minutes, and the overlay
@@ -445,6 +386,11 @@ class GraphLayoutManager {
         }
 
         this.cache.ui.info(`Created Workspace: ${result.name} (${result.templateType})`);
+        // A new workspace starts its own history, and this — fully settled —
+        // is its origin (the render above may have marked a half-synced one).
+        this.cache.history?.dropOrigin(result.name);
+        this.cache.history?.reset();
+        this.cache.history?.markOrigin();
       } finally {
         // Defensive: release the hold + drop the overlay on any failure so a
         // half-created workspace never strands a blocked UI; clear the tween flag.
@@ -453,6 +399,65 @@ class GraphLayoutManager {
         if (this.cache.graph) this.cache.graph.pendingLayoutTransition = false;
       }
     }
+  }
+
+  /**
+   * Copy the current workspace under `name` and switch to it. Every key is
+   * copied, so settings added to workspaces later come along without this
+   * having to learn about them; only the styles are taken from what is on
+   * screen rather than from the stored maps.
+   */
+  async #cloneSelectedLayout(name) {
+    const source = this.cache.data.layouts[this.cache.data.selectedLayout];
+    const clone = {};
+    for (const [key, value] of Object.entries(source)) {
+      if (key === 'internals') continue; // renderer handle, rebuilt per render
+      clone[key] = structuredClone(value);
+    }
+
+    const nodeStyles = new Map();
+    for (const [nodeID, node] of this.cache.nodeRef.entries()) {
+      nodeStyles.set(nodeID, { type: node.type, style: structuredClone(node.style) });
+    }
+    const edgeStyles = new Map();
+    for (const [edgeID, edge] of this.cache.edgeRef.entries()) {
+      edgeStyles.set(edgeID, { type: edge.type, style: structuredClone(edge.style) });
+    }
+
+    this.cache.data.layouts[name] = {
+      ...clone,
+      internals: null,
+      isCustom: true,
+      nodeStyles,
+      edgeStyles,
+    };
+
+    this.cache.uiComponents.buildDropdownOptions();
+    document.getElementById('selectView').value = name;
+    // Applies styles and positions, syncs the groups, refreshes the UI.
+    await this.changeLayout();
+  }
+
+  /** One-click copy of the current workspace, named "<name> (copy)". */
+  async duplicateSelectedLayout() {
+    const current = this.cache.data.selectedLayout;
+    const taken = new Set(Object.keys(this.cache.data.layouts));
+    let name = `${current} (copy)`;
+    for (let n = 2; taken.has(name); n++) name = `${current} (copy ${n})`;
+    await this.#cloneSelectedLayout(name);
+    this.cache.rail?.refresh();
+    this.cache.ui.info(`Duplicated "${current}" as "${name}"`);
+  }
+
+  /** Put the current workspace back the way it was when it was loaded or created. */
+  async resetSelectedLayout() {
+    const name = this.cache.data.selectedLayout;
+    const done = await this.cache.history?.resetToOrigin();
+    if (!done) {
+      this.cache.ui.error(`There is no loaded state of "${name}" to go back to.`);
+      return;
+    }
+    this.cache.rail?.refresh();
   }
 
   /** Rename the current workspace (the Default workspace keeps its name). */
@@ -477,6 +482,7 @@ class GraphLayoutManager {
     this.cache.data.layouts[name] = this.cache.data.layouts[current];
     delete this.cache.data.layouts[current];
     this.cache.data.selectedLayout = name;
+    this.cache.history?.renameOrigin(current, name);
     this.cache.uiComponents.buildDropdownOptions();
     this.cache.rail?.refresh();
     this.cache.ui.info(`Renamed workspace "${current}" to "${name}"`);
@@ -500,6 +506,7 @@ class GraphLayoutManager {
     );
     if (!confirmed) return false;
 
+    this.cache.history?.dropOrigin(this.cache.data.selectedLayout);
     delete this.cache.data.layouts[this.cache.data.selectedLayout];
     this.cache.uiComponents.buildDropdownOptions();
 

@@ -395,6 +395,8 @@ async function mergeAndApply(cache, newNodes, newRels, deps = {}) {
     }
     // A merge is structural: earlier snapshots describe a smaller graph.
     cache.history?.reset();
+    cache.history?.forgetOrigins();
+    cache.history?.markOrigin();
   }
   return rendered;
 }
