@@ -118,3 +118,30 @@ describe("Map by data: elements without a value", () => {
     expect(sizeOf(cache, "A")).toBe(DEFAULTS.NODE.SIZE);
   });
 });
+
+describe("Map by data: what counts as a value", () => {
+  it("reads numbers and numeric text, and nothing else", async () => {
+    const { StaticUtilities } = await import("../src/utilities/static.js");
+    expect(StaticUtilities.numericValue("12")).toBe(12);
+    for (const none of [" ", "abc", null, undefined, Infinity, NaN]) {
+      expect(StaticUtilities.numericValue(none)).toBeUndefined();
+    }
+  });
+
+  it("the value for missing follows the minimum output until it is edited", async () => {
+    const cache = cacheWith({ A: undefined, B: 10, C: 20 });
+    cache.selectedNodes = ["A", "B", "C"];
+    const picker = cache.numericPicker;
+    const pending = picker.pickNumericScale("nodes", "Node Size");
+    picker.dom.minOutputInput.value = "7";
+    picker.dom.minOutputInput.oninput();
+    expect(picker.missingOutput).toBe(7);
+    picker.dom.missingOutputInput.value = "3";
+    picker.dom.missingOutputInput.oninput();
+    picker.dom.minOutputInput.value = "9";
+    picker.dom.minOutputInput.oninput();
+    expect(picker.missingOutput).toBe(3);
+    picker.cancel();
+    await pending;
+  });
+});

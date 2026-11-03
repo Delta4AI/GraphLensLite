@@ -23,6 +23,31 @@ function pickerOver(values, filter) {
 }
 
 describe('ColorScalePicker missing values', () => {
+  it('builds the gradient range from numbers only', () => {
+    const { picker } = pickerOver({ a: null, b: '', c: 10, d: 20 }, { isCategory: false });
+    picker.dom.gradient = { style: {} };
+    picker.dom.handleContainer = { style: {} };
+    picker.dom.controls = { style: {} };
+    picker.dom.categoryContainer = { style: {} };
+    picker.renderHandles = () => {};
+    picker.updateGradient = () => {};
+    picker.defaultColors = { min: '#000000', max: '#ffffff' };
+    picker.initializeGradient(P);
+    expect([picker.minValue, picker.maxValue]).toEqual([10, 20]);
+  });
+
+  it('gives a single shared value the end colour', () => {
+    const { picker, result } = pickerOver({ a: 5, b: 5 }, { isCategory: false });
+    picker.minValue = 5;
+    picker.maxValue = 5;
+    picker.handles = [
+      { pos: 0, color: '#000000' },
+      { pos: 100, color: '#ffffff' },
+    ];
+    picker.apply();
+    expect(Object.fromEntries(result())).toEqual({ a: '#ffffff', b: '#ffffff' });
+  });
+
   it('gives continuous elements without a number the missing-value colour', () => {
     const { picker, result } = pickerOver({ a: 0, b: 10, c: null, d: undefined }, { isCategory: false });
     picker.minValue = 0;

@@ -282,13 +282,14 @@ describe('History origins ("Reset to as loaded")', () => {
     history.markOrigin();
   });
 
-  it('keeps the first settled state, not a later one', () => {
+  it('keeps the first settled state, not a later one', async () => {
     layoutOf(cache).filters.get('p1').active = false;
     history.commit('Filter change');
     history.reset(); // e.g. switching away and back
     history.markOrigin();
 
-    expect(history.origins.get('Default').state.filters.get('p1').active).toBe(true);
+    await history.resetToOrigin();
+    expect(layoutOf(cache).filters.get('p1').active).toBe(true);
   });
 
   it('restores the origin as one undoable step, including uncommitted edits', async () => {

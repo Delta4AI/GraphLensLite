@@ -125,3 +125,25 @@ describe("modifier lasso on empty canvas", () => {
     expect(m.manager.draggedNode).toBe("in");
   });
 });
+
+describe("lasso mode release modifiers", () => {
+  /** A pointer event at viewport (x, y) with the given modifiers, as jsdom lacks PointerEvent. */
+  function pointer(type, x, y, keys = {}) {
+    const event = new MouseEvent(type, { button: 0, bubbles: true, ...keys });
+    Object.defineProperties(event, { offsetX: { value: x }, offsetY: { value: y }, pointerId: { value: 1 } });
+    return event;
+  }
+
+  it("Ctrl+Shift on release takes the enclosed nodes out of the selection", async () => {
+    const m = makeManager();
+    m.cache.ui.toggleLassoSelection = vi.fn();
+    m.manager.setEnabled("lasso", true);
+    const canvas = m.manager.container.querySelector(".lasso-overlay");
+    canvas.setPointerCapture = () => {};
+    canvas.dispatchEvent(pointer("pointerdown", 0, 0));
+    for (const [x, y] of [[100, 0], [100, 100], [0, 100]]) canvas.dispatchEvent(pointer("pointermove", x, y));
+    canvas.dispatchEvent(pointer("pointerup", 0, 100, { ctrlKey: true, shiftKey: true }));
+    await flush();
+    expect(m.cache.sm.updateSelectedState).toHaveBeenCalledWith([{ ref: "in" }], false);
+  });
+});

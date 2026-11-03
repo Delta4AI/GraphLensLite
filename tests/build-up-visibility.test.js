@@ -104,6 +104,28 @@ describe('build up', () => {
   });
 });
 
+describe('match bookkeeping', () => {
+  it('records which property each shown node matched (bubble groups read it)', async () => {
+    const nodes = [node('p1', [NODE_P])];
+    nodes[0].featureIsWithinThreshold = new Map([[NODE_P, true]]);
+    const cache = {
+      CFG: { EXCEL_EDGE_HEADER: 'Edge filters' },
+      EVENT_LOCKS: {},
+      data: { selectedLayout: 'L', layouts: { L: { filters: ticked(NODE_P) } } },
+      nodeRef: new Map(nodes.map((n) => [n.id, n])),
+      edgeRef: new Map(),
+      hiddenDanglingNodeIDs: new Set(),
+      hiddenDanglingEdgeIDs: new Set(),
+      qm: { resetQuery() {}, decodeQueryAndBuildAST() {}, storeQuery() {} },
+      query: { ast: { testNode: () => true, testEdge: () => false } },
+      fm: { resetFeatureIsWithinThresholdMaps() {}, updateElementVisibility: async () => {} },
+      bs: { updateBubbleSetIfChanged: async () => {} },
+    };
+    await new GraphCoreManager(cache).preRenderEvent();
+    expect([...cache.propIDsToNodeIDsToBeShown.get(NODE_P)]).toEqual(['p1']);
+  });
+});
+
 describe('narrow down', () => {
   it('still filters links by the query', async () => {
     const shown = await run({ filterJoinMode: 'AND' }, { nodeMatches: ['p1', 'p2'], edgeMatches: [] });
