@@ -899,13 +899,15 @@ body {
 
 /* Persistent renderer-dead message (src/graph/webgl_support.js) — shown
    where the graph would be when WebGL2 is unavailable */
-/* Building up with no filter row ticked: say why the stage is empty. The card
-   takes clicks; the stage around it stays usable (notes, pan, zoom). */
+/* Building up with no filter row ticked: say why the stage is (nearly) empty.
+   The card takes clicks; the stage around it stays usable (notes, pan, zoom). */
 .build-up-empty {
     position: absolute;
-    top: 50%;
+    /* Near the top, clear of the toasts' column, so it never sits on the
+       elements that do still show (those without properties). */
+    top: 64px;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
     z-index: var(--z-minimap);
     max-width: 320px;
     padding: 16px 20px;
@@ -2352,8 +2354,9 @@ h5 {
 
 .filter-toolbar-join {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 6px 8px;
 }
 
 .filter-strict-checkbox {
@@ -2409,6 +2412,7 @@ h5 {
 }
 
 .filter-join-segment {
+    white-space: nowrap;
     padding: 2px 9px;
     font-size: 11px;
     font-weight: 600;

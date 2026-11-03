@@ -696,7 +696,8 @@ function createStyleDiv(cache) {
     // Called on every selection change (selection.js), so the list and the
     // column choices always describe the nodes the buttons will act on.
     cache.ui.refreshBadgeControls = () => {
-      const nodes = (cache.selectedNodes ?? [])
+      // selectedNodes starts as a Set and becomes an array once something is selected.
+      const nodes = [...(cache.selectedNodes ?? [])]
         .map((id) => cache.nodeRef.get(id))
         .filter(Boolean);
       refreshColumnOptions(nodes);

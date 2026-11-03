@@ -101,7 +101,7 @@ describe('summarizeBadges', () => {
 });
 
 describe('badge controls in the node card', () => {
-  async function mount() {
+  async function mount({ selectedNodes = ['a'] } = {}) {
     const { createStyleDiv } = await import('../src/managers/ui_style_div.js');
     const { DEFAULTS, CFG } = await import('../src/config.js');
     const a = {
@@ -119,7 +119,7 @@ describe('badge controls in the node card', () => {
       data: { selectedLayout: 'Default', layouts: { Default: { filters: new Map(), bubbleSetStyle: {} } } },
       nodeRef: new Map([['a', a]]),
       edgeRef: new Map(),
-      selectedNodes: ['a'],
+      selectedNodes,
       selectedEdges: [],
       nodeLabels: [],
       edgeLabels: [],
@@ -131,6 +131,11 @@ describe('badge controls in the node card', () => {
     document.body.replaceChildren(root);
     return { cache, root };
   }
+
+  it('builds before anything was selected, when the selection is still a Set', async () => {
+    const { root } = await mount({ selectedNodes: new Set() });
+    expect(root.querySelector('.badge-list').hidden).toBe(true);
+  });
 
   it('lists the slot and loads it back into the controls for editing', async () => {
     const { cache, root } = await mount();

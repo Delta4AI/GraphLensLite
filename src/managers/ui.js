@@ -1132,10 +1132,9 @@ class UIManager {
 
       const title = document.createElement('strong');
       title.className = 'build-up-empty-title';
-      title.textContent = 'Nothing shown yet';
+      title.textContent = 'Nothing added yet';
       const body = document.createElement('p');
       body.className = 'build-up-empty-body';
-      body.textContent = 'You are building up: tick a filter row to add the elements it matches.';
 
       const actions = document.createElement('div');
       actions.className = 'build-up-empty-actions';
@@ -1161,6 +1160,13 @@ class UIManager {
       card.append(title, body, actions);
       document.getElementById('outerGraphContainer')?.appendChild(card);
     }
+    const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
+    const bareShown =
+      layout?.includePropertyless !== false &&
+      [...(this.cache.nodeRef?.values() ?? [])].some((node) => node.features?.size === 0);
+    card.querySelector('.build-up-empty-body').textContent =
+      'You are building up: tick a filter row to add the elements it matches.' +
+      (bareShown ? ' Only the elements without properties show until then.' : '');
     card.hidden = false;
   }
 
