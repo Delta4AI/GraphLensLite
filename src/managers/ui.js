@@ -18,6 +18,9 @@ const FILTER_JOIN_KEY = 'gll.filterJoinMode';
 // same-type filter.
 const FILTER_STRICT_KEY = 'gll.filterStrict';
 
+// "Ctrl" or "⌘": the modifier a replacing lasso is drawn with.
+const LASSO_MODIFIER = hotkeyLabel('').replace(/\+$/, '');
+
 // The keyboard cheat sheet (opened with "?"). Must mirror the hotkey switch
 // in graph/core.js registerHotkeyEvents — update both when a key changes.
 const KEYBOARD_SHORTCUTS = [
@@ -32,6 +35,9 @@ const KEYBOARD_SHORTCUTS = [
   ['M', 'Toggle metrics panel'],
   ['Y', 'Jump to the inspector’s appearance controls'],
   ['L', 'Toggle lasso selection'],
+  ['⇧ drag', 'Lasso on empty canvas: add to the selection (⇧ click toggles one element)'],
+  [`${LASSO_MODIFIER} drag`, 'Lasso on empty canvas: replace the selection'],
+  [`${LASSO_MODIFIER}+⇧ drag`, 'Lasso on empty canvas: remove from the selection'],
   ['H', 'Toggle hover highlight'],
   ['A', 'Toggle assistant'],
   ['⇧F', 'Presentation mode (hide the rail and inspector)'],

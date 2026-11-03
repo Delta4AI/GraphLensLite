@@ -14,6 +14,23 @@ import { idsInsidePolygon } from "./lasso_geometry.js";
 const LASSO_STROKE = "#C33D35";
 const LASSO_FILL = "rgba(195, 61, 53, 0.3)";
 const TOOLTIP_OFFSET_PX = 12;
+// A modifier press on empty canvas becomes a lasso once it travels this far;
+// shorter, it stays a click.
+const LASSO_DRAG_THRESHOLD_PX = 3;
+const LASSO_ARMED_CLASS = "lasso-armed";
+
+/**
+ * What a lasso does, from the modifiers held: Shift adds to the selection,
+ * Ctrl (⌘ on a Mac) replaces it, both together take the hits back out.
+ * @returns {"add"|"replace"|"subtract"|null} null when no modifier is held
+ */
+function lassoModeFor(event) {
+  const command = Boolean(event?.ctrlKey || event?.metaKey);
+  if (command && event.shiftKey) return "subtract";
+  if (command) return "replace";
+  if (event?.shiftKey) return "add";
+  return null;
+}
 
 class InteractionManager {
   /**
@@ -39,6 +56,9 @@ class InteractionManager {
 
     this.lassoCanvas = null;
     this.lassoPolygon = null;
+    // A lasso drawn by dragging with a modifier held, outside lasso mode:
+    // {mode, start, polygon} from the press until the release.
+    this.modifierLasso = null;
     this.tooltipEl = null;
     // Serializes drag-end persists: a second drag finishing while the first
     // persist is still in flight must not race it.
@@ -46,6 +66,16 @@ class InteractionManager {
     this.escHandler = (event) => {
       if (event.key === "Escape" && this.enabled.lasso) this.cache.ui.toggleLassoSelection();
     };
+    // Crosshair while a lasso modifier is held, so the gesture announces
+    // itself before the drag. Cosmetic only: a missed keyup costs a cursor.
+    this.modifierCursorHandler = (event) => {
+      const armed = Boolean(lassoModeFor(event)) && this.enabled.click && !this.enabled.lasso;
+      this.container.classList.toggle(LASSO_ARMED_CLASS, armed);
+    };
+    this.clearModifierCursor = () => this.container.classList.remove(LASSO_ARMED_CLASS);
+    document.addEventListener("keydown", this.modifierCursorHandler);
+    document.addEventListener("keyup", this.modifierCursorHandler);
+    window.addEventListener("blur", this.clearModifierCursor);
 
     this.#wireSigmaEvents();
   }
@@ -68,6 +98,9 @@ class InteractionManager {
 
   destroy() {
     document.removeEventListener("keydown", this.escHandler);
+    document.removeEventListener("keydown", this.modifierCursorHandler);
+    document.removeEventListener("keyup", this.modifierCursorHandler);
+    window.removeEventListener("blur", this.clearModifierCursor);
     this.lassoCanvas?.remove();
     this.lassoCanvas = null;
     this.tooltipEl?.remove();
@@ -92,13 +125,14 @@ class InteractionManager {
     sigma.on("downNode", (e) => this.#onDownNode(e.node));
     captor.on("mousemovebody", (e) => this.#onMouseMoveBody(e));
     captor.on("mouseup", () => this.#guard(this.#onMouseUp()));
-    captor.on("mousedown", () => {
+    captor.on("mousedown", (e) => {
       this.suppressNextClick = false;
+      this.#armModifierLasso(e);
     });
 
     sigma.on("clickNode", (e) => this.#guard(this.#onClickElement(e.node, false, e.event)));
     sigma.on("clickEdge", (e) => this.#guard(this.#onClickElement(e.edge, true, e.event)));
-    sigma.on("clickStage", () => this.#guard(this.#onClickStage()));
+    sigma.on("clickStage", (e) => this.#guard(this.#onClickStage(e.event)));
 
     sigma.on("enterNode", (e) => this.#onEnter(e.node, false));
     sigma.on("leaveNode", () => this.#clearHover());
@@ -146,6 +180,10 @@ class InteractionManager {
   }
 
   #onMouseMoveBody(event) {
+    if (this.modifierLasso) {
+      this.#extendModifierLasso(event);
+      return;
+    }
     if (!this.draggedNode) return;
     // viewportToGraph returns sigma-space (y-up) — written to graphology
     // as-is; the flip to app space happens once in getNodeData (see
@@ -170,6 +208,10 @@ class InteractionManager {
   }
 
   async #onMouseUp() {
+    if (this.modifierLasso) {
+      await this.#finishModifierLasso();
+      return;
+    }
     if (!this.draggedNode) return;
     const moved = this.dragMoved;
     this.draggedNode = null;
@@ -231,10 +273,13 @@ class InteractionManager {
     if (this.enabled.tooltip && !shiftHeld) this.showTooltip(id, isEdge);
   }
 
-  async #onClickStage() {
+  async #onClickStage(event) {
     if (this.#consumeSuppressedClick()) return;
     this.hideTooltip();
     if (!this.enabled.click) return;
+    // A modifier click on empty canvas is a lasso that never left the spot:
+    // it must not throw away the selection it was meant to extend.
+    if (lassoModeFor(event?.original)) return;
     await this.cache.sm.selectElements([], this.#combinedRefMap());
   }
 
@@ -244,7 +289,7 @@ class InteractionManager {
     // CFG.DISABLE_HOVER_EFFECT is checked live: io.preProcessData and the
     // hover toggle button flip it at runtime.
     if (!this.enabled.hover || this.cache.CFG.DISABLE_HOVER_EFFECT) return;
-    if (this.draggedNode) return;
+    if (this.draggedNode || this.modifierLasso) return;
     this.hoverIds.clear();
     for (const member of hoverNeighborhood(this.adapter.graph, id, isEdge)) {
       this.hoverIds.add(member);
@@ -260,22 +305,76 @@ class InteractionManager {
 
   // ------------------------------------------------------------------ lasso
 
+  // ----------------------------------------------------- modifier lasso
+  // Outside lasso mode, a drag that starts on empty canvas with a modifier
+  // held draws a lasso instead of panning. The gesture rides sigma's own
+  // mouse captor (the overlay canvas stays inert), so wheel zoom keeps
+  // working and a press on a node still drags the node.
+
+  #armModifierLasso(event) {
+    if (this.enabled.lasso || !this.enabled.click || this.draggedNode) return;
+    if (event.original?.button !== 0) return;
+    const mode = lassoModeFor(event.original);
+    if (!mode) return;
+    this.modifierLasso = { mode, start: { x: event.x, y: event.y }, polygon: null };
+  }
+
+  #extendModifierLasso(event) {
+    const lasso = this.modifierLasso;
+    // Held from the press on, so a short wobble never pans the camera either.
+    event.preventSigmaDefault();
+    event.original.preventDefault();
+    const point = { x: event.x, y: event.y };
+    if (!lasso.polygon) {
+      if (Math.hypot(point.x - lasso.start.x, point.y - lasso.start.y) < LASSO_DRAG_THRESHOLD_PX) return;
+      lasso.polygon = [lasso.start];
+      this.hideTooltip();
+      this.#clearHover();
+      this.#showLassoCanvas({ interactive: false });
+    }
+    lasso.polygon.push(point);
+    this.#drawLasso(lasso.polygon);
+  }
+
+  async #finishModifierLasso() {
+    const { mode, polygon } = this.modifierLasso;
+    this.modifierLasso = null;
+    if (!polygon) return; // never travelled: the click handlers own it
+    // Before any await: sigma emits the click straight after mouseup.
+    this.suppressNextClick = true;
+    this.#hideLassoCanvas();
+    await this.#applyLassoSelection(polygon, mode);
+  }
+
+  // ------------------------------------------------------------------ lasso
+
+  /**
+   * @param {{interactive: boolean}} options  interactive: the overlay takes the
+   *   pointer (lasso mode); otherwise it only paints, under sigma's captor.
+   */
+  #showLassoCanvas({ interactive }) {
+    if (!this.lassoCanvas) this.lassoCanvas = this.#createLassoCanvas();
+    this.#resizeLassoCanvas();
+    this.lassoCanvas.style.pointerEvents = interactive ? "" : "none";
+    this.lassoCanvas.style.display = "";
+  }
+
+  #hideLassoCanvas() {
+    if (!this.lassoCanvas) return;
+    this.lassoCanvas.style.display = "none";
+    this.lassoCanvas.getContext("2d").clearRect(0, 0, this.lassoCanvas.width, this.lassoCanvas.height);
+  }
+
   #activateLasso() {
     this.hideTooltip();
     this.#clearHover();
-    if (!this.lassoCanvas) this.lassoCanvas = this.#createLassoCanvas();
-    this.#resizeLassoCanvas();
-    this.lassoCanvas.style.display = "";
+    this.clearModifierCursor();
+    this.#showLassoCanvas({ interactive: true });
     document.addEventListener("keydown", this.escHandler);
   }
 
   #deactivateLasso() {
-    if (this.lassoCanvas) {
-      this.lassoCanvas.style.display = "none";
-      this.lassoCanvas
-        .getContext("2d")
-        .clearRect(0, 0, this.lassoCanvas.width, this.lassoCanvas.height);
-    }
+    this.#hideLassoCanvas();
     this.lassoPolygon = null;
     document.removeEventListener("keydown", this.escHandler);
   }
@@ -321,7 +420,7 @@ class InteractionManager {
   #onLassoPointerMove(event) {
     if (!this.lassoPolygon) return;
     this.lassoPolygon.push({ x: event.offsetX, y: event.offsetY });
-    this.#drawLasso();
+    this.#drawLasso(this.lassoPolygon);
   }
 
   async #onLassoPointerUp(event) {
@@ -330,7 +429,7 @@ class InteractionManager {
     this.lassoPolygon = null;
     const ctx = this.lassoCanvas.getContext("2d");
     ctx.clearRect(0, 0, this.lassoCanvas.width, this.lassoCanvas.height);
-    await this.#applyLassoSelection(polygon, event.shiftKey);
+    await this.#applyLassoSelection(polygon, lassoModeFor(event) ?? "replace");
   }
 
   #cancelLasso() {
@@ -340,12 +439,12 @@ class InteractionManager {
     ctx.clearRect(0, 0, this.lassoCanvas.width, this.lassoCanvas.height);
   }
 
-  #drawLasso() {
+  #drawLasso(polygon) {
     const ctx = this.lassoCanvas.getContext("2d");
     ctx.clearRect(0, 0, this.lassoCanvas.width, this.lassoCanvas.height);
     ctx.beginPath();
-    ctx.moveTo(this.lassoPolygon[0].x, this.lassoPolygon[0].y);
-    for (const p of this.lassoPolygon.slice(1)) ctx.lineTo(p.x, p.y);
+    ctx.moveTo(polygon[0].x, polygon[0].y);
+    for (const p of polygon.slice(1)) ctx.lineTo(p.x, p.y);
     ctx.closePath();
     ctx.fillStyle = LASSO_FILL;
     ctx.strokeStyle = LASSO_STROKE;
@@ -355,11 +454,12 @@ class InteractionManager {
   }
 
   /**
-   * Point-in-polygon over VISIBLE node viewport coordinates. Plain lasso
-   * replaces the selection (an empty/degenerate lasso therefore deselects,
-   * matching a canvas click); shift adds the hits to the selection.
+   * Point-in-polygon over VISIBLE node viewport coordinates. "replace" makes
+   * the hits the selection (an empty lasso therefore deselects, matching a
+   * canvas click); "add" and "subtract" change only the hits.
+   * @param {"replace"|"add"|"subtract"} mode
    */
-  async #applyLassoSelection(polygon, additive) {
+  async #applyLassoSelection(polygon, mode) {
     const sigma = this.adapter.sigma;
     const points = [];
     this.adapter.graph.forEachNode((id, attrs) => {
@@ -369,13 +469,13 @@ class InteractionManager {
     });
     const ids = idsInsidePolygon(points, polygon);
 
-    if (additive) {
-      if (ids.length === 0) return;
-      const refs = ids.map((id) => this.cache.nodeRef.get(id)).filter(Boolean);
-      await this.cache.sm.updateSelectedState(refs, true);
-    } else {
+    if (mode === "replace") {
       await this.cache.sm.selectElements(ids, this.#combinedRefMap());
+      return;
     }
+    if (ids.length === 0) return;
+    const refs = ids.map((id) => this.cache.nodeRef.get(id)).filter(Boolean);
+    await this.cache.sm.updateSelectedState(refs, mode === "add");
   }
 
   // ---------------------------------------------------------------- tooltip
@@ -461,4 +561,4 @@ class InteractionManager {
   }
 }
 
-export { InteractionManager };
+export { InteractionManager, lassoModeFor };

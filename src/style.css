@@ -899,6 +899,11 @@ body {
 
 /* Persistent renderer-dead message (src/graph/webgl_support.js) — shown
    where the graph would be when WebGL2 is unavailable */
+/* A lasso modifier is held (interactions.js): dragging on empty canvas draws. */
+#innerGraphContainer.lasso-armed canvas {
+    cursor: crosshair;
+}
+
 #innerGraphContainer .webgl-error {
     height: 100%;
     display: flex;
