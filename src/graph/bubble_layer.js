@@ -30,7 +30,7 @@ import {
   resolveBubbleLabel,
   OUTLINE_STROKE_WIDTH,
 } from './bubble_geometry.js';
-import { idsKey, positionsChecksum, styleKey } from './overlay_keys.js';
+import { idsKey, positionsChecksum, geometryKey } from './overlay_keys.js';
 import { smoothClosedPath } from './bubble_smoothing.js';
 import { prepareOverlayCanvas } from './dpr_watch.js';
 import { FrameCoalescer } from './overlay_frame.js';
@@ -245,6 +245,9 @@ class BubbleSetLayer {
       state.avoidKey = idsKey(state.avoidMembers);
     }
     state.opts = { ...state.opts, ...style };
+    // Paint-only style (colours, label) leaves the fitted outline as it is,
+    // so nothing else would invalidate the paint skip in #paint.
+    if (Object.keys(style).length > 0) this.lastPaintSignature = null;
     this.scheduleRedraw();
   }
 
@@ -469,7 +472,7 @@ class BubbleSetLayer {
     // identity (what is in the group and how it is styled) always re-fits;
     // position may be deferred while the graph is in motion.
     const identityKey =
-      `${state.membersKey}|${state.avoidKey}|${visibleMembers.length}|${styleKey(state.opts)}`;
+      `${state.membersKey}|${state.avoidKey}|${visibleMembers.length}|${geometryKey(state.opts)}`;
     const positionKey =
       `${positionsChecksum(memberPositions)}|${positionsChecksum(avoidPositions)}`;
     const key = `${identityKey}|${positionKey}`;

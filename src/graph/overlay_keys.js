@@ -45,43 +45,22 @@ function positionsChecksum(points) {
   return `${points.length}:${hash >>> 0}`;
 }
 
-// Style fields that change the painted result; everything else the manager
-// passes (members, avoidMembers) is keyed elsewhere by the layer.
-const STYLE_KEY_FIELDS = [
-  "fill",
-  "fillOpacity",
-  "stroke",
-  "strokeOpacity",
-  "padding",
-  "corridor",
-  "avoidance",
-  "label",
-  "labelText",
-  "labelFill",
-  "labelFontSize",
-  "labelFontStyle",
-  "labelPadding",
-  "labelBackground",
-  "labelBackgroundFill",
-  "labelBackgroundRadius",
-  "labelOffsetX",
-  "labelOffsetY",
-  "labelPlacement",
-  "labelCloseToPath",
-  "labelAutoRotate",
-];
+// The style fields that change the fitted outline. Colours and every label
+// knob only change how a fitted outline is painted — a group's update repaints
+// for those (bubble_layer #updateGroup) without paying for a re-fit, which a
+// label being dragged would otherwise trigger on every frame.
+const GEOMETRY_KEY_FIELDS = ["padding", "corridor", "avoidance"];
 
 /**
- * Stable key over the style options that affect painting. JSON-serialized
- * per field so a literal "undefined" string can never collide with a
- * missing field; null and missing collide on purpose (both paint via the
- * group defaults).
+ * Stable key over the style options that shape the outline. JSON-serialized
+ * per field so a literal "undefined" string can never collide with a missing
+ * field; null and missing collide on purpose (both fit via the group defaults).
  *
  * @param {object} opts  group style options (manager-passed)
  * @returns {string}
  */
-function styleKey(opts = {}) {
-  return STYLE_KEY_FIELDS.map((field) => JSON.stringify(opts[field] ?? null)).join("|");
+function geometryKey(opts = {}) {
+  return GEOMETRY_KEY_FIELDS.map((field) => JSON.stringify(opts[field] ?? null)).join("|");
 }
 
-export { idsKey, positionsChecksum, styleKey };
+export { idsKey, positionsChecksum, geometryKey };

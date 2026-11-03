@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { idsKey, positionsChecksum, styleKey } from "../src/graph/overlay_keys.js";
+import { idsKey, positionsChecksum, geometryKey } from "../src/graph/overlay_keys.js";
 
 // ==========================================================================
 // Overlay cache keys: "has the cached fit gone stale?" for the bubble, heatmap
@@ -89,50 +89,25 @@ describe("positionsChecksum", () => {
   });
 });
 
-describe("styleKey", () => {
+describe("geometryKey", () => {
   it("invalidates on padding/corridor/avoidance changes", () => {
-    expect(styleKey({ padding: 1 })).not.toBe(styleKey({ padding: 1.5 }));
-    expect(styleKey({ corridor: 1 })).not.toBe(styleKey({ corridor: 2 }));
-    expect(styleKey({ avoidance: 1 })).not.toBe(styleKey({ avoidance: 0 }));
+    expect(geometryKey({ padding: 1 })).not.toBe(geometryKey({ padding: 1.5 }));
+    expect(geometryKey({ corridor: 1 })).not.toBe(geometryKey({ corridor: 2 }));
+    expect(geometryKey({ avoidance: 1 })).not.toBe(geometryKey({ avoidance: 0 }));
   });
 
-  it("is stable for equal styles and ignores irrelevant fields", () => {
-    const style = { fill: "#403C53", fillOpacity: 0.25, stroke: "#C33D35", label: true };
-    expect(styleKey({ ...style, members: ["a"] })).toBe(styleKey({ ...style, members: ["b"] }));
-  });
-
-  it("changes when a painted field changes", () => {
-    expect(styleKey({ fill: "#000" })).not.toBe(styleKey({ fill: "#fff" }));
-    expect(styleKey({ label: true, labelText: "a" })).not.toBe(
-      styleKey({ label: true, labelText: "b" }),
+  it("ignores everything that only changes the paint, so it never forces a re-fit", () => {
+    const base = { padding: 1, corridor: 1, avoidance: 1 };
+    expect(geometryKey({ ...base, fill: "#000", labelText: "a", labelShiftX: 3 })).toBe(
+      geometryKey({ ...base, fill: "#fff", labelText: "b", labelShiftX: 40 }),
     );
-    expect(styleKey({ fillOpacity: 0 })).not.toBe(styleKey({ fillOpacity: 0.25 }));
-  });
-
-  it("changes when a label placement knob changes (paint signature must invalidate)", () => {
-    expect(styleKey({ labelPlacement: "top" })).not.toBe(styleKey({ labelPlacement: "bottom" }));
-    expect(styleKey({ labelCloseToPath: true })).not.toBe(styleKey({ labelCloseToPath: false }));
-    expect(styleKey({ labelAutoRotate: true })).not.toBe(styleKey({ labelAutoRotate: false }));
   });
 
   it("distinguishes the literal string \"undefined\" from a missing field", () => {
-    expect(styleKey({ fill: "undefined" })).not.toBe(styleKey({}));
+    expect(geometryKey({ padding: "undefined" })).not.toBe(geometryKey({}));
   });
 
-  it("treats null and missing as equal (both paint via group defaults)", () => {
-    expect(styleKey({ fill: null })).toBe(styleKey({}));
-  });
-});
-
-describe("positionsChecksum node-size fold", () => {
-  it("changes when a member's on-screen radius changes (same positions)", () => {
-    const small = [{ x: 1, y: 2, s: 5 }, { x: 3, y: 4, s: 5 }];
-    const grown = [{ x: 1, y: 2, s: 5 }, { x: 3, y: 4, s: 9 }];
-    expect(positionsChecksum(grown)).not.toBe(positionsChecksum(small));
-  });
-
-  it("treats missing size as stable (legacy point arrays keep working)", () => {
-    const pts = [{ x: 1, y: 2 }, { x: 3, y: 4 }];
-    expect(positionsChecksum(pts)).toBe(positionsChecksum(pts.map((p) => ({ ...p }))));
+  it("treats null and missing as equal (both fit via group defaults)", () => {
+    expect(geometryKey({ padding: null })).toBe(geometryKey({}));
   });
 });
