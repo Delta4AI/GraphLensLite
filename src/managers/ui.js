@@ -562,7 +562,7 @@ class UIManager {
       layer: (c) => c.graph?.bubbleLayer,
       // A group with no members draws nothing, so the count IS the content.
       empty: (c) => UIManager.#groupSetCount(c) === 0,
-      emptyHint: 'Nothing to show yet — put nodes in a group below',
+      emptyHint: 'No group has nodes yet — select nodes, then click ＋ From selection',
     },
     heatmap: { switchId: 'overlaySwitchHeatmap', layer: (c) => c.graph?.heatmapLayer },
     notes: {
