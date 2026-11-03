@@ -14,9 +14,9 @@ import { idsInsidePolygon } from "./lasso_geometry.js";
 const LASSO_STROKE = "#C33D35";
 const LASSO_FILL = "rgba(195, 61, 53, 0.3)";
 const TOOLTIP_OFFSET_PX = 12;
-// A modifier press on empty canvas becomes a lasso once it travels this far;
-// shorter, it stays a click.
-const LASSO_DRAG_THRESHOLD_PX = 3;
+// A press that travels this far becomes a drag (a modifier lasso, a group
+// label); shorter, it stays a click.
+const DRAG_THRESHOLD_PX = 3;
 const LASSO_ARMED_CLASS = "lasso-armed";
 const OVER_GROUP_LABEL_CLASS = "over-group-label";
 const DRAGGING_GROUP_LABEL_CLASS = "dragging-group-label";
@@ -321,8 +321,6 @@ class InteractionManager {
     this.adapter.sigma.refresh({ skipIndexation: true });
   }
 
-  // ------------------------------------------------------------------ lasso
-
   // --------------------------------------------------- group label drag
   // A group's label can be grabbed and dropped anywhere, like a note. The
   // position is kept in graph units (bubble_sets.setLabelShift), so it stays
@@ -349,7 +347,7 @@ class InteractionManager {
     event.original.preventDefault();
     const dx = event.x - drag.start.x;
     const dy = event.y - drag.start.y;
-    if (!drag.moved && Math.hypot(dx, dy) < LASSO_DRAG_THRESHOLD_PX) return;
+    if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
     if (!drag.moved) {
       drag.moved = true;
       this.hideTooltip();
@@ -397,7 +395,7 @@ class InteractionManager {
     event.original.preventDefault();
     const point = { x: event.x, y: event.y };
     if (!lasso.polygon) {
-      if (Math.hypot(point.x - lasso.start.x, point.y - lasso.start.y) < LASSO_DRAG_THRESHOLD_PX) return;
+      if (Math.hypot(point.x - lasso.start.x, point.y - lasso.start.y) < DRAG_THRESHOLD_PX) return;
       lasso.polygon = [lasso.start];
       this.hideTooltip();
       this.#clearHover();
@@ -433,7 +431,14 @@ class InteractionManager {
   #hideLassoCanvas() {
     if (!this.lassoCanvas) return;
     this.lassoCanvas.style.display = "none";
-    this.lassoCanvas.getContext("2d").clearRect(0, 0, this.lassoCanvas.width, this.lassoCanvas.height);
+    this.#clearLassoCanvas();
+  }
+
+  /** @returns {CanvasRenderingContext2D} the lasso canvas's context, wiped */
+  #clearLassoCanvas() {
+    const ctx = this.lassoCanvas.getContext("2d");
+    ctx.clearRect(0, 0, this.lassoCanvas.width, this.lassoCanvas.height);
+    return ctx;
   }
 
   #activateLasso() {
@@ -498,21 +503,18 @@ class InteractionManager {
     if (!this.lassoPolygon) return;
     const polygon = this.lassoPolygon;
     this.lassoPolygon = null;
-    const ctx = this.lassoCanvas.getContext("2d");
-    ctx.clearRect(0, 0, this.lassoCanvas.width, this.lassoCanvas.height);
+    this.#clearLassoCanvas();
     await this.#applyLassoSelection(polygon, lassoModeFor(event) ?? "replace");
   }
 
   #cancelLasso() {
     if (!this.lassoPolygon) return;
     this.lassoPolygon = null;
-    const ctx = this.lassoCanvas.getContext("2d");
-    ctx.clearRect(0, 0, this.lassoCanvas.width, this.lassoCanvas.height);
+    this.#clearLassoCanvas();
   }
 
   #drawLasso(polygon) {
-    const ctx = this.lassoCanvas.getContext("2d");
-    ctx.clearRect(0, 0, this.lassoCanvas.width, this.lassoCanvas.height);
+    const ctx = this.#clearLassoCanvas();
     ctx.beginPath();
     ctx.moveTo(polygon[0].x, polygon[0].y);
     for (const p of polygon.slice(1)) ctx.lineTo(p.x, p.y);

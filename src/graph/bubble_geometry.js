@@ -879,25 +879,6 @@ const LABEL_STANDOFF_PX = 8;
 const BUBBLE_LABEL_FONT_FAMILY = "Arial, sans-serif";
 
 /**
- * Resolve a group label to pure geometry: where the text goes, whether it is
- * rotated onto the path, and the background box behind it. Both sinks then only
- * PAINT — bubble_layer #drawLabel and export_svg bubbleLabelPrimitives used to
- * re-implement the standoff maths, the rotation predicate and the background
- * rect line for line.
- *
- * The `label` on/off gate stays with the callers: the live layer reads it from
- * manager-merged opts, the export resolves it through opts ?? defaults.
- *
- * @param {{x: number, y: number, angle: number, nx: number, ny: number}|null} anchor
- * @param {object} opts per-group style
- * @param {object} defaults BUBBLE_GROUP_STYLE_TEMPLATE
- * @param {(text: string, font: string) => number} measureText
- * @returns {null|{text: string, font: string, fontSize: number, x: number,
- *   y: number, lx: number, ly: number, rotated: boolean, angle: number,
- *   fill: string, background: null|{x: number, y: number, width: number,
- *   height: number, radius: number, fill: string}}}
- */
-/**
  * The label anchor moved by where the user dragged the label to. The shift is
  * stored in app graph units (y down, like node positions in a saved file);
  * the anchor is in sigma graph space (y up), hence the flip on y.
@@ -913,6 +894,26 @@ function shiftedLabelAnchor(anchor, opts = {}) {
   return { ...anchor, x: anchor.x + dx, y: anchor.y - dy };
 }
 
+/**
+ * Resolve a group label to pure geometry: where the text goes, whether it is
+ * rotated onto the path, and the background box behind it. Both sinks then only
+ * PAINT — bubble_layer #drawLabel and export_svg bubbleLabelPrimitives used to
+ * re-implement the standoff maths, the rotation predicate and the background
+ * rect line for line.
+ *
+ * The `label` on/off gate stays with the callers: the live layer reads it from
+ * manager-merged opts, the export resolves it through opts ?? defaults.
+ *
+ * @param {{x: number, y: number, angle: number, nx: number, ny: number}|null} anchor
+ * @param {object} opts per-group style
+ * @param {object} defaults BUBBLE_GROUP_STYLE_TEMPLATE
+ * @param {(text: string, font: string) => number} measureText
+ * @returns {null|{text: string, font: string, fontSize: number, fontStyle: string,
+ *   width: number, padding: number, x: number,
+ *   y: number, lx: number, ly: number, rotated: boolean, angle: number,
+ *   fill: string, background: null|{x: number, y: number, width: number,
+ *   height: number, radius: number, fill: string}}}
+ */
 function resolveBubbleLabel(anchor, opts = {}, defaults = {}, measureText) {
   const text = String(opts.labelText ?? defaults.labelText ?? "");
   if (!text || !anchor) return null;

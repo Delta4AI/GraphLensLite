@@ -131,6 +131,11 @@ function sanitizeAnnotations(list) {
   return list.slice(0, MAX_ANNOTATIONS).map(normalizeAnnotation).filter(Boolean);
 }
 
+/** The note's CSS/canvas font; one string so the DOM, canvas and measuring agree. */
+function annotationFont(ann) {
+  return styledFont(ann.fontStyle, ann.fontSize, ANNOTATION_FONT_FAMILY);
+}
+
 /**
  * Box metrics for an annotation at camera ratio 1 (multiply by the zoom factor
  * for on-screen sizes). boxW/boxH are the OUTER border-box — the same rectangle
@@ -151,11 +156,6 @@ function sanitizeAnnotations(list) {
  *     radius: number, strokeWidth: number},
  *   textLines: Array<{text: string, x: number, y: number}>}}
  */
-/** The note's CSS/canvas font; one string so the DOM, canvas and measuring agree. */
-function annotationFont(ann) {
-  return styledFont(ann.fontStyle, ann.fontSize, ANNOTATION_FONT_FAMILY);
-}
-
 function annotationLayout(ann, measureText) {
   const font = annotationFont(ann);
   const lines = String(ann.text).split('\n');

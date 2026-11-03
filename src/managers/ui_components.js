@@ -1256,8 +1256,8 @@ class UIComponentManager {
     return `Click to ${enable ? 'hide' : 'show'} elements with the property:${StaticUtilities.formatPropsAsTree(propID)}`;
   }
 
-  /** An active-but-unnarrowed filter under AND: on, dimmed, and constraining
-   * nothing. The normal "click to hide elements" reads as a lie there. */
+  /** An active-but-unnarrowed filter while narrowing down: on, dimmed, and
+   * constraining nothing. The normal "click to hide elements" reads as a lie there. */
   getInertCheckboxTT(propID) {
     return `Not narrowed, so narrowing down it excludes nothing — narrow it, or switch to build up:${StaticUtilities.formatPropsAsTree(propID)}`;
   }

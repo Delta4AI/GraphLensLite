@@ -21,7 +21,6 @@ class DataTable {
     this.tableData = [];
     this.headers = [];
     this.currentEditingCell = null;
-    this.onChangeCallback = null;
     this.sortState = {};
     this.headerIndexMap = new Map();
     this.currentTab = 'selectedNodes';
@@ -547,9 +546,6 @@ class DataTable {
 
       this.loadTabData();
 
-      if (this.onChangeCallback) {
-        this.onChangeCallback(-1, -1, 'row_deleted');
-      }
 
       this.notifyPendingChanges();
     }
@@ -596,9 +592,6 @@ class DataTable {
     row[colIndex] = cell.textContent;
     this.trackChange(row[2], row[3], this.headers[colIndex], cell.textContent);
 
-    if (this.onChangeCallback) {
-      this.onChangeCallback(rowIndex, colIndex, cell.textContent);
-    }
 
     this.notifyPendingChanges();
     this.currentEditingCell = null;
@@ -607,11 +600,7 @@ class DataTable {
   notifyPendingChanges() {
     if (this.onPendingChangesCallback) {
       // The pending changes are the whole difference from the loaded data.
-      const hasPendingChanges = this.pendingChanges.size > 0;
-      this.onPendingChangesCallback({
-        hasPendingChanges,
-        hasChangesFromOriginal: hasPendingChanges,
-      });
+      this.onPendingChangesCallback({ hasPendingChanges: this.pendingChanges.size > 0 });
     }
   }
 
@@ -662,17 +651,6 @@ class DataTable {
     if (targetCell && targetCell.contentEditable === 'true') {
       targetCell.focus();
     }
-  }
-
-  onChange(callback) {
-    this.onChangeCallback = callback;
-  }
-
-  getData() {
-    return {
-      headers: [...this.headers],
-      data: this.tableData.map((row) => [...row]),
-    };
   }
 
   async addNode() {
@@ -922,14 +900,6 @@ class DataTable {
     }
     // An added row stays pending even while empty; an edited one does not.
     if (element && Object.keys(change.values).length === 0) this.pendingChanges.delete(key);
-  }
-
-  clear() {
-    this.tableData = [];
-    this.headers = [];
-    this.sortState = {};
-    this.headerIndexMap.clear();
-    this.render();
   }
 
   async update() {
@@ -1446,16 +1416,11 @@ class DataTable {
 }
 
 function buildDataTable(fileData) {
-  this.dataTable.onPendingChangesUpdated(({ hasPendingChanges, hasChangesFromOriginal }) => {
-    const applyBtn = document.getElementById('updateDataTableBtn');
-    const resetBtn = document.getElementById('resetDataTableBtn');
-
-    if (applyBtn) {
-      applyBtn.disabled = !hasPendingChanges;
-    }
-
-    if (resetBtn) {
-      resetBtn.disabled = !hasChangesFromOriginal;
+  this.dataTable.onPendingChangesUpdated(({ hasPendingChanges }) => {
+    // Apply and Reset both act on the pending changes.
+    for (const id of ['updateDataTableBtn', 'resetDataTableBtn']) {
+      const btn = document.getElementById(id);
+      if (btn) btn.disabled = !hasPendingChanges;
     }
   });
   this.dataTable.populateFromFileData(fileData);

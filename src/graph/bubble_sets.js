@@ -457,13 +457,6 @@ class GraphBubbleSetManager {
   }
 
   /**
-   * The renderer handle for a group, created on first use. Groups now arrive
-   * after graph build — from a load or from createGroup — so binding them all
-   * up front at graph-build time is no longer possible; materialising
-   * here removes the ordering question entirely (the layer does the same with
-   * its own per-group state, see bubble_layer #groupState).
-   */
-  /**
    * Keep a group label where it was dragged to (graph units from its outline
    * anchor; see shiftedLabelAnchor). Paint-only: no re-fit, no full render.
    */
@@ -476,6 +469,13 @@ class GraphBubbleSetManager {
     this.cache.history?.commit(x === 0 && y === 0 ? 'Reset group label position' : 'Move group label');
   }
 
+  /**
+   * The renderer handle for a group, created on first use. Groups now arrive
+   * after graph build — from a load or from createGroup — so binding them all
+   * up front at graph-build time is no longer possible; materialising
+   * here removes the ordering question entirely (the layer does the same with
+   * its own per-group state, see bubble_layer #groupState).
+   */
   #groupInstance(group) {
     this.cache.INSTANCES.BUBBLE_GROUPS[group] ??=
       this.cache.graph.getPluginInstance(`bubbleSetPlugin-${group}`);
