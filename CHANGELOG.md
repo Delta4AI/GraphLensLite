@@ -1,10 +1,48 @@
 # Changelog
 
-## Unreleased
+## 1.18.0 — 2026-11-03
+
+Saved files load unchanged. One behaviour changes on purpose — **with the filter join on "Build up" (formerly OR), unticking every row now shows nothing instead of everything** — and files saved by earlier versions in that state open with every row ticked, so they look exactly as they did. Details under *Changed*.
+
+### Features
+
+* **Build a view up from nothing, one property at a time.** The filter panel's OR/AND toggle is now a **＋ Build up** / **− Narrow down** switch, named for what it does, in one card with the options of the chosen mode. Building up (OR) starts from an empty graph: every ticked filter adds the elements it matches, and with nothing ticked a card on the stage says so and offers *Tick all filters* or *Switch to Narrow down*. Narrowing down (AND) is unchanged: start from the full graph, keep what matches every narrowed filter. The line under the search box counts the filters at work — "5 of 7 filters contribute to the graph" when building up, "5 of 7 filters constrain the graph" when narrowing down.
+  * **Links between shown nodes are an explicit choice** while building up — **All between shown nodes** (the default), **Only edge-filter matches** (which bring their end nodes along) or **None**. Ticking a node filter therefore shows those nodes *with* the links between them; previously a ticked node row alone hid every edge that carried a property. Edge filters are dimmed while their ticks change nothing (Links not on edge-filter matches), with a tooltip saying why.
+  * **Elements without any property** — which no filter can match — get their own switch, "Include N elements without properties", shown only when the graph has some. On by default, as before.
+* **Lasso without lasso mode.** Drag on empty canvas while holding **Shift** to add what you encircle to the selection, **Ctrl** (⌘ on a Mac) to replace the selection with it, or both to remove it. The cursor turns into a crosshair while a modifier is held; a press on a node still drags the node, a click still clicks, and wheel zoom keeps working. Inside lasso mode the same modifiers apply on release. The keyboard sheet (**?**) lists the gestures.
+* **Drag a group's label to place it**, like a note. Grab a bubble group's label on the canvas (the cursor turns into a hand) and drop it anywhere; it stays put relative to the drawing at any zoom and follows its group when nodes move. PNG and SVG exports draw it where the screen does, undo takes a move back, and the group's settings gain a *Reset* that puts it back on its outline.
+* **Bold and italic text** for node labels, edge labels (straight and curved), group labels and notes — one *Label Font Style* choice (normal / bold / italic / bold italic) in the node and edge cards, the group settings and the note popover. Hover labels and PNG/SVG exports follow it.
+* **Badges: one per spot, editable, and text from a column.** Each of the eight spots around a node holds one badge: *Set* fills or replaces the chosen spot (so a badge can finally be moved or changed — previously *Add* stacked a second badge beside the first). Under the controls, a list shows what the selected nodes carry spot by spot, with ✎ to load a badge back into the controls and × to remove just that one. A badge's text can come from a node column instead of being typed: each node gets its own value, and nodes without one get no badge there, with a note saying how many.
+* **Reset a workspace to how it was loaded**, and **duplicate one in one click**, from the workspace menu. *Reset to as loaded* puts the current workspace back the way it first settled — when the file was loaded, the workspace created, or the data last changed — positions, styles, filters, groups and notes alike, as one undoable step. *Duplicate workspace* copies the current one as "<name> (copy)" without the New-workspace dialog.
+
+### Fixes
+
+* **Clicking a selected node again no longer adds duplicate rows to the data editor.** Any row with a pending change was re-appended on every redraw, and merely clicking into a cell counted as a change — so after touching a row, each further click on its node added another identical row. The editor now keeps unapplied edits only as per-cell changes over the loaded data, and a value typed back to its original withdraws the edit. The same rework fixes edits that were silently dropped on *Apply*, deleted rows reappearing on the next redraw, values landing in the wrong columns after switching tabs, a node and an edge sharing an ID overwriting each other's edit, an unrelated edit resetting a custom label text, and un-sorting a column bringing back stale values.
+* **Map by data gives every selected element a defined result.** Elements without a value for the chosen property used to keep whatever they had — a manually set node size of 30 then sat among the mapped sizes as if its data said so. The picker now has a *Without a value* field (defaulting to the lowest output) that those elements get, and says how many there are. Blank or null values no longer count as 0 and drag the whole scale with them, and a single shared value maps to the maximum instead of producing invalid sizes that reloaded as invisible nodes. The colour picker's *Default color for missing values*, shown but previously ignored, now applies.
+* **Cloning a workspace keeps its join and Complete-cases settings.** The clone copied a hand-kept list of settings that had fallen behind; it now copies the whole workspace.
+* **A Shift click on empty canvas no longer clears the selection** it was meant to extend.
+* **Emptying a Label or Description cell in the data editor clears it.** *Apply* used to keep the old text while the table showed the cell empty. Edges removed on *Apply* because a node they connect was deleted are now reported instead of vanishing silently.
+* **Failures surface instead of vanishing.** Workspace-menu actions and the styling panel's buttons report an error in the app when they fail (they used to reach only the browser console), a failed filter-mode, Links or without-properties change puts the control back instead of showing a setting the graph does not, and a filter control clicked while a hand-typed query drives the filters says why nothing happens.
+* **A workspace setting this version does not know is no longer replaced silently.** A filter mode or Links value it cannot read (a typo, a file from a newer version) still falls back to the default, but loading now names the workspace and the value. In *Map by data*, a *Without a value* entry that is not a number keeps the last good value and marks the field instead of quietly using the minimum.
+
+### Security
+
+* **A JSON file can no longer write onto JavaScript's object prototype through the data editor.** A data column named `__proto__` (or `constructor` / `prototype`) — refused by the Excel importer but not by the JSON and API loaders — let a value typed into that column and applied land on every object in the page. Such columns are now dropped on load, and *Apply* skips any that get through.
+
+### Accessibility
+
+* The new and existing style selects, the badge list's edit/remove buttons and the group settings' new controls have accessible names; focus rings on the segmented toggles are no longer clipped away; the census line under the filter toolbar announces changes (including "nothing added yet"); small text in the badge list meets contrast; and the keyboard sheet names ⇧ and ⌘ as Shift and Command for screen readers.
 
 ### Changed
 
+* **Build up with no row ticked shows nothing.** Before, the OR join with every row unticked showed the full graph — the one state where adding nothing added everything. JSON files saved before 1.18.0 with an OR workspace in that state open with every row ticked, which shows the same full graph. Hand-typed queries are unaffected: an empty query still matches everything.
+* **Select Elements: separate ＋ Add and − Remove buttons** next to each Node IDs, Edge IDs and label box, in place of one Include/Exclude button flipped by a switch. Enter always adds; before, it followed the switch, so a switch left on Exclude made Enter remove what was typed. The boxes are wider, too.
+* **The app menu opens from a 📂 File button** at the left of the toolbar, instead of from the Delta4 logo, which gave no hint that it was a menu.
 * **The ingest service deploys with `just` instead of shell scripts.** `install-service.sh` and `update-service.sh` are gone; `just deploy` replaces both, and `just status`, `logs`, `down` and `uninstall` cover the rest (see [SERVICE.md](SERVICE.md)). The service no longer needs `npm install` on the server, and node upgrades are picked up on the next deploy.
+
+### Performance
+
+* **Changing a group's colour or label no longer re-fits its outline.** Every style field counted as part of the outline's shape, so recolouring a group or editing its label re-ran the full outline fit. Only padding, corridor and avoidance change the shape now; everything else just repaints.
 
 ## 1.17.1 — 2026-08-12
 
