@@ -157,16 +157,13 @@ class GraphSelectionManager {
     }
   }
 
-  async addNodeOrEdgeIDsToSelectionWrapper(elementIDs, isNode) {
-    const shouldAdd = isNode
-      ? !document.getElementById('selectByNodeIDsSwitch').checked
-      : !document.getElementById('selectByEdgeIDsSwitch').checked;
+  async addNodeOrEdgeIDsToSelectionWrapper(elementIDs, isNode, shouldAdd) {
     const elementIDsAsArray = elementIDs ? elementIDs.split(',') : [];
 
     await this.addNodeOrEdgeIDsToSelection(elementIDsAsArray, isNode, shouldAdd);
   }
 
-  async addNodeOrEdgeLabelsToSelectionWrapper(elementLabels, isNode) {
+  async addNodeOrEdgeLabelsToSelectionWrapper(elementLabels, isNode, shouldAdd) {
     const elementLabelsAsArray = elementLabels ? elementLabels.split(',') : [];
 
     const elementIDs = elementLabelsAsArray.flatMap((label) => {
@@ -175,10 +172,6 @@ class GraphSelectionManager {
         : this.cache.edgeLabelToEdgeIDs.get(label);
       return set ? Array.from(set) : [];
     });
-
-    const shouldAdd = isNode
-      ? !document.getElementById('selectByNodeLabelsSwitch').checked
-      : !document.getElementById('selectByEdgeLabelsSwitch').checked;
 
     await this.addNodeOrEdgeIDsToSelection(elementIDs, isNode, shouldAdd);
   }

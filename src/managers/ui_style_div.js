@@ -780,139 +780,69 @@ function createStyleDiv(cache) {
 
     appendHorizontalRule(selDiv);
 
-    const rowFour = createNewRow(selDiv);
-    const nodeIDsTT = "Enter comma-separated list of node IDs to add/remove to/from selection\nConfirm with Enter";
-    appendLabel(rowFour, "Node IDs", nodeIDsTT);
-    const topTwoNodeIDs = cache.data?.nodes?.slice(0, 2).map(n => n.id).join(',') || 'Node1,Node2';
-    const nodeIDsInput = createInput(190, topTwoNodeIDs, nodeIDsTT, undefined,
-      async (val) => {
-        await cache.sm.addNodeOrEdgeIDsToSelectionWrapper(val, true);
+    // One grid for all lookup rows, so labels of different widths still line
+    // the inputs and buttons up in columns.
+    const lookups = document.createElement("div");
+    lookups.className = "select-lookup";
+    selDiv.appendChild(lookups);
+    appendLookupRow(lookups, {
+      label: "Node IDs",
+      noun: "node IDs",
+      idPrefix: "selectByNodeIDs",
+      placeholder: cache.data?.nodes?.slice(0, 2).map(n => n.id).join(',') || 'Node1,Node2',
+      apply: (value, add) => cache.sm.addNodeOrEdgeIDsToSelectionWrapper(value, true, add),
+    });
+    appendLookupRow(lookups, {
+      label: "Edge IDs",
+      noun: "edge IDs (SourceID::TargetID)",
+      idPrefix: "selectByEdgeIDs",
+      placeholder: cache.data?.edges?.slice(0, 2).map(e => e.id).join(',') || 'Node1::Node2,Node1::Node3',
+      apply: (value, add) => cache.sm.addNodeOrEdgeIDsToSelectionWrapper(value, false, add),
+    });
+    if (cache.nodeLabels.length > 0) {
+      appendLookupRow(lookups, {
+        label: "Node Labels",
+        noun: "node labels",
+        idPrefix: "selectByNodeLabels",
+          placeholder: cache.nodeLabels.slice(0, 2).join(','),
+        apply: (value, add) => cache.sm.addNodeOrEdgeLabelsToSelectionWrapper(value, true, add),
       });
-    nodeIDsInput.id = "selectByNodeIDsInput";
-    rowFour.appendChild(nodeIDsInput);
-    const nodeIDsInputSwitch = createSwitch(e => {
-      const btn = document.getElementById("selectByNodeIDsButton");
-      if (e.target.checked) {
-        btn.textContent = "Exclude";
-        btn.classList.add("red");
-        btn.title = "Remove the selected nodes from the selection";
-      } else {
-        btn.textContent = "Include";
-        btn.classList.remove("red");
-        btn.title = "Add the selected nodes to the selection";
-      }
-    }, "selectByNodeIDsSwitch");
-    rowFour.appendChild(nodeIDsInputSwitch);
-    const includeNodesByIdBtn = createButton("Include", "Add the selected nodes to the selection", async () => {
-      const elements = document.getElementById("selectByNodeIDsInput").value;
-      if (elements) {
-        await cache.sm.addNodeOrEdgeIDsToSelectionWrapper(elements, true);
-      }
-    }, "selectByNodeIDsButton");
-    rowFour.appendChild(includeNodesByIdBtn);
-
-    const rowFive = createNewRow(selDiv);
-    const edgeIDsTT = "Enter comma-separated list of edge IDs (SourceID::TargetID) to add/remove to/from selection\nConfirm with Enter";
-    appendLabel(rowFive, "Edge IDs", edgeIDsTT);
-    const topTwoEdgeIDs = cache.data?.edges?.slice(0, 2).map(e => e.id).join(',') || 'Node1::Node2,Node1::Node3';
-    const edgeIDsInput = createInput(190, topTwoEdgeIDs, edgeIDsTT, undefined,
-      async (val) => {
-        await cache.sm.addNodeOrEdgeIDsToSelectionWrapper(val, false);
+    }
+    if (cache.edgeLabels.length > 0) {
+      appendLookupRow(lookups, {
+        label: "Edge Labels",
+        noun: "edge labels",
+        idPrefix: "selectByEdgeLabels",
+          placeholder: cache.edgeLabels.slice(0, 2).join(','),
+        apply: (value, add) => cache.sm.addNodeOrEdgeLabelsToSelectionWrapper(value, false, add),
       });
-    edgeIDsInput.id = "selectByEdgeIDsInput";
-    rowFive.appendChild(edgeIDsInput);
-    const edgeIDsInputSwitch = createSwitch(e => {
-      const btn = document.getElementById("selectByEdgeIDsButton");
-      if (e.target.checked) {
-        btn.textContent = "Exclude";
-        btn.classList.add("red");
-        btn.title = "Remove the selected edges from the selection";
-      } else {
-        btn.textContent = "Include";
-        btn.classList.remove("red");
-        btn.title = "Add the selected edges to the selection";
-      }
-    }, "selectByEdgeIDsSwitch");
-    rowFive.appendChild(edgeIDsInputSwitch);
-    const includeEdgesByIdBtn = createButton("Include", "Add the selected nodes to the selection", async () => {
-      const elements = document.getElementById("selectByEdgeIDsInput").value;
-      if (elements) {
-        await cache.sm.addNodeOrEdgeIDsToSelectionWrapper(elements, false);
-      }
-    }, "selectByEdgeIDsButton");
-    rowFive.appendChild(includeEdgesByIdBtn);
-
-    conditionallyCreateNodeOrEdgeSelectionRow(selDiv);
+    }
   }
 
-  function conditionallyCreateNodeOrEdgeSelectionRow(selDiv) {
-    let row;
-    if (cache.nodeLabels.length > 0 || cache.edgeLabels.length > 0) {
-      row = createNewRow(selDiv);
-    }
-
-    if (cache.nodeLabels.length > 0) {
-      const nodeLabelsTT = "Enter comma-separated list of node labels to add/remove to/from selection\nConfirm with Enter";
-      appendLabel(row, "Node Labels", nodeLabelsTT);
-      const topTwoNodeLabels = cache.nodeLabels?.slice(0, 2).join(',') || 'Label1,Label2';
-      const nodeLabelsInput = createInput(174, topTwoNodeLabels, nodeLabelsTT, undefined,
-        async (val) => {
-          await cache.sm.addNodeOrEdgeLabelsToSelectionWrapper(val, true);
-        });
-      nodeLabelsInput.id = "selectByNodeLabelsInput";
-      row.appendChild(nodeLabelsInput);
-      const nodeLabelsInputSwitch = createSwitch(e => {
-        const btn = document.getElementById("selectByNodeLabelsButton");
-        if (e.target.checked) {
-          btn.textContent = "Exclude";
-          btn.classList.add("red");
-          btn.title = "Remove the selected nodes from the selection";
-        } else {
-          btn.textContent = "Include";
-          btn.classList.remove("red");
-          btn.title = "Add the selected nodes to the selection";
-        }
-      }, "selectByNodeLabelsSwitch");
-      row.appendChild(nodeLabelsInputSwitch);
-      const includeNodesByLabelBtn = createButton("Include", "Add the selected nodes to the selection", async () => {
-        const elements = document.getElementById("selectByNodeLabelsInput").value;
-        if (elements) {
-          await cache.sm.addNodeOrEdgeLabelsToSelectionWrapper(elements, true);
-        }
-      }, "selectByNodeLabelsButton");
-      row.appendChild(includeNodesByLabelBtn);
-    }
-
-    if (cache.edgeLabels.length > 0) {
-      const edgeLabelsTT = "Enter comma-separated list of edge Labels to add/remove to/from selection\nConfirm with Enter";
-      appendVerticalRule(row, "Edge Label(s)", edgeLabelsTT);
-      const topTwoEdgeLabels = cache.edgeLabels.slice(0, 2).join(',') || 'Label1,Label2';
-      const edgeLabelsInput = createInput(200, topTwoEdgeLabels, edgeLabelsTT, undefined,
-        async (val) => {
-          await cache.sm.addNodeOrEdgeLabelsToSelectionWrapper(val, false);
-        });
-      edgeLabelsInput.id = "selectByEdgeLabelsInput";
-      row.appendChild(edgeLabelsInput);
-      const edgeLabelsInputSwitch = createSwitch(e => {
-        const btn = document.getElementById("selectByEdgeLabelsButton");
-        if (e.target.checked) {
-          btn.textContent = "Exclude";
-          btn.classList.add("red");
-          btn.title = "Remove the selected edges from the selection";
-        } else {
-          btn.textContent = "Include";
-          btn.classList.remove("red");
-          btn.title = "Add the selected edges to the selection";
-        }
-      }, "selectByEdgeLabelsSwitch");
-      row.appendChild(edgeLabelsInputSwitch);
-      const includeEdgesByLabelBtn = createButton("Include", "Add the selected nodes to the selection", async () => {
-        const elements = document.getElementById("selectByEdgeLabelsInput").value;
-        if (elements) {
-          await cache.sm.addNodeOrEdgeLabelsToSelectionWrapper(elements, false);
-        }
-      }, "selectByEdgeLabelsButton");
-      row.appendChild(includeEdgesByLabelBtn);
+  // A row that looks elements up by a typed list: Enter or "＋ Add" puts them
+  // in the selection, "− Remove" takes them out. Two verbs instead of one
+  // button plus a mode switch, whose state also silently decided what Enter did.
+  function appendLookupRow(parent, { label, noun, idPrefix, placeholder, apply }) {
+    const row = document.createElement("div");
+    row.className = "select-lookup-row";
+    parent.appendChild(row);
+    const tooltip = `Comma-separated ${noun}. Enter adds them to the selection.`;
+    appendLabel(row, label, tooltip);
+    const input = createInput(undefined, placeholder, tooltip, undefined, (value) => apply(value, true));
+    input.style.width = ""; // the grid column sizes it
+    input.id = `${idPrefix}Input`;
+    row.appendChild(input);
+    for (const add of [true, false]) {
+      const btn = createButton(
+        add ? "＋ Add" : "− Remove",
+        add ? `Add these ${noun} to the selection` : `Remove these ${noun} from the selection`,
+        async () => {
+          const value = input.value.trim();
+          if (value) await apply(value, add);
+        },
+        `${idPrefix}${add ? "Add" : "Remove"}Button`
+      );
+      row.appendChild(btn);
     }
   }
 

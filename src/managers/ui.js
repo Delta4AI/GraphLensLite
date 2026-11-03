@@ -267,9 +267,8 @@ class UIManager {
       [
         'selectByNodeIDsInput',
         'Node IDs',
-        'selectByNodeIDsSwitch',
-        'selectByNodeIDsSwitchLabel',
-        'selectByNodeIDsButton',
+        'selectByNodeIDsAddButton',
+        'selectByNodeIDsRemoveButton',
       ],
       enable
     );
@@ -280,9 +279,8 @@ class UIManager {
       [
         'selectByEdgeIDsInput',
         'Edge IDs',
-        'selectByEdgeIDsSwitch',
-        'selectByEdgeIDsSwitchLabel',
-        'selectByEdgeIDsButton',
+        'selectByEdgeIDsAddButton',
+        'selectByEdgeIDsRemoveButton',
       ],
       enable
     );
