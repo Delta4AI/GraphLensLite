@@ -797,6 +797,8 @@ class GraphLayoutManager {
       // requires complete cases. Persisted per view via the workspace JSON.
       filterJoinMode: 'OR',
       filterStrict: false,
+      filterLinks: 'all',
+      includePropertyless: true,
       hideDisconnectedNodes: false,
       // Per-view styles
       nodeStyles: new Map(),

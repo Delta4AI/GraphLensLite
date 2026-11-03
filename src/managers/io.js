@@ -2,9 +2,13 @@
 import { VERSION, bubbleGroupStyle, UNSAFE_OBJECT_KEYS } from '../config.js';
 import { sanitizeAnnotations, MAX_ANNOTATIONS } from '../graph/annotation_geometry.js';
 import { StaticUtilities } from '../utilities/static.js';
+import { FILTER_LINKS } from '../graph/visibility_rule.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
 import { excelData, EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from './excel_schema.js';
 import { ExcelTemplate } from './excel_template.js';
+
+/** The first version in which a build-up workspace with no row ticked is empty. */
+const BUILD_UP_EMPTY_SINCE = '1.18.0';
 
 const EXPORT_SCALE_KEY = 'gll.exportScale';
 // Grace period before revoking an SVG download's blob URL: long enough for
@@ -248,7 +252,27 @@ class IOManager {
     });
   }
 
+  /**
+   * Before 1.18.0 a build-up (OR) workspace with no filter row ticked showed
+   * the whole graph; now it shows nothing. A file saved in that state opens
+   * with every row ticked instead — the build-up spelling of "everything" —
+   * so it looks the way it did when it was saved.
+   */
+  keepPreBuildUpWorkspacesFull(jsonContent) {
+    const version = typeof jsonContent.version === 'string' ? jsonContent.version : null;
+    if (version && !StaticUtilities.isVersionNewer(BUILD_UP_EMPTY_SINCE, version)) return;
+    for (const layout of Object.values(jsonContent.layouts ?? {})) {
+      if (!layout || layout.filterJoinMode === 'AND' || layout.query) continue;
+      const filters =
+        layout.filters instanceof Map ? [...layout.filters.values()] : Object.values(layout.filters ?? {});
+      const usable = filters.filter((filter) => filter && !filter.unusable);
+      if (usable.length === 0 || usable.some((filter) => filter.active)) continue;
+      for (const filter of usable) filter.active = true;
+    }
+  }
+
   restoreSetsFromJSON(jsonContent) {
+    this.keepPreBuildUpWorkspacesFull(jsonContent);
     // Deduplicate headers to fix old exported files with duplicate headers
     if (jsonContent.nodeDataHeaders) {
       const seen = new Set();
@@ -1308,6 +1332,10 @@ class IOManager {
         // predate them (OR / non-strict = the historical behavior).
         filterJoinMode: layout.filterJoinMode === 'AND' ? 'AND' : 'OR',
         filterStrict: layout.filterStrict === true,
+        // Build-up links and elements without properties (visibility_rule.js);
+        // older files get today's look: every link, every element.
+        filterLinks: FILTER_LINKS.includes(layout.filterLinks) ? layout.filterLinks : 'all',
+        includePropertyless: layout.includePropertyless !== false,
         // Per-view styles - check if already Maps
         hideDisconnectedNodes: layout.hideDisconnectedNodes || false,
         nodeStyles:

@@ -4,6 +4,7 @@ import { replaceNumericScale } from '../utilities/numeric_scale_picker.js';
 import { initTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
 import { buildGraphologyGraph, makeNodeReducer, makeEdgeReducer } from './graph_model.js';
 import { badgeSlot, withoutSlot, withBadge, badgeTextFromValue } from './badges.js';
+import { visibilityRule, edgeShown, propertylessShown } from './visibility_rule.js';
 // NOTE: sigma_adapter.js is imported lazily in createGraphInstance(), never
 // statically: the sigma vendor bundle probes WebGL at module scope
 // (@sigma/node-image reads MAX_TEXTURE_SIZE from a throwaway context), so a
@@ -686,50 +687,65 @@ class GraphCoreManager {
     this.cache.bubbleSetChanged = false;
     this.cache.qm.decodeQueryAndBuildAST();
 
+    const rule = visibilityRule(
+      this.cache.data.layouts[this.cache.data.selectedLayout],
+      this.cache.CFG.EXCEL_EDGE_HEADER
+    );
+    const ast = this.cache.query.ast;
+    // A filter-built OR of no rows adds nothing. The AST alone reads that
+    // empty query as "no constraint" and would match everything.
+    const testNode = (node) => !rule.nothingTicked && ast.testNode(node);
+    const testEdge = (edge) => !rule.nothingTicked && ast.testEdge(edge);
+    const recordMatches = (element, byProp) => {
+      element.featureIsWithinThreshold.forEach((v, k) => {
+        if (v !== true) return;
+        if (!byProp.has(k)) byProp.set(k, new Set());
+        byProp.get(k).add(element.id);
+      });
+    };
+
     for (const node of this.cache.nodeRef.values()) {
-      // Nodes with no features are always visible (nothing to filter on)
       if (node.features.size === 0) {
-        this.cache.nodeIDsToBeShown.add(node.id);
+        if (propertylessShown(rule, { isEdge: false })) this.cache.nodeIDsToBeShown.add(node.id);
         continue;
       }
-      if (this.cache.query.ast.testNode(node)) {
+      if (testNode(node)) {
         this.cache.nodeIDsToBeShown.add(node.id);
-        node.featureIsWithinThreshold.forEach((v, k) => {
-          if (v === true) {
-            if (!this.cache.propIDsToNodeIDsToBeShown.has(k)) {
-              this.cache.propIDsToNodeIDsToBeShown.set(k, new Set());
-            }
-            this.cache.propIDsToNodeIDsToBeShown.get(k).add(node.id);
-          }
-        });
+        recordMatches(node, this.cache.propIDsToNodeIDsToBeShown);
+      }
+    }
+
+    // Build-up with "only ticked" links: a matching edge brings its end nodes,
+    // so they have to be in before any edge asks whether its ends are shown.
+    const matchedEdges = new Set();
+    if (rule.buildUp && rule.links === 'ticked') {
+      for (const edge of this.cache.edgeRef.values()) {
+        if (edge.features.size === 0 || !testEdge(edge)) continue;
+        matchedEdges.add(edge.id);
+        this.cache.nodeIDsToBeShown.add(edge.source);
+        this.cache.nodeIDsToBeShown.add(edge.target);
       }
     }
 
     for (const edge of this.cache.edgeRef.values()) {
-      const endsOk =
+      const endsShown =
         this.cache.nodeIDsToBeShown.has(edge.source) &&
         this.cache.nodeIDsToBeShown.has(edge.target);
 
-      // Edges with no features are always visible (nothing to filter on),
-      // but still require both endpoints to be visible
       if (edge.features.size === 0) {
-        if (endsOk) {
+        if (propertylessShown(rule, { isEdge: true, endsShown })) {
           this.cache.edgeIDsToBeShown.add(edge.id);
         }
         continue;
       }
 
-      if (endsOk && this.cache.query.ast.testEdge(edge)) {
-        this.cache.edgeIDsToBeShown.add(edge.id);
-        edge.featureIsWithinThreshold.forEach((v, k) => {
-          if (v === true) {
-            if (!this.cache.propIDsToEdgeIDsToBeShown.has(k)) {
-              this.cache.propIDsToEdgeIDsToBeShown.set(k, new Set());
-            }
-            this.cache.propIDsToEdgeIDsToBeShown.get(k).add(edge.id);
-          }
-        });
-      }
+      const matches =
+        rule.buildUp && rule.links === 'ticked'
+          ? matchedEdges.has(edge.id)
+          : endsShown && testEdge(edge);
+      if (!edgeShown(rule, { matches, endsShown })) continue;
+      this.cache.edgeIDsToBeShown.add(edge.id);
+      if (matches) recordMatches(edge, this.cache.propIDsToEdgeIDsToBeShown);
     }
 
     // Re-evaluate disconnected elements against the freshly filtered view.

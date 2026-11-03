@@ -52,13 +52,16 @@ function makeCache({ nodes, edges, hideDisconnected, visibleEdgeIds }) {
     cache: {
       styleChanged: false,
       bubbleSetChanged: false,
+      CFG: { EXCEL_EDGE_HEADER: 'Edge filters' },
       EVENT_LOCKS: {
         QUERY_UPDATE_EVENT: false,
         FILTERS_LOCKED_BY_MANUAL_QUERY: false,
       },
       data: {
         selectedLayout: 'Default',
-        layouts: { Default: { hideDisconnectedNodes: hideDisconnected } },
+        // Narrow-down: edges are filtered by the query. (Build-up would show
+        // every link between shown nodes; see visibility_rule.js.)
+        layouts: { Default: { hideDisconnectedNodes: hideDisconnected, filterJoinMode: 'AND' } },
       },
       nodeRef,
       edgeRef,

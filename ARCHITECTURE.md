@@ -38,6 +38,9 @@ The rendering and graph-operation core. Key modules:
   (force via graphology forceAtlas2; circular/grid geometric; radial/concentric/mds
   via `@antv/layout` v2)
 - `filter.js` — range-slider + dropdown filtering
+- `visibility_rule.js` — what the join toggle means beyond the query: build up
+  (nothing ticked shows nothing; links between shown nodes all/ticked/none) vs
+  narrow down, and whether elements without properties show
 - `selection.js` — selection state with undo/redo memory
 - `bubble_sets.js` / `bubble_layer.js` / `bubble_geometry.js` — bubble-set grouping
   drawn on an owned canvas layer beneath the nodes. A workspace holds ANY number
