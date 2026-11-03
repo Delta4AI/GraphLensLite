@@ -18,6 +18,23 @@ const FILTER_JOIN_KEY = 'gll.filterJoinMode';
 // same-type filter.
 const FILTER_STRICT_KEY = 'gll.filterStrict';
 
+const NARROW_DOWN_CENSUS_TITLE =
+  'Narrowing down, a filter only constrains the graph once you narrow it from ' +
+  'the range or values it loaded with.\n' +
+  'Filters still at their defaults mean "don\'t care" — they are shown ' +
+  'dimmed, and switching them on or off changes nothing.';
+const BUILD_UP_CENSUS_TITLE =
+  'Building up, the graph starts empty and every ticked row adds the elements ' +
+  'it matches. Untick everything and nothing is shown.';
+
+// What the join toggle's two modes are called on screen. Stored as OR/AND.
+const JOIN_MODE_LABELS = { OR: '＋ Build up', AND: '− Narrow down' };
+const FILTER_LINK_LABELS = [
+  ['all', 'All'],
+  ['ticked', 'Only ticked'],
+  ['none', 'None'],
+];
+
 // "Ctrl" or "⌘": the modifier a replacing lasso is drawn with.
 const LASSO_MODIFIER = hotkeyLabel('').replace(/\+$/, '');
 
@@ -803,14 +820,23 @@ class UIManager {
     // "Complete cases only" is a modifier of AND, revealed only under AND (the
     // join toggle drives its visibility). It sits to the RIGHT of the toggle so
     // switching OR<->AND never shifts the toggle.
+    // Each join mode reveals its own modifier in the same spot: Complete cases
+    // narrows down, Links builds up.
     const strictCheckbox = this.createFilterStrictCheckbox();
+    const linksToggle = this.createFilterLinksToggle();
     const joinToggle = this.createFilterJoinToggle((mode) => {
       strictCheckbox.hidden = mode !== 'AND';
+      linksToggle.hidden = mode === 'AND';
     });
     const joinCluster = document.createElement('div');
     joinCluster.className = 'filter-toolbar-join';
-    joinCluster.append(joinToggle, strictCheckbox);
-    toolbar.append(joinCluster, this.createFilterSearch(), this.createFilterConstraintCount());
+    joinCluster.append(joinToggle, strictCheckbox, linksToggle);
+    toolbar.append(
+      joinCluster,
+      this.createPropertylessCheckbox(),
+      this.createFilterSearch(),
+      this.createFilterConstraintCount()
+    );
     return toolbar;
   }
 
@@ -1026,11 +1052,7 @@ class UIManager {
     el.id = 'filterConstraintCount';
     el.className = 'filter-constraint-count';
     el.hidden = true;
-    el.title =
-      'Under AND, a filter only constrains the graph once you narrow it from ' +
-      'the range or values it loaded with.\n' +
-      'Filters still at their defaults mean "don\'t care" — they are shown ' +
-      'dimmed, and switching them on or off changes nothing.';
+    el.title = NARROW_DOWN_CENSUS_TITLE;
     return el;
   }
 
@@ -1043,6 +1065,10 @@ class UIManager {
     if (!container || !layout?.filters) return;
 
     const andMode = layout.filterJoinMode === 'AND';
+    // Under build up, edge rows only decide anything when links are "Only
+    // ticked"; with All or None their ticks change nothing on screen.
+    const edgeRowsIdle = !andMode && (layout.filterLinks ?? 'all') !== 'ticked';
+    const edgePrefix = `${this.cache.CFG?.EXCEL_EDGE_HEADER}::`;
     const defaults = this.cache.data.filterDefaults;
     let constraining = 0;
     let total = 0;
@@ -1067,21 +1093,75 @@ class UIManager {
         constraining += 1;
         tally.constraining += 1;
       }
-      const inert = andMode && !!fo.active && !counts;
+      const idleEdgeRow = edgeRowsIdle && row.dataset.propId.startsWith(edgePrefix);
+      const inert = (andMode && !!fo.active && !counts) || idleEdgeRow;
       row.classList.toggle('filter-row-inert', inert);
       // The row is dimmed but its checkbox still offered to "hide elements".
       // This pass runs on every filter change (query.js funnels into it), so it
       // is also where the row's tooltip is kept honest.
       const wrapper = row.querySelector('.checkboxWrapper');
       if (wrapper) {
-        wrapper.title = inert
-          ? this.cache.uiComponents.getInertCheckboxTT(row.dataset.propId)
-          : this.cache.uiComponents.getCheckboxTT(!!fo.active, row.dataset.propId);
+        let tooltip = this.cache.uiComponents.getCheckboxTT(!!fo.active, row.dataset.propId);
+        if (idleEdgeRow) tooltip = this.cache.uiComponents.getIdleEdgeRowTT(row.dataset.propId);
+        else if (inert) tooltip = this.cache.uiComponents.getInertCheckboxTT(row.dataset.propId);
+        wrapper.title = tooltip;
       }
     }
 
     this.renderFilterConstraintCount(andMode, constraining, total);
-    UIManager.#renderScopeCounts(perSection);
+    UIManager.#renderScopeCounts(perSection, andMode);
+    this.renderBuildUpEmptyState(!andMode && !layout.query && constraining === 0);
+  }
+
+  /**
+   * Building up with no row ticked shows nothing — on purpose, but a blank
+   * stage must still say why and how to go on. A card over the stage offers
+   * both ways out: tick everything, or narrow down from everything instead.
+   */
+  renderBuildUpEmptyState(show) {
+    let card = document.getElementById('buildUpEmptyState');
+    if (!show) {
+      if (card) card.hidden = true;
+      return;
+    }
+    if (!card) {
+      card = document.createElement('div');
+      card.id = 'buildUpEmptyState';
+      card.className = 'build-up-empty';
+      card.setAttribute('role', 'status');
+
+      const title = document.createElement('strong');
+      title.className = 'build-up-empty-title';
+      title.textContent = 'Nothing shown yet';
+      const body = document.createElement('p');
+      body.className = 'build-up-empty-body';
+      body.textContent = 'You are building up: tick a filter row to add the elements it matches.';
+
+      const actions = document.createElement('div');
+      actions.className = 'build-up-empty-actions';
+      const everything = document.createElement('button');
+      everything.type = 'button';
+      everything.className = 'p-button';
+      everything.textContent = 'Show everything';
+      everything.title = 'Tick every filter row';
+      everything.addEventListener('click', async () => {
+        if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
+        this.toggleCheckboxesForSetOfPropIDs(true, '');
+        await this.cache.fm.handleFilterEvent('Showing Elements', 'Every filter row ticked');
+      });
+      const narrow = document.createElement('button');
+      narrow.type = 'button';
+      narrow.className = 'p-button p-button-secondary';
+      narrow.textContent = 'Narrow down instead';
+      narrow.title = 'Start from everything and remove what the narrowed rows rule out';
+      narrow.addEventListener('click', () => {
+        document.querySelector('.filter-join-segment[data-mode="AND"]')?.click();
+      });
+      actions.append(everything, narrow);
+      card.append(title, body, actions);
+      document.getElementById('outerGraphContainer')?.appendChild(card);
+    }
+    card.hidden = false;
   }
 
   renderFilterConstraintCount(andMode, constraining, total) {
@@ -1093,9 +1173,17 @@ class UIManager {
     // redundant — the active filter may be in the section that is not on screen.
     el.hidden = !total;
     if (el.hidden) return;
+    if (andMode) {
+      el.title = NARROW_DOWN_CENSUS_TITLE;
+      el.textContent = constraining
+        ? `${constraining} of ${total} filters constrain the graph`
+        : 'No filter constrains the graph — every filter is still at its loaded range';
+      return;
+    }
+    el.title = BUILD_UP_CENSUS_TITLE;
     el.textContent = constraining
-      ? `${constraining} of ${total} filters constrain the graph`
-      : 'No filter constrains the graph — every filter is still at its loaded range';
+      ? `${constraining} of ${total} rows ticked — each adds what it matches`
+      : 'No row ticked — nothing added yet';
   }
 
   /**
@@ -1103,7 +1191,7 @@ class UIManager {
    * hidden section can still account for itself.
    * @param {Map<string, {constraining: number, total: number}>} perSection
    */
-  static #renderScopeCounts(perSection) {
+  static #renderScopeCounts(perSection, andMode) {
     for (const btn of document.querySelectorAll('.filter-scope-segment')) {
       const { constraining = 0, total = 0 } = perSection.get(btn.dataset.section) ?? {};
       const count = btn.querySelector('.filter-scope-count');
@@ -1111,8 +1199,9 @@ class UIManager {
       count.textContent = constraining ? `${constraining}/${total}` : String(total);
       count.classList.toggle('filter-scope-count-active', constraining > 0);
       const name = btn.dataset.section?.toLowerCase() ?? 'filters';
+      const verb = andMode ? 'constrain the graph' : 'are ticked';
       btn.title = constraining
-        ? `Show the ${total} ${name} — ${constraining} of them constrain the graph`
+        ? `Show the ${total} ${name} — ${constraining} of them ${verb}`
         : `Show the ${total} ${name}`;
     }
   }
@@ -1139,12 +1228,13 @@ class UIManager {
     const group = document.createElement('div');
     group.className = 'filter-join-toggle';
     group.setAttribute('role', 'group');
-    group.setAttribute('aria-label', 'Combine active filters with OR or AND');
+    group.setAttribute('aria-label', 'How the filter rows choose what is shown');
     group.title =
-      'How multiple active filters combine.\n' +
-      'OR: show elements matching any active filter.\n' +
-      'AND: show elements matching every active filter ' +
-      '(a property an element lacks does not exclude it).';
+      'Build up: start from nothing — every ticked row adds the elements it ' +
+      'matches (any of them, OR).\n' +
+      'Narrow down: start from everything — every narrowed row removes what it ' +
+      'does not match (all of them, AND; a property an element lacks does not ' +
+      'remove it).';
 
     const buttons = new Map();
     const apply = (mode) => {
@@ -1163,7 +1253,8 @@ class UIManager {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'filter-join-segment';
-      btn.textContent = mode;
+      btn.dataset.mode = mode;
+      btn.textContent = JOIN_MODE_LABELS[mode];
       btn.addEventListener('click', async () => {
         if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
         if (layout().filterJoinMode === mode) return;
@@ -1174,7 +1265,10 @@ class UIManager {
           this.debug(`Could not persist filter-join preference: ${err.message}`);
         }
         apply(mode);
-        await this.cache.fm.handleFilterEvent('Filtering', `Combining active filters with ${mode}`);
+        await this.cache.fm.handleFilterEvent(
+          'Filtering',
+          mode === 'AND' ? 'Narrowing down from everything' : 'Building up from nothing'
+        );
       });
       buttons.set(mode, btn);
       group.appendChild(btn);
@@ -1182,6 +1276,100 @@ class UIManager {
 
     apply(layout().filterJoinMode);
     return group;
+  }
+
+  /**
+   * Build up's links choice (visibility_rule.js): which links show between
+   * the nodes the ticked rows added. Starts hidden; the join toggle reveals it
+   * under build up.
+   */
+  createFilterLinksToggle() {
+    const layout = () => this.cache.data.layouts[this.cache.data.selectedLayout];
+    const wrapper = document.createElement('div');
+    wrapper.className = 'filter-links';
+    wrapper.hidden = true;
+    wrapper.title =
+      'Which links show between the nodes your rows added.\n' +
+      'All: every link between them.\n' +
+      'Only ticked: just the links an edge row matches — their end nodes come along.\n' +
+      'None: no links.';
+
+    const label = document.createElement('span');
+    label.className = 'filter-links-label';
+    label.textContent = 'Links';
+
+    const group = document.createElement('div');
+    group.className = 'filter-join-toggle';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', 'Links between shown nodes');
+
+    const buttons = [];
+    const apply = () => {
+      const current = layout().filterLinks ?? 'all';
+      for (const btn of buttons) {
+        const on = btn.dataset.links === current;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-pressed', String(on));
+      }
+    };
+    for (const [value, text] of FILTER_LINK_LABELS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'filter-join-segment';
+      btn.dataset.links = value;
+      btn.textContent = text;
+      btn.addEventListener('click', async () => {
+        if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
+        if ((layout().filterLinks ?? 'all') === value) return;
+        layout().filterLinks = value;
+        apply();
+        await this.cache.fm.handleFilterEvent('Filtering', `Links between shown nodes: ${text}`);
+      });
+      buttons.push(btn);
+      group.appendChild(btn);
+    }
+    apply();
+    wrapper.append(label, group);
+    return wrapper;
+  }
+
+  /**
+   * "Include N without properties": nodes and edges that carry no filterable
+   * property can't be matched by any row, so they show or hide as a whole.
+   * Only offered when the graph has some.
+   */
+  createPropertylessCheckbox() {
+    const layout = () => this.cache.data.layouts[this.cache.data.selectedLayout];
+    let count = 0;
+    for (const element of [...(this.cache.nodeRef?.values() ?? []), ...(this.cache.edgeRef?.values() ?? [])]) {
+      if (element.features?.size === 0) count += 1;
+    }
+    const wrapper = document.createElement('label');
+    wrapper.className = 'filter-strict-checkbox filter-propertyless-checkbox';
+    wrapper.hidden = count === 0;
+    wrapper.title =
+      `${count} node${count === 1 ? '' : 's'} or edges carry no property any filter could match. ` +
+      'On: they always show (edges still need both end nodes). Off: they never do.';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = layout().includePropertyless !== false;
+    input.addEventListener('change', async () => {
+      if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
+        input.checked = layout().includePropertyless !== false;
+        return;
+      }
+      layout().includePropertyless = input.checked;
+      await this.cache.fm.handleFilterEvent(
+        'Filtering',
+        `Elements without properties: ${input.checked ? 'shown' : 'hidden'}`
+      );
+    });
+
+    const text = document.createElement('span');
+    text.textContent = `Include ${count} without properties`;
+    wrapper.append(input, text);
+    return wrapper;
   }
 
   // Builds the "Complete cases only" checkbox — the strict modifier of the AND

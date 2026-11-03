@@ -219,10 +219,14 @@ const TOUR_STEPS = [
            a minimum threshold (≥), the right thumb for a maximum (≤), double-click to reset
            <br>• <strong>Categorical properties</strong> get dropdown checklists — check/uncheck values
            <br>• The <strong>checkbox</strong> toggles whether that filter is active.
-           Active filters are combined with <strong>OR</strong> logic by default — nodes/edges matching <em>any</em> active filter are shown.
            The
-           <span style="display:inline-flex;align-items:stretch;border:1px solid var(--border-soft);border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:var(--surface-3);color:var(--brand-text);">OR</span><span style="padding:2px 9px;background:#C33D35;color:#fff;border-left:1px solid var(--border-soft);">AND</span></span>
-           toggle at the top of the panel switches to requiring <em>all</em> the filters you've narrowed (AND); its <strong>Complete cases only</strong> option additionally hides elements missing any of those filters.
+           <span style="display:inline-flex;align-items:stretch;border:1px solid var(--border-soft);border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:#C33D35;color:#fff;">＋ Build up</span><span style="padding:2px 9px;background:var(--surface-3);color:var(--brand-text);border-left:1px solid var(--border-soft);">− Narrow down</span></span>
+           toggle at the top of the panel picks how the rows work. <strong>Build up</strong> (the default) starts from nothing:
+           every ticked row adds the nodes and edges it matches (<em>any</em> of them, OR) — untick everything and the stage is empty,
+           ready to build a view one property at a time. Its <strong>Links</strong> choice decides which links show between those nodes:
+           <em>All</em>, <em>Only ticked</em> (just the ones an edge row matches, which bring their end nodes along) or <em>None</em>.
+           <strong>Narrow down</strong> starts from everything and keeps only what matches <em>all</em> the rows you've narrowed (AND);
+           its <strong>Complete cases only</strong> option additionally hides elements missing any of those filters.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            <span style="display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:middle;background:var(--brand-text);"></span>
            <strong>Bubble group chip</strong> — click it to put that filter's matching nodes into a
@@ -415,7 +419,7 @@ const TOUR_STEPS = [
   {
     title: 'Query Editor 📝',
     text: `The query editor uses a custom query language that goes beyond what the filter panel can do.
-           While the filter panel combines active filters with <strong>OR</strong> or <strong>AND</strong>, the query editor
+           While the filter panel either builds up (OR) or narrows down (AND), the query editor
            adds <span class="q-connector-not">&nbsp;NOT&nbsp;</span>, nested parentheses, and free mixing of <span class="q-connector-and">&nbsp;AND&nbsp;</span> <span class="q-connector-or">&nbsp;OR&nbsp;</span> and conditional operators:
            <br>
            <div class="tour-query-example">
