@@ -908,7 +908,7 @@ function shiftedLabelAnchor(anchor, opts = {}) {
  * @param {object} opts per-group style
  * @param {object} defaults BUBBLE_GROUP_STYLE_TEMPLATE
  * @param {(text: string, font: string) => number} measureText
- * @returns {null|{text: string, font: string, fontSize: number, fontStyle: string,
+ * @returns {null|{text: string, font: string, fontSize: number, fontChoice: string,
  *   width: number, padding: number, x: number,
  *   y: number, lx: number, ly: number, rotated: boolean, angle: number,
  *   fill: string, background: null|{x: number, y: number, width: number,
@@ -953,7 +953,8 @@ function resolveBubbleLabel(anchor, opts = {}, defaults = {}, measureText) {
     text,
     font,
     fontSize,
-    fontStyle: fontStylePrefix(fontStyle),
+    // One of FONT_STYLES ("bold italic" …), for the SVG export's attributes.
+    fontChoice: fontStylePrefix(fontStyle),
     width: textWidth,
     padding,
     x,

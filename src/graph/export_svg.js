@@ -465,7 +465,11 @@ function nodePrimitives(node) {
 
 // --- label primitives ------------------------------------------------------------
 
-function textPrimitive(x, y, text, fill, fontSize, fontFamily, fontWeight, fontStyle = "normal") {
+/**
+ * @param {{fontWeight: string, fontStyle: string}} font  SVG font-weight and
+ *   font-style values (svgFontAttributes)
+ */
+function textPrimitive(x, y, text, fill, fontSize, fontFamily, { fontWeight, fontStyle }) {
   return { kind: "text", x, y, text, fill, fontSize, fontFamily, fontWeight, fontStyle };
 }
 
@@ -498,7 +502,9 @@ function badgePrimitives(node, env) {
       rx: boxHeight / 2, // pill: fully rounded ends
       fill: safeColor(data.badgePalette?.[index] ?? FALLBACK_BADGE_COLOR),
     });
-    prims.push(textPrimitive(cx, cy + size * ALPHABETIC_BASELINE_SHIFT, text, BADGE_TEXT_COLOR, size, env.labelFont, "bold"));
+    prims.push(
+      textPrimitive(cx, cy + size * ALPHABETIC_BASELINE_SHIFT, text, BADGE_TEXT_COLOR, size, env.labelFont, svgFontAttributes("bold")),
+    );
   });
   return prims;
 }
@@ -509,7 +515,7 @@ function nodeLabelPrimitives(node, env) {
   if (!data.label) return [];
   const size = finiteSize(data.labelSize, env.labelSize);
   const font = `${fontStylePrefix(data.labelFontStyle, env.labelWeight)} ${size}px ${env.labelFont}`;
-  const { fontWeight, fontStyle } = svgFontAttributes(data.labelFontStyle, env.labelWeight);
+  const svgFont = svgFontAttributes(data.labelFontStyle, env.labelWeight);
   const color = safeColor(resolveElementLabelColor(data.labelColor, env.labelColor, data));
   const padding = data.labelPadding ?? 2;
   const boxWidth = env.measureText(data.label, font) + 2 * padding;
@@ -532,7 +538,7 @@ function nodeLabelPrimitives(node, env) {
     });
   }
   prims.push(
-    textPrimitive(cx, cy + size * ALPHABETIC_BASELINE_SHIFT, data.label, color, size, env.labelFont, fontWeight, fontStyle),
+    textPrimitive(cx, cy + size * ALPHABETIC_BASELINE_SHIFT, data.label, color, size, env.labelFont, svgFont),
   );
   prims.push(...badgePrimitives(node, env)); // badges follow label visibility
   return prims;
@@ -565,7 +571,7 @@ function edgeLabelPrimitives(edge, env) {
   if (!data.label) return [];
   const size = finiteSize(data.labelSize, env.edgeLabelSize);
   const font = `${fontStylePrefix(data.labelFontStyle, env.edgeLabelWeight)} ${size}px ${env.edgeLabelFont}`;
-  const { fontWeight, fontStyle } = svgFontAttributes(data.labelFontStyle, env.edgeLabelWeight);
+  const svgFont = svgFontAttributes(data.labelFontStyle, env.edgeLabelWeight);
   const color = safeColor(resolveElementLabelColor(data.labelColor, env.edgeLabelColor, data));
   const padding = data.labelPadding ?? 1;
   const width = env.measureText(data.label, font);
@@ -592,7 +598,7 @@ function edgeLabelPrimitives(edge, env) {
     });
   }
   children.push(
-    textPrimitive(0, size * ALPHABETIC_BASELINE_SHIFT, data.label, color, size, env.edgeLabelFont, fontWeight, fontStyle),
+    textPrimitive(0, size * ALPHABETIC_BASELINE_SHIFT, data.label, color, size, env.edgeLabelFont, svgFont),
   );
   return [
     {
@@ -677,8 +683,7 @@ function bubbleLabelPrimitives({ points, labelAnchor, opts = {}, defaults = {} }
       safeColor(label.fill),
       label.fontSize,
       BUBBLE_LABEL_FONT_FAMILY,
-      svgFontAttributes(label.fontStyle).fontWeight,
-      svgFontAttributes(label.fontStyle).fontStyle,
+      svgFontAttributes(label.fontChoice),
     ),
   );
   if (!label.rotated) return prims;
@@ -768,8 +773,7 @@ function annotationPrimitives({ ann, x, y, k }, measureText) {
         safeColor(ann.fontColor),
         ann.fontSize,
         ANNOTATION_FONT_FAMILY,
-        svgFontAttributes(ann.fontStyle).fontWeight,
-        svgFontAttributes(ann.fontStyle).fontStyle,
+        svgFontAttributes(ann.fontStyle),
       ),
       textAnchor: "start",
     });
