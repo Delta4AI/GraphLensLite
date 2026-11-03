@@ -2426,8 +2426,21 @@ h5 {
     border-left: 1px solid var(--border-soft);
 }
 
+/* The background changes, not the text: accent text on this surface is
+   under 4.5:1 at 11px. */
 .filter-join-segment:hover {
-    color: var(--accent-text);
+    background: var(--row-hover);
+}
+
+/* The group clips its overflow (rounded ends), which cut the global outline
+   down to the seam between segments: draw it inside instead, and in the page
+   colour where the fill is the accent. */
+.filter-join-segment:focus-visible {
+    outline-offset: -3px;
+}
+
+.filter-join-segment.active:focus-visible {
+    outline-color: var(--bg);
 }
 
 .filter-join-segment.active {
@@ -3292,7 +3305,7 @@ input:checked + .checkbox-green::after {
 .badge-list {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 6px;
     margin: 4px 8px 0;
 }
 
@@ -3337,7 +3350,7 @@ input:checked + .checkbox-green::after {
 
 .badge-list-count {
     flex: none;
-    color: var(--text-faint);
+    color: var(--text-muted);
 }
 
 .style-input-sm {

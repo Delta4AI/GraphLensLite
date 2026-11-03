@@ -349,6 +349,8 @@ function createStyleDiv(cache) {
   function createCategoricalControls(parent, property, defaultValue, listOfValues, tooltip = undefined) {
     const dropdown = document.createElement("select");
     dropdown.className = "style-inner-button";
+    // The visible label is a sibling, not a <label for>; name the select itself.
+    dropdown.setAttribute("aria-label", property);
     if (tooltip) dropdown.title = tooltip;
 
     listOfValues.forEach((value) => {
@@ -672,6 +674,9 @@ function createStyleDiv(cache) {
         // Colours come from the loaded file: only plain colour syntax reaches CSS.
         swatch.style.background = entry.colors.length === 1 ? safePaint(entry.colors[0], "transparent") : "transparent";
         if (entry.colors.length > 1) swatch.classList.add("mixed");
+        swatch.setAttribute("role", "img");
+        swatch.setAttribute("aria-label", entry.colors.length > 1 ? "mixed colours" : `colour ${entry.colors[0]}`);
+        swatch.title = entry.colors.join(", ");
 
         const slot = document.createElement("span");
         slot.className = "badge-list-slot";
@@ -699,6 +704,9 @@ function createStyleDiv(cache) {
           async () => await cache.gcm.updateNodes({}, ["badge_remove"], {badge: {placement: entry.slot}}),
           `badgeRemove-${entry.slot}`);
         remove.classList.add("red");
+        const slotName = entry.slot.replace("-", " ");
+        edit.setAttribute("aria-label", `Edit the ${slotName} badge`);
+        remove.setAttribute("aria-label", `Remove the ${slotName} badge`);
 
         row.append(swatch, slot, text, count, edit, remove);
         list.appendChild(row);
@@ -1438,6 +1446,7 @@ function createStyleDiv(cache) {
     const placementDropdown = document.createElement("select");
     placementDropdown.className = "style-inner-button";
     placementDropdown.dataset.property = `Bubble Set ${group} Label Placement`;
+    placementDropdown.setAttribute("aria-label", `Label placement for "${name}"`);
     placementDropdown.classList.add(optionalCSSClass);
     ['left', 'right', 'top', 'bottom', 'center'].forEach(v => {
       const opt = document.createElement("option");
@@ -1456,6 +1465,7 @@ function createStyleDiv(cache) {
     const fontStyleDropdown = document.createElement("select");
     fontStyleDropdown.className = "style-inner-button";
     fontStyleDropdown.dataset.property = `Bubble Set ${group} Label Font Style`;
+    fontStyleDropdown.setAttribute("aria-label", `Label font style for "${name}"`);
     fontStyleDropdown.classList.add(optionalCSSClass);
     for (const v of FONT_STYLES) fontStyleDropdown.appendChild(new Option(v, v));
     fontStyleDropdown.value = bs.labelFontStyle ?? "normal";
@@ -1505,6 +1515,7 @@ function createStyleDiv(cache) {
     const resetPosition = createButton("Reset",
       `Put the label of "${name}" back on its outline after dragging it.`,
       async () => await cache.bs.setLabelShift(group, 0, 0), `bubbleLabelShiftReset-${group}`);
+    resetPosition.setAttribute("aria-label", `Reset the dragged label position of "${name}"`);
     resetPosition.classList.add(optionalCSSClass);
     rowResetPosition.appendChild(resetPosition);
   }
