@@ -5,7 +5,16 @@ import { EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from '../managers/io.js'
 import { computeMergePlan, showMergePreview } from './excel_merge.js';
 
 
+/** Columns every row has; the rest are property columns. */
+const BASIC_HEADERS = new Set(['Del', 'Row #', 'Type', 'ID', 'Label', 'Description']);
+
+/** Pending-change key: node and edge IDs live in separate namespaces. */
+const rowKey = (type, id) => `${type}::${id}`;
+
 class DataTable {
+  #elementIndex = new Map();
+  #indexedFileData = null;
+
   constructor(cache, containerId = 'dataTableContainer') {
     this.containerId = containerId;
     this.tableData = [];
@@ -13,11 +22,11 @@ class DataTable {
     this.currentEditingCell = null;
     this.onChangeCallback = null;
     this.sortState = {};
-    this.originalOrder = [];
     this.headerIndexMap = new Map();
     this.currentTab = 'selectedNodes';
     this.fileData = null;
-    this.tableDataBackup = [];
+    // rowKey → { type, id, action: 'edit', values: { header: text } }
+    //        | { type, id, action: 'delete' }
     this.pendingChanges = new Map();
     this.onPendingChangesCallback = null;
 
@@ -116,7 +125,7 @@ class DataTable {
       return;
     }
 
-    this.headers = ['Del', 'Row #', 'Type', 'ID', 'Label', 'Description'];
+    this.headers = [...BASIC_HEADERS];
 
     // Deduplicate headers to prevent duplicate columns
     const nodeHeaders = this.fileData.nodeDataHeaders.map(
@@ -147,13 +156,6 @@ class DataTable {
       this.headerIndexMap.set(header, index);
     });
 
-    const pendingRowIds = new Set();
-    this.pendingChanges.forEach((change, id) => {
-      pendingRowIds.add(id);
-    });
-
-    const preservedRows = this.tableData.filter((row) => pendingRowIds.has(row[3]));
-
     this.tableData = [];
 
     switch (this.currentTab) {
@@ -177,22 +179,80 @@ class DataTable {
         break;
     }
 
-    // Ensure preserved rows have correct number of columns
-    preservedRows.forEach((row) => {
-      while (row.length < this.headers.length) {
-        row.push('');
-      }
-    });
-
-    this.tableData.push(...preservedRows);
+    this.#overlayPendingChanges();
 
     this.tableData.forEach((row, index) => {
       row[1] = index + 1;
     });
 
-    this.tableDataBackup = this.tableData.map((row) => [...row]);
-    this.originalOrder = this.tableData.map((_, index) => index);
+    this.#sortRows();
     this.render();
+  }
+
+  /** Element types the current tab lists. */
+  #tabTypes() {
+    if (['selectedNodes', 'allNodes'].includes(this.currentTab)) return ['Node'];
+    if (['selectedEdges', 'allEdges'].includes(this.currentTab)) return ['Edge'];
+    return ['Node', 'Edge'];
+  }
+
+  // Pending changes are the only record of unapplied edits; the table is
+  // re-derived from fileData on every load and the edits laid over it here.
+  // Keeping edits in the table instead meant every reload appended another
+  // copy of each edited row.
+  #overlayPendingChanges() {
+    const types = this.#tabTypes();
+    const rowIndexByKey = new Map(this.tableData.map((row, i) => [rowKey(row[2], row[3]), i]));
+    const deleted = new Set();
+
+    for (const [key, change] of this.pendingChanges) {
+      if (!types.includes(change.type)) continue;
+      const index = rowIndexByKey.get(key);
+      if (change.action === 'delete') {
+        if (index !== undefined) deleted.add(index);
+        continue;
+      }
+      // Edited or added rows stay listed even once deselected, so an unapplied
+      // edit is never out of sight.
+      let row = this.tableData[index];
+      if (!row) {
+        row = this.#buildRow(change.type, change.id, this.#elementFor(change.type, change.id));
+        this.tableData.push(row);
+      }
+      for (const [header, value] of Object.entries(change.values)) {
+        const col = this.headerIndexMap.get(header);
+        if (col !== undefined) row[col] = value;
+      }
+    }
+
+    if (deleted.size) this.tableData = this.tableData.filter((_, i) => !deleted.has(i));
+  }
+
+  /** The loaded (unedited) element of that type and id, or undefined for a new one. */
+  #elementFor(type, id) {
+    if (this.#indexedFileData !== this.fileData) {
+      this.#elementIndex = new Map();
+      for (const node of this.fileData?.nodes ?? []) this.#elementIndex.set(rowKey('Node', node.id), node);
+      for (const edge of this.fileData?.edges ?? []) this.#elementIndex.set(rowKey('Edge', edge.id), edge);
+      this.#indexedFileData = this.fileData;
+    }
+    return this.#elementIndex.get(rowKey(type, id));
+  }
+
+  #sortRows() {
+    const [column, direction] =
+      Object.entries(this.sortState).find(([, dir]) => dir === 'asc' || dir === 'desc') ?? [];
+    if (!direction) return;
+    const col = Number(column);
+    const sign = direction === 'asc' ? 1 : -1;
+    this.tableData.sort((a, b) => {
+      const aVal = a[col] ?? '';
+      const bVal = b[col] ?? '';
+      const aNum = parseFloat(aVal);
+      const bNum = parseFloat(bVal);
+      if (!isNaN(aNum) && !isNaN(bNum)) return sign * (aNum - bNum);
+      return sign * String(aVal).toLowerCase().localeCompare(String(bVal).toLowerCase());
+    });
   }
 
   loadSelectedNodes() {
@@ -247,47 +307,26 @@ class DataTable {
   }
 
   addNodesToTable(nodes) {
-    nodes.forEach((node) => {
-      const row = new Array(this.headers.length).fill('');
-      row[0] = '';
-      row[1] = this.tableData.length + 1;
-      row[2] = 'Node';
-      row[3] = node.id;
-      row[4] = node.label || '';
-      row[5] = node.description || '';
-
-      for (let [section, subSection, prop, data] of this.cache.gcm.traverseD4Data(node)) {
-        const headerKey = `${section}::${subSection}::${prop}`;
-        const headerIdx = this.headerIndexMap.get(headerKey);
-        if (headerIdx !== undefined) {
-          row[headerIdx] = data;
-        }
-      }
-
-      this.tableData.push(row);
-    });
+    for (const node of nodes) this.tableData.push(this.#buildRow('Node', node.id, node));
   }
 
   addEdgesToTable(edges) {
-    edges.forEach((edge) => {
-      const row = new Array(this.headers.length).fill('');
-      row[0] = '';
-      row[1] = this.tableData.length + 1;
-      row[2] = 'Edge';
-      row[3] = edge.id;
-      row[4] = edge.label || '';
-      row[5] = edge.description || '';
+    for (const edge of edges) this.tableData.push(this.#buildRow('Edge', edge.id, edge));
+  }
 
-      for (let [section, subSection, prop, data] of this.cache.gcm.traverseD4Data(edge)) {
-        const headerKey = `${section}::${subSection}::${prop}`;
-        const headerIdx = this.headerIndexMap.get(headerKey);
-        if (headerIdx !== undefined) {
-          row[headerIdx] = data;
-        }
-      }
-
-      this.tableData.push(row);
-    });
+  /** A row for the current headers; `element` is undefined for a row being added. */
+  #buildRow(type, id, element) {
+    const row = new Array(this.headers.length).fill('');
+    row[2] = type;
+    row[3] = id;
+    if (!element) return row;
+    row[4] = element.label || '';
+    row[5] = element.description || '';
+    for (const [section, subSection, prop, data] of this.cache.gcm.traverseD4Data(element)) {
+      const headerIdx = this.headerIndexMap.get(`${section}::${subSection}::${prop}`);
+      if (headerIdx !== undefined) row[headerIdx] = data;
+    }
+    return row;
   }
 
   handleTableClick(event) {
@@ -354,15 +393,10 @@ class DataTable {
   }
 
   reset() {
-    this.tableData = this.tableDataBackup.map((row) => [...row]);
     this.sortState = {};
-    this.originalOrder = this.tableData.map((_, index) => index);
-    // The table alone is not the state — Apply replays pendingChanges, so
-    // leaving them behind would rebuild the graph from the very edits and row
-    // deletions the user just discarded.
     this.pendingChanges.clear();
     this.notifyPendingChanges();
-    this.render();
+    this.loadTabData();
   }
 
   /** @returns {string} HTML — imported header text is escaped, the markup is ours. */
@@ -499,16 +533,17 @@ class DataTable {
 
   handleDeleteRow(rowIndex) {
     if (rowIndex >= 0 && rowIndex < this.tableData.length) {
-      const id = this.tableData[rowIndex][3];
-      const type = this.tableData[rowIndex][2];
+      const [, , type, id] = this.tableData[rowIndex];
+      const key = rowKey(type, id);
 
-      this.pendingChanges.set(id, { type, action: 'delete' });
+      // Deleting a row that was only added here just forgets the addition.
+      if (this.#elementFor(type, id)) {
+        this.pendingChanges.set(key, { type, id, action: 'delete' });
+      } else {
+        this.pendingChanges.delete(key);
+      }
 
-      this.tableData.splice(rowIndex, 1);
-      this.originalOrder.splice(rowIndex, 1);
-      this.originalOrder = this.originalOrder.map((idx) => (idx > rowIndex ? idx - 1 : idx));
-
-      this.render();
+      this.loadTabData();
 
       if (this.onChangeCallback) {
         this.onChangeCallback(-1, -1, 'row_deleted');
@@ -530,37 +565,7 @@ class DataTable {
       this.sortState[columnIndex] = null;
     }
 
-    this.sortColumn(columnIndex, this.sortState[columnIndex]);
-  }
-
-  sortColumn(columnIndex, direction) {
-    if (!direction) {
-      const originalData = this.originalOrder.map((idx) => this.tableDataBackup[idx]);
-      this.tableData = originalData.map((row) => [...row]);
-      this.render();
-      return;
-    }
-
-    const sortIndices = this.tableData.map((_, index) => index);
-
-    sortIndices.sort((aIdx, bIdx) => {
-      let aVal = this.tableData[aIdx][columnIndex] || '';
-      let bVal = this.tableData[bIdx][columnIndex] || '';
-
-      const aNum = parseFloat(aVal);
-      const bNum = parseFloat(bVal);
-
-      if (!isNaN(aNum) && !isNaN(bNum)) {
-        return direction === 'asc' ? aNum - bNum : bNum - aNum;
-      } else {
-        aVal = String(aVal).toLowerCase();
-        bVal = String(bVal).toLowerCase();
-        return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-      }
-    });
-
-    this.tableData = sortIndices.map((idx) => this.tableData[idx]);
-    this.render();
+    this.loadTabData();
   }
 
   getSortIndicator(columnIndex) {
@@ -585,11 +590,9 @@ class DataTable {
   handleCellBlur(event, rowIndex, colIndex) {
     const cell = event.target;
     cell.classList.remove('editing');
-    this.tableData[rowIndex][colIndex] = cell.textContent;
-
-    const id = this.tableData[rowIndex][3];
-    const type = this.tableData[rowIndex][2];
-    this.trackChange(id, type);
+    const row = this.tableData[rowIndex];
+    row[colIndex] = cell.textContent;
+    this.trackChange(row[2], row[3], this.headers[colIndex], cell.textContent);
 
     if (this.onChangeCallback) {
       this.onChangeCallback(rowIndex, colIndex, cell.textContent);
@@ -601,36 +604,13 @@ class DataTable {
 
   notifyPendingChanges() {
     if (this.onPendingChangesCallback) {
+      // The pending changes are the whole difference from the loaded data.
       const hasPendingChanges = this.pendingChanges.size > 0;
-      const hasChangesFromOriginal = this.hasChangesFromOriginal();
       this.onPendingChangesCallback({
         hasPendingChanges,
-        hasChangesFromOriginal,
+        hasChangesFromOriginal: hasPendingChanges,
       });
     }
-  }
-
-  hasChangesFromOriginal() {
-    if (this.tableData.length !== this.tableDataBackup.length) {
-      return true;
-    }
-
-    for (let i = 0; i < this.tableData.length; i++) {
-      const currentRow = this.tableData[i];
-      const originalRow = this.tableDataBackup[i];
-
-      if (!currentRow || !originalRow) {
-        return true;
-      }
-
-      for (let j = 0; j < currentRow.length; j++) {
-        if (currentRow[j] !== originalRow[j]) {
-          return true;
-        }
-      }
-    }
-
-    return false;
   }
 
   onPendingChangesUpdated(callback) {
@@ -708,15 +688,12 @@ class DataTable {
       return;
     }
 
-    if (
-      this.cache.nodeRef.has(nodeID) ||
-      this.tableData.some((row) => row[2] === 'Node' && row[3] === nodeID)
-    ) {
+    if (this.hasElement('Node', nodeID)) {
       this.cache.ui.error(`Node "${nodeID}" already exists`);
       return;
     }
 
-    this.addRow('Node', nodeID);
+    await this.addRow('Node', nodeID);
     this.cache.ui.success(`Node "${nodeID}" added. Click Apply to save changes.`);
   }
 
@@ -735,10 +712,7 @@ class DataTable {
       return;
     }
 
-    if (
-      this.cache.edgeRef.has(edgeID) ||
-      this.tableData.some((row) => row[2] === 'Edge' && row[3] === edgeID)
-    ) {
+    if (this.hasElement('Edge', edgeID)) {
       this.cache.ui.error(`Edge "${edgeID}" already exists`);
       return;
     }
@@ -758,12 +732,8 @@ class DataTable {
 
     const [source, target] = parts.map((p) => p.trim());
 
-    const sourceExists =
-      this.cache.nodeRef.has(source) ||
-      this.tableData.some((row) => row[2] === 'Node' && row[3] === source);
-    const targetExists =
-      this.cache.nodeRef.has(target) ||
-      this.tableData.some((row) => row[2] === 'Node' && row[3] === target);
+    const sourceExists = this.hasElement('Node', source);
+    const targetExists = this.hasElement('Node', target);
 
     if (!sourceExists) {
       this.cache.ui.error(`Source node "${source}" does not exist. Please create the node first.`);
@@ -775,7 +745,7 @@ class DataTable {
       return;
     }
 
-    this.addRow('Edge', edgeID);
+    await this.addRow('Edge', edgeID);
     this.cache.ui.success(`Edge "${edgeID}" added. Click Apply to save changes.`);
   }
 
@@ -905,45 +875,57 @@ class DataTable {
     });
   }
 
-  addRow(type = 'Node', id = '') {
-    const newRow = new Array(this.headers.length).fill('');
-    newRow[0] = '';
-    newRow[1] =
-      this.tableData.length > 0 ? Math.max(...this.tableData.map((row) => row[1])) + 1 : 1;
-    newRow[2] = type;
-    newRow[3] = id;
-    newRow[4] = '';
-    newRow[5] = '';
-    this.tableData.push(newRow);
-    this.originalOrder.push(this.originalOrder.length);
-
-    this.trackChange(id, type);
+  async addRow(type = 'Node', id = '') {
+    this.pendingChanges.set(rowKey(type, id), { type, id, action: 'edit', values: {} });
     this.notifyPendingChanges();
-
-    this.render();
-  }
-
-  trackChange(id, type) {
-    const rowData = this.tableData.find((row) => row[3] === id && row[2] === type);
-    if (rowData) {
-      this.pendingChanges.set(id, { type, rowData: [...rowData] });
+    // A tab that does not list this element type would hide the new row.
+    if (this.#tabTypes().includes(type)) {
+      this.loadTabData();
+    } else {
+      await this.switchTab('selectedElements');
     }
   }
 
-  removeRow(index) {
-    if (index >= 0 && index < this.tableData.length) {
-      this.tableData.splice(index, 1);
-      this.originalOrder.splice(index, 1);
-      this.originalOrder = this.originalOrder.map((idx) => (idx > index ? idx - 1 : idx));
-      this.render();
+  /** True when `type`/`id` exists after the pending changes are applied. */
+  hasElement(type, id) {
+    const change = this.pendingChanges.get(rowKey(type, id));
+    if (change) return change.action !== 'delete';
+    return (type === 'Node' ? this.cache.nodeRef : this.cache.edgeRef).has(id);
+  }
+
+  /**
+   * Record a cell's text as a pending edit. A value equal to the loaded one
+   * withdraws the edit, so clicking into a cell and out again changes nothing.
+   */
+  trackChange(type, id, header, value) {
+    const key = rowKey(type, id);
+    const element = this.#elementFor(type, id);
+    let loaded = '';
+    if (element) {
+      const loadedRow = this.#buildRow(type, id, element);
+      loaded = String(loadedRow[this.headerIndexMap.get(header)] ?? '');
     }
+
+    let change = this.pendingChanges.get(key);
+    if (!change) {
+      if (value === loaded) return;
+      change = { type, id, action: 'edit', values: {} };
+      this.pendingChanges.set(key, change);
+    }
+
+    if (value === loaded) {
+      delete change.values[header];
+    } else {
+      change.values[header] = value;
+    }
+    // An added row stays pending even while empty; an edited one does not.
+    if (element && Object.keys(change.values).length === 0) this.pendingChanges.delete(key);
   }
 
   clear() {
     this.tableData = [];
     this.headers = [];
     this.sortState = {};
-    this.originalOrder = [];
     this.headerIndexMap.clear();
     this.render();
   }
@@ -1118,38 +1100,16 @@ class DataTable {
   validateNewElements() {
     const errors = [];
 
-    this.pendingChanges.forEach((change, id) => {
-      if (change.action === 'delete') return;
+    for (const change of this.pendingChanges.values()) {
+      if (change.action === 'delete' || this.#elementFor(change.type, change.id)) continue;
 
-      const row = change.rowData;
-      if (!row) return;
-
-      const type = row[2]; // 'Node' or 'Edge'
-      const elementId = row[3];
-
-      // Check if this is a newly added element (not in original fileData)
-      const isNew =
-        type === 'Node'
-          ? !this.fileData.nodes?.some((n) => n.id === elementId)
-          : !this.fileData.edges?.some((e) => e.id === elementId);
-
-      if (!isNew) return;
-
-      let hasProperty = false;
-
-      // Start from column 6 (after Del, Row #, Type, ID, Label, Description)
-      for (let i = 6; i < row.length; i++) {
-        const value = row[i];
-        if (value !== null && value !== undefined && String(value).trim() !== '') {
-          hasProperty = true;
-          break;
-        }
-      }
-
+      const hasProperty = Object.entries(change.values).some(
+        ([header, value]) => !BASIC_HEADERS.has(header) && String(value).trim() !== ''
+      );
       if (!hasProperty) {
-        errors.push(`• ${type} "${elementId}" requires at least one property value`);
+        errors.push(`• ${change.type} "${change.id}" requires at least one property value`);
       }
-    });
+    }
 
     return errors;
   }
@@ -1177,28 +1137,13 @@ class DataTable {
       'type',
     ]);
 
-    const processedIds = new Set();
-    const deletedIds = new Set();
-
-    this.pendingChanges.forEach((change, id) => {
-      if (change.action === 'delete') {
-        deletedIds.add(id);
-        processedIds.add(id);
-      }
-    });
-
-    const processRow = (row) => {
-      const isNode = row[2] === 'Node';
-      const id = row[3];
-
-      if (processedIds.has(id)) return;
-      processedIds.add(id);
-
-      const label = row[4] || undefined;
-      const description = row[5] || undefined;
+    // Edits are partial: only the cells the user changed, laid over the loaded
+    // element, so editing under one tab never drops the columns another shows.
+    const applyEdit = (change) => {
+      const isNode = change.type === 'Node';
       const elem = isNode
-        ? this.cache.nodeRef.get(id) || this.createNode(id)
-        : this.cache.edgeRef.get(id) || this.createEdge(id);
+        ? this.cache.nodeRef.get(change.id) || this.createNode(change.id)
+        : this.cache.edgeRef.get(change.id) || this.createEdge(change.id);
 
       const cleanElem = {};
       for (const key of allowedKeys) {
@@ -1206,69 +1151,49 @@ class DataTable {
           cleanElem[key] = elem[key];
         }
       }
+      cleanElem.D4Data = structuredClone(this.#elementFor(change.type, change.id)?.D4Data ?? {});
 
-      if (label) cleanElem.label = label;
-      if (description) cleanElem.description = description;
-
-      if (isNode && label) {
-        cleanElem.style.label = true;
-        cleanElem.style.labelText = label;
-      }
-
-      cleanElem.D4Data = {};
-
-      for (let i = 6; i < row.length; i++) {
-        const value = row[i];
-        if (value !== null && value !== undefined && String(value).trim() !== '') {
-          const headerName = this.headers[i];
-          const [group, subGroup, prop] = StaticUtilities.decodePropHashId(headerName);
-
-          if (!cleanElem.D4Data[group]) {
-            cleanElem.D4Data[group] = {};
+      for (const [header, value] of Object.entries(change.values)) {
+        if (header === 'Label') {
+          if (value) {
+            cleanElem.label = value;
+            if (isNode) {
+              cleanElem.style.label = true;
+              cleanElem.style.labelText = value;
+            }
           }
-
-          if (!cleanElem.D4Data[group][subGroup]) {
-            cleanElem.D4Data[group][subGroup] = {};
-          }
-          cleanElem.D4Data[group][subGroup][prop] = isNaN(value) ? value : Number(value);
+          continue;
         }
+        if (header === 'Description') {
+          if (value) cleanElem.description = value;
+          continue;
+        }
+        const [group, subGroup, prop] = StaticUtilities.decodePropHashId(header);
+        if (String(value).trim() === '') {
+          delete cleanElem.D4Data[group]?.[subGroup]?.[prop];
+          continue;
+        }
+        cleanElem.D4Data[group] ??= {};
+        cleanElem.D4Data[group][subGroup] ??= {};
+        cleanElem.D4Data[group][subGroup][prop] = isNaN(value) ? value : Number(value);
       }
 
-      isNode ? result.nodes.push(cleanElem) : result.edges.push(cleanElem);
+      return cleanElem;
     };
 
-    const pendingNodes = [];
-    const pendingEdges = [];
-
-    this.pendingChanges.forEach((change, id) => {
-      if (change.action !== 'delete' && change.rowData) {
-        if (change.type === 'Node') {
-          pendingNodes.push(change.rowData);
-        } else if (change.type === 'Edge') {
-          pendingEdges.push(change.rowData);
-        }
-      }
-    });
-
-    pendingNodes.forEach((rowData) => processRow(rowData));
-    pendingEdges.forEach((rowData) => processRow(rowData));
-
-    if (this.fileData.nodes) {
-      this.fileData.nodes.forEach((node) => {
-        if (!processedIds.has(node.id) && !deletedIds.has(node.id)) {
-          result.nodes.push(structuredClone(node));
-          processedIds.add(node.id);
-        }
-      });
+    const changed = new Set();
+    for (const [key, change] of this.pendingChanges) {
+      changed.add(key);
+      if (change.action === 'delete') continue;
+      const elem = applyEdit(change);
+      change.type === 'Node' ? result.nodes.push(elem) : result.edges.push(elem);
     }
 
-    if (this.fileData.edges) {
-      this.fileData.edges.forEach((edge) => {
-        if (!processedIds.has(edge.id) && !deletedIds.has(edge.id)) {
-          result.edges.push(structuredClone(edge));
-          processedIds.add(edge.id);
-        }
-      });
+    for (const node of this.fileData.nodes ?? []) {
+      if (!changed.has(rowKey('Node', node.id))) result.nodes.push(structuredClone(node));
+    }
+    for (const edge of this.fileData.edges ?? []) {
+      if (!changed.has(rowKey('Edge', edge.id))) result.edges.push(structuredClone(edge));
     }
 
     const nodeIds = new Set(result.nodes.map((n) => n.id));
