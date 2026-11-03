@@ -28,6 +28,7 @@ import {
   polygonSelfIntersects,
   outlineLabelAnchor,
   resolveBubbleLabel,
+  shiftedLabelAnchor,
   OUTLINE_STROKE_WIDTH,
 } from './bubble_geometry.js';
 import { idsKey, positionsChecksum, geometryKey } from './overlay_keys.js';
@@ -77,6 +78,9 @@ class BubbleSetLayer {
 
     this.frame = new FrameCoalescer(() => this.#paint());
     this.lastPaintSignature = null;
+    // Where each group's label was last painted, in viewport CSS px, for
+    // grabbing it with the mouse: group → {cx, cy, angle, hw, hh}.
+    this.labelBoxes = new Map();
     /** Last fit duration per group, in ms — drives refit deferral. */
     this.fitDurations = new Map();
     this.settleHandle = null;
@@ -127,6 +131,44 @@ class BubbleSetLayer {
         layer.scheduleRedraw();
       },
     };
+  }
+
+  // ----------------------------------------------------------- label drag
+
+  /**
+   * The group whose painted label covers viewport point (x, y), topmost
+   * first, or null.
+   */
+  labelAt(x, y) {
+    for (const [group, box] of [...this.labelBoxes].reverse()) {
+      const dx = x - box.cx;
+      const dy = y - box.cy;
+      const cos = Math.cos(-box.angle);
+      const sin = Math.sin(-box.angle);
+      if (Math.abs(dx * cos - dy * sin) <= box.hw && Math.abs(dx * sin + dy * cos) <= box.hh) {
+        return group;
+      }
+    }
+    return null;
+  }
+
+  /** The label shift a viewport drag of (dx, dy) px amounts to, in graph units. */
+  viewportDeltaToShift(dx, dy) {
+    const view = viewportTransform(this.adapter.sigma);
+    if (!view) return { x: 0, y: 0 };
+    // The shift is y-down (app space); sigma graph space is y-up.
+    return { x: dx / view.sx, y: -dy / view.sy };
+  }
+
+  /** Move a group's label on screen only; the caller persists it at the end. */
+  previewLabelShift(group, shift) {
+    this.#updateGroup(group, { labelShiftX: shift.x, labelShiftY: shift.y });
+  }
+
+  /** The label shift the layer currently paints for `group`. */
+  labelShift(group) {
+    const opts = this.groups.get(group)?.opts ?? {};
+    return { x: Number(opts.labelShiftX) || 0, y: Number(opts.labelShiftY) || 0 };
   }
 
   /**
@@ -332,6 +374,7 @@ class BubbleSetLayer {
       this.ctx.restore();
     }
 
+    this.labelBoxes.clear();
     for (const [group, state] of active) {
       if (!state.opts.label) continue;
       const cached = this.outlines.get(group);
@@ -344,7 +387,9 @@ class BubbleSetLayer {
         cached.anchorPlacement = placement;
       }
       if (cached.anchor) {
-        this.#drawLabel(this.labelCtx, projectAnchor(cached.anchor, view), state.opts, defaults);
+        const anchor = projectAnchor(shiftedLabelAnchor(cached.anchor, state.opts), view);
+        const label = this.#drawLabel(this.labelCtx, anchor, state.opts, defaults);
+        if (label) this.labelBoxes.set(group, labelBox(label));
       }
     }
   }
@@ -375,8 +420,13 @@ class BubbleSetLayer {
         ({ outer: graphPoints, holes: graphHoles } = this.#fitGraphOutline(state, visibleMembers));
       }
       if (!graphPoints || graphPoints.length < 2) continue;
+      const placement = state.opts.labelPlacement ?? DEFAULTS.BUBBLE_GROUP_STYLE_TEMPLATE.labelPlacement;
+      const graphAnchor = shiftedLabelAnchor(outlineLabelAnchor(graphPoints, placement), state.opts);
+      const view = viewportTransform(sigma);
       out.push({
         group,
+        // Same anchor the screen paints, dragged position included.
+        labelAnchor: graphAnchor && view ? projectAnchor(graphAnchor, view) : null,
         points: graphPoints.map((p) => sigma.graphToViewport(p)),
         holes: graphHoles.map((h) => h.map((p) => sigma.graphToViewport(p))),
         opts: state.opts,
@@ -421,10 +471,10 @@ class BubbleSetLayer {
     ctx.save();
     try {
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      for (const { points, opts, defaults } of groups) {
+      for (const { points, labelAnchor, opts, defaults } of groups) {
         if (!opts.label) continue;
         const placement = opts.labelPlacement ?? defaults.labelPlacement ?? 'bottom';
-        this.#drawLabel(ctx, outlineLabelAnchor(points, placement), opts, defaults);
+        this.#drawLabel(ctx, labelAnchor ?? outlineLabelAnchor(points, placement), opts, defaults);
       }
     } finally {
       ctx.restore();
@@ -665,7 +715,7 @@ class BubbleSetLayer {
       ctx.font = font;
       return ctx.measureText(text).width;
     });
-    if (!label) return;
+    if (!label) return null;
 
     ctx.font = label.font;
     ctx.textAlign = 'center';
@@ -685,7 +735,19 @@ class BubbleSetLayer {
     ctx.fillStyle = label.fill;
     ctx.fillText(label.text, label.lx, label.ly);
     if (label.rotated) ctx.restore();
+    return label;
   }
+}
+
+/** The grab box of a painted label: its text plus padding, turned with it. */
+function labelBox(label) {
+  return {
+    cx: label.x,
+    cy: label.y,
+    angle: label.rotated ? label.angle : 0,
+    hw: label.width / 2 + label.padding,
+    hh: label.fontSize / 2 + label.padding,
+  };
 }
 
 /**

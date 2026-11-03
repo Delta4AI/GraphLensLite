@@ -1484,6 +1484,16 @@ function createStyleDiv(cache) {
     createNumericalSlider(rowOffsetY, `Bubble Set ${group} Label Offset Y`, bs.labelOffsetY,
       {min: -50, max: 50, step: 1}, `Define the label Y offset for "${name}".`, false);
     rowOffsetY.lastChild.classList.add(optionalCSSClass);
+
+    // Dragging the label on the canvas moves it in graph space; this puts it
+    // back on its outline (the offsets above stay as they are).
+    const rowResetPosition = createNewRow(panel);
+    appendLabel(rowResetPosition, "Dragged Position", undefined, undefined, optionalCSSClass);
+    const resetPosition = createButton("Reset",
+      `Put the label of "${name}" back on its outline after dragging it.`,
+      async () => await cache.bs.setLabelShift(group, 0, 0), `bubbleLabelShiftReset-${group}`);
+    resetPosition.classList.add(optionalCSSClass);
+    rowResetPosition.appendChild(resetPosition);
   }
 
   // Turn a config card into a collapsible section: replace the floating

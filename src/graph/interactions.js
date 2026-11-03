@@ -18,6 +18,8 @@ const TOOLTIP_OFFSET_PX = 12;
 // shorter, it stays a click.
 const LASSO_DRAG_THRESHOLD_PX = 3;
 const LASSO_ARMED_CLASS = "lasso-armed";
+const OVER_GROUP_LABEL_CLASS = "over-group-label";
+const DRAGGING_GROUP_LABEL_CLASS = "dragging-group-label";
 
 /**
  * What a lasso does, from the modifiers held: Shift adds to the selection,
@@ -59,6 +61,8 @@ class InteractionManager {
     // A lasso drawn by dragging with a modifier held, outside lasso mode:
     // {mode, start, polygon} from the press until the release.
     this.modifierLasso = null;
+    // A group label being dragged: {group, start, from, shift, moved}.
+    this.labelDrag = null;
     this.tooltipEl = null;
     // Serializes drag-end persists: a second drag finishing while the first
     // persist is still in flight must not race it.
@@ -122,11 +126,12 @@ class InteractionManager {
     const sigma = this.adapter.sigma;
     const captor = sigma.getMouseCaptor();
 
-    sigma.on("downNode", (e) => this.#onDownNode(e.node));
+    sigma.on("downNode", (e) => this.#onDownNode(e.node, e.event));
     captor.on("mousemovebody", (e) => this.#onMouseMoveBody(e));
     captor.on("mouseup", () => this.#guard(this.#onMouseUp()));
     captor.on("mousedown", (e) => {
       this.suppressNextClick = false;
+      if (this.#armLabelDrag(e)) return;
       this.#armModifierLasso(e);
     });
 
@@ -146,8 +151,10 @@ class InteractionManager {
 
   // -------------------------------------------------------------------- drag
 
-  #onDownNode(node) {
+  #onDownNode(node, event) {
     if (!this.enabled.drag) return;
+    // Group labels paint above the nodes, so a press on one grabs the label.
+    if (event && this.#groupLabelAt(event)) return;
     this.draggedNode = node;
     this.dragMoved = false;
     // Dragging a selected node moves the whole selection along.
@@ -180,11 +187,18 @@ class InteractionManager {
   }
 
   #onMouseMoveBody(event) {
+    if (this.labelDrag) {
+      this.#moveLabelDrag(event);
+      return;
+    }
     if (this.modifierLasso) {
       this.#extendModifierLasso(event);
       return;
     }
-    if (!this.draggedNode) return;
+    if (!this.draggedNode) {
+      this.container.classList?.toggle(OVER_GROUP_LABEL_CLASS, Boolean(this.#groupLabelAt(event)));
+      return;
+    }
     // viewportToGraph returns sigma-space (y-up) — written to graphology
     // as-is; the flip to app space happens once in getNodeData (see
     // graph_model.js flipY contract).
@@ -208,6 +222,10 @@ class InteractionManager {
   }
 
   async #onMouseUp() {
+    if (this.labelDrag) {
+      await this.#finishLabelDrag();
+      return;
+    }
     if (this.modifierLasso) {
       await this.#finishModifierLasso();
       return;
@@ -289,7 +307,7 @@ class InteractionManager {
     // CFG.DISABLE_HOVER_EFFECT is checked live: io.preProcessData and the
     // hover toggle button flip it at runtime.
     if (!this.enabled.hover || this.cache.CFG.DISABLE_HOVER_EFFECT) return;
-    if (this.draggedNode || this.modifierLasso) return;
+    if (this.draggedNode || this.modifierLasso || this.labelDrag) return;
     this.hoverIds.clear();
     for (const member of hoverNeighborhood(this.adapter.graph, id, isEdge)) {
       this.hoverIds.add(member);
@@ -304,6 +322,53 @@ class InteractionManager {
   }
 
   // ------------------------------------------------------------------ lasso
+
+  // --------------------------------------------------- group label drag
+  // A group's label can be grabbed and dropped anywhere, like a note. The
+  // position is kept in graph units (bubble_sets.setLabelShift), so it stays
+  // put relative to the drawing at any zoom; only the end of the drag is
+  // persisted and recorded for undo.
+
+  #groupLabelAt(event) {
+    if (!this.enabled.drag || this.enabled.lasso) return null;
+    return this.adapter.bubbleLayer?.labelAt(event.x, event.y) ?? null;
+  }
+
+  #armLabelDrag(event) {
+    if (event.original?.button !== 0) return false;
+    const group = this.#groupLabelAt(event);
+    if (!group) return false;
+    const from = this.adapter.bubbleLayer.labelShift(group);
+    this.labelDrag = { group, start: { x: event.x, y: event.y }, from, shift: from, moved: false };
+    return true;
+  }
+
+  #moveLabelDrag(event) {
+    const drag = this.labelDrag;
+    event.preventSigmaDefault();
+    event.original.preventDefault();
+    const dx = event.x - drag.start.x;
+    const dy = event.y - drag.start.y;
+    if (!drag.moved && Math.hypot(dx, dy) < LASSO_DRAG_THRESHOLD_PX) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      this.hideTooltip();
+      this.#clearHover();
+      this.container.classList?.add(DRAGGING_GROUP_LABEL_CLASS);
+    }
+    const delta = this.adapter.bubbleLayer.viewportDeltaToShift(dx, dy);
+    drag.shift = { x: drag.from.x + delta.x, y: drag.from.y + delta.y };
+    this.adapter.bubbleLayer.previewLabelShift(drag.group, drag.shift);
+  }
+
+  async #finishLabelDrag() {
+    const { group, shift, moved } = this.labelDrag;
+    this.labelDrag = null;
+    this.container.classList?.remove(DRAGGING_GROUP_LABEL_CLASS);
+    if (!moved) return; // a click on a label: the click handlers own it
+    this.suppressNextClick = true; // before any await (see #onMouseUp)
+    await this.cache.bs.setLabelShift(group, shift.x, shift.y);
+  }
 
   // ----------------------------------------------------- modifier lasso
   // Outside lasso mode, a drag that starts on empty canvas with a modifier

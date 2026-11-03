@@ -225,6 +225,9 @@ const DEFAULTS = {
     labelAutoRotate: true,
     labelOffsetX: 0,
     labelOffsetY: 0,
+    // Where the label was dragged to, in graph units from its outline anchor.
+    labelShiftX: 0,
+    labelShiftY: 0,
     labelPlacement: 'bottom',
   },
   // The brand colours the original four groups used, in their original order,

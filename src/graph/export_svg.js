@@ -642,14 +642,14 @@ function bubbleBodyPrimitives({ points, holes = [], opts = {}, defaults = {} }) 
  * opts.label; the export receives raw opts + defaults, so the gate resolves
  * through the same opts ?? defaults chain as every other label option.
  */
-function bubbleLabelPrimitives({ points, opts = {}, defaults = {} }, measureText) {
+function bubbleLabelPrimitives({ points, labelAnchor, opts = {}, defaults = {} }, measureText) {
   if (!points || points.length < 2) return [];
   if (!(opts.label ?? defaults.label)) return [];
   const placement = opts.labelPlacement ?? defaults.labelPlacement ?? "bottom";
   // Every number below comes from the shared resolver, so this export and the
   // live canvas cannot drift on standoff, rotation or the background box.
   const label = resolveBubbleLabel(
-    outlineLabelAnchor(points, placement),
+    labelAnchor ?? outlineLabelAnchor(points, placement),
     opts,
     defaults,
     measureText,

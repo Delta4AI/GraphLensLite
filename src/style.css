@@ -899,6 +899,15 @@ body {
 
 /* Persistent renderer-dead message (src/graph/webgl_support.js) — shown
    where the graph would be when WebGL2 is unavailable */
+/* A group label can be grabbed and dragged (interactions.js). */
+#innerGraphContainer.over-group-label canvas {
+    cursor: grab;
+}
+
+#innerGraphContainer.dragging-group-label canvas {
+    cursor: grabbing;
+}
+
 /* A lasso modifier is held (interactions.js): dragging on empty canvas draws. */
 #innerGraphContainer.lasso-armed canvas {
     cursor: crosshair;

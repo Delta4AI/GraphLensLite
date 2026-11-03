@@ -375,7 +375,8 @@ To group by data instead of by id, use `groupOneProps` — e.g.
 Useful `bubbleSetStyle.<group>` fields: `fill`, `fillOpacity`, `stroke`,
 `strokeOpacity`, `padding`, `corridor`, `avoidance`, `label` (boolean), `labelText`,
 `labelFill`, `labelFontSize`, `labelFontStyle`, `labelBackground`, `labelBackgroundFill`,
-`labelBackgroundRadius`, `labelPlacement`.
+`labelBackgroundRadius`, `labelPlacement`, and `labelShiftX` / `labelShiftY` — where
+the label was dragged to, in graph units (y down) from its spot on the outline.
 
 ---
 

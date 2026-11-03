@@ -463,6 +463,19 @@ class GraphBubbleSetManager {
    * here removes the ordering question entirely (the layer does the same with
    * its own per-group state, see bubble_layer #groupState).
    */
+  /**
+   * Keep a group label where it was dragged to (graph units from its outline
+   * anchor; see shiftedLabelAnchor). Paint-only: no re-fit, no full render.
+   */
+  async setLabelShift(group, x, y) {
+    const bStyle = this.#layout().bubbleSetStyle[group];
+    if (!bStyle) return;
+    bStyle.labelShiftX = x;
+    bStyle.labelShiftY = y;
+    await this.#groupInstance(group).update({ labelShiftX: x, labelShiftY: y });
+    this.cache.history?.commit(x === 0 && y === 0 ? 'Reset group label position' : 'Move group label');
+  }
+
   #groupInstance(group) {
     this.cache.INSTANCES.BUBBLE_GROUPS[group] ??=
       this.cache.graph.getPluginInstance(`bubbleSetPlugin-${group}`);

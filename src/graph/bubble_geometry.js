@@ -897,6 +897,21 @@ const BUBBLE_LABEL_FONT_FAMILY = "Arial, sans-serif";
  *   fill: string, background: null|{x: number, y: number, width: number,
  *   height: number, radius: number, fill: string}}}
  */
+/**
+ * The label anchor moved by where the user dragged the label to. The shift is
+ * stored in app graph units (y down, like node positions in a saved file);
+ * the anchor is in sigma graph space (y up), hence the flip on y.
+ *
+ * @param {{x: number, y: number}|null} anchor  graph-space outline anchor
+ * @param {{labelShiftX?: number, labelShiftY?: number}} opts
+ */
+function shiftedLabelAnchor(anchor, opts = {}) {
+  const dx = Number(opts.labelShiftX) || 0;
+  const dy = Number(opts.labelShiftY) || 0;
+  if (!anchor || (dx === 0 && dy === 0)) return anchor;
+  return { ...anchor, x: anchor.x + dx, y: anchor.y - dy };
+}
+
 function resolveBubbleLabel(anchor, opts = {}, defaults = {}, measureText) {
   const text = String(opts.labelText ?? defaults.labelText ?? "");
   if (!text || !anchor) return null;
@@ -937,6 +952,8 @@ function resolveBubbleLabel(anchor, opts = {}, defaults = {}, measureText) {
     font,
     fontSize,
     fontStyle: fontStylePrefix(fontStyle),
+    width: textWidth,
+    padding,
     x,
     y,
     lx,
@@ -954,6 +971,7 @@ export {
   polygonSelfIntersects,
   outlineLabelAnchor,
   resolveBubbleLabel,
+  shiftedLabelAnchor,
   OUTLINE_STROKE_WIDTH,
   LABEL_STANDOFF_PX,
   BUBBLE_LABEL_FONT_FAMILY,
