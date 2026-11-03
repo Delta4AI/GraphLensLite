@@ -3,6 +3,7 @@ import { replaceColorScale } from '../utilities/color_scale_picker.js';
 import { replaceNumericScale } from '../utilities/numeric_scale_picker.js';
 import { initTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
 import { buildGraphologyGraph, makeNodeReducer, makeEdgeReducer } from './graph_model.js';
+import { badgeSlot, withoutSlot, withBadge, badgeTextFromValue } from './badges.js';
 // NOTE: sigma_adapter.js is imported lazily in createGraphInstance(), never
 // statically: the sigma vendor bundle probes WebGL at module scope
 // (@sigma/node-image reads MAX_TEXTURE_SIZE from a throwaway context), so a
@@ -519,7 +520,15 @@ class GraphCoreManager {
     if (this.cache.selectedEdges.length) this.cache.history?.commit('Edge style change');
   }
 
-  async updateNodes(overrides = {}, commands = []) {
+  /**
+   * @param {object} overrides  style overrides merged into every selected node
+   * @param {string[]} commands
+   * @param {object} [options]
+   * @param {object} [options.badge]  for 'badge_set': {placement, color, text}
+   *   or {placement, color, property} to take each node's text from a column;
+   *   for 'badge_remove': {placement}
+   */
+  async updateNodes(overrides = {}, commands = [], { badge } = {}) {
     let colorMap = null;
     if (commands.includes('set_continuous_color_scale')) {
       colorMap = await this.cache.picker.pickColors('nodes');
@@ -548,13 +557,7 @@ class GraphCoreManager {
       }
     }
 
-    const badgesToAdd = overrides.style?.badges;
-    const badgePaletteToAdd = overrides.style?.badgePalette;
-
-    if (commands.includes('badge_add')) {
-      delete overrides.style?.badges;
-      delete overrides.style?.badgePalette;
-    }
+    let nodesWithoutBadgeValue = 0;
 
     for (const nodeID of this.cache.selectedNodes) {
       const node = this.cache.nodeRef.get(nodeID);
@@ -565,24 +568,26 @@ class GraphCoreManager {
           node.style.badges = [];
           node.style.badgePalette = [];
         }
-        if (command === 'badge_add') {
-          node.style.badge = true;
-          node.style.badges = node.style.badges || [];
-          node.style.badgePalette = node.style.badgePalette || [];
-
-          if (badgesToAdd) {
-            node.style.badges = [
-              ...node.style.badges,
-              ...(Array.isArray(badgesToAdd) ? badgesToAdd : [badgesToAdd]),
-            ];
+        if (command === 'badge_set' || command === 'badge_remove') {
+          const slot = badgeSlot(badge.placement);
+          let next = withoutSlot(node.style, slot);
+          if (command === 'badge_set') {
+            const text = badge.property
+              ? badgeTextFromValue(node.featureValues?.get(badge.property))
+              : badge.text;
+            // A node with no value for the column gets no badge in the slot,
+            // so a stale one never passes for this column's value.
+            if (text) {
+              const placed = { text, placement: slot };
+              if (badge.property) placed.property = badge.property;
+              next = withBadge(next, placed, badge.color);
+            } else {
+              nodesWithoutBadgeValue += 1;
+            }
           }
-
-          if (badgePaletteToAdd) {
-            node.style.badgePalette = [
-              ...node.style.badgePalette,
-              ...(Array.isArray(badgePaletteToAdd) ? badgePaletteToAdd : [badgePaletteToAdd]),
-            ];
-          }
+          node.style.badges = next.badges;
+          node.style.badgePalette = next.badgePalette;
+          node.style.badge = next.badges.length > 0;
         }
 
         if (command === 'label_set_to_id') {
@@ -630,6 +635,12 @@ class GraphCoreManager {
 
     await this.cache.style.handleStyleChangeLoadingEvent('Style', `Updating Node Styles`);
     if (this.cache.selectedNodes.length) this.cache.history?.commit('Node style change');
+    if (nodesWithoutBadgeValue > 0) {
+      this.cache.ui.info(
+        `${nodesWithoutBadgeValue} of ${this.cache.selectedNodes.length} selected nodes have no ` +
+          `value for that column, so they got no badge there.`
+      );
+    }
   }
 
   getTargetNodes(propID) {

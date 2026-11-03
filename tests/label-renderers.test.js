@@ -70,7 +70,7 @@ describe("placementVector", () => {
     expect(placementVector("diagonal")).toEqual([0, 0]);
   });
 
-  it("maps all 12 badge placements (DEFAULTS.STYLES.NODE_BADGE_PLACEMENTS)", () => {
+  it("maps all 12 badge placement spellings saved files can carry", () => {
     const expected = {
       left: [-1, 0],
       right: [1, 0],
@@ -86,10 +86,6 @@ describe("placementVector", () => {
       "bottom-right": [1, 1],
     };
 
-    // The fixture must stay in sync with the configured placement list.
-    expect(Object.keys(expected).sort()).toEqual(
-      [...DEFAULTS.STYLES.NODE_BADGE_PLACEMENTS].sort(),
-    );
     for (const [placement, vector] of Object.entries(expected)) {
       expect(placementVector(placement), placement).toEqual(vector);
     }

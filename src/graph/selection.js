@@ -440,6 +440,7 @@ class GraphSelectionManager {
     // resync the group rows' ＋/－ buttons here. (updateSelectedState fires
     // before this refresh and would read a stale selection.)
     this.cache.bs.syncGroupRows();
+    this.cache.ui.refreshBadgeControls?.();
 
     if (typeof this.cache.dataTable !== 'undefined' && this.cache.dataTable.fileData) {
       if (

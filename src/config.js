@@ -254,7 +254,6 @@ const DEFAULTS = {
       grey: "#ABACBD",
       none: "#00000000"
     },
-    NODE_BADGE_PLACEMENTS: ["left", "right", "top", "bottom", "left-top", "left-bottom", "right-top", "right-bottom", "top-left", "top-right", "bottom-left", "bottom-right"],
     EDGE_TYPES: ["line", "cubic", "quadratic", "polyline"],
     EDGE_COLORS: {red: "#C33D35", purple: "#403C53", blue: "#8CA6D9", pink: "#EFB0AA", grey: "#ABACBD"},
     // EDGE_WIDTHS: {sm: 0.5, md: 0.75, lg: 1, xlg: 3},

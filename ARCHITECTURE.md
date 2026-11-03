@@ -51,6 +51,8 @@ The rendering and graph-operation core. Key modules:
 - `bubble_tuning.js` / `bubble_smoothing.js` — the layout-aware initial group
   settings behind ✨ Re-tune, and the Catmull-Rom ring painter/resampler both the
   canvas layer and the SVG export draw through
+- `badges.js` — node badges: one pill per perimeter slot (set, replace, remove,
+  text taken from a column) and the per-slot summary the badge list shows
 - `annotation_layer.js` / `annotation_geometry.js` — text notes: a DOM overlay
   over the stage (place/drag/edit/style popover) plus the node-safe box metrics
   the layer, the PNG export and the SVG export all measure with
