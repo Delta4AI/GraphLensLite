@@ -133,30 +133,6 @@ body {
     z-index: var(--z-rail);
 }
 
-.rail-mark {
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
-    border: 1px solid transparent;
-    background: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    flex: none;
-}
-
-.rail-mark img {
-    height: 22px;
-    width: 22px;
-}
-
-.rail-mark:hover {
-    background: var(--surface-3);
-    border-color: var(--border);
-}
-
 .rail-wschip {
     display: flex;
     flex-direction: column;
@@ -1845,7 +1821,9 @@ h5 {
    columns shared by every row. */
 .select-lookup {
     display: grid;
-    grid-template-columns: max-content minmax(0, 1fr) auto auto;
+    /* The input column has a floor: the card is otherwise only as wide as
+       its button row, which left room for a couple of IDs. */
+    grid-template-columns: max-content minmax(240px, 1fr) auto auto;
     align-items: center;
     gap: 4px 2px;
     margin-top: 4px;
@@ -1853,6 +1831,11 @@ h5 {
 
 .select-lookup-row {
     display: contents;
+}
+
+.select-lookup .style-input {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Collapsible config sections (Node / Edge / Bubble) so the panel reads as
