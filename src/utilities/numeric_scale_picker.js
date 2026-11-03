@@ -95,7 +95,15 @@ class NumericScalePicker {
       'replacing whatever it had before.';
     missingOutputInput.oninput = () => {
       const parsed = parseFloat(missingOutputInput.value);
-      this.missingOutput = Number.isFinite(parsed) ? parsed : this.minOutput;
+      // Not a number: keep the last good value and say so on the field,
+      // rather than quietly falling back to something the user did not type.
+      const valid = Number.isFinite(parsed);
+      missingOutputInput.setCustomValidity(valid ? '' : 'Enter a number');
+      if (!valid) {
+        missingOutputInput.reportValidity();
+        return;
+      }
+      this.missingOutput = parsed;
       this.missingOutputEdited = true;
     };
     missingRow.append(missingLabel, missingOutputInput);

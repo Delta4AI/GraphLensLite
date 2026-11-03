@@ -144,4 +144,20 @@ describe("Map by data: what counts as a value", () => {
     picker.cancel();
     await pending;
   });
+
+  it("keeps the last good value when the field is not a number", async () => {
+    const cache = cacheWith({ A: undefined, B: 10 });
+    cache.selectedNodes = ["A", "B"];
+    const picker = cache.numericPicker;
+    const pending = picker.pickNumericScale("nodes", "Node Size");
+    const input = picker.dom.missingOutputInput;
+    input.value = "4";
+    input.oninput();
+    input.value = "";
+    input.oninput();
+    expect(picker.missingOutput).toBe(4);
+    expect(input.validationMessage).toBe("Enter a number");
+    picker.cancel();
+    await pending;
+  });
 });

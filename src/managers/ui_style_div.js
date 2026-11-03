@@ -1521,7 +1521,9 @@ function createStyleDiv(cache) {
     // Dragging the label on the canvas moves it in graph space; this puts it
     // back on its outline (the offsets above stay as they are).
     const rowResetPosition = createNewRow(panel);
-    appendLabel(rowResetPosition, "Dragged Position", undefined, undefined, optionalCSSClass);
+    appendLabel(rowResetPosition, "Dragged Position",
+      "Drag the label on the canvas to place it; the Offset X/Y sliders above nudge it without dragging.",
+      undefined, optionalCSSClass);
     const resetPosition = createButton("Reset",
       `Put the label of "${name}" back on its outline after dragging it.`,
       async () => await cache.bs.setLabelShift(group, 0, 0), `bubbleLabelShiftReset-${group}`);

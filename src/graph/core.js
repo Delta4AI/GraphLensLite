@@ -705,8 +705,9 @@ class GraphCoreManager {
 
     // Build-up with "only ticked" links: a matching edge brings its end nodes,
     // so they have to be in before any edge asks whether its ends are shown.
+    const linksPickedByRows = rule.buildUp && rule.links === 'ticked';
     const matchedEdges = new Set();
-    if (rule.buildUp && rule.links === 'ticked') {
+    if (linksPickedByRows) {
       for (const edge of this.cache.edgeRef.values()) {
         if (edge.features.size === 0 || !testEdge(edge)) continue;
         matchedEdges.add(edge.id);
@@ -727,10 +728,7 @@ class GraphCoreManager {
         continue;
       }
 
-      const matches =
-        rule.buildUp && rule.links === 'ticked'
-          ? matchedEdges.has(edge.id)
-          : endsShown && testEdge(edge);
+      const matches = linksPickedByRows ? matchedEdges.has(edge.id) : endsShown && testEdge(edge);
       if (!edgeShown(rule, { matches, endsShown })) continue;
       this.cache.edgeIDsToBeShown.add(edge.id);
       if (matches) recordMatches(edge, this.cache.propIDsToEdgeIDsToBeShown);

@@ -39,6 +39,16 @@ const FILTER_LINK_LABELS = [
   ['none', 'None'],
 ];
 
+/** "Ctrl+⇧ drag" → "Ctrl Shift drag": the cheat sheet's keys as words. */
+function spokenKeys(key) {
+  return key
+    .replace(/⇧/g, ' Shift ')
+    .replace(/⌘/g, ' Command ')
+    .replace(/\+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // "Ctrl" or "⌘": the modifier a replacing lasso is drawn with.
 const LASSO_MODIFIER = hotkeyLabel('').replace(/\+$/, '');
 
@@ -651,6 +661,9 @@ class UIManager {
       row.className = 'keyboard-sheet-row';
       const kbd = document.createElement('kbd');
       kbd.textContent = key;
+      // Screen readers spell ⇧ and ⌘ as symbol names; give them the key names.
+      const spoken = spokenKeys(key);
+      if (spoken !== key) kbd.setAttribute('aria-label', spoken);
       const label = document.createElement('span');
       label.textContent = action;
       row.append(kbd, label);

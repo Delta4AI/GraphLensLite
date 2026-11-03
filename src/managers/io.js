@@ -2,7 +2,7 @@
 import { VERSION, bubbleGroupStyle, UNSAFE_OBJECT_KEYS } from '../config.js';
 import { sanitizeAnnotations, MAX_ANNOTATIONS } from '../graph/annotation_geometry.js';
 import { StaticUtilities } from '../utilities/static.js';
-import { FILTER_LINKS } from '../graph/visibility_rule.js';
+import { FILTER_LINKS, visibilitySettings } from '../graph/visibility_rule.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
 import { excelData, EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from './excel_schema.js';
 import { ExcelTemplate } from './excel_template.js';
@@ -1325,7 +1325,16 @@ class IOManager {
     // trust boundary. Silently, until now — while the same feature warns when
     // it trims a single note's text.
     let droppedNotes = 0;
+    // Settings this version does not know get their default; collected so
+    // the user hears which, instead of the workspace quietly looking different.
+    const unknownSettings = [];
     Object.entries(jsonLayouts).forEach(([key, layout]) => {
+      if (layout.filterJoinMode != null && !['OR', 'AND'].includes(layout.filterJoinMode)) {
+        unknownSettings.push(`"${key}": filter mode "${layout.filterJoinMode}" (using build up)`);
+      }
+      if (layout.filterLinks != null && !FILTER_LINKS.includes(layout.filterLinks)) {
+        unknownSettings.push(`"${key}": links "${layout.filterLinks}" (using All)`);
+      }
       const positions =
         layout.positions instanceof Map
           ? layout.positions
@@ -1349,8 +1358,7 @@ class IOManager {
         filterStrict: layout.filterStrict === true,
         // Build-up links and elements without properties (visibility_rule.js);
         // older files get today's look: every link, every element.
-        filterLinks: FILTER_LINKS.includes(layout.filterLinks) ? layout.filterLinks : 'all',
-        includePropertyless: layout.includePropertyless !== false,
+        ...visibilitySettings(layout),
         // Per-view styles - check if already Maps
         hideDisconnectedNodes: layout.hideDisconnectedNodes || false,
         nodeStyles:
@@ -1401,6 +1409,9 @@ class IOManager {
             : new Set(layout[`${group}ManualMembers`] || []);
       }
     });
+    if (unknownSettings.length > 0) {
+      this.cache.ui?.warning(`Unknown workspace settings were replaced: ${unknownSettings.join('; ')}.`);
+    }
     if (droppedNotes > 0) {
       this.cache.ui?.warning?.(
         `${droppedNotes} text note${droppedNotes === 1 ? '' : 's'} could not be loaded ` +

@@ -18,6 +18,19 @@
 const FILTER_LINKS = ['all', 'ticked', 'none'];
 
 /**
+ * A workspace's build-up settings with their defaults: every link and every
+ * element, which is how a workspace without them (an older file) looked.
+ * The loader and visibilityRule both read them through here.
+ * @returns {{filterLinks: string, includePropertyless: boolean}}
+ */
+function visibilitySettings(layout) {
+  return {
+    filterLinks: FILTER_LINKS.includes(layout?.filterLinks) ? layout.filterLinks : 'all',
+    includePropertyless: layout?.includePropertyless !== false,
+  };
+}
+
+/**
  * @param {object} layout  workspace (filters Map, filterJoinMode, query, …)
  * @param {string} edgeSection  the edge section's prefix (CFG.EXCEL_EDGE_HEADER)
  * @returns {{buildUp: boolean, nothingTicked: boolean, links: string,
@@ -32,13 +45,14 @@ function visibilityRule(layout, edgeSection) {
     if (propID.startsWith(`${edgeSection}::`)) tickedEdgeRows += 1;
     else tickedNodeRows += 1;
   }
+  const { filterLinks, includePropertyless } = visibilitySettings(layout);
   return {
     buildUp,
     // Only a query the rows built: a hand-typed one keeps the query
     // language's own rule (an empty query matches everything).
     nothingTicked: buildUp && !layout?.query && tickedNodeRows + tickedEdgeRows === 0,
-    links: FILTER_LINKS.includes(layout?.filterLinks) ? layout.filterLinks : 'all',
-    includePropertyless: layout?.includePropertyless !== false,
+    links: filterLinks,
+    includePropertyless,
     tickedNodeRows,
     tickedEdgeRows,
   };
@@ -64,4 +78,4 @@ function propertylessShown(rule, { isEdge, endsShown = true }) {
   return endsShown;
 }
 
-export { FILTER_LINKS, visibilityRule, edgeShown, propertylessShown };
+export { FILTER_LINKS, visibilitySettings, visibilityRule, edgeShown, propertylessShown };
