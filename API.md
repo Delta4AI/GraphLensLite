@@ -169,6 +169,7 @@ above ~1000 nodes). Set any subset; unset fields fall back to the defaults below
 | ----------------------- | --------------- | ----------- | ----------------------------------------------------------------------- |
 | `labelText`             | string          | `label`     | Rendered text (normally derived from `label`).                          |
 | `labelFontSize`         | number          | `12`        | Font size (pt).                                                         |
+| `labelFontStyle`        | string          | `"normal"`  | `normal` / `bold` / `italic` / `bold italic`.                           |
 | `labelFill`             | hex             | `"#000000"` | Text colour.                                                            |
 | `labelPlacement`        | string          | `"bottom"`  | `top`/`bottom`/`left`/`right`/`center` + corner variants (`top-right`). |
 | `labelBackground`       | boolean         | `false`     | Draw a filled pill behind the label.                                    |
@@ -373,7 +374,7 @@ To group by data instead of by id, use `groupOneProps` — e.g.
 
 Useful `bubbleSetStyle.<group>` fields: `fill`, `fillOpacity`, `stroke`,
 `strokeOpacity`, `padding`, `corridor`, `avoidance`, `label` (boolean), `labelText`,
-`labelFill`, `labelFontSize`, `labelBackground`, `labelBackgroundFill`,
+`labelFill`, `labelFontSize`, `labelFontStyle`, `labelBackground`, `labelBackgroundFill`,
 `labelBackgroundRadius`, `labelPlacement`.
 
 ---
