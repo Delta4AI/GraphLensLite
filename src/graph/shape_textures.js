@@ -175,4 +175,4 @@ function shapeTextureURI({ shape, fill, stroke = null, lineWidth = 0, size = 10,
   return uri;
 }
 
-export { shapeTextureURI, isTextureOnlyShape, HALO_EXTRA_PX, SHAPE_NAMES };
+export { shapeTextureURI, isTextureOnlyShape, safePaint, HALO_EXTRA_PX, SHAPE_NAMES };

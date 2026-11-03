@@ -906,8 +906,9 @@ const BUBBLE_LABEL_FONT_FAMILY = "Arial, sans-serif";
  * @param {{labelShiftX?: number, labelShiftY?: number}} opts
  */
 function shiftedLabelAnchor(anchor, opts = {}) {
-  const dx = Number(opts.labelShiftX) || 0;
-  const dy = Number(opts.labelShiftY) || 0;
+  const finite = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+  const dx = finite(opts.labelShiftX);
+  const dy = finite(opts.labelShiftY);
   if (!anchor || (dx === 0 && dy === 0)) return anchor;
   return { ...anchor, x: anchor.x + dx, y: anchor.y - dy };
 }

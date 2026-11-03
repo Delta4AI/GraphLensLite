@@ -40,7 +40,7 @@ function badgeSlot(placement) {
 function withoutSlot(style, slot) {
   const badges = [];
   const badgePalette = [];
-  (style.badges ?? []).forEach((badge, i) => {
+  (Array.isArray(style.badges) ? style.badges : []).forEach((badge, i) => {
     if (badgeSlot(badge?.placement) === slot) return;
     badges.push(badge);
     badgePalette.push(style.badgePalette?.[i]);
@@ -82,14 +82,14 @@ function badgeTextFromValue(value) {
 function summarizeBadges(styles) {
   const bySlot = new Map();
   for (const style of styles) {
-    if (!style?.badge) continue;
-    (style.badges ?? []).forEach((badge, i) => {
+    if (!style?.badge || !Array.isArray(style.badges)) continue;
+    style.badges.forEach((badge, i) => {
       const slot = badgeSlot(badge?.placement);
       if (!slot) return;
       const entry = bySlot.get(slot) ?? { texts: new Set(), colors: new Set(), properties: new Set(), nodes: 0 };
       entry.texts.add(String(badge.text ?? ''));
       entry.colors.add(style.badgePalette?.[i]);
-      entry.properties.add(badge.property ?? null);
+      entry.properties.add(typeof badge.property === 'string' ? badge.property : null);
       entry.nodes += 1;
       bySlot.set(slot, entry);
     });

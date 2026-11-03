@@ -136,3 +136,17 @@ describe('DataTable pending changes', () => {
     expect(edge.D4Data['Edge filters'].g.w).toBeUndefined();
   });
 });
+
+describe('DataTable apply with a hostile header', () => {
+  it('never writes a prototype-named column onto Object.prototype', async () => {
+    const t = makeTable();
+    t.dt.populateFromFileData({
+      ...t.dt.fileData,
+      nodeDataHeaders: [{ subGroup: '__proto__', key: 'polluted' }],
+    });
+    await t.dt.switchTab('allNodes');
+    typeInto(t, 0, 'Node filters::__proto__::polluted', 'yes');
+    t.dt.getUpdatedFileData();
+    expect({}.polluted).toBeUndefined();
+  });
+});

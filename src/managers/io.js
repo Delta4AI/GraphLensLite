@@ -7,6 +7,11 @@ import { EXPORT_SCALES } from '../utilities/export_scale.js';
 import { excelData, EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from './excel_schema.js';
 import { ExcelTemplate } from './excel_template.js';
 
+/** A header whose group or key is spelled like a prototype key (the data
+ * editor turns headers into object keys); the Excel decoder refuses the same. */
+const isUnsafeHeader = (header) =>
+  UNSAFE_OBJECT_KEYS.has(header?.subGroup) || UNSAFE_OBJECT_KEYS.has(header?.key);
+
 /** The first version in which a build-up workspace with no row ticked is empty. */
 const BUILD_UP_EMPTY_SINCE = '1.18.0';
 
@@ -265,7 +270,7 @@ class IOManager {
       if (!layout || layout.filterJoinMode === 'AND' || layout.query) continue;
       const filters =
         layout.filters instanceof Map ? [...layout.filters.values()] : Object.values(layout.filters ?? {});
-      const usable = filters.filter((filter) => filter && !filter.unusable);
+      const usable = filters.filter((filter) => filter && typeof filter === 'object' && !filter.unusable);
       if (usable.length === 0 || usable.some((filter) => filter.active)) continue;
       for (const filter of usable) filter.active = true;
     }
@@ -277,6 +282,7 @@ class IOManager {
     if (jsonContent.nodeDataHeaders) {
       const seen = new Set();
       jsonContent.nodeDataHeaders = jsonContent.nodeDataHeaders.filter((h) => {
+        if (isUnsafeHeader(h)) return false;
         const key = `${h.subGroup}::${h.key}`;
         if (seen.has(key)) return false;
         seen.add(key);
@@ -286,6 +292,7 @@ class IOManager {
     if (jsonContent.edgeDataHeaders) {
       const seen = new Set();
       jsonContent.edgeDataHeaders = jsonContent.edgeDataHeaders.filter((h) => {
+        if (isUnsafeHeader(h)) return false;
         const key = `${h.subGroup}::${h.key}`;
         if (seen.has(key)) return false;
         seen.add(key);

@@ -168,7 +168,8 @@ class BubbleSetLayer {
   /** The label shift the layer currently paints for `group`. */
   labelShift(group) {
     const opts = this.groups.get(group)?.opts ?? {};
-    return { x: Number(opts.labelShiftX) || 0, y: Number(opts.labelShiftY) || 0 };
+    const finite = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+    return { x: finite(opts.labelShiftX), y: finite(opts.labelShiftY) };
   }
 
   /**

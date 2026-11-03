@@ -111,3 +111,16 @@ describe("geometryKey", () => {
     expect(geometryKey({ padding: null })).toBe(geometryKey({}));
   });
 });
+
+describe("positionsChecksum node-size fold", () => {
+  it("changes when a member's on-screen radius changes (same positions)", () => {
+    const small = [{ x: 1, y: 2, s: 5 }, { x: 3, y: 4, s: 5 }];
+    const grown = [{ x: 1, y: 2, s: 5 }, { x: 3, y: 4, s: 9 }];
+    expect(positionsChecksum(grown)).not.toBe(positionsChecksum(small));
+  });
+
+  it("treats missing size as stable (legacy point arrays keep working)", () => {
+    const pts = [{ x: 1, y: 2 }, { x: 3, y: 4 }];
+    expect(positionsChecksum(pts)).toBe(positionsChecksum(pts.map((p) => ({ ...p }))));
+  });
+});

@@ -88,6 +88,11 @@ describe('badge text from a column', () => {
 });
 
 describe('summarizeBadges', () => {
+  it('tolerates malformed saved badges', () => {
+    expect(summarizeBadges([{ badge: true, badges: 'x' }, { badge: true, badges: [{ text: 'a', placement: 'top', property: 5 }] }]))
+      .toEqual([{ slot: 'top', texts: ['a'], colors: [undefined], property: null, nodes: 1 }]);
+  });
+
   it('reports each slot once, with mixed texts and the column it came from', () => {
     const styles = [
       { badge: true, badges: [{ text: '1', placement: 'top', property: 'p' }], badgePalette: ['#111111'] },

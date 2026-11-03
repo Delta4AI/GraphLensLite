@@ -121,6 +121,18 @@ describe('files saved before build-up', () => {
     expect(Object.values(old.layouts.W.filters).every((f) => f.active)).toBe(true);
   });
 
+  it('run on every JSON load, including files without a version, and survive junk filters', () => {
+    const unversioned = { layouts: { W: { filters: { [NODE_P]: { active: false }, junk: 5 } } } };
+    new IOManager({}).restoreSetsFromJSON(unversioned);
+    expect(unversioned.layouts.W.filters.get(NODE_P).active).toBe(true);
+  });
+
+  it('drop a data column named like a prototype key', () => {
+    const hostile = { nodeDataHeaders: [{ subGroup: '__proto__', key: 'x' }, { subGroup: 'g', key: 'type' }], layouts: {} };
+    new IOManager({}).restoreSetsFromJSON(hostile);
+    expect(hostile.nodeDataHeaders).toEqual([{ subGroup: 'g', key: 'type' }]);
+  });
+
   it('leave newer files, narrow-down workspaces and workspaces with a ticked row as they are', () => {
     const current = file('1.18.0', { filters: { [NODE_P]: { active: false } } });
     const and = file('1.17.1', { filterJoinMode: 'AND', filters: { [NODE_P]: { active: false } } });

@@ -1,6 +1,7 @@
 import {StaticUtilities} from "../utilities/static.js";
 import {attachCommunityMenu} from "./community_menu.js";
 import {BADGE_SLOTS, summarizeBadges} from "../graph/badges.js";
+import {safePaint} from "../graph/shape_textures.js";
 import {FONT_STYLES} from "../graph/label_renderers.js";
 
 // ----------------------------------------------------------- DOM primitives
@@ -658,7 +659,8 @@ function createStyleDiv(cache) {
 
         const swatch = document.createElement("span");
         swatch.className = "badge-list-swatch";
-        swatch.style.background = entry.colors.length === 1 ? entry.colors[0] : "transparent";
+        // Colours come from the loaded file: only plain colour syntax reaches CSS.
+        swatch.style.background = entry.colors.length === 1 ? safePaint(entry.colors[0], "transparent") : "transparent";
         if (entry.colors.length > 1) swatch.classList.add("mixed");
 
         const slot = document.createElement("span");

@@ -3,6 +3,7 @@ import { Popup } from './popup.js';
 import { StaticUtilities } from './static.js';
 import { EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from '../managers/io.js';
 import { computeMergePlan, showMergePreview } from './excel_merge.js';
+import { UNSAFE_OBJECT_KEYS } from '../config.js';
 
 
 /** Columns every row has; the rest are property columns. */
@@ -1169,6 +1170,9 @@ class DataTable {
           continue;
         }
         const [group, subGroup, prop] = StaticUtilities.decodePropHashId(header);
+        // A header from a loaded file names object keys here; one spelled
+        // like a prototype key would write onto Object.prototype.
+        if ([group, subGroup, prop].some((key) => UNSAFE_OBJECT_KEYS.has(key))) continue;
         if (String(value).trim() === '') {
           delete cleanElem.D4Data[group]?.[subGroup]?.[prop];
           continue;
