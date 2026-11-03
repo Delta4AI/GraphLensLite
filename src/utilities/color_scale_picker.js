@@ -1,5 +1,6 @@
 import { Popup } from './popup.js';
 import { StaticUtilities } from './static.js';
+import { rawScaleValue, numericScaleValue, scalePosition } from './scale_values.js';
 
 class ColorScalePicker {
   constructor(cache) {
@@ -221,9 +222,7 @@ class ColorScalePicker {
 
     const values = [];
     const elementsWithProperty = Array.from(selectedElements).filter((id) => {
-      const raw = metricSource
-        ? metricSource.values.get(id)
-        : elementRef.get(id)?.featureValues.get(property);
+      const raw = rawScaleValue(metricSource, elementRef, property, id);
       // A continuous scale needs a number; null or "" from JSON is no value.
       const value = filterObj.isCategory ? raw : StaticUtilities.numericValue(raw);
       if (value === undefined || value === null) return false;
@@ -323,14 +322,10 @@ class ColorScalePicker {
       this.elementType === 'nodes' ? this.cache.selectedNodes : this.cache.selectedEdges;
     const elementRef = this.elementType === 'nodes' ? this.cache.nodeRef : this.cache.edgeRef;
     const values = Array.from(selectedElements)
-      .map((id) =>
-        StaticUtilities.numericValue(
-          this.activeMetricSource
-            ? this.activeMetricSource.values.get(id)
-            : elementRef.get(id)?.featureValues.get(property),
-        ),
-      )
+      .map((id) => numericScaleValue(this.activeMetricSource, elementRef, property, id))
       .filter((v) => v !== undefined);
+    // selectProperty only gets here with at least one number; say so loudly if not.
+    if (values.length === 0) throw new Error(`No numeric values for "${property}" to build a colour scale from.`);
 
     this.minValue = values.reduce((a, b) => Math.min(a, b));
     this.maxValue = values.reduce((a, b) => Math.max(a, b));
@@ -495,18 +490,13 @@ class ColorScalePicker {
       });
     } else {
       Array.from(selectedElements).forEach((elementId) => {
-        const element = elementRef.get(elementId);
-        const value = StaticUtilities.numericValue(
-          metricSource ? metricSource.values.get(elementId) : element?.featureValues.get(dropdown.value),
-        );
-
+        const value = numericScaleValue(metricSource, elementRef, dropdown.value, elementId);
         if (value === undefined) {
           colorMap.set(elementId, this.defaultColorForMissing);
           return;
         }
-        const span = this.maxValue - this.minValue;
-        const normalizedValue = span === 0 ? 100 : ((value - this.minValue) / span) * 100;
-        colorMap.set(elementId, this.getColorForValue(normalizedValue));
+        const position = scalePosition(value, this.minValue, this.maxValue);
+        colorMap.set(elementId, this.getColorForValue(position * 100));
       });
     }
 

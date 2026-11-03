@@ -144,6 +144,8 @@ Business logic and UI:
 - `neo4j_session.js` — Neo4j session extensions: expand selected nodes, merge additional queries
 - `tour.js` — guided tour with a sample dataset
 - `color_scale_picker.js` / `numeric_scale_picker.js` / `pie_chart_picker.js` — styling pickers
+- `scale_values.js` — what the two Map-by-data pickers read off an element (metric
+  or data, finite numbers only) and where a value falls on the scale
 - `excel_merge.js`, `theme.js`, `export_scale.js`
 
 ### Key files

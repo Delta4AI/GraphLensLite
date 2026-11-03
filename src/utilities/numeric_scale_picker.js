@@ -1,5 +1,6 @@
 import {Popup} from './popup.js';
 import {StaticUtilities} from './static.js';
+import {numericScaleValue, scalePosition} from './scale_values.js';
 
 class NumericScalePicker {
   constructor(cache) {
@@ -280,7 +281,7 @@ class NumericScalePicker {
 
     const values = [];
     for (const id of selectedElements) {
-      const value = this.#valueOf(property, metricSource, elementRef, id);
+      const value = numericScaleValue(metricSource, elementRef, property, id);
       if (value !== undefined) values.push(value);
     }
     const elementsWithProperty = values.length;
@@ -330,11 +331,6 @@ class NumericScalePicker {
     this.dom.applyButton.classList.remove('disabled');
   }
 
-  /** The element's value for `property` as a finite number, or undefined. */
-  #valueOf(property, metricSource, elementRef, id) {
-    const raw = metricSource ? metricSource.values.get(id) : elementRef.get(id)?.featureValues.get(property);
-    return StaticUtilities.numericValue(raw);
-  }
 
   apply() {
     const property = this.dom.dropdown.value;
@@ -349,17 +345,15 @@ class NumericScalePicker {
     const metricSource = this.getMetricSource(property);
 
     const scaleMap = new Map();
-    const span = this.maxValue - this.minValue;
-
     // Every selected element gets a value, so nothing keeps an earlier manual
     // setting that would read as data.
     for (const elementId of selectedElements) {
-      const value = this.#valueOf(property, metricSource, elementRef, elementId);
+      const value = numericScaleValue(metricSource, elementRef, property, elementId);
       if (value === undefined) {
         scaleMap.set(elementId, this.missingOutput);
       } else {
-        const normalizedValue = span === 0 ? 1 : (value - this.minValue) / span;
-        scaleMap.set(elementId, this.minOutput + normalizedValue * (this.maxOutput - this.minOutput));
+        const position = scalePosition(value, this.minValue, this.maxValue);
+        scaleMap.set(elementId, this.minOutput + position * (this.maxOutput - this.minOutput));
       }
     }
 
