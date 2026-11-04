@@ -84,6 +84,8 @@ class GraphImport {
     this.edges = [];
     this.nodeIDs = new Set();
     this.edgeIDs = new Set();
+    /** `source::target` → the last suffix handed out for it. */
+    this.edgeSuffixes = new Map();
     this.nodeHeaders = new Map();
     this.edgeHeaders = new Map();
     this.counts = new Map();
@@ -131,10 +133,7 @@ class GraphImport {
     for (const end of [source, target]) {
       if (!this.nodeIDs.has(end)) throw new Error(`${where} points to node "${end}", which is not in the file.`);
     }
-    const base = `${source}${PROP_ID_SEPARATOR}${target}`;
-    let id = base;
-    for (let n = 2; this.edgeIDs.has(id); n++) id = `${base}${PROP_ID_SEPARATOR}${n}`;
-    this.edgeIDs.add(id);
+    const id = this.#uniqueEdgeId(`${source}${PROP_ID_SEPARATOR}${target}`);
 
     const edge = { id, source, target, style: {}, D4Data: { [CFG.EXCEL_EDGE_HEADER]: {} } };
     if (!isBlank(fields.label)) applyEdgeLabel(edge, String(fields.label));
@@ -142,6 +141,20 @@ class GraphImport {
     if (fields.directed) applyEdgeEndArrow(edge, true);
     this.#addProps(edge.D4Data[CFG.EXCEL_EDGE_HEADER], props, this.edgeHeaders);
     this.edges.push(edge);
+  }
+
+  /**
+   * Resumes from the last suffix of this base, so N parallel edges cost N
+   * steps rather than N²/2; the loop only probes on a rare cross-collision
+   * (node "a" with "b::2" against node "a::b" with "2").
+   */
+  #uniqueEdgeId(base) {
+    let n = this.edgeSuffixes.get(base) ?? 1;
+    let id = n === 1 ? base : `${base}${PROP_ID_SEPARATOR}${n}`;
+    while (this.edgeIDs.has(id)) id = `${base}${PROP_ID_SEPARATOR}${++n}`;
+    this.edgeSuffixes.set(base, n);
+    this.edgeIDs.add(id);
+    return id;
   }
 
   #addProps(target, props, headers) {
