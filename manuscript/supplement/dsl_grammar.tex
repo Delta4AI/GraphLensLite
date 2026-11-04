@@ -1,0 +1,169 @@
+%% Supplementary Note: grammar of the Graph Lens Lite query language.
+%% Standalone document; build with:  latexmk -pdf dsl_grammar  (in this folder)
+%%
+%% AI-DRAFTED -- REVIEW
+%% Derived from src/managers/query.js (encodeQuery / decodeQuery / QueryAST).
+%% The four examples were checked by running them through QueryManager.encodeQuery,
+%% decodeQuery and QueryAST (vitest, jsdom). Re-check if query.js changes.
+
+\documentclass[10pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{listings}
+\usepackage{url}
+
+\lstset{basicstyle=\ttfamily\small, columns=fullflexible, keepspaces=true,
+  breaklines=true, frame=single, framesep=4pt, upquote=true}
+
+\title{Supplementary Note: Grammar of the Graph Lens Lite query language}
+\date{}
+
+\begin{document}
+\maketitle
+
+The query language selects or filters nodes and edges by conditions on their
+properties. The grammar below is written in ISO EBNF and describes the queries
+that the editor accepts as valid and that the evaluator assigns a meaning to.
+It is derived from the implementation in \texttt{src/managers/query.js}, which
+tokenizes the query text with regular expressions and decodes the tokens into
+nested groups.
+
+\section*{Grammar}
+
+\begin{lstlisting}
+query          = ws , expression , ws ;
+expression     = clause
+               | group , { ws , connector , ws , group } ;
+group          = "(" , ws , expression , ws , ")" ;
+
+clause         = property , " " , condition ;
+property       = scope , "::" , name , "::" , name ;
+scope          = "Node filters" | "Edge filters" ;
+name           = name char , { name char } ;
+name char      = ? any character except ":" ? ;
+
+condition      = range | inverted range | membership | predicate ;
+range          = "BETWEEN" , ws1 , number , ws1 , "AND" , ws1 , number ;
+inverted range = "LOWER THAN" , ws1 , number , ws1 ,
+                 "OR GREATER THAN" , ws1 , number ;
+membership     = "IN" , ws , "[" , value , { "," , value } , "]" ;
+value          = { value char | "\" , ? any character ? } ;
+value char     = ? any character except "]", "\" and "," ? ;
+predicate      = "IS TRUE" | "IS FALSE" | "IS MISSING" | "IS FOREIGN" ;
+
+number         = [ "-" ] , digits , [ "." , digits ] ;
+digits         = digit , { digit } ;
+digit          = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+connector      = "AND" | "OR" | "NOT" ;      (* case-insensitive *)
+ws             = { white space } ;
+ws1            = white space , ws ;
+white space    = ? space, tab, line break or no-break space ? ;
+\end{lstlisting}
+
+\section*{Lexical rules}
+
+\begin{itemize}
+  \item \textbf{Property path.} A property is addressed as
+    \texttt{Section::Group::Property}. The section is \texttt{Node filters} or
+    \texttt{Edge filters}; the group is the last bracketed label of the input
+    column (\texttt{Uncategorized Properties} when none is given); the property
+    is the rest of the column name. Group and property names may contain spaces but not
+    colons. Exactly one white-space character separates the property path from
+    its condition keyword.
+  \item \textbf{Keywords.} Condition keywords (\texttt{BETWEEN},
+    \texttt{AND} inside a range, \texttt{LOWER THAN}, \texttt{OR GREATER THAN},
+    \texttt{IN}, \texttt{IS TRUE}, \texttt{IS FALSE}, \texttt{IS MISSING},
+    \texttt{IS FOREIGN}) are upper case with single spaces as shown.
+    Connectors (\texttt{AND}, \texttt{OR}, \texttt{NOT}) are matched
+    case-insensitively.
+  \item \textbf{Numbers.} Decimal with optional leading minus and optional
+    fractional part (\texttt{-1.5}, \texttt{10}); exponents and a leading
+    decimal point (\texttt{1e3}, \texttt{.5}) are not accepted.
+  \item \textbf{Category values.} Values in \texttt{IN [\ldots]} are taken
+    verbatim, including surrounding white space (\texttt{IN [a, b]} lists
+    \texttt{a} and \texttt{\textvisiblespace b}). A backslash escapes the next
+    character, so \texttt{[}, \texttt{]}, \texttt{,}, \texttt{(}, \texttt{)}
+    and \texttt{\textbackslash} can appear in a value
+    (\texttt{IN [a\textbackslash,b]} lists the single value \texttt{a,b}).
+  \item \textbf{Connectors need parentheses.} A connector is recognized only
+    between a closing and an opening parenthesis, \texttt{(\ldots)~AND~(\ldots)}. Two clauses joined without parentheses are rejected. A single
+    clause may stand alone or in parentheses.
+\end{itemize}
+
+\section*{Evaluation}
+
+\begin{itemize}
+  \item \textbf{Order.} A chain $g_1\ c_1\ g_2\ c_2\ g_3 \ldots$ is evaluated
+    strictly left to right, without operator precedence:
+    \texttt{(A) OR (B) AND (C)} means \texttt{((A) OR (B)) AND (C)}.
+    Parentheses nest to any depth and determine grouping.
+  \item \textbf{Connectors.} \texttt{AND} and \texttt{OR} are the Boolean
+    conjunction and disjunction. \texttt{NOT} is binary:
+    \texttt{(A) NOT (B)} means \texttt{A AND NOT B}. There is no unary
+    \texttt{NOT}; \texttt{NOT (A)} is rejected.
+  \item \textbf{Range.} \texttt{BETWEEN a AND b} holds for numeric values $v$
+    with $a \le v \le b$. \texttt{LOWER THAN a OR GREATER THAN b} holds for
+    numeric values with $v \le a$ or $v \ge b$. Both bounds are inclusive.
+  \item \textbf{Membership.} \texttt{IN [\ldots]} holds when the value equals
+    one of the listed values exactly (case-sensitive). A value holding several
+    entries separated by \texttt{|} matches if any entry does.
+  \item \textbf{Boolean predicates.} \texttt{IS TRUE} matches
+    \texttt{true}/\texttt{TRUE}/\texttt{1} and \texttt{IS FALSE} matches
+    \texttt{false}/\texttt{FALSE}/\texttt{0}, as text or number.
+  \item \textbf{Missing values and element type.} A node is tested only
+    against \texttt{Node filters} properties and an edge only against
+    \texttt{Edge filters} properties. A clause on the other element type's
+    property, or on an absent value, is false, with two exceptions:
+    \texttt{IS MISSING} is true when the value is absent or empty or the
+    property belongs to the other element type, and \texttt{IS FOREIGN} is true
+    only in the latter case. Both predicates are inserted by the filter panel's
+    AND join (non-strict and ``complete cases'' mode, respectively) and are
+    rarely written by hand.
+  \item \textbf{No constraint.} When the filter panel has no active filter,
+    the generated query is empty and every element matches; typed text in the
+    editor must be non-empty to be applied.
+\end{itemize}
+
+\section*{Validation}
+
+The editor re-validates on every change. A query is invalid, and cannot be
+applied, when it is empty, contains an empty group \texttt{()}, two adjacent
+groups without a connector \texttt{)(}, an unmatched parenthesis, or any text
+not covered by the grammar. Property paths that are syntactically valid but
+absent from the loaded graph are highlighted without blocking the query; they
+match no element.
+
+\section*{Examples}
+
+The following queries use the columns of the case-study data set
+(Supplementary datafile S1) and were checked against the implementation.
+
+\begin{enumerate}
+  \item Nodes strongly regulated in large cysts (inverted range, bounds
+    inclusive):
+\begin{lstlisting}
+Node filters::Bulk TX data::Large cysts [log2FC] LOWER THAN -1 OR GREATER THAN 1
+\end{lstlisting}
+  \item Membrane or secreted proteins with a known direction of Wnt pathway
+    modulation:
+\begin{lstlisting}
+(Node filters::Subcellular location::SubLoc coarse IN [Membrane,Secreted]) AND (Node filters::Mechanisms::Wnt signaling IN [modulates positive,modulates negative])
+\end{lstlisting}
+  \item Nodes in either drug interference signature, excluding those without a
+    bulk expression value for large cysts (nesting and binary \texttt{NOT}):
+\begin{lstlisting}
+((Node filters::Drug interference::tolvaptan IS TRUE) OR (Node filters::Drug interference::metformin IS TRUE)) NOT (Node filters::Bulk TX data::Large cysts [log2FC] IS MISSING)
+\end{lstlisting}
+  \item A mixed edge and node query: physical protein--protein interactions
+    together with nodes whose ADPKD literature evidence value is at least 100:
+\begin{lstlisting}
+(Edge filters::Physical interactions::Protein-protein interaction IS TRUE) OR (Node filters::Literature evidence::ADPKD literature evidence BETWEEN 100 AND 911)
+\end{lstlisting}
+\end{enumerate}
+
+The group of a property is the last bracketed label of its input column, so the
+column \texttt{Large cysts [log2FC] [Bulk TX data]} is addressed as
+\texttt{Node filters::Bulk TX data::Large cysts [log2FC]}.
+
+\end{document}
