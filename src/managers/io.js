@@ -12,6 +12,8 @@ import { ExcelTemplate } from './excel_template.js';
 const isUnsafeHeader = (header) =>
   UNSAFE_OBJECT_KEYS.has(header?.subGroup) || UNSAFE_OBJECT_KEYS.has(header?.key);
 
+const isGivenCoordinate = (value) => value === 0 || Boolean(value);
+
 /** The first version in which a build-up workspace with no row ticked is empty. */
 const BUILD_UP_EMPTY_SINCE = '1.18.0';
 
@@ -838,7 +840,8 @@ class IOManager {
         nodeFeatureWithinThreshold.set(propId, null);
       }
 
-      if (node.style?.x && node.style?.y) {
+      // 0 is a coordinate like any other, not a missing one.
+      if (isGivenCoordinate(node.style?.x) && isGivenCoordinate(node.style?.y)) {
         this.cache.nodePositionsFromExcelImport.set(node.id, {
           x: node.style.x,
           y: node.style.y,
