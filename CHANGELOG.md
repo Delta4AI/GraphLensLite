@@ -24,6 +24,7 @@ Saved files load unchanged. One behaviour changes on purpose — **with the filt
 * **Emptying a Label or Description cell in the data editor clears it.** *Apply* used to keep the old text while the table showed the cell empty. Edges removed on *Apply* because a node they connect was deleted are now reported instead of vanishing silently.
 * **Failures surface instead of vanishing.** Workspace-menu actions and the styling panel's buttons report an error in the app when they fail (they used to reach only the browser console), a failed filter-mode, Links or without-properties change puts the control back instead of showing a setting the graph does not, and a filter control clicked while a hand-typed query drives the filters says why nothing happens.
 * **A workspace setting this version does not know is no longer replaced silently.** A filter mode or Links value it cannot read (a typo, a file from a newer version) still falls back to the default, but loading now names the workspace and the value. In *Map by data*, a *Without a value* entry that is not a number keeps the last good value and marks the field instead of quietly using the minimum.
+* **Nodes placed at an x or y of exactly 0 keep their place.** A coordinate of 0 in an Excel or API import counted as missing, so that node was handed to the force layout while the others kept theirs.
 
 ### Security
 
