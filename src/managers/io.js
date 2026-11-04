@@ -1557,6 +1557,10 @@ class IOManager {
     );
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
+    // True between tearing the old graph down and the new file's data being
+    // in place: a failure in that window leaves neither, so the label must
+    // not keep naming the old file.
+    let labelIsStale = false;
     try {
       // Parse before destroying anything. The old order tore the graph down
       // first, so a malformed file left an empty stage with nothing to go
@@ -1564,14 +1568,15 @@ class IOManager {
       const fileData = await this.cache.io.loadFile(event);
       if (!fileData) return;
 
-      this.cache.ui.setDataSourceLabel(file.name);
-
       if (this.cache.graph) {
+        labelIsStale = true;
         await this.cache.gcm.destroyGraphAndRollBackUI();
         await this.cache.gcm.resetEventLocks();
       }
 
       this.cache.io.preProcessData(fileData);
+      this.cache.ui.setDataSourceLabel(file.name);
+      labelIsStale = false;
       this.cache.ui.updateHoverToggleButton();
       this.cache.buildDataTable(fileData);
       this.cache.ui.buildUI();
@@ -1607,6 +1612,8 @@ class IOManager {
         this.cache.ui.updateFilterLockState();
       }
     } catch (errorMsg) {
+      console.error(errorMsg);
+      if (labelIsStale) this.cache.ui.setDataSourceLabel('');
       this.cache.ui.error(`Error loading graph: ${errorMsg}`);
     } finally {
       await this.cache.ui.hideLoading();

@@ -112,6 +112,21 @@ const graphmlEvent = (text) => {
 const GRAPHML_WITH_SKIPS = `<graphml xmlns="http://graphml.graphdrawing.org/xmlns"><graph>
   <node id="a"><data key="nope">1</data></node><hyperedge/></graph></graphml>`;
 
+describe('IOManager.loadFileWrapper when preprocessing fails', () => {
+  it('does not leave the old file\'s name over the torn-down graph', async () => {
+    const cache = makeCache({ nodes: [], edges: [] });
+    cache.io.preProcessData = vi.fn(() => {
+      throw new Error('bad data');
+    });
+
+    await new IOManager(cache).loadFileWrapper(fileEvent());
+
+    expect(cache.ui.setDataSourceLabel).not.toHaveBeenCalledWith('graph.json');
+    expect(cache.ui.setDataSourceLabel).toHaveBeenLastCalledWith('');
+    expect(cache.ui.error).toHaveBeenCalledWith(expect.stringContaining('bad data'));
+  });
+});
+
 describe('IOManager.loadFileWrapper import notices', () => {
   it('shows what a file left out after the new graph is up, not before the log is cleared', async () => {
     const events = [];
