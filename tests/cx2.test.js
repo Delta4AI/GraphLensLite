@@ -6,6 +6,7 @@ import { normalizeD4DataBooleans } from '../src/managers/io.js';
 import { CFG } from '../src/config.js';
 
 const NODE = CFG.EXCEL_NODE_HEADER;
+const UNCATEGORIZED = CFG.EXCEL_UNCATEGORIZED_SUBHEADER;
 const EDGE = CFG.EXCEL_EDGE_HEADER;
 const fixture = fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'ndex-style.cx2'), 'utf8');
 
@@ -93,21 +94,21 @@ describe('CX2 import of an NDEx-style file', () => {
     const { fileData, notices } = parseCX2(fixture);
     const [tp53, mdm2, atm] = fileData.nodes;
     expect(tp53).toMatchObject({ id: '101', label: 'TP53', style: { x: 0, y: 0 } });
-    expect(tp53.D4Data[NODE].CX2).toEqual({
+    expect(tp53.D4Data[NODE][UNCATEGORIZED]).toEqual({
       'stringdb:canonical name': '9606.ENSP00000269305',
       expression: 2.5,
       is_target: true,
       alias: 'P53|LFS1',
     });
-    expect(mdm2.D4Data[NODE].CX2.expression).toBe(0);
+    expect(mdm2.D4Data[NODE][UNCATEGORIZED].expression).toBe(0);
     expect(atm.style).toMatchObject({ x: -60, y: 210 });
     expect(fileData.edges.map((e) => [e.source, e.target])).toEqual([
       ['101', '102'],
       ['103', '101'],
       ['102', '101'],
     ]);
-    expect(fileData.edges[0].D4Data[EDGE].CX2).toEqual({ interaction: 'pp', 'stringdb:score': 0.999, evidence_count: 12 });
-    expect(fileData.edges[1].D4Data[EDGE].CX2.interaction).toBe('phosphorylation');
+    expect(fileData.edges[0].D4Data[EDGE][UNCATEGORIZED]).toEqual({ interaction: 'pp', 'stringdb:score': 0.999, evidence_count: 12 });
+    expect(fileData.edges[1].D4Data[EDGE][UNCATEGORIZED].interaction).toBe('phosphorylation');
     expect(notices).toEqual([
       '"::" is reserved in property names and was replaced by ":" in "stringdb::canonical name", "stringdb::score".',
       'CX2 carries no arrow style, so edges are drawn without arrows; source and target are kept.',
@@ -162,7 +163,7 @@ describe('CX2 broken input', () => {
     const text = '[{"CXVersion":"2.0"},{"nodes":[{"id":1,"v":{"__proto__":{"polluted":true},"ok":1}}]}]';
     const { fileData, notices } = parseCX2(text);
     expect({}.polluted).toBeUndefined();
-    expect(fileData.nodes[0].D4Data[NODE].CX2).toEqual({ ok: 1 });
+    expect(fileData.nodes[0].D4Data[NODE][UNCATEGORIZED]).toEqual({ ok: 1 });
     expect(notices[0]).toMatch(/1 values with a reserved or empty property name/);
   });
 });

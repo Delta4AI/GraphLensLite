@@ -21,7 +21,6 @@ import {
   exportSummary,
 } from './interchange.js';
 
-const FORMAT_NAME = 'CX2';
 const CX_VERSION = '2.0';
 /** Node attribute carrying the GLL node id, since CX2 node ids must be integers. */
 const GLL_ID_ATTRIBUTE = 'GLL ID';
@@ -191,7 +190,7 @@ function parseCX2(text) {
   const nodes = aspects.get('nodes') ?? [];
   const edges = aspects.get('edges') ?? [];
   checkElementCount(nodes.length + edges.length);
-  const importer = new GraphImport(FORMAT_NAME);
+  const importer = new GraphImport();
   const nodeIds = readNodes(nodes, readDeclarations(aspects, 'nodes', importer), importer);
   readEdges(edges, readDeclarations(aspects, 'edges', importer), nodeIds, importer);
 
