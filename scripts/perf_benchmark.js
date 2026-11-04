@@ -69,6 +69,13 @@ const SELECT_NODE_COUNT = 500;
 const FPS_WINDOW_MS = 3000;
 const WHEEL_INTERVAL_MS = 30;
 const DRAG_WARMUP_MS = 1000;
+// Idle settle: a frame more than ~3x the 60 Hz budget after the previous one
+// means earlier work is still draining; 30 on-budget frames in a row (~0.5 s)
+// count as settled. Animated variants (edge flow) never settle, so give up
+// after the timeout and measure anyway.
+const SETTLE_FRAME_MS = 50;
+const SETTLE_RUN_FRAMES = 30;
+const SETTLE_TIMEOUT_MS = 15000;
 // An idle rAF ceiling below this means the environment has no usable GPU and is
 // rAF-throttled (some CI runners measure ~1.6 fps vs ~59 fps on real hardware).
 // Used as a secondary non-representative-environment signal alongside the WebGL
@@ -253,6 +260,31 @@ async function stopFrameCounter(page) {
 }
 
 /**
+ * Resolve once rAF runs on budget again (`runFrames` consecutive frames, each
+ * less than `frameMs` after the previous one) or after `timeoutMs`. Runs
+ * in-page via page.evaluate, which serializes the source, so it must stay
+ * self-contained.
+ * @returns {Promise<{settled: boolean, waitedMs: number}>}
+ */
+function waitForRafSettle({ frameMs, runFrames, timeoutMs }) {
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    let last = t0;
+    let run = 0;
+    const tick = (now) => {
+      run = now - last < frameMs ? run + 1 : 0;
+      last = now;
+      if (run >= runFrames || now - t0 >= timeoutMs) {
+        resolve({ settled: run >= runFrames, waitedMs: now - t0 });
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+/**
  * Idle rAF ceiling of this environment. Headless chromium pins rAF to a
  * virtual 60 Hz BeginFrame regardless of --disable-frame-rate-limit (verified
  * against chromium/headless-shell 1223), so a flawless renderer measures
@@ -260,7 +292,19 @@ async function stopFrameCounter(page) {
  * therefore evaluated against min(60, 0.95 × ceiling).
  */
 async function measureIdleFpsCeiling(page) {
-  await page.waitForTimeout(1000); // let deferred work from prior steps settle
+  // A fixed pause is not enough: on a large graph the stall step's hover
+  // refresh and wheel-zoom frames keep the GPU busy for seconds after the
+  // main thread is idle, and that backlog would be counted as "idle" fps.
+  const settle = await page.evaluate(waitForRafSettle, {
+    frameMs: SETTLE_FRAME_MS,
+    runFrames: SETTLE_RUN_FRAMES,
+    timeoutMs: SETTLE_TIMEOUT_MS,
+  });
+  if (!settle.settled) {
+    console.warn(
+      `[perf]   rAF did not settle within ${SETTLE_TIMEOUT_MS} ms (continuous animation or GPU backlog); idle fps includes it`
+    );
+  }
   await startFrameCounter(page);
   await page.waitForTimeout(1000);
   const { fps } = await stopFrameCounter(page);
@@ -840,7 +884,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(`[perf] fatal: ${err.stack || err.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(`[perf] fatal: ${err.stack || err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = { waitForRafSettle };
