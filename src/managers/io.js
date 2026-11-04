@@ -21,6 +21,8 @@ const isGivenCoordinate = (value) => value === 0 || Boolean(value);
 const BUILD_UP_EMPTY_SINCE = '1.18.0';
 
 const EXPORT_SCALE_KEY = 'gll.exportScale';
+/** Import notices beyond this many are merged into one message. */
+const MAX_SEPARATE_NOTICES = 3;
 // Grace period before revoking an SVG download's blob URL: long enough for
 // any browser to start (and realistically finish) fetching the blob, short
 // enough not to pin big documents in memory for the whole session.
@@ -1407,6 +1409,7 @@ class IOManager {
   }
 
   loadFile(event) {
+    this.importNotices = [];
     const file = event.target.files[0];
     if (!file) {
       this.cache.ui.error('No file selected.');
@@ -1454,20 +1457,35 @@ class IOManager {
 
   /**
    * Read a GraphML or CX2 file into preProcessData input. The parser throws a
-   * plain-language Error for anything it cannot use; that and every notice
-   * about parts it left out reach the user here.
+   * plain-language Error for anything it cannot use, reported here. Notices
+   * about parts it left out wait in `importNotices` for reportImportNotices:
+   * replacing the graph clears the log, which would take them along.
    * @returns {Promise<object|null>} null after reporting the error
    */
   async parseInterchangeFile(file, parse) {
     try {
       checkImportSize(file.size);
       const { fileData, notices } = parse(await file.text());
-      for (const notice of notices) this.cache.ui.warning(notice);
+      this.importNotices = notices.map((notice) => ({ file: file.name, notice }));
       return fileData;
     } catch (err) {
+      console.error(err);
       this.cache.ui.error(`Could not open ${file.name}: ${err.message}`);
       return null;
     }
+  }
+
+  /** Show the notices of the file just rendered; more than a few become one message. */
+  reportImportNotices() {
+    const pending = this.importNotices ?? [];
+    this.importNotices = [];
+    if (pending.length === 0) return;
+    if (pending.length <= MAX_SEPARATE_NOTICES) {
+      for (const { notice } of pending) this.cache.ui.warning(notice);
+      return;
+    }
+    const lines = pending.map(({ notice }) => `• ${notice}`);
+    this.cache.ui.warning(`${pending.length} notes on ${pending[0].file}:\n${lines.join('\n')}`);
   }
 
   /** The loaded graph in the shape interchangeGraph reads. */
@@ -1575,6 +1593,7 @@ class IOManager {
       await this.cache.graph.render();
       await this.cache.gcm.fitViewToVisibleNodes();
       this.cache.io.restoreHeatmapFromImport(fileData);
+      this.reportImportNotices();
 
       // Restored ManualMembers populate the layout, but the selection-panel
       // badges (per-group deselect toggles) only refresh via these calls —
