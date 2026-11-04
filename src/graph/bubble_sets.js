@@ -494,6 +494,7 @@ class GraphBubbleSetManager {
    * @returns {Promise<string[]>} empty when the user would rather not wait
    */
   async consentedAvoidMembers(group, members) {
+    if (!this.#avoidanceOn(group)) return []; // the fit ignores obstacles, so there is no cost to ask about
     const candidates = this.getAvoidMembers(members);
     if (candidates.length === 0) return candidates; // nothing to route around
     const memberCount = members instanceof Set ? members.size : members.length;
@@ -514,6 +515,13 @@ class GraphBubbleSetManager {
       )) === true;
     this.avoidConsent.set(group, accepted);
     return accepted ? candidates : [];
+  }
+
+  /** Same reading as the fit's (bubble_geometry.js): missing means on, 0 or less means off. */
+  #avoidanceOn(group) {
+    const style = this.cache.data.layouts[this.cache.data.selectedLayout]?.bubbleSetStyle?.[group];
+    const value = Number(style?.avoidance ?? 1);
+    return !(Number.isFinite(value) && value <= 0);
   }
 
   /** Forget the per-group answers — a new graph is a new set of costs. */

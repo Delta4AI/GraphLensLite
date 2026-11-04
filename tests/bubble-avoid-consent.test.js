@@ -92,6 +92,16 @@ describe('consentedAvoidMembers', () => {
     expect(await bs.consentedAvoidMembers('g1', membersOf(300))).toEqual([]);
   });
 
+  it('neither asks nor hands over obstacles while avoidance is off', async () => {
+    const cache = makeCache(6000);
+    cache.data.layouts.Default.bubbleSetStyle.g1.avoidance = 0;
+    const bs = new GraphBubbleSetManager(cache);
+    const confirm = vi.spyOn(Popup, 'confirm');
+
+    expect(await bs.consentedAvoidMembers('g1', membersOf(300))).toEqual([]);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
   it('remembers the answer instead of asking on every edit', async () => {
     const cache = makeCache(6000);
     const bs = new GraphBubbleSetManager(cache);
