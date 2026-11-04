@@ -71,7 +71,10 @@ describe('CX2 round trip', () => {
   it('keeps ids, labels, edges, typed attributes, groups and positions', () => {
     const { fileData, notices } = parseCX2(toCX2(sampleGraph(), 'demo').text);
     normalizeD4DataBooleans(fileData);
-    expect(notices).toEqual(['Not loaded from this CX2 file: networkAttributes. Graph Lens Lite reads nodes, edges and their attributes and applies its own styling.']);
+    expect(notices).toEqual([
+      'CX2 carries no arrow style, so edges are drawn without arrows; source and target are kept.',
+      'Not loaded from this CX2 file: networkAttributes. Graph Lens Lite reads nodes, edges and their attributes and applies its own styling.',
+    ]);
     const [a, b] = fileData.nodes;
     expect(a).toMatchObject({ id: 'A', label: 'Alpha', description: 'first', style: { x: 0, y: 5 } });
     expect(b.label).toBeUndefined();
@@ -107,6 +110,7 @@ describe('CX2 import of an NDEx-style file', () => {
     expect(fileData.edges[1].D4Data[EDGE].CX2.interaction).toBe('phosphorylation');
     expect(notices).toEqual([
       '"::" is reserved in property names and was replaced by ":" in "stringdb::canonical name", "stringdb::score".',
+      'CX2 carries no arrow style, so edges are drawn without arrows; source and target are kept.',
       'Not loaded from this CX2 file: networkAttributes, visualProperties, nodeBypasses. ' +
         'Graph Lens Lite reads nodes, edges and their attributes and applies its own styling.',
     ]);
@@ -138,6 +142,19 @@ describe('CX2 broken input', () => {
     const nodes = Array.from({ length: 5001 }, (_, id) => ({ id }));
     const text = doc({ attributeDeclarations: [{ nodes: attributes }] }, { nodes });
     expect(() => parseCX2(text)).toThrow(/more than 5,000,000 attribute values/);
+  });
+
+  it('reads text coordinates and reports nodes whose position is unusable', () => {
+    const nodes = [
+      { id: 1, x: '10', y: '-5' },
+      { id: 2, x: 3 },
+      { id: 3, x: 'left', y: 1 },
+      { id: 4, x: 2e9, y: 0 },
+    ];
+    const { fileData, notices } = parseCX2(doc({ nodes }));
+    expect(fileData.nodes[0].style).toEqual({ x: 10, y: -5 });
+    expect(fileData.nodes.slice(1).map((n) => n.style.x)).toEqual([undefined, undefined, undefined]);
+    expect(notices[0]).toMatch(/^3 nodes have an incomplete, non-numeric or out-of-range position/);
   });
 
   it('never lets an attribute named __proto__ reach an object prototype', () => {

@@ -26,6 +26,29 @@ describe('GraphImport edge ids', () => {
   });
 });
 
+describe('interchangeGraph edge direction', () => {
+  const directionOf = (style) =>
+    interchangeGraph(
+      {
+        nodes: [{ id: 'a' }, { id: 'b' }],
+        edges: [{ id: 'a::b', source: 'a', target: 'b', style }],
+        nodeColumns: [],
+        edgeColumns: [],
+      },
+      { node: [], edge: [] }
+    ).edges[0];
+
+  it('turns a start-only arrow into an edge pointing the other way', () => {
+    expect(directionOf({ startArrow: true })).toMatchObject({ source: 'b', target: 'a', directed: true });
+  });
+
+  it('treats an arrow at both ends, or none, as undirected', () => {
+    expect(directionOf({ startArrow: true, endArrow: true })).toMatchObject({ source: 'a', directed: false });
+    expect(directionOf({})).toMatchObject({ source: 'a', directed: false });
+    expect(directionOf({ endArrow: true })).toMatchObject({ source: 'a', target: 'b', directed: true });
+  });
+});
+
 describe('interchangeGraph column types', () => {
   const columnOf = (values) => {
     const nodes = values.map((value, i) => ({ id: `n${i}`, D4Data: { [CFG.EXCEL_NODE_HEADER]: { g: { v: value } } } }));

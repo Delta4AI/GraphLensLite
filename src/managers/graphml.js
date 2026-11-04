@@ -17,6 +17,7 @@ import {
   checkAttributeValues,
   interchangeGraph,
   isBlank,
+  toCoordinate,
   MAX_IMPORT_ELEMENTS,
 } from './interchange.js';
 
@@ -154,13 +155,16 @@ function nodeFields(values, graphics) {
   const yed = yedGraphics(graphics);
   const label = take(values, 'label', 'name') ?? yed.label;
   const description = take(values, 'description');
-  let x = yed.x;
-  let y = yed.y;
-  if (typeof values.get('x') === 'number' && typeof values.get('y') === 'number') {
-    x = take(values, 'x');
-    y = take(values, 'y');
+  if (!values.has('x') && !values.has('y')) return { label, description, x: yed.x, y: yed.y };
+  const x = toCoordinate(values.get('x'));
+  const y = toCoordinate(values.get('y'));
+  if (Number.isFinite(x) && Number.isFinite(y)) {
+    values.delete('x');
+    values.delete('y');
+    return { label, description, x, y };
   }
-  return { label, description, x, y };
+  // Unusable as a position: GraphImport reports it, and the values stay as properties.
+  return { label, description, x: values.get('x'), y: values.get('y') };
 }
 
 function readNodes(graph, keys, importer) {
