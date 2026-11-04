@@ -157,8 +157,33 @@ describe('GraphML hostile and broken input', () => {
   });
 
   it('refuses files above the size and element caps', () => {
-    expect(() => checkImportSize(MAX_IMPORT_BYTES + 1)).toThrow(/larger than 100 MB/);
-    expect(() => checkElementCount(MAX_IMPORT_ELEMENTS + 1)).toThrow(/opens at most 500,000/);
+    expect(() => checkImportSize(MAX_IMPORT_BYTES + 1)).toThrow(/larger than 50 MB/);
+    expect(() => checkElementCount(MAX_IMPORT_ELEMENTS + 1)).toThrow(/more than 500,000 nodes and edges/);
+  });
+
+  it('counts elements on the raw text, before building the document', () => {
+    const parse = vi.spyOn(DOMParser.prototype, 'parseFromString');
+    const text = wrap('<node id="n"/>'.repeat(MAX_IMPORT_ELEMENTS + 1));
+    expect(() => parseGraphML(text)).toThrow(/more than 500,000 nodes and edges/);
+    expect(parse).not.toHaveBeenCalled();
+    parse.mockRestore();
+  });
+
+  it('refuses more declared attributes than it reads', () => {
+    const keys = Array.from({ length: 1001 }, (_, i) => `<key id="k${i}" for="node" attr.name="a${i}"/>`).join('');
+    const text = `<graphml xmlns="http://graphml.graphdrawing.org/xmlns">${keys}<graph><node id="a"/></graph></graphml>`;
+    expect(() => parseGraphML(text)).toThrow(/declares 1,001 node attributes; Graph Lens Lite reads at most 1,000/);
+  });
+
+  it('refuses a node id that would land on an object prototype', () => {
+    expect(() => parseGraphML(wrap('<node id="__proto__"/>'))).toThrow(/Node 1 has the reserved id "__proto__"/);
+  });
+
+  it('opens a file whose values merely mention <!DOCTYPE', () => {
+    const { fileData } = parseGraphML(`<?xml version="1.0"?><graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+      <key id="l" for="node" attr.name="label"/>
+      <graph><node id="a"><data key="l"><![CDATA[<!DOCTYPE html>]]></data></node></graph></graphml>`);
+    expect(fileData.nodes[0].label).toBe('<!DOCTYPE html>');
   });
 
   it('keeps markup in attribute values as text', () => {

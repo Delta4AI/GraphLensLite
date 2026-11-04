@@ -9,7 +9,16 @@
  * `v`); visual styles and other aspects are reported, not loaded. Fragmented
  * documents work because repeated aspects are concatenated.
  */
-import { GraphImport, coerceValue, checkImportSize, checkElementCount, interchangeGraph, isBlank } from './interchange.js';
+import {
+  GraphImport,
+  coerceValue,
+  checkImportSize,
+  checkElementCount,
+  checkDeclaredAttributes,
+  checkAttributeValues,
+  interchangeGraph,
+  isBlank,
+} from './interchange.js';
 
 const FORMAT_NAME = 'CX2';
 const CX_VERSION = '2.0';
@@ -83,6 +92,7 @@ function readDeclarations(aspects, domain, importer) {
       if (typeof spec.a === 'string') alias.set(spec.a, name);
     }
   }
+  checkDeclaredAttributes(byName.size, domain === 'nodes' ? 'node' : 'edge');
   return { byName, alias };
 }
 
@@ -113,8 +123,15 @@ function take(values, name) {
   return value;
 }
 
+/** Every default lands on every element; refuse before multiplying them out. */
+function checkDefaults(declarations, elementCount) {
+  const defaults = [...declarations.byName.values()].filter((spec) => spec.default !== undefined);
+  checkAttributeValues(defaults.length * elementCount);
+}
+
 /** @returns {Map<string, string>} CX2 node id → GLL node id */
 function readNodes(nodes, declarations, importer) {
+  checkDefaults(declarations, nodes.length);
   const ids = new Map();
   nodes.forEach((node, index) => {
     const where = `Node ${index + 1}`;
@@ -139,6 +156,7 @@ function readNodes(nodes, declarations, importer) {
 }
 
 function readEdges(edges, declarations, nodeIds, importer) {
+  checkDefaults(declarations, edges.length);
   edges.forEach((edge, index) => {
     const where = `Edge ${index + 1}`;
     if (!isPlainObject(edge) || isBlank(edge.s) || isBlank(edge.t)) {
