@@ -133,6 +133,13 @@ describe('CX2 broken input', () => {
     expect(() => parseCX2(text)).toThrow(message);
   });
 
+  it('refuses declared defaults that would multiply past the value cap', () => {
+    const attributes = Object.fromEntries(Array.from({ length: 1000 }, (_, i) => [`a${i}`, { d: 'long', v: i }]));
+    const nodes = Array.from({ length: 5001 }, (_, id) => ({ id }));
+    const text = doc({ attributeDeclarations: [{ nodes: attributes }] }, { nodes });
+    expect(() => parseCX2(text)).toThrow(/more than 5,000,000 attribute values/);
+  });
+
   it('never lets an attribute named __proto__ reach an object prototype', () => {
     // Spelled as text: an object literal's __proto__ would set the prototype, not a key.
     const text = '[{"CXVersion":"2.0"},{"nodes":[{"id":1,"v":{"__proto__":{"polluted":true},"ok":1}}]}]';

@@ -8,14 +8,29 @@
  * yEd geometry) and edge direction. Nested graphs, hyperedges and ports have
  * no GLL counterpart and are reported, not loaded.
  */
-import { GraphImport, coerceValue, checkImportSize, checkElementCount, interchangeGraph, isBlank } from './interchange.js';
+import {
+  GraphImport,
+  coerceValue,
+  checkImportSize,
+  checkElementCount,
+  checkDeclaredAttributes,
+  checkAttributeValues,
+  interchangeGraph,
+  isBlank,
+  MAX_IMPORT_ELEMENTS,
+} from './interchange.js';
 
 const FORMAT_NAME = 'GraphML';
 const GRAPHML_NS = 'http://graphml.graphdrawing.org/xmlns';
 const GRAPHML_XSD = 'http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd';
 // Entity declarations are how "billion laughs" files expand to gigabytes;
-// GraphML never needs them, so any DTD is refused before parsing.
+// GraphML never needs them, so any DTD is refused before parsing. A DTD can
+// only stand in the prolog, before the root element, so only that is searched
+// (a "<!DOCTYPE" inside a CDATA value or comment further down is just text).
 const DTD_PATTERN = /<!(DOCTYPE|ENTITY)/i;
+const ROOT_START = /<([\w.-]+:)?graphml[\s>/]/;
+// Counted on the raw text so an oversized file is refused before the DOM is built.
+const ELEMENT_START = /<([\w.-]+:)?(node|edge)[\s>/]/g;
 const MAX_MESSAGE_CHARS = 200;
 const MAX_NAME_CHARS = 40;
 const KEY_KINDS = { boolean: 'boolean', int: 'number', long: 'number', float: 'number', double: 'number', string: 'string' };
@@ -24,14 +39,24 @@ const EDGE_BUILTINS = ['label', 'description'];
 
 const childElements = (el, name) => [...el.children].filter((child) => child.localName === name);
 
+/** Matches of a global `pattern`, counting stops just past `limit`. */
+function countUpTo(text, pattern, limit) {
+  let count = 0;
+  pattern.lastIndex = 0;
+  while (count <= limit && pattern.exec(text)) count++;
+  return count;
+}
+
 function parseRoot(text) {
   checkImportSize(text.length);
-  if (DTD_PATTERN.test(text)) {
+  const rootAt = text.search(ROOT_START);
+  if (DTD_PATTERN.test(rootAt === -1 ? text : text.slice(0, rootAt))) {
     throw new Error(
       'The file declares a DTD or entities (<!DOCTYPE …>), which Graph Lens Lite does not load ' +
         'for safety. Remove that declaration and open the file again.'
     );
   }
+  checkElementCount(countUpTo(text, ELEMENT_START, MAX_IMPORT_ELEMENTS));
   const doc = new DOMParser().parseFromString(text, 'application/xml');
   const parserError = doc.getElementsByTagName('parsererror')[0];
   if (parserError) {
@@ -62,6 +87,10 @@ function readKeys(root) {
       yfiles,
       default: defaultEl ? defaultEl.textContent : null,
     });
+  }
+  for (const domain of ['node', 'edge']) {
+    const declared = [...keys.values()].filter((key) => key.domain === domain || key.domain === 'all');
+    checkDeclaredAttributes(declared.length, domain);
   }
   return keys;
 }
@@ -136,7 +165,10 @@ function nodeFields(values, graphics) {
 
 function readNodes(graph, keys, importer) {
   const defaults = domainDefaults(keys, 'node', importer);
-  childElements(graph, 'node').forEach((node, index) => {
+  const nodes = childElements(graph, 'node');
+  // Every default lands on every element; refuse before multiplying them out.
+  checkAttributeValues(defaults.size * nodes.length);
+  nodes.forEach((node, index) => {
     if (childElements(node, 'graph').length > 0) importer.note('nested');
     importer.note('port', childElements(node, 'port').length);
     const { values, graphics } = readData(node, keys, defaults, importer);
@@ -148,7 +180,9 @@ function readEdges(graph, keys, importer) {
   const defaults = domainDefaults(keys, 'edge', importer);
   // edgedefault is required by the schema, with "directed" as its default.
   const directedByDefault = graph.getAttribute('edgedefault') !== 'undirected';
-  childElements(graph, 'edge').forEach((edge, index) => {
+  const edges = childElements(graph, 'edge');
+  checkAttributeValues(defaults.size * edges.length);
+  edges.forEach((edge, index) => {
     const { values } = readData(edge, keys, defaults, importer);
     const directedAttr = edge.getAttribute('directed');
     const fields = {
@@ -192,7 +226,6 @@ function parseGraphML(text) {
   const importer = new GraphImport(FORMAT_NAME);
   importer.note('graphs', graphs.length - 1);
   const graph = graphs[0];
-  checkElementCount(childElements(graph, 'node').length + childElements(graph, 'edge').length);
   readNodes(graph, keys, importer);
   readEdges(graph, keys, importer);
   return { fileData: importer.result(), notices: notices(importer) };

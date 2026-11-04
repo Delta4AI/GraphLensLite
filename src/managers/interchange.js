@@ -7,13 +7,21 @@
  * Export: `interchangeGraph` flattens the loaded graph into named, typed
  * columns a writer can serialize.
  */
-import { CFG } from '../config.js';
+import { CFG, UNSAFE_OBJECT_KEYS } from '../config.js';
 import { EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES, decodeKey } from './excel_schema.js';
 
-/** Files above this size are refused before they are read. */
-const MAX_IMPORT_BYTES = 100 * 1024 * 1024;
+/**
+ * Files above this size are refused before they are read. Parsing builds the
+ * whole DOM or JSON tree first, so this cap bounds memory before any count
+ * can be taken.
+ */
+const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
 /** Nodes plus edges a single file may carry. */
 const MAX_IMPORT_ELEMENTS = 500_000;
+/** Declared node (or edge) attributes a file may carry. */
+const MAX_DECLARED_ATTRIBUTES = 1_000;
+/** Attribute values across all elements, defaults included. */
+const MAX_ATTRIBUTE_VALUES = 5_000_000;
 /** The separator inside GLL property ids (`section::group::key`). */
 const PROP_ID_SEPARATOR = '::';
 /** GLL splits categorical cells on this; list attributes are joined with it. */
@@ -28,6 +36,8 @@ const applyEdgeLabel = columnApplier(EXCEL_EDGE_PROPERTIES, 'Label');
 const applyEdgeDescription = columnApplier(EXCEL_EDGE_PROPERTIES, 'Description');
 const applyEdgeEndArrow = columnApplier(EXCEL_EDGE_PROPERTIES, 'End Arrow');
 
+const formatCount = (n) => n.toLocaleString('en');
+
 const isBlank = (value) => value === null || value === undefined || String(value).trim() === '';
 
 function checkImportSize(length) {
@@ -41,8 +51,27 @@ function checkImportSize(length) {
 function checkElementCount(count) {
   if (count > MAX_IMPORT_ELEMENTS) {
     throw new Error(
-      `The file holds ${count.toLocaleString('en')} nodes and edges; ` +
-        `Graph Lens Lite opens at most ${MAX_IMPORT_ELEMENTS.toLocaleString('en')}.`
+      `The file holds more than ${formatCount(MAX_IMPORT_ELEMENTS)} nodes and edges, ` +
+        'the most Graph Lens Lite opens.'
+    );
+  }
+}
+
+function checkAttributeValues(count) {
+  if (count > MAX_ATTRIBUTE_VALUES) {
+    throw new Error(
+      `The file holds more than ${formatCount(MAX_ATTRIBUTE_VALUES)} attribute values, ` +
+        'the most Graph Lens Lite opens.'
+    );
+  }
+}
+
+/** @param {string} domain "node" or "edge" */
+function checkDeclaredAttributes(count, domain) {
+  if (count > MAX_DECLARED_ATTRIBUTES) {
+    throw new Error(
+      `The file declares ${formatCount(count)} ${domain} attributes; ` +
+        `Graph Lens Lite reads at most ${formatCount(MAX_DECLARED_ATTRIBUTES)}.`
     );
   }
 }
@@ -90,6 +119,7 @@ class GraphImport {
     this.edgeHeaders = new Map();
     this.counts = new Map();
     this.renamed = new Set();
+    this.valueCount = 0;
   }
 
   /** Count one occurrence of something the import could not carry over. */
@@ -106,6 +136,8 @@ class GraphImport {
   addNode(rawId, fields, props, where) {
     if (isBlank(rawId)) throw new Error(`${where} has no id.`);
     const id = String(rawId);
+    // Node ids become object keys (saved positions, styles).
+    if (UNSAFE_OBJECT_KEYS.has(id)) throw new Error(`${where} has the reserved id "${id}".`);
     if (this.nodeIDs.has(id)) throw new Error(`Node id "${id}" appears more than once.`);
     this.nodeIDs.add(id);
 
@@ -172,6 +204,7 @@ class GraphImport {
         this.note('refused');
         continue;
       }
+      checkAttributeValues(++this.valueCount);
       const { subGroup, key } = decoded;
       target[subGroup] ??= {};
       target[subGroup][key] = value;
@@ -326,8 +359,12 @@ export {
   coerceValue,
   checkImportSize,
   checkElementCount,
+  checkDeclaredAttributes,
+  checkAttributeValues,
   interchangeGraph,
   isBlank,
   MAX_IMPORT_BYTES,
   MAX_IMPORT_ELEMENTS,
+  MAX_DECLARED_ATTRIBUTES,
+  MAX_ATTRIBUTE_VALUES,
 };
