@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Shaped after Cytoscape 3's GraphML export: attr.name doubles as the key id, a
+     "name" column carries the node label, edges are directed and may run in
+     parallel. Hand-written, not produced by Cytoscape itself. -->
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+<key attr.name="name" attr.type="string" for="node" id="name"/>
+<key attr.name="shared name" attr.type="string" for="node" id="shared name"/>
+<key attr.name="selected" attr.type="boolean" for="node" id="selected"><default>false</default></key>
+<key attr.name="Degree" attr.type="int" for="node" id="Degree"/>
+<key attr.name="log2FC" attr.type="double" for="node" id="log2FC"/>
+<key attr.name="interaction" attr.type="string" for="edge" id="interaction"/>
+<key attr.name="score" attr.type="double" for="edge" id="score"/>
+<graph edgedefault="directed" id="string_interactions">
+<node id="n0">
+<data key="name">TP53</data>
+<data key="shared name">TP53</data>
+<data key="Degree">2</data>
+<data key="log2FC">-1.25</data>
+</node>
+<node id="n1">
+<data key="name">MDM2</data>
+<data key="shared name">MDM2</data>
+<data key="selected">true</data>
+<data key="Degree">2</data>
+<data key="log2FC">0.8</data>
+</node>
+<node id="n2">
+<data key="name">CDKN1A</data>
+<data key="Degree">1</data>
+</node>
+<edge source="n0" target="n1">
+<data key="interaction">pp</data>
+<data key="score">0.999</data>
+</edge>
+<edge source="n0" target="n1">
+<data key="interaction">expression</data>
+<data key="score">0.42</data>
+</edge>
+<edge source="n0" target="n2">
+<data key="interaction">pp</data>
+<data key="score">0.9</data>
+</edge>
+</graph>
+</graphml>

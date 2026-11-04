@@ -6,6 +6,9 @@ import { FILTER_LINKS, visibilitySettings } from '../graph/visibility_rule.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
 import { excelData, EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES, decodeKey } from './excel_schema.js';
 import { ExcelTemplate } from './excel_template.js';
+import { checkImportSize } from './interchange.js';
+import { parseGraphML, toGraphML } from './graphml.js';
+import { parseCX2, toCX2 } from './cx2.js';
 
 /** A header whose group or key is spelled like a prototype key (the data
  * editor turns headers into object keys); the Excel decoder refuses the same. */
@@ -1430,6 +1433,14 @@ class IOManager {
               return null;
             });
 
+        case 'graphml':
+          return this.parseInterchangeFile(file, parseGraphML);
+
+        // .cx is usually CX version 1; the CX2 reader names that case itself.
+        case 'cx':
+        case 'cx2':
+          return this.parseInterchangeFile(file, parseCX2);
+
         default:
           this.cache.ui.error(`Unsupported file type: ${fileType}`);
       }
@@ -1439,6 +1450,83 @@ class IOManager {
 
     // Reset the file input for subsequent uploads
     event.target.value = '';
+  }
+
+  /**
+   * Read a GraphML or CX2 file into preProcessData input. The parser throws a
+   * plain-language Error for anything it cannot use; that and every notice
+   * about parts it left out reach the user here.
+   * @returns {Promise<object|null>} null after reporting the error
+   */
+  async parseInterchangeFile(file, parse) {
+    try {
+      checkImportSize(file.size);
+      const { fileData, notices } = parse(await file.text());
+      for (const notice of notices) this.cache.ui.warning(notice);
+      return fileData;
+    } catch (err) {
+      this.cache.ui.error(`Could not open ${file.name}: ${err.message}`);
+      return null;
+    }
+  }
+
+  /** The loaded graph in the shape interchangeGraph reads. */
+  interchangeSource() {
+    const nodeColumns = [];
+    const edgeColumns = [];
+    for (const propId of this.cache.data.filterDefaults.keys()) {
+      const [section, subGroup, key] = StaticUtilities.decodePropHashId(propId);
+      const target = section === this.cache.CFG.EXCEL_NODE_HEADER ? nodeColumns : edgeColumns;
+      target.push({ subGroup, key });
+    }
+    return {
+      nodes: this.cache.data.nodes,
+      edges: this.cache.data.edges,
+      nodeColumns,
+      edgeColumns,
+      positions: this.cache.data.layouts[this.cache.data.selectedLayout]?.positions,
+    };
+  }
+
+  /** Download `text` under the usual export filename. */
+  downloadText(text, type, ext) {
+    const objectUrl = URL.createObjectURL(new Blob([text], { type }));
+    // Revoked late for the same reason as in exportSVG.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), SVG_URL_REVOKE_DELAY_MS);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = this.buildExportFilename(ext);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  /**
+   * Export nodes, edges, their properties and the current workspace's
+   * positions for Cytoscape, Gephi, yEd, NetworkX or igraph (GraphML), or
+   * Cytoscape and NDEx (CX2). Styles, workspaces and groups stay in the JSON
+   * model only.
+   */
+  exportNetwork(format) {
+    if (!this.cache.data?.nodes) {
+      this.cache.ui.error('No graph data to export.');
+      return;
+    }
+    try {
+      const source = this.interchangeSource();
+      if (format === 'graphml') {
+        this.downloadText(toGraphML(source), 'application/graphml+xml', 'graphml');
+        return;
+      }
+      const label = document.getElementById('dataSourceLabel')?.textContent || '';
+      const { text, withCoordinates } = toCX2(source, label.replace(/\.[a-z0-9]+$/i, ''));
+      if (!withCoordinates) {
+        this.cache.ui.warning('Some nodes have no position yet, so the CX2 file carries no coordinates.');
+      }
+      this.downloadText(text, 'application/json', 'cx2');
+    } catch (err) {
+      this.cache.ui.error(`Export failed: ${err.message}`);
+    }
   }
 
   async loadFileWrapper(event) {

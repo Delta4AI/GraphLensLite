@@ -35,7 +35,7 @@
       <button class="landing-browse-btn" data-needs-webgl onclick="document.getElementById('fileInput').click()">
         <span class="landing-browse-icon">📂</span>
         <span class="landing-browse-label">Open Graph File</span>
-        <span class="landing-browse-desc">Load from Excel (.xlsx, .xls) or a saved model (.json)</span>
+        <span class="landing-browse-desc">Load from Excel (.xlsx, .xls), a saved model (.json), or GraphML / CX2 from Cytoscape, Gephi or NDEx</span>
       </button>
     </div>
 
@@ -99,7 +99,7 @@
   </button>
   <select name="selectView" id="selectView" hidden onchange="cache.lm.changeLayout()" aria-hidden="true" tabindex="-1"></select>
   <input type="file" id="fileInput" name="fileInput" hidden onchange="cache.io.loadFileWrapper(event);"
-         accept=".json, .xls, .xlsx"/>
+         accept=".json, .xls, .xlsx, .graphml, .cx2, .cx"/>
   <div class="rail-hist">
     <button id="historyUndoBtn" class="rail-mini disabled" aria-label="Undo"
             title="Nothing to undo" onclick="cache.history.undo()">↶</button>

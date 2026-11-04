@@ -42,6 +42,7 @@ function makeCache() {
       exportPNG: vi.fn(),
       exportSVG: vi.fn(),
       exportGraphAsJSON: vi.fn(),
+      exportNetwork: vi.fn(),
       downloadExcelTemplate: vi.fn(),
     },
     dataTable: { exportToExcel: vi.fn() },
@@ -304,7 +305,7 @@ describe('initRail', () => {
     expect(cache.gcm.toggleCleanUpDanglingElements).toHaveBeenCalledWith(toggleBtn);
   });
 
-  it('export menu offers PNG scales (remembered one checked), SVG, JSON and Excel', () => {
+  it('export menu offers PNG scales (remembered one checked), SVG, JSON, Excel, GraphML and CX2', () => {
     document.getElementById('exportMenuBtn').click();
     const exportMenu = document.querySelector('.rail-menu.open');
     const items = [...exportMenu.querySelectorAll('.rail-menu-item')];
@@ -325,6 +326,10 @@ describe('initRail', () => {
     expect(cache.io.exportGraphAsJSON).toHaveBeenCalled();
     items.find((i) => i.textContent.includes('Excel')).click();
     expect(cache.dataTable.exportToExcel).toHaveBeenCalled();
+    items.find((i) => i.textContent.includes('GraphML')).click();
+    expect(cache.io.exportNetwork).toHaveBeenCalledWith('graphml');
+    items.find((i) => i.textContent.includes('CX2')).click();
+    expect(cache.io.exportNetwork).toHaveBeenCalledWith('cx2');
   });
 
   it('workspace and layout menus stay empty before any data is loaded', () => {
