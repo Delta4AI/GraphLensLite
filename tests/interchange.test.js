@@ -7,7 +7,7 @@ const BUDGET_MS = 1000;
 
 describe('GraphImport edge ids', () => {
   it(`numbers ${PARALLEL_EDGES} parallel edges in under ${BUDGET_MS} ms`, () => {
-    const importer = new GraphImport('GraphML');
+    const importer = new GraphImport();
     importer.addNode('a', {}, [], 'Node 1');
     importer.addNode('b', {}, [], 'Node 2');
     const started = performance.now();
@@ -17,7 +17,7 @@ describe('GraphImport edge ids', () => {
   });
 
   it('still steps past an id another node pair already produced', () => {
-    const importer = new GraphImport('GraphML');
+    const importer = new GraphImport();
     for (const id of ['a', 'b', 'a::b', '2']) importer.addNode(id, {}, [], id);
     importer.addEdge('a::b', '2', {}, [], 'Edge 1');
     importer.addEdge('a', 'b', {}, [], 'Edge 2');

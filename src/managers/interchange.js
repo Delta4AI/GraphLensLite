@@ -116,8 +116,7 @@ function coerceValue(value, kind) {
 
 /** Collects one imported graph; `result()` returns the preProcessData input. */
 class GraphImport {
-  constructor(formatName) {
-    this.formatName = formatName;
+  constructor() {
     this.nodes = [];
     this.edges = [];
     this.nodeIDs = new Set();
@@ -213,8 +212,8 @@ class GraphImport {
         name = name.replaceAll(PROP_ID_SEPARATOR, ':');
       }
       // Brackets name the property group, as in the Excel template; anything
-      // unbracketed lands in a group named after the format.
-      const decoded = decodeKey(name, this.formatName);
+      // unbracketed lands in the catch-all group, as an Excel header would.
+      const decoded = decodeKey(name, CFG.EXCEL_UNCATEGORIZED_SUBHEADER);
       if (!decoded || decoded.key === '') {
         this.note('refused');
         continue;
@@ -293,7 +292,7 @@ function typedValue(value, type) {
 
 /**
  * Attribute names for GLL columns: the bare key when its group is the
- * catch-all one (or a format's own default) and the name is free, else
+ * catch-all one and the name is free, else
  * `key [group]` — which the importers decode back into the same group.
  */
 function nameColumns(columns, reserved, plainGroups) {
@@ -356,7 +355,7 @@ function nodePosition(node, positions) {
  * @param {{node: string[], edge: string[]}} reserved names the writer uses itself
  */
 function interchangeGraph(source, reserved) {
-  const plainGroups = new Set([CFG.EXCEL_UNCATEGORIZED_SUBHEADER, 'GraphML', 'CX2']);
+  const plainGroups = new Set([CFG.EXCEL_UNCATEGORIZED_SUBHEADER]);
   const nodeSection = CFG.EXCEL_NODE_HEADER;
   const edgeSection = CFG.EXCEL_EDGE_HEADER;
   const nodeColumns = typedColumns(

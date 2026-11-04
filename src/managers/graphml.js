@@ -22,7 +22,6 @@ import {
   MAX_IMPORT_ELEMENTS,
 } from './interchange.js';
 
-const FORMAT_NAME = 'GraphML';
 const GRAPHML_NS = 'http://graphml.graphdrawing.org/xmlns';
 const GRAPHML_XSD = 'http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd';
 // Entity declarations are how "billion laughs" files expand to gigabytes;
@@ -228,7 +227,7 @@ function parseGraphML(text) {
   const keys = readKeys(root);
   const graphs = childElements(root, 'graph');
   if (graphs.length === 0) throw new Error('The GraphML file contains no <graph> element.');
-  const importer = new GraphImport(FORMAT_NAME);
+  const importer = new GraphImport();
   importer.note('graphs', graphs.length - 1);
   const graph = graphs[0];
   readNodes(graph, keys, importer);

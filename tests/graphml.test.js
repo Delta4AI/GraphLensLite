@@ -8,9 +8,10 @@ import { IOManager, normalizeD4DataBooleans } from '../src/managers/io.js';
 import { CFG } from '../src/config.js';
 
 const NODE = CFG.EXCEL_NODE_HEADER;
+const UNCATEGORIZED = CFG.EXCEL_UNCATEGORIZED_SUBHEADER;
 const EDGE = CFG.EXCEL_EDGE_HEADER;
 const fixture = (name) => fs.readFileSync(path.join(import.meta.dirname, 'fixtures', name), 'utf8');
-const props = (element, group = 'GraphML') =>
+const props = (element, group = CFG.EXCEL_UNCATEGORIZED_SUBHEADER) =>
   element.D4Data[element.id.includes('::') ? EDGE : NODE][group];
 
 /** A graph as the Excel importer hands it over: groups, types, a parallel edge, a self-loop. */
@@ -67,8 +68,8 @@ describe('GraphML round trip', () => {
     expect(b.label).toBeUndefined();
     expect(b.style).toMatchObject({ x: -12.25, y: 40 });
     expect(a.D4Data[NODE].omics).toEqual({ score: 1.5, count: 3, hit: 'true' });
-    // Ungrouped columns travel under their bare name and come back in the format's group.
-    expect(a.D4Data[NODE].GraphML).toEqual({ note: 'x "y"' });
+    // Ungrouped columns travel under their bare name and come back in the same group.
+    expect(a.D4Data[NODE][UNCATEGORIZED]).toEqual({ note: 'x "y"' });
 
     expect(fileData.edges.map((e) => [e.id, e.source, e.target])).toEqual([
       ['A::B', 'A', 'B'],
@@ -91,7 +92,7 @@ describe('GraphML import of other tools\' files', () => {
     expect(props(cdkn1a)).toEqual({ selected: false, Degree: 1 });
     expect(fileData.edges.map((e) => e.id)).toEqual(['n0::n1', 'n0::n1::2', 'n0::n2']);
     expect(fileData.edges.every((e) => e.style.endArrow === true)).toBe(true);
-    expect(fileData.edges[1].D4Data[EDGE].GraphML).toEqual({ interaction: 'expression', score: 0.42 });
+    expect(fileData.edges[1].D4Data[EDGE][UNCATEGORIZED]).toEqual({ interaction: 'expression', score: 0.42 });
   });
 
   it('reads a NetworkX-style export: label key, x/y keys as positions, undirected, self-loop', () => {
@@ -114,9 +115,9 @@ describe('GraphML import of other tools\' files', () => {
         <node id="b"><data key="x">7</data></node></graph></graphml>`);
     const [a, b] = fileData.nodes;
     expect(a.style).toEqual({ x: 12.5, y: -3 });
-    expect(a.D4Data[NODE].GraphML).toBeUndefined();
+    expect(a.D4Data[NODE][UNCATEGORIZED]).toBeUndefined();
     expect(b.style.x).toBeUndefined();
-    expect(b.D4Data[NODE].GraphML).toEqual({ x: '7' });
+    expect(b.D4Data[NODE][UNCATEGORIZED]).toEqual({ x: '7' });
     expect(notices).toEqual([
       '1 nodes have an incomplete, non-numeric or out-of-range position and were placed by the layout instead.',
     ]);

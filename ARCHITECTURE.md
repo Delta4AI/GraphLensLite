@@ -85,8 +85,8 @@ Business logic and UI:
   and CX2 (Cytoscape, NDEx) readers and writers. Both carry nodes, edges, typed
   attributes and positions only — styles, workspaces and groups stay JSON-only.
   `interchange.js` is their shared half: `GraphImport` builds the same file
-  data the Excel importer produces (unbracketed attributes land in a group
-  named after the format; `name [group]` decodes like an Excel header), and
+  data the Excel importer produces (unbracketed attributes land in the
+  *Uncategorized Properties* group; `name [group]` decodes like an Excel header), and
   `interchangeGraph` turns the loaded graph into typed, named columns. Files are
   untrusted: size and element caps, no DTDs, and plain-language errors for
   missing ids and dangling edges

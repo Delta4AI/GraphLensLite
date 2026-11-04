@@ -57,7 +57,7 @@ describe('preProcessData on an opened GraphML file', () => {
 
     expect(cache.nodePositionsFromExcelImport.get('EGFR')).toEqual({ x: 0, y: 0 });
     expect(cache.data.selectedLayout).toBe(DEFAULTS.CUSTOM_LAYOUT_NAME);
-    const filter = (section, key) => cache.data.filterDefaults.get(`${section}::GraphML::${key}`);
+    const filter = (section, key) => cache.data.filterDefaults.get(`${section}::${CFG.EXCEL_UNCATEGORIZED_SUBHEADER}::${key}`);
     expect(filter(CFG.EXCEL_NODE_HEADER, 'essential').isBoolean).toBe(true);
     expect(filter(CFG.EXCEL_EDGE_HEADER, 'weight').isCategory).toBe(false);
   });
