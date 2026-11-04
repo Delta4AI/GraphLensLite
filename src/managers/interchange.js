@@ -22,6 +22,8 @@ const MAX_IMPORT_ELEMENTS = 500_000;
 const MAX_DECLARED_ATTRIBUTES = 1_000;
 /** Attribute values across all elements, defaults included. */
 const MAX_ATTRIBUTE_VALUES = 5_000_000;
+/** Coordinates beyond this are treated as unusable (they break the layout maths). */
+const MAX_COORDINATE = 1e9;
 /** The separator inside GLL property ids (`section::group::key`). */
 const PROP_ID_SEPARATOR = '::';
 /** GLL splits categorical cells on this; list attributes are joined with it. */
@@ -39,6 +41,13 @@ const applyEdgeEndArrow = columnApplier(EXCEL_EDGE_PROPERTIES, 'End Arrow');
 const formatCount = (n) => n.toLocaleString('en');
 
 const isBlank = (value) => value === null || value === undefined || String(value).trim() === '';
+
+/** A file value as a coordinate, or NaN when it is missing, not a number or out of range. */
+function toCoordinate(value) {
+  if (isBlank(value) || typeof value === 'boolean') return NaN;
+  const n = Number(value);
+  return Math.abs(n) <= MAX_COORDINATE ? n : NaN;
+}
 
 function checkImportSize(length) {
   if (length > MAX_IMPORT_BYTES) {
@@ -144,9 +153,15 @@ class GraphImport {
     const node = { id, style: {}, D4Data: { [CFG.EXCEL_NODE_HEADER]: {} } };
     if (!isBlank(fields.label)) applyNodeLabel(node, String(fields.label));
     if (!isBlank(fields.description)) applyNodeDescription(node, String(fields.description));
-    if (Number.isFinite(fields.x) && Number.isFinite(fields.y)) {
-      applyNodeX(node, fields.x);
-      applyNodeY(node, fields.y);
+    if (fields.x !== undefined || fields.y !== undefined) {
+      const x = toCoordinate(fields.x);
+      const y = toCoordinate(fields.y);
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        applyNodeX(node, x);
+        applyNodeY(node, y);
+      } else {
+        this.note('coordinate');
+      }
     }
     this.#addProps(node.D4Data[CFG.EXCEL_NODE_HEADER], props, this.nodeHeaders);
     this.nodes.push(node);
@@ -221,6 +236,12 @@ class GraphImport {
     }
     if (this.counts.has('refused')) {
       lines.push(`${this.counts.get('refused')} values with a reserved or empty property name were not loaded.`);
+    }
+    if (this.counts.has('coordinate')) {
+      lines.push(
+        `${this.counts.get('coordinate')} nodes have an incomplete, non-numeric or out-of-range ` +
+          'position and were placed by the layout instead.'
+      );
     }
     if (this.counts.has('mismatch')) {
       lines.push(
@@ -303,6 +324,21 @@ function columnValues(element, section, columns) {
   return values;
 }
 
+/**
+ * GLL draws direction as arrows. One arrow is a direction (a start arrow alone
+ * points target → source, so the ends are swapped); both or none are not.
+ */
+function edgeDirection(edge) {
+  const end = edge.style?.endArrow === true;
+  const start = edge.style?.startArrow === true;
+  const reversed = start && !end;
+  return {
+    source: String(reversed ? edge.target : edge.source),
+    target: String(reversed ? edge.source : edge.target),
+    directed: start !== end,
+  };
+}
+
 function nodePosition(node, positions) {
   const style = positions?.get(node.id)?.style ?? node.style;
   return Number.isFinite(style?.x) && Number.isFinite(style?.y) ? { x: style.x, y: style.y } : null;
@@ -344,11 +380,9 @@ function interchangeGraph(source, reserved) {
       values: columnValues(node, nodeSection, nodeColumns),
     })),
     edges: source.edges.map((edge) => ({
-      source: String(edge.source),
-      target: String(edge.target),
+      ...edgeDirection(edge),
       label: edge.label,
       description: edge.description,
-      directed: edge.style?.endArrow === true,
       values: columnValues(edge, edgeSection, edgeColumns),
     })),
   };
@@ -363,6 +397,7 @@ export {
   checkAttributeValues,
   interchangeGraph,
   isBlank,
+  toCoordinate,
   MAX_IMPORT_BYTES,
   MAX_IMPORT_ELEMENTS,
   MAX_DECLARED_ATTRIBUTES,

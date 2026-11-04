@@ -107,6 +107,21 @@ describe('GraphML import of other tools\' files', () => {
     expect(notices).toEqual([]);
   });
 
+  it('takes text-typed x/y keys as a position and keeps a lone x as a property', () => {
+    const { fileData, notices } = parseGraphML(`<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+      <key id="x" for="node" attr.name="x" attr.type="string"/><key id="y" for="node" attr.name="y" attr.type="string"/>
+      <graph><node id="a"><data key="x">12.5</data><data key="y">-3</data></node>
+        <node id="b"><data key="x">7</data></node></graph></graphml>`);
+    const [a, b] = fileData.nodes;
+    expect(a.style).toEqual({ x: 12.5, y: -3 });
+    expect(a.D4Data[NODE].GraphML).toBeUndefined();
+    expect(b.style.x).toBeUndefined();
+    expect(b.D4Data[NODE].GraphML).toEqual({ x: '7' });
+    expect(notices).toEqual([
+      '1 nodes have an incomplete, non-numeric or out-of-range position and were placed by the layout instead.',
+    ]);
+  });
+
   it('takes a yEd node label and the centre of its geometry', () => {
     const { fileData } = parseGraphML(`<?xml version="1.0"?>
       <graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:y="http://www.yworks.com/xml/graphml">

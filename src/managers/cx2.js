@@ -196,6 +196,9 @@ function parseCX2(text) {
 
   const fileData = importer.result();
   const notices = importer.notices();
+  if (edges.length > 0) {
+    notices.push('CX2 carries no arrow style, so edges are drawn without arrows; source and target are kept.');
+  }
   const ignored = [...aspects.keys()].filter((name) => !READ_ASPECTS.has(name));
   if (ignored.length > 0) {
     notices.push(
