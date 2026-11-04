@@ -18,6 +18,7 @@ import {
   checkAttributeValues,
   interchangeGraph,
   isBlank,
+  exportSummary,
 } from './interchange.js';
 
 const FORMAT_NAME = 'CX2';
@@ -211,15 +212,16 @@ function parseCX2(text) {
 
 // ----------------------------------------------------------------- export
 
+// Export maps are keyed by attribute names, so they carry no prototype.
 function declarations(builtins, columns) {
-  const declared = {};
+  const declared = Object.create(null);
   for (const [name, d] of builtins) declared[name] = { d };
   for (const column of columns) declared[column.name] = { d: column.type };
   return declared;
 }
 
 function attributeMap(element, builtins) {
-  const v = {};
+  const v = Object.create(null);
   for (const [name, value] of builtins) if (!isBlank(value)) v[name] = value;
   for (const [column, value] of element.values) v[column.name] = value;
   return v;
@@ -277,7 +279,8 @@ function cxDeclarations(graph, network) {
  *
  * @param {object} source see interchangeGraph
  * @param {string} [networkName]
- * @returns {{text: string, withCoordinates: boolean}}
+ * @returns {{text: string, nodes: number, edges: number, unplaced: number, directed: number}}
+ *   unplaced > 0 means no node carries coordinates
  */
 function toCX2(source, networkName) {
   const graph = interchangeGraph(source, { node: NODE_BUILTINS, edge: EDGE_BUILTINS });
@@ -300,7 +303,7 @@ function toCX2(source, networkName) {
     { edges },
     { status: [{ error: '', success: true }] },
   ];
-  return { text: JSON.stringify(doc), withCoordinates: nodes.every((node) => 'x' in node) };
+  return { text: JSON.stringify(doc), ...exportSummary(graph) };
 }
 
 export { parseCX2, toCX2, GLL_ID_ATTRIBUTE };

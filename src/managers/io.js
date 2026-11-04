@@ -21,6 +21,24 @@ const isGivenCoordinate = (value) => value === 0 || Boolean(value);
 const BUILD_UP_EMPTY_SINCE = '1.18.0';
 
 const EXPORT_SCALE_KEY = 'gll.exportScale';
+/** The network exports: writer, download type, and what each loses that the user should hear. */
+const NETWORK_EXPORTS = {
+  graphml: {
+    name: 'GraphML',
+    type: 'application/graphml+xml',
+    write: (source) => toGraphML(source),
+    unplaced: (n) => `${n} nodes have no position yet and are written without coordinates.`,
+  },
+  cx2: {
+    name: 'CX2',
+    type: 'application/json',
+    write: (source, networkName) => toCX2(source, networkName),
+    unplaced: (n) =>
+      `${n} nodes have no position yet, so the CX2 file carries no coordinates (CX2 needs them on every node or none).`,
+    directed: (n) => `${n} edges have an arrow, which CX2 cannot carry; their source and target are kept.`,
+  },
+};
+
 /** Import notices beyond this many are merged into one message. */
 const MAX_SEPARATE_NOTICES = 3;
 // Grace period before revoking an SVG download's blob URL: long enough for
@@ -1493,7 +1511,9 @@ class IOManager {
     const nodeColumns = [];
     const edgeColumns = [];
     for (const propId of this.cache.data.filterDefaults.keys()) {
-      const [section, subGroup, key] = StaticUtilities.decodePropHashId(propId);
+      // A key may itself contain "::"; everything after the group is the key.
+      const [section, subGroup, ...keyParts] = StaticUtilities.decodePropHashId(propId);
+      const key = keyParts.join('::');
       const target = section === this.cache.CFG.EXCEL_NODE_HEADER ? nodeColumns : edgeColumns;
       target.push({ subGroup, key });
     }
@@ -1526,25 +1546,30 @@ class IOManager {
    * model only.
    */
   exportNetwork(format) {
+    const exporter = NETWORK_EXPORTS[format];
+    if (!exporter) throw new Error(`Unknown network export format "${format}".`);
     if (!this.cache.data?.nodes) {
       this.cache.ui.error('No graph data to export.');
       return;
     }
     try {
-      const source = this.interchangeSource();
-      if (format === 'graphml') {
-        this.downloadText(toGraphML(source), 'application/graphml+xml', 'graphml');
-        return;
-      }
       const label = document.getElementById('dataSourceLabel')?.textContent || '';
-      const { text, withCoordinates } = toCX2(source, label.replace(/\.[a-z0-9]+$/i, ''));
-      if (!withCoordinates) {
-        this.cache.ui.warning('Some nodes have no position yet, so the CX2 file carries no coordinates.');
-      }
-      this.downloadText(text, 'application/json', 'cx2');
+      const result = exporter.write(this.interchangeSource(), label.replace(/\.[a-z0-9]+$/i, ''));
+      this.downloadText(result.text, exporter.type, format);
+      this.reportNetworkExport(exporter, result);
     } catch (err) {
+      console.error(err);
       this.cache.ui.error(`Export failed: ${err.message}`);
     }
+  }
+
+  reportNetworkExport(exporter, { nodes, edges, unplaced, directed }) {
+    this.cache.ui.info(
+      `Exported ${nodes} nodes and ${edges} edges as ${exporter.name}: every node, with filters not applied; ` +
+        'styles, groups, workspaces and notes are not included.'
+    );
+    if (unplaced > 0) this.cache.ui.warning(exporter.unplaced(unplaced));
+    if (directed > 0 && exporter.directed) this.cache.ui.warning(exporter.directed(directed));
   }
 
   async loadFileWrapper(event) {
