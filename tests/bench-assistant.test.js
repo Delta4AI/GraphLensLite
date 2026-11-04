@@ -116,3 +116,14 @@ describe('assistant query benchmark', () => {
     );
   }, 30000);
 });
+
+describe('airports template', () => {
+  it('stores coordinates and altitude as numbers, so range queries match', async () => {
+    const { loadGraph, evaluateQuery } = await import('../bench/assistant/harness.mjs');
+    const cache = await loadGraph(AIRPORTS);
+    const high = evaluateQuery(cache, '(Node filters::geo::altitude_m BETWEEN 1000 AND 5000)');
+    const south = evaluateQuery(cache, '(Node filters::geo::lat BETWEEN -90 AND 0)');
+    expect(high.nodes).toContain('GKA'); // Goroka, 5282 ft = 1610 m
+    expect(south.nodes.length).toBeGreaterThan(0);
+  });
+});
