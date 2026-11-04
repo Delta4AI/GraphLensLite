@@ -89,5 +89,3 @@ Equivalent formulations score identically, because scoring compares selections r
 GLL's ranges are inclusive (`BETWEEN` and `LOWER THAN … OR GREATER THAN` both use ≤/≥). Inclusive thresholds are therefore worded "at least / at most". Strictly worded ones ("more than 8000 km", "below -1 or above 2", "go down") were checked to have no data value exactly on the threshold, so the strict and inclusive readings select the same set.
 
 `tests/bench-assistant.test.js` checks the gold set on every test run: each gold query must parse and select a non-empty set. The same file runs the whole pipeline against a stubbed Ollama and asserts the scoring.
-
-**Known data caveat**: in the airports template, `geo::altitude_m`, `geo::lat` and `geo::lon` are stored as text cells. The filter panel treats them as numeric, but the query evaluator's `BETWEEN` requires real numbers, so every range query on them selects nothing. The gold set avoids these properties.

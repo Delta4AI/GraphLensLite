@@ -84,6 +84,20 @@ const normalizeEquipment = (raw) => {
   return cleaned.length ? cleaned.join(" ") : "Unknown";
 };
 
+/** OpenFlights altitudes are in feet; the template column is in metres. */
+const METRES_PER_FOOT = 0.3048;
+
+/** A numeric cell, or an empty one when OpenFlights has no value. */
+const toNumber = (raw) => {
+  const value = Number(raw);
+  return raw === "" || raw === "\\N" || !Number.isFinite(value) ? "" : value;
+};
+
+const toMetres = (rawFeet) => {
+  const feet = toNumber(rawFeet);
+  return feet === "" ? "" : Math.round(feet * METRES_PER_FOOT);
+};
+
 // Simple CSV parser that respects quoted fields
 function parseCSV(text) {
   return text
@@ -154,9 +168,9 @@ async function main() {
       "icao [codes]": icao,
       "country [geo]": country,
       "region [geo]": regionFromTz(tz),
-      "lat [geo]": a[6] || "",
-      "lon [geo]": a[7] || "",
-      "altitude_m [geo]": a[8] || "",
+      "lat [geo]": toNumber(a[6]),
+      "lon [geo]": toNumber(a[7]),
+      "altitude_m [geo]": toMetres(a[8]),
       "zone [geo]": tz.split("/")[0] || "",
       "bio_risk_level [health]": pickFrom(["low", "medium", "high"], seed >> 3),
     };
@@ -193,9 +207,9 @@ async function main() {
         "icao [codes]": icao,
         "country [geo]": country,
         "region [geo]": regionFromTz(tz),
-        "lat [geo]": a[6] || "",
-        "lon [geo]": a[7] || "",
-        "altitude_m [geo]": a[8] || "",
+        "lat [geo]": toNumber(a[6]),
+        "lon [geo]": toNumber(a[7]),
+        "altitude_m [geo]": toMetres(a[8]),
         "zone [geo]": tz.split("/")[0] || "",
         "bio_risk_level [health]": pickFrom(["low", "medium", "high"], seed >> 3),
       };
