@@ -107,15 +107,6 @@
   abstract = {The Open Targets Platform (https://platform.opentargets.org) is a unique, open-source, publicly-available knowledge base providing data and tooling for systematic drug target identification, annotation, and prioritisation. Since our last report, we have expanded the scope of the Platform through a number of significant enhancements and data updates, with the aim to enable our users to formulate more flexible and impactful therapeutic hypotheses. In this context, we have completely revamped our target--disease associations page with more interactive facets and built-in functionalities to empower users with additional control over their experience using the Platform, and added a new Target Prioritisation view. This enables users to prioritise targets based upon clinical precedence, tractability, doability and safety attributes. We have also implemented a direction of effect assessment for eight sources of target--disease association evidence, showing the effect of genetic variation on the function of a target is associated with risk or protection for a trait to inform on potential mechanisms of modulation suitable for disease treatment. These enhancements and the introduction of new back and front-end technologies to support them have increased the impact and usability of our resource within the drug discovery community.},
 }
 
-@misc{claptonSheetJS,
-  title = {{{SheetJS}}},
-  author = {Clapton, Eric},
-  urldate = {2025-05-23},
-  abstract = {SheetJS Tools for Excel Spreadsheets},
-  howpublished = {https://sheetjs.com/},
-  langid = {american},
-}
-
 @inproceedings{dangBioLinkerBottomupExploration2017,
   title = {{{BioLinker}}: {{Bottom-up}} Exploration of Protein Interaction Networks},
   shorttitle = {{{BioLinker}}},
@@ -515,23 +506,6 @@
   abstract = {Proteins cooperate, regulate and bind each other to achieve their functions. Understanding the complex network of their interactions is essential for a systems-level description of cellular processes. The STRING database compiles, scores and integrates protein--protein association information drawn from experimental assays, computational predictions and prior knowledge. Its goal is to create comprehensive and objective global networks that encompass both physical and functional interactions. Additionally, STRING provides supplementary tools such as network clustering and pathway enrichment analysis. The latest version, STRING 12.5, introduces a new `regulatory network', for which it gathers evidence on the type and directionality of interactions using curated pathway databases and a fine-tuned language model parsing the literature. This update enables users to visualize and access three distinct network types---functional, physical and regulatory---separately, each applicable to distinct research needs. In addition, the pathway enrichment detection functionality has been updated, with better false discovery rate corrections, redundancy filtering~and improved visual displays. The resource now also offers improved annotations of clustered networks and provides users with downloadable network embeddings, which facilitate the use of STRING networks in machine learning and allow cross-species transfer of protein information. The STRING database is available online at https://string-db.org/.},
 }
 
-@misc{teamQwen35OmniTechnicalReport2026,
-  title = {Qwen3.5-{{Omni Technical Report}}},
-  author = {{Qwen Team}},
-  howpublished = {Preprint at arXiv:2604.15804},
-  year = 2026,
-  month = apr,
-  number = {arXiv:2604.15804},
-  eprint = {2604.15804},
-  primaryclass = {cs.CL},
-  publisher = {arXiv},
-  doi = {10.48550/arXiv.2604.15804},
-  urldate = {2026-05-29},
-  abstract = {In this work, we present Qwen3.5-Omni, the latest advancement in the Qwen-Omni model family. Representing a significant evolution over its predecessor, Qwen3.5-Omni scales to hundreds of billions of parameters and supports a 256k context length. By leveraging a massive dataset comprising heterogeneous text-vision pairs and over 100 million hours of audio-visual content, the model demonstrates robust omni-modality capabilities. Qwen3.5-Omni-plus achieves SOTA results across 215 audio and audio-visual understanding, reasoning, and interaction subtasks and benchmarks, surpassing Gemini-3.1 Pro in key audio tasks and matching it in comprehensive audio-visual understanding. Architecturally, Qwen3.5-Omni employs a Hybrid Attention Mixture-of-Experts (MoE) framework for both Thinker and Talker, enabling efficient long-sequence inference. The model facilitates sophisticated interaction, supporting over 10 hours of audio understanding and 400 seconds of 720P video (at 1 FPS). To address the inherent instability and unnaturalness in streaming speech synthesis, often caused by encoding efficiency discrepancies between text and speech tokenizers, we introduce ARIA. ARIA dynamically aligns text and speech units, significantly enhancing the stability and prosody of conversational speech with minimal latency impact. Furthermore, Qwen3.5-Omni expands linguistic boundaries, supporting multilingual understanding and speech generation across 10 languages with human-like emotional nuance. Finally, Qwen3.5-Omni exhibits superior audio-visual grounding capabilities, generating script-level structured captions with precise temporal synchronization and automated scene segmentation. Remarkably, we observed the emergence of a new capability in omnimodal models: directly performing coding based on audio-visual instructions, which we call Audio-Visual Vibe Coding.},
-  archiveprefix = {arXiv},
-  keywords = {Computer Science - Computation and Language,Electrical Engineering and Systems Science - Audio and Speech Processing},
-}
-
 @article{valenzuela-escarcegaLargescaleAutomatedMachine2018,
   title = {Large-Scale Automated Machine Reading Discovers New Cancer-Driving Mechanisms},
   author = {{Valenzuela-Esc{\'a}rcega}, Marco A and Babur, {\"O}zg{\"u}n and {Hahn-Powell}, Gus and others},
@@ -547,23 +521,6 @@
   urldate = {2025-05-26},
   abstract = {PubMed, a repository and search engine for biomedical literature, now indexes \&gt;1 million articles each year. This exceeds the processing capacity of human domain experts, limiting our ability to truly understand many diseases. We present Reach, a system for automated, large-scale machine reading of biomedical papers that can extract mechanistic descriptions of biological processes with relatively high precision at high throughput. We demonstrate that combining the extracted pathway fragments with existing biological data analysis algorithms that rely on curated models helps identify and explain a large number of previously unidentified mutually exclusive altered signaling pathways in seven different cancer types. This work shows that combining human-curated `big mechanisms' with extracted `big data' can lead to a causal, predictive understanding of cellular processes and unlock important downstream applications.},
   keywords = {REACH;biolinker},
-}
-
-@article{wangG6WebbasedLibrary2021,
-  title = {G6: {{A}} Web-Based Library for Graph Visualization},
-  shorttitle = {G6},
-  author = {Wang, Yanyan and Bai, Zhanning and Lin, Zhifeng and others},
-  year = 2021,
-  month = dec,
-  journal = {Visual Informatics},
-  volume = {5},
-  number = {4},
-  pages = {49--55},
-  issn = {2468-502X},
-  doi = {10.1016/j.visinf.2021.12.003},
-  urldate = {2025-05-23},
-  abstract = {Authoring graph visualization poses great challenges to developers due to its high requirements on both domain knowledge and development skills. Although existing libraries and tools reduce the difficulty of generating graph visualization, there are still many challenges. We work closely with developers and formulate several design goals, then design and implement G6, a web-based library for graph visualization. It combines template-based configuration for high usability and flexible customization for high expressiveness. To enhance development efficiency, G6 proposes a range of optimizations, including state management and interaction modes. We demonstrate its capabilities through an extensive gallery, a quantitative performance evaluation, and an expert interview. G6 was first released in 2017 and has been iterated for 317 versions. It has served as a web-based library for thousands of applications and received 8312 stars on GitHub.},
-  keywords = {Graph visualization,Node-link diagram,Visualization library,Web-based visualization},
 }
 
 @article{zhouOmicsNet20Webbased2022,
@@ -582,4 +539,145 @@
   pmcid = {PMC9252810},
   urldate = {2025-05-14},
   abstract = {Researchers are increasingly seeking to interpret molecular data within a multi-omics context to gain a more comprehensive picture of their study system. OmicsNet (www.omicsnet.ca) is a web-based tool developed to allow users to easily build, visualize, and analyze multi-omics networks to study rich relationships among lists of `omics features of interest. Three major improvements have been introduced in OmicsNet 2.0, which include: (i) enhanced network visual analytics with eleven 2D graph layout options and a novel 3D module layout; (ii) support for three new `omics types: single nucleotide polymorphism (SNP) list from genetic variation studies; taxon list from microbiome profiling studies, as well as liquid chromatography--mass spectrometry (LC--MS) peaks from~untargeted metabolomics;~and (iii) measures to improve research reproducibility by coupling R command history with the release of the companion OmicsNetR package, and generation of persistent links to share interactive network views. We performed a case study using the multi-omics data obtained from a recent large-scale investigation~on inflammatory bowel disease (IBD) and demonstrated that OmicsNet was able to quickly create meaningful multi-omics context to facilitate hypothesis generation and mechanistic insights.},
+}
+
+@article{blondelFastUnfoldingCommunities2008,
+  title = {Fast Unfolding of Communities in Large Networks},
+  author = {Blondel, Vincent D. and Guillaume, Jean-Loup and Lambiotte, Renaud and Lefebvre, Etienne},
+  year = 2008,
+  month = oct,
+  journal = {Journal of Statistical Mechanics: Theory and Experiment},
+  volume = {2008},
+  number = {10},
+  pages = {P10008},
+  doi = {10.1088/1742-5468/2008/10/P10008}
+}
+
+@article{bonacichFactoringWeightingApproaches1972,
+  title = {Factoring and Weighting Approaches to Status Scores and Clique Identification},
+  author = {Bonacich, Phillip},
+  year = 1972,
+  journal = {The Journal of Mathematical Sociology},
+  volume = {2},
+  number = {1},
+  pages = {113--120},
+  doi = {10.1080/0022250X.1972.9989806}
+}
+
+@article{collinsBubbleSetsRevealing2009,
+  title = {Bubble {{Sets}}: Revealing Set Relations with Isocontours over Existing Visualizations},
+  author = {Collins, C. and Penn, G. and Carpendale, S.},
+  year = 2009,
+  month = nov,
+  journal = {IEEE Transactions on Visualization and Computer Graphics},
+  volume = {15},
+  number = {6},
+  pages = {1009--1016},
+  doi = {10.1109/TVCG.2009.122}
+}
+
+@article{franzCytoscapejsGraphTheory2016,
+  title = {{{Cytoscape.js}}: A Graph Theory Library for Visualisation and Analysis},
+  author = {Franz, Max and Lopes, Christian T. and Huck, Gerardo and others},
+  year = 2016,
+  journal = {Bioinformatics},
+  volume = {32},
+  number = {2},
+  pages = {309--311},
+  doi = {10.1093/bioinformatics/btv557}
+}
+
+@article{franzCytoscapejs2023Update2023,
+  title = {{{Cytoscape.js}} 2023 Update: A Graph Theory Library for Visualization and Analysis},
+  author = {Franz, Max and Lopes, Christian T. and Fong, Dylan and others},
+  year = 2023,
+  journal = {Bioinformatics},
+  volume = {39},
+  number = {1},
+  pages = {btad031},
+  doi = {10.1093/bioinformatics/btad031}
+}
+
+@article{franzGeneMANIAUpdate20182018,
+  title = {{{GeneMANIA}} Update 2018},
+  author = {Franz, Max and Rodriguez, Harold and Lopes, Christian and others},
+  year = 2018,
+  journal = {Nucleic Acids Research},
+  volume = {46},
+  number = {W1},
+  pages = {W60--W64},
+  doi = {10.1093/nar/gky311}
+}
+
+@article{freemanCentralitySocialNetworks1978,
+  title = {Centrality in Social Networks Conceptual Clarification},
+  author = {Freeman, Linton C.},
+  year = 1978,
+  journal = {Social Networks},
+  volume = {1},
+  number = {3},
+  pages = {215--239},
+  doi = {10.1016/0378-8733(78)90021-7}
+}
+
+@article{jacomyForceAtlas2ContinuousGraph2014,
+  title = {{{ForceAtlas2}}, a Continuous Graph Layout Algorithm for Handy Network Visualization Designed for the {{Gephi}} Software},
+  author = {Jacomy, Mathieu and Venturini, Tommaso and Heymann, Sebastien and Bastian, Mathieu},
+  year = 2014,
+  month = jun,
+  journal = {PLoS ONE},
+  volume = {9},
+  number = {6},
+  pages = {e98679},
+  doi = {10.1371/journal.pone.0098679}
+}
+
+@article{karatzasArena3DwebInteractive3D2021,
+  title = {{{Arena3Dweb}}: Interactive {{3D}} Visualization of Multilayered Networks},
+  author = {Karatzas, Evangelos and Baltoumas, Fotis A. and Panayiotou, Nikolaos A. and others},
+  year = 2021,
+  journal = {Nucleic Acids Research},
+  volume = {49},
+  number = {W1},
+  pages = {W36--W45},
+  doi = {10.1093/nar/gkab278}
+}
+
+@misc{ouestwareRetina,
+  title = {Retina: A Free Open Source Web Application to Share Network Visualizations Online},
+  author = {{OuestWare}},
+  howpublished = {\url{https://gitlab.com/ouestware/retina}},
+  year = 2025,
+  note = {GPL-3.0; last updated September 2025, accessed 2026-11-04}
+}
+
+@article{prattNDExNetworkData2015,
+  title = {{{NDEx}}, the {{Network Data Exchange}}},
+  author = {Pratt, Dexter and Chen, Jing and Welker, David and others},
+  year = 2015,
+  month = oct,
+  journal = {Cell Systems},
+  volume = {1},
+  number = {4},
+  pages = {302--305},
+  doi = {10.1016/j.cels.2015.10.001}
+}
+
+@misc{qwen3.5,
+  title = {{Qwen3.5}: Towards Native Multimodal Agents},
+  author = {{Qwen Team}},
+  month = feb,
+  year = {2026},
+  url = {https://qwen.ai/blog?id=qwen3.5}
+}
+
+@article{zhouNetworkAnalyst30Visual2019,
+  title = {{{NetworkAnalyst}} 3.0: A Visual Analytics Platform for Comprehensive Gene Expression Profiling and Meta-Analysis},
+  author = {Zhou, Guangyan and Soufan, Othman and Ewald, Jessica and others},
+  year = 2019,
+  journal = {Nucleic Acids Research},
+  volume = {47},
+  number = {W1},
+  pages = {W234--W241},
+  doi = {10.1093/nar/gkz240}
 }
