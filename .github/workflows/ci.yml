@@ -39,6 +39,16 @@ jobs:
       - name: Run tests
         run: npm test
 
+  container:
+    name: Container build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t graph-lens-lite .
+
   perf:
     name: Renderer perf gates
     runs-on: ubuntu-latest

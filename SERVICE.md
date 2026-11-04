@@ -33,6 +33,41 @@ Open the viewer URL in a browser. POST a graph (see [API.md](API.md)) and it
 renders immediately; subsequent pushes replace the current graph live via
 Server-Sent Events.
 
+## Running in a container
+
+The [`Dockerfile`](Dockerfile) builds the single-file viewer (vendor libs,
+production bundle, inline HTML) and runs this service on `node:22-alpine` as
+the unprivileged `node` user. Nothing besides Docker or Podman is needed on the
+host.
+
+```bash
+# Docker
+docker build -t graph-lens-lite .
+docker run --rm -p 8080:8080 -e GLL_API_TOKEN=<long random string> graph-lens-lite
+
+# Podman (--format docker keeps the HEALTHCHECK; the OCI default drops it)
+podman build --format docker -t graph-lens-lite .
+podman run --rm -p 8080:8080 -e GLL_API_TOKEN=<long random string> graph-lens-lite
+```
+
+Open `http://localhost:8080/`. Without `-e GLL_API_TOKEN` the viewer works as
+usual, but the ingest endpoint gets a random per-run token that is printed only
+when the container has a terminal (`docker run -it`), so in practice nothing can
+push to it. Pass the token from your shell or secret store (`-e GLL_API_TOKEN`
+without a value forwards it from the environment); the image never contains
+one. Don't pass a `.env` copied from `.env.example` with `--env-file`: its
+`GLL_API_HOST=127.0.0.1` makes the container unreachable from outside.
+
+The image sets `GLL_API_HOST=0.0.0.0` (required inside a container; the
+published port decides what is reachable), `GLL_API_PORT=8080` and
+`GLL_STATIC_DIR=/app/web`. Every variable in [Configuration](#configuration)
+can be overridden with `-e`; if you change `GLL_API_PORT`, publish that port
+instead (`-p 9000:9000 -e GLL_API_PORT=9000`). An invalid value stops the
+container at start with an error naming the variable. Publish to loopback only
+(`-p 127.0.0.1:8080:8080`) unless a firewall or reverse proxy protects the
+port. No volumes are needed: graphs live in memory and are gone on restart.
+The healthcheck polls `GET /health`.
+
 ## Deploying as a systemd service
 
 On a Linux host, from the checkout, as your normal user (commands that need

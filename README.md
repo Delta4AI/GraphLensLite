@@ -28,6 +28,17 @@ Then:
 1. (Optional) Download a [template](templates/simple-template.xlsx) and add your data
 2. Launch Graph Lens Lite and load a demo or your file
 
+### Container
+
+Run it on any OS with only Docker or Podman installed: the image builds the app from source and serves the viewer together with the [ingest service](SERVICE.md).
+
+```bash
+docker build -t graph-lens-lite .
+docker run --rm -p 8080:8080 graph-lens-lite    # open http://localhost:8080/
+```
+
+With Podman, use `podman build --format docker -t graph-lens-lite .` (the `docker` format keeps the healthcheck) and `podman run` the same way. To push graphs to it, pass `-e GLL_API_TOKEN=<long random string>`; see [SERVICE.md](SERVICE.md#running-in-a-container).
+
 ## Features
 
 |                            <img src="./static/screenshots/launch_screen.png" alt="Launch screen" width="100%">                            |                                 <img src="./static/screenshots/query_editor.png" alt="Query editor" width="100%">                                  |      <img src="./static/screenshots/selection_panel_and_active_clusters.png" alt="Selection tools and bubble sets" width="100%">       |
