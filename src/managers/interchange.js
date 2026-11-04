@@ -210,15 +210,24 @@ class GraphImport {
 
 // ----------------------------------------------------------------- export
 
+/**
+ * A value that survives a trip through Number unchanged. Text such as "007",
+ * "0x1F", "1e3" or a 20-digit id slides as a number in GLL but would be
+ * rewritten by the conversion, so it is exported as text.
+ */
+function isCanonicalNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value !== 'string') return false;
+  const n = Number(value);
+  return Number.isFinite(n) && String(n) === value.trim();
+}
+
 /** Column type of a set of GLL values: 'boolean' | 'long' | 'double' | 'string'. */
 function inferColumnType(values) {
   if (values.length === 0) return 'string';
   const isBool = (v) => typeof v === 'boolean' || /^(true|false)$/i.test(String(v).trim());
   if (values.every(isBool)) return 'boolean';
-  // Same test the filter classification uses (isNaN), so a column that
-  // slides in GLL is numeric in the file.
-  const isNum = (v) => typeof v !== 'boolean' && String(v).trim() !== '' && !isNaN(v);
-  if (!values.every(isNum)) return 'string';
+  if (!values.every(isCanonicalNumber)) return 'string';
   return values.every((v) => Number.isInteger(Number(v))) ? 'long' : 'double';
 }
 

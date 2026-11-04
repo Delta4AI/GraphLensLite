@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { GraphImport } from '../src/managers/interchange.js';
+import { GraphImport, interchangeGraph } from '../src/managers/interchange.js';
+import { CFG } from '../src/config.js';
 
 const PARALLEL_EDGES = 50_000;
 const BUDGET_MS = 1000;
@@ -22,5 +23,28 @@ describe('GraphImport edge ids', () => {
     importer.addEdge('a', 'b', {}, [], 'Edge 2');
     importer.addEdge('a', 'b', {}, [], 'Edge 3');
     expect(importer.edges.map((e) => e.id)).toEqual(['a::b::2', 'a::b', 'a::b::3']);
+  });
+});
+
+describe('interchangeGraph column types', () => {
+  const columnOf = (values) => {
+    const nodes = values.map((value, i) => ({ id: `n${i}`, D4Data: { [CFG.EXCEL_NODE_HEADER]: { g: { v: value } } } }));
+    const graph = interchangeGraph(
+      { nodes, edges: [], nodeColumns: [{ subGroup: 'g', key: 'v' }], edgeColumns: [] },
+      { node: [], edge: [] }
+    );
+    return { type: graph.nodeColumns[0].type, values: graph.nodes.map((n) => n.values[0][1]) };
+  };
+
+  it.each([['007'], ['0x1F'], ['1e3'], ['12345678901234567890'], ['Infinity']])(
+    'exports "%s" as the text it is, not as a number',
+    (text) => {
+      expect(columnOf([text, '2'])).toEqual({ type: 'string', values: [text, '2'] });
+    }
+  );
+
+  it('still exports plain numbers as numbers', () => {
+    expect(columnOf([3, '-2', '0.5'])).toEqual({ type: 'double', values: [3, -2, 0.5] });
+    expect(columnOf(['7', 8])).toEqual({ type: 'long', values: [7, 8] });
   });
 });
