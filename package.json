@@ -47,6 +47,7 @@
     "format:check": "prettier --check .",
     "perf:fixture": "node scripts/generate_benchmark_fixture.js",
     "perf": "node scripts/perf_benchmark.js",
+    "perf:sweep": "node scripts/perf_benchmark.js --sweep",
     "notices": "node scripts/gen_third_party_notices.mjs"
   },
   "build": {

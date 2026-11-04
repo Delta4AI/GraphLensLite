@@ -1,13 +1,34 @@
 #!/usr/bin/env node
 /* global window, document, requestAnimationFrame */ // browser globals run inside page.evaluate() callbacks
-// Renderer performance benchmark (MIGRATION.md Phase 0 acceptance gates).
-// Boots the app in headless chromium against the benchmark fixture and
-// measures: load time, first-interaction stall, wheel-zoom FPS, drag-pan FPS
-// and 500-node select time. Prints a gate table and writes JSON results to
-// scripts/fixtures/perf_results_<timestamp>.json.
+// Renderer performance benchmark (MIGRATION.md Phase 0 acceptance gates) and
+// size x styling sweep (bench/render/README.md).
 //
-// Run: node scripts/perf_benchmark.js [--assert]
-//   --assert  exit 1 when any acceptance gate fails (CI mode)
+// Gate mode (default): boots the app in headless chromium against the
+// 6000x9000 benchmark fixture and measures load time, first-interaction stall,
+// wheel-zoom FPS, drag-pan FPS and 500-node select time. Prints a gate table
+// and writes JSON results to scripts/fixtures/perf_results_<timestamp>.json.
+//
+// Sweep mode (--sweep): the same measurements, one fresh browser per run, over
+// node count x edge/node ratio x styling variant (plain | heavy | overlays, see
+// scripts/generate_benchmark_fixture.js), N runs per cell, median + IQR, plus
+// JS heap and an environment block. Writes bench/render/results/sweep_<ts>.json
+// and the .md/.csv tables from it (scripts/perf_sweep_report.js).
+//
+// Run: node scripts/perf_benchmark.js [--assert] [--chromium <path>]
+//      node scripts/perf_benchmark.js --sweep [--sizes 1000,5000,...]
+//           [--ratios 1.5,5] [--variants plain,heavy,overlays] [--runs 3]
+//           [--timeout-ms 240000] [--chromium <path>]
+//   --assert      exit 1 when any acceptance gate fails (CI mode; gate mode only)
+//   --chromium    chromium executable to use instead of playwright's pinned
+//                 build (e.g. an already-installed ~/.cache/ms-playwright one)
+//   --sweep       run the sweep instead of the gates
+//   --sizes       node counts (multiples of 8); default 1000,5000,10000,25000,50000,100000
+//   --ratios      edges per node; default 1.5,5
+//   --variants    styling variants; default plain,heavy,overlays
+//   --runs        runs per cell (fresh browser each); default 3
+//   --timeout-ms  per-run budget; a run that exceeds it is recorded as a
+//                 timeout and the larger sizes of that ratio x variant series
+//                 are skipped (they would only time out slower)
 //
 // Fixture loading choice: the harness calls window.renderGraphData(data)
 // (src/managers/api_client.js) instead of page.setInputFiles on #fileInput.
@@ -19,15 +40,28 @@
 
 const fs = require('fs');
 const http = require('http');
+const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { chromium } = require('playwright');
+const { ensureFixtureFile, VARIANTS } = require('./generate_benchmark_fixture.js');
+const { writeReports, summarizeRuns, SWEEP_METRICS } = require('./perf_sweep_report.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC_DIR = path.join(ROOT, 'src');
 const FIXTURE_DIR = path.join(__dirname, 'fixtures');
 const FIXTURE_FILE = path.join(FIXTURE_DIR, 'benchmark_6000x9000.json');
 const FIXTURE_URL_PATH = '/__fixtures__/benchmark_6000x9000.json';
+const SWEEP_RESULTS_DIR = path.join(ROOT, 'bench', 'render', 'results');
+const VIEWPORT = { width: 1600, height: 900 };
+
+const SWEEP_DEFAULTS = {
+  sizes: [1000, 5000, 10000, 25000, 50000, 100000],
+  ratios: [1.5, 5],
+  variants: VARIANTS,
+  runs: 3,
+  timeoutMs: 240000,
+};
 
 const LOAD_RUNS = 3;
 const SELECT_RUNS = 3;
@@ -95,10 +129,17 @@ function run(cmd, args) {
   }
 }
 
-function ensurePreconditions() {
+function ensurePreconditions(executablePath) {
   run('node', [path.join(SRC_DIR, 'package', 'vendor_libs.js')]);
   if (!fs.existsSync(FIXTURE_FILE)) {
     run('node', [path.join(__dirname, 'generate_benchmark_fixture.js')]);
+  }
+  if (executablePath) {
+    if (!fs.existsSync(executablePath)) {
+      console.error(`[perf] --chromium ${executablePath} does not exist`);
+      process.exit(1);
+    }
+    return;
   }
   // Only download chromium when the pinned revision is actually missing.
   if (!fs.existsSync(chromium.executablePath())) {
@@ -142,15 +183,24 @@ function startServer() {
  * after the render pipeline resolves (render + fitView + overlay hidden + one
  * rAF as the painted-frame marker). Runs entirely in-page.
  */
-async function measureLoadOnce(page) {
-  return page.evaluate(async (fixtureUrl) => {
-    const data = await (await fetch(fixtureUrl)).json();
-    const t0 = performance.now();
-    const ok = await window.renderGraphData(data);
-    if (!ok) throw new Error('renderGraphData reported failure');
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    return performance.now() - t0;
-  }, FIXTURE_URL_PATH);
+async function measureLoadOnce(page, fixtureUrl = FIXTURE_URL_PATH, { heatmap = false } = {}) {
+  return page.evaluate(
+    async ({ url, withHeatmap }) => {
+      const data = await (await fetch(url)).json();
+      const t0 = performance.now();
+      const ok = await window.renderGraphData(data);
+      if (!ok) throw new Error('renderGraphData reported failure');
+      // The heatmap is a workspace toggle, not payload data: switch it on the
+      // way the Overlays row does, and count its first paint as part of load.
+      if (withHeatmap) {
+        window.cache.ui.setOverlayVisible('heatmap', true);
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      return performance.now() - t0;
+    },
+    { url: fixtureUrl, withHeatmap: heatmap }
+  );
 }
 
 /** Center of the graph container (Node-side geometry for real mouse input). */
@@ -168,18 +218,23 @@ async function containerCenter(page) {
  */
 async function installFrameCounter(page) {
   await page.evaluate(() => {
-    window.__fps = { frames: 0, start: 0, running: false };
+    window.__fps = { frames: 0, renders: 0, start: 0, running: false };
     const loop = () => {
       if (window.__fps.running) window.__fps.frames++;
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
+    // Frames sigma actually drew (rAF can tick without a sigma render).
+    window.cache.graph?.sigma.on('afterRender', () => {
+      if (window.__fps.running) window.__fps.renders++;
+    });
   });
 }
 
 async function startFrameCounter(page) {
   await page.evaluate(() => {
     window.__fps.frames = 0;
+    window.__fps.renders = 0;
     window.__fps.running = true;
     window.__fps.start = performance.now();
   });
@@ -189,7 +244,11 @@ async function stopFrameCounter(page) {
   return page.evaluate(() => {
     window.__fps.running = false;
     const elapsed = performance.now() - window.__fps.start;
-    return { fps: window.__fps.frames / (elapsed / 1000), elapsedMs: elapsed };
+    return {
+      fps: window.__fps.frames / (elapsed / 1000),
+      renderFps: window.__fps.renders / (elapsed / 1000),
+      elapsedMs: elapsed,
+    };
   });
 }
 
@@ -377,38 +436,303 @@ function printTable(rows) {
   console.log('');
 }
 
-async function main() {
-  const assertGates = process.argv.includes('--assert');
-  ensurePreconditions();
-
-  const server = await startServer();
-  const baseUrl = `http://127.0.0.1:${server.address().port}`;
-  console.log(`[perf] serving src/ at ${baseUrl}`);
-
-  // The sigma renderer is WebGL: measured through SwiftShader (headless
-  // default) a bare 6000x9000 sigma scene caps at ~8 fps, on the real GPU at
-  // ~60 fps — software GL emulation is the bottleneck, not the renderer. The
-  // Vulkan flags pick the hardware GPU when present and fall back to
-  // SwiftShader's Vulkan device otherwise (verified 2026-06-10, chromium
-  // headless + AMD Radeon 890M/RADV). FPS gates are calibrated against the
-  // idle rAF ceiling (see measureIdleFpsCeiling) because headless rAF is
-  // pinned to 60 Hz.
-  const browser = await chromium.launch({
+// The sigma renderer is WebGL: measured through SwiftShader (headless
+// default) a bare 6000x9000 sigma scene caps at ~8 fps, on the real GPU at
+// ~60 fps — software GL emulation is the bottleneck, not the renderer. The
+// Vulkan flags pick the hardware GPU when present and fall back to
+// SwiftShader's Vulkan device otherwise (verified 2026-06-10, chromium
+// headless + AMD Radeon 890M/RADV). FPS gates are calibrated against the
+// idle rAF ceiling (see measureIdleFpsCeiling) because headless rAF is
+// pinned to 60 Hz. --enable-precise-memory-info un-buckets performance.memory.
+function launchBrowser(executablePath) {
+  return chromium.launch({
     headless: true,
+    executablePath,
     args: [
       '--enable-gpu',
       '--use-angle=vulkan',
       '--enable-features=Vulkan',
       '--ignore-gpu-blocklist',
+      '--enable-precise-memory-info',
     ],
   });
-  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
-  page.on('pageerror', (err) => console.error(`[perf] page error: ${err.message}`));
+}
 
+async function openAppPage(browser, baseUrl, onPageError = () => {}) {
+  const page = await browser.newPage({ viewport: VIEWPORT });
+  page.on('pageerror', (err) => {
+    console.error(`[perf] page error: ${err.message}`);
+    onPageError(err);
+  });
   const gotoApp = async () => {
     await page.goto(`${baseUrl}/graph_lens_lite.html`, { waitUntil: 'load' });
     await page.waitForFunction(() => typeof window.renderGraphData === 'function');
   };
+  return { page, gotoApp };
+}
+
+/** Value of `--name <value>` on the command line, or undefined. */
+function cliValue(name) {
+  const i = process.argv.indexOf(name);
+  return i === -1 ? undefined : process.argv[i + 1];
+}
+
+function cliList(name, fallback, parse = Number) {
+  const raw = cliValue(name);
+  if (raw === undefined) return fallback;
+  const list = raw.split(',').map((v) => parse(v.trim()));
+  if (list.some((v) => (typeof v === 'number' ? !(v > 0) : !v))) {
+    throw new Error(`${name} expects a comma-separated list, got "${raw}"`);
+  }
+  return list;
+}
+
+/** Host + browser facts that decide whether the numbers mean anything. */
+async function collectEnvironment(browser, baseUrl, executablePath) {
+  const { page, gotoApp } = await openAppPage(browser, baseUrl);
+  await gotoApp();
+  const pageEnv = await page.evaluate(() => {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const ext = gl?.getExtension('WEBGL_debug_renderer_info');
+    return {
+      webgl2: !!gl,
+      glVendor: gl ? String(gl.getParameter(ext ? ext.UNMASKED_VENDOR_WEBGL : gl.VENDOR)) : null,
+      userAgent: navigator.userAgent,
+      screen: { width: window.screen.width, height: window.screen.height },
+      devicePixelRatio: window.devicePixelRatio,
+      hardwareConcurrency: navigator.hardwareConcurrency,
+    };
+  });
+  const renderer = await detectRenderer(page);
+  await installFrameCounter(page);
+  const idleFpsCeiling = await measureIdleFpsCeiling(page);
+  await page.close();
+
+  const osRelease = fs.existsSync('/etc/os-release')
+    ? fs.readFileSync('/etc/os-release', 'utf8').match(/^PRETTY_NAME="?([^"\n]*)/m)?.[1]
+    : undefined;
+  const git = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ROOT, encoding: 'utf8' });
+  return {
+    cpu: os.cpus()[0]?.model,
+    cpuThreads: os.cpus().length,
+    memoryGB: Math.round(os.totalmem() / 2 ** 30),
+    os: `${osRelease ?? os.type()} (${os.platform()} ${os.release()})`,
+    node: process.version,
+    browser: `chromium ${browser.version()} (headless)`,
+    browserExecutable: executablePath ?? chromium.executablePath(),
+    renderer,
+    ...pageEnv,
+    viewport: VIEWPORT,
+    idleFpsCeiling,
+    nonRepresentative: isSoftwareRenderer(renderer) || idleFpsCeiling < REALTIME_FPS_FLOOR,
+    gllVersion: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
+    gitCommit: git.status === 0 ? git.stdout.trim() : null,
+  };
+}
+
+/**
+ * One sweep run in its own browser: fresh app → timed load → overlay/heap
+ * snapshot → stall → idle ceiling → wheel-zoom → drag-pan → 500-node select.
+ * A fresh browser per run keeps runs independent (no warm JIT, no leftover
+ * WebGL contexts) and lets a timeout kill a wedged renderer outright.
+ */
+async function sweepRunOnce(browser, baseUrl, fixtureUrl, variant) {
+  const pageErrors = [];
+  const { page, gotoApp } = await openAppPage(browser, baseUrl, (err) =>
+    pageErrors.push(err.message)
+  );
+  await gotoApp();
+  // The overlays fixture's groups have avoidance off, but the app estimates
+  // the avoidance cost from membership alone and would block on a confirm
+  // popup; lifting the budget skips the question, not any work.
+  await page.evaluate(() => {
+    window.cache.CFG.AVOID_FIT_CONFIRM_MS = Infinity;
+  });
+  const loadMs = await measureLoadOnce(page, fixtureUrl, { heatmap: variant === 'overlays' });
+  const state = await page.evaluate(() => {
+    const adapter = window.cache.graph;
+    return {
+      nodes: adapter.graph.order,
+      edges: adapter.graph.size,
+      labelsOn: adapter.sigma.getSetting('renderLabels'),
+      bubbleOutlines: adapter.bubbleLayer.outlines.size,
+      flowActive: adapter.flowAnimator.hasFlow,
+      heatmapOn: !!adapter.heatmapLayer.heatmapEnabled,
+      heapUsedMB: performance.memory ? performance.memory.usedJSHeapSize / 2 ** 20 : null,
+    };
+  });
+  await installFrameCounter(page);
+  const stall = await measureFirstInteractionStall(page);
+  // No input, graph loaded: the environment's idle ceiling for static variants,
+  // the sustained edge-flow animation rate for the overlays variant.
+  const settled = await measureIdleFpsCeiling(page);
+  const renderer = await detectRenderer(page);
+  const wheel = await measureWheelZoomFps(page);
+  const drag = await measureDragPanFps(page);
+  const select500Ms = await measureSelectOnce(page);
+  return {
+    loadMs,
+    firstInteractionStallMs: stall.stallMs,
+    settledFps: settled,
+    wheelZoomFps: wheel.fps,
+    wheelZoomRenderFps: wheel.renderFps,
+    dragPanFps: drag.fps,
+    dragPanRenderFps: drag.renderFps,
+    select500Ms,
+    heapUsedMB: state.heapUsedMB,
+    renderer,
+    state,
+    zoomChanged: wheel.zoomChanged,
+    pageErrors,
+  };
+}
+
+/** Why a cell's numbers don't stand for a real desktop (empty = they do). */
+function cellCaveats(runs, variant, expected, environment) {
+  const caveats = new Set();
+  if (environment.idleFpsCeiling < REALTIME_FPS_FLOOR) {
+    caveats.add(`idle rAF ceiling ${environment.idleFpsCeiling.toFixed(1)} fps`);
+  }
+  for (const r of runs) {
+    if (isSoftwareRenderer(r.renderer)) caveats.add(`software renderer (${r.renderer})`);
+    if (!r.zoomChanged) caveats.add('wheel did not change zoom');
+    if (r.state.nodes !== expected.nodes || r.state.edges !== expected.edges) {
+      caveats.add(
+        `loaded ${r.state.nodes}/${r.state.edges} of ${expected.nodes}/${expected.edges}`
+      );
+    }
+    if (variant !== 'plain' && !r.state.labelsOn) caveats.add('labels not on');
+    if (variant === 'overlays') {
+      if (r.state.bubbleOutlines === 0) caveats.add('no bubble outline drawn');
+      if (!r.state.flowActive) caveats.add('edge flow not active');
+      if (!r.state.heatmapOn) caveats.add('heatmap not on');
+    }
+    if (r.pageErrors.length) caveats.add(`page errors: ${r.pageErrors[0]}`);
+  }
+  return [...caveats];
+}
+
+async function runSweep(executablePath) {
+  const sizes = [...cliList('--sizes', SWEEP_DEFAULTS.sizes)].sort((a, b) => a - b);
+  const ratios = cliList('--ratios', SWEEP_DEFAULTS.ratios);
+  const variants = cliList('--variants', SWEEP_DEFAULTS.variants, String);
+  const runs = Number(cliValue('--runs') ?? SWEEP_DEFAULTS.runs);
+  const timeoutMs = Number(cliValue('--timeout-ms') ?? SWEEP_DEFAULTS.timeoutMs);
+  const unknown = variants.filter((v) => !VARIANTS.includes(v));
+  if (unknown.length) throw new Error(`unknown --variants ${unknown.join(', ')}`);
+  if (!(runs >= 1) || !(timeoutMs > 0)) throw new Error('--runs and --timeout-ms must be positive');
+
+  const server = await startServer();
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const envBrowser = await launchBrowser(executablePath);
+  const environment = await collectEnvironment(envBrowser, baseUrl, executablePath);
+  await envBrowser.close();
+  console.log(`[perf] environment: ${JSON.stringify(environment, null, 2)}`);
+  if (environment.nonRepresentative) {
+    console.warn(
+      '[perf] NON-REPRESENTATIVE environment: no hardware GPU; FPS/load are lower bounds.'
+    );
+  }
+
+  const startedAt = new Date().toISOString();
+  const outFile = path.join(SWEEP_RESULTS_DIR, `sweep_${startedAt.replace(/[:.]/g, '-')}.json`);
+  fs.mkdirSync(SWEEP_RESULTS_DIR, { recursive: true });
+  const report = {
+    kind: 'gll-render-sweep',
+    startedAt,
+    config: { sizes, ratios, variants, runs, timeoutMs, fpsWindowMs: FPS_WINDOW_MS },
+    environment,
+    cells: [],
+  };
+  const save = () => fs.writeFileSync(outFile, JSON.stringify(report, null, 2));
+
+  try {
+    for (const ratio of ratios) {
+      for (const variant of variants) {
+        let blockedBy = null; // first size of this series that timed out
+        for (const nodeCount of sizes) {
+          const edgeCount = Math.round(nodeCount * ratio);
+          const cell = { nodes: nodeCount, edges: edgeCount, ratio, variant, runs: [] };
+          report.cells.push(cell);
+          const tag = `${nodeCount}x${edgeCount} ${variant}`;
+          if (blockedBy !== null) {
+            cell.status = 'skipped';
+            cell.reason = `${blockedBy} nodes already exceeded the ${timeoutMs} ms run budget`;
+            console.log(`[perf] ${tag}: skipped (${cell.reason})`);
+            save();
+            continue;
+          }
+          const fixtureFile = ensureFixtureFile({ nodeCount, edgeCount, variant });
+          const fixtureUrl = `/__fixtures__/${path.basename(fixtureFile)}`;
+
+          for (let i = 0; i < runs && !cell.status; i++) {
+            const browser = await launchBrowser(executablePath);
+            let timer;
+            const attempt = sweepRunOnce(browser, baseUrl, fixtureUrl, variant);
+            attempt.catch(() => {}); // a timed-out run rejects once the browser dies
+            try {
+              const result = await Promise.race([
+                attempt,
+                new Promise((_, reject) => {
+                  timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+                }),
+              ]);
+              cell.runs.push(result);
+              console.log(
+                `[perf] ${tag} run ${i + 1}/${runs}: load ${Math.round(result.loadMs)} ms, ` +
+                  `zoom ${result.wheelZoomFps.toFixed(1)} fps, pan ${result.dragPanFps.toFixed(1)} fps, ` +
+                  `select ${Math.round(result.select500Ms)} ms, heap ${Math.round(result.heapUsedMB)} MB`
+              );
+            } catch (err) {
+              cell.status = err.message === 'timeout' ? 'timeout' : 'error';
+              cell.reason =
+                err.message === 'timeout' ? `run ${i + 1} exceeded ${timeoutMs} ms` : err.message;
+              console.warn(`[perf] ${tag} run ${i + 1}: ${cell.status} — ${cell.reason}`);
+            } finally {
+              clearTimeout(timer);
+              await browser.close().catch(() => {});
+            }
+          }
+          if (cell.status === 'timeout') blockedBy = nodeCount;
+          cell.status ??= 'ok';
+          if (cell.runs.length) {
+            cell.summary = summarizeRuns(cell.runs, SWEEP_METRICS);
+            cell.caveats = cellCaveats(
+              cell.runs,
+              variant,
+              { nodes: nodeCount, edges: edgeCount },
+              environment
+            );
+            cell.nonRepresentative = cell.caveats.length > 0 || cell.runs.length < runs;
+          }
+          save();
+        }
+      }
+    }
+  } finally {
+    server.close();
+  }
+  report.finishedAt = new Date().toISOString();
+  save();
+  const { mdFile, csvFile } = writeReports(outFile);
+  console.log(`[perf] sweep results: ${path.relative(process.cwd(), outFile)}`);
+  console.log(
+    `[perf] tables: ${path.relative(process.cwd(), mdFile)}, ${path.relative(process.cwd(), csvFile)}`
+  );
+}
+
+async function main() {
+  const executablePath = cliValue('--chromium');
+  ensurePreconditions(executablePath);
+  if (process.argv.includes('--sweep')) return runSweep(executablePath);
+
+  const assertGates = process.argv.includes('--assert');
+  const server = await startServer();
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  console.log(`[perf] serving src/ at ${baseUrl}`);
+
+  const browser = await launchBrowser(executablePath);
+  const { page, gotoApp } = await openAppPage(browser, baseUrl);
 
   try {
     // Reload the page between load runs: re-applying a graph into a running
