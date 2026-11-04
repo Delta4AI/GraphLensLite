@@ -29,6 +29,8 @@ Look for these markers when reviewing the draft:
   the comment block lists the angles to consider.
 - `% TODO(authors)` / `% CONFIRM(authors)` — a fact or wording only the
   authors can supply or sign off.
+- `% NOTE(authors, <date>)` — a recorded author decision (e.g. details
+  deliberately left to reviewer request); no action needed.
 - `% TODO(figure)` — a change needed in a figure image.
 - `% TODO(freeze)` — a version-dependent fact (versions, counts, sizes,
   screenshots) to update once at release freeze.
