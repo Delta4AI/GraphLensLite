@@ -4,7 +4,7 @@ import { sanitizeAnnotations, MAX_ANNOTATIONS } from '../graph/annotation_geomet
 import { StaticUtilities } from '../utilities/static.js';
 import { FILTER_LINKS, visibilitySettings } from '../graph/visibility_rule.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
-import { excelData, EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from './excel_schema.js';
+import { excelData, EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES, decodeKey } from './excel_schema.js';
 import { ExcelTemplate } from './excel_template.js';
 
 /** A header whose group or key is spelled like a prototype key (the data
@@ -94,7 +94,7 @@ function normalizeD4DataBooleans(fileData) {
 // ------------------------------------------------------ Excel parsing helpers
 // Pure functions lifted out of IOManager.parseExcelToJson, which was a
 // 500-line method with a dozen helper closures trapped inside it — none of
-// them reachable by a test, though these five are where the actual cell
+// them reachable by a test, though these are where the actual cell
 // decoding happens.
 
   function getOrNull(row, key) {
@@ -150,40 +150,6 @@ function normalizeD4DataBooleans(fileData) {
     });
 
     return { headers: headers, jsonData: jsonData };
-  }
-
-/**
- * Split a column header into its property key and its sub-group: the LAST
- * bracketed segment names the group, everything before it is the key.
- *
- * @returns {{subGroup: string, key: string}|null} null for a reserved name
- */
-  function decodeKey(key, uncategorizedSubGroup) {
-    let subGroup = uncategorizedSubGroup;
-    let trimmedKey;
-
-    const matches = key.match(/\[.*?\]/g);
-    if (matches && matches.length >= 2) {
-      const lastBracketContent = matches[matches.length - 1];
-      subGroup = lastBracketContent.substring(1, lastBracketContent.length - 1).trim();
-
-      // For multiple brackets, preserve all except the last one in the key
-      const lastBracketIndex = key.lastIndexOf(matches[matches.length - 1]);
-      trimmedKey = key.substring(0, lastBracketIndex).trim();
-    } else if (matches && matches.length === 1) {
-      const bracketContent = matches[0];
-      subGroup = bracketContent.substring(1, bracketContent.length - 1).trim();
-      trimmedKey = key.substring(0, key.indexOf('[')).trim();
-    } else {
-      trimmedKey = key.trim();
-    }
-
-    // Both halves become live object keys in D4Data; a column named
-    // `__proto__` would land its properties on a prototype instead (see
-    // UNSAFE_OBJECT_KEYS). Refused here, the one place every header and cell
-    // key is decoded.
-    if (UNSAFE_OBJECT_KEYS.has(subGroup) || UNSAFE_OBJECT_KEYS.has(trimmedKey)) return null;
-    return { subGroup: subGroup, key: trimmedKey };
   }
 
   function validateUserData(row, key, uncategorizedSubGroup) {
