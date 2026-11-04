@@ -78,9 +78,18 @@ The rendering and graph-operation core. Key modules:
 
 Business logic and UI:
 
-- `io.js` — `IOManager`: Excel/JSON loading, export (JSON / PNG / SVG), data
-  preprocessing; the Excel column schema lives in `excel_schema.js` and the
-  downloadable workbook in `excel_template.js`
+- `io.js` — `IOManager`: Excel/JSON/GraphML/CX2 loading, export (JSON / PNG /
+  SVG / GraphML / CX2), data preprocessing; the Excel column schema lives in
+  `excel_schema.js` and the downloadable workbook in `excel_template.js`
+- `graphml.js` / `cx2.js` — GraphML (Cytoscape, Gephi, yEd, NetworkX, igraph)
+  and CX2 (Cytoscape, NDEx) readers and writers. Both carry nodes, edges, typed
+  attributes and positions only — styles, workspaces and groups stay JSON-only.
+  `interchange.js` is their shared half: `GraphImport` builds the same file
+  data the Excel importer produces (unbracketed attributes land in a group
+  named after the format; `name [group]` decodes like an Excel header), and
+  `interchangeGraph` turns the loaded graph into typed, named columns. Files are
+  untrusted: size and element caps, no DTDs, and plain-language errors for
+  missing ids and dangling edges
 - `ui.js` — loading overlays, UI enable/disable, notifications, presentation mode,
   and the inspector's overlay layer stack (`OVERLAYS`: one table row per thing
   drawn over the graph, each layer answering `visible`/`setVisible`)

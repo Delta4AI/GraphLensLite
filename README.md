@@ -39,15 +39,26 @@ docker run --rm -p 8080:8080 graph-lens-lite    # open http://localhost:8080/
 
 With Podman, use `podman build --format docker -t graph-lens-lite .` (the `docker` format keeps the healthcheck) and `podman run` the same way. To push graphs to it, pass `-e GLL_API_TOKEN=<long random string>`; see [SERVICE.md](SERVICE.md#running-in-a-container).
 
+## File formats
+
+| Format | Open | Export | What travels |
+|--------|:----:|:------:|--------------|
+| Excel (`.xlsx`, `.xls`) | ✓ | ✓ | nodes, edges, properties, styling columns, coordinates ([template](templates/simple-template.xlsx)) |
+| JSON model (`.json`) | ✓ | ✓ | everything — workspaces, styles, filters, groups, notes |
+| GraphML (`.graphml`) | ✓ | ✓ | nodes, edges, typed attributes, labels, positions, edge direction |
+| CX2 (`.cx2`) | ✓ | ✓ | nodes, edges, typed attributes, names, positions |
+
+GraphML and CX2 are for exchange with Cytoscape, Gephi, yEd, NetworkX, igraph and NDEx. They carry data, not looks: GLL styles, workspaces and groups are not written, and visual styles in a file you open are skipped with a note saying so. Attributes land in a property group named after the format; one named `score [omics]` lands in group *omics*, as an Excel column header would.
+
 ## Features
 
 |                            <img src="./static/screenshots/launch_screen.png" alt="Launch screen" width="100%">                            |                                 <img src="./static/screenshots/query_editor.png" alt="Query editor" width="100%">                                  |      <img src="./static/screenshots/selection_panel_and_active_clusters.png" alt="Selection tools and bubble sets" width="100%">       |
 |:-----------------------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------:|
-|          Open Excel or JSON files, fetch a graph straight from a Neo4j server, explore demo networks, or take a tour; zero install with portable versions          |                 Write expressive queries with boolean logic, nested conditions, and range operators to filter your graph                  | Lasso select elements, undo and redo, focus and expand neighborhoods, and group nodes visually |
+|          Open Excel, JSON, GraphML or CX2 (Cytoscape, Gephi, NDEx, NetworkX) files, fetch a graph straight from a Neo4j server, explore demo networks, or take a tour; zero install with portable versions          |                 Write expressive queries with boolean logic, nested conditions, and range operators to filter your graph                  | Lasso select elements, undo and redo, focus and expand neighborhoods, and group nodes visually |
 |                  <img src="./static/screenshots/main_view_with_popup.png" alt="Graph canvas with filters" width="100%">                   |              <img src="./static/screenshots/network_metrics_and_data_editor.png" alt="Network metrics and data editor" width="100%">               |                           <img src="./static/screenshots/rich_styling.png" alt="Styling panel" width="100%">                           |
 | Filter by any property using range sliders and dropdown checklists, inspect node and edge metadata via tooltips, and navigate large graphs with a minimap | Compute centrality metrics like degree, betweenness, closeness, eigenvector, and PageRank, and edit your graph data live in a built-in spreadsheet |       Customize shapes, sizes, colors, labels, halos, badges, arrows, pie-chart nodes, animated edge flow, and bubble set appearance per element, with an optional density-heatmap overlay        |
 |                     <img src="./static/screenshots/workspace_management.png" alt="Workspace management" width="100%">                     |                       <img src="./static/screenshots/graph_assistant.png" alt="Graph Assistant" width="100%">                       |         <img src="./static/screenshots/property_based_numerical_color_mapping.png" alt="Numerical color mapping" width="100%">         |
-|                    Create independent workspaces, each preserving their own node positions, styles, filters, and bubble set groups                     |                        Ask questions in plain English — the assistant translates them into filters, queries, and styling actions                        |         Map numeric properties to continuous color gradients with configurable stops, and export graphs as JSON, PNG, SVG, or Excel         |
+|                    Create independent workspaces, each preserving their own node positions, styles, filters, and bubble set groups                     |                        Ask questions in plain English — the assistant translates them into filters, queries, and styling actions                        |         Map numeric properties to continuous color gradients with configurable stops, and export graphs as JSON, PNG, SVG, Excel, GraphML, or CX2         |
 
 ## Development
 

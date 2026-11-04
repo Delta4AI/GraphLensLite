@@ -259,7 +259,8 @@ class Rail {
       menuItem({
         icon: '📂',
         label: 'Open graph file…',
-        title: 'Load graph data from Excel (.xlsx, .xls) or a saved model (.json)',
+        title:
+          'Load graph data from Excel (.xlsx, .xls), a saved model (.json), GraphML (.graphml) or CX2 (.cx2)',
         onClick: this.#closeAnd(() =>
           this.#replacingGraph('Opening a file', () =>
             document.getElementById('fileInput')?.click()
@@ -498,6 +499,20 @@ class Rail {
         label: 'Excel data',
         title: 'Export the data table and styling properties as Excel',
         onClick: this.#closeAnd(() => this.cache.dataTable.exportToExcel()),
+      }),
+      menuSeparator(),
+      menuItem({
+        icon: '🔗',
+        label: 'GraphML',
+        title:
+          'Export nodes, edges, properties and positions as GraphML for Cytoscape, Gephi, yEd, NetworkX or igraph',
+        onClick: this.#closeAnd(() => this.cache.io.exportNetwork('graphml')),
+      }),
+      menuItem({
+        icon: '🔗',
+        label: 'CX2 (Cytoscape, NDEx)',
+        title: 'Export nodes, edges, properties and positions as CX2 for Cytoscape or NDEx',
+        onClick: this.#closeAnd(() => this.cache.io.exportNetwork('cx2')),
       })
     );
   }

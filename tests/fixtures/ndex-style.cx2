@@ -1,0 +1,58 @@
+[
+  { "CXVersion": "2.0", "hasFragments": false },
+  {
+    "metaData": [
+      { "name": "attributeDeclarations", "elementCount": 1 },
+      { "name": "networkAttributes", "elementCount": 1 },
+      { "name": "nodes", "elementCount": 3 },
+      { "name": "edges", "elementCount": 3 },
+      { "name": "visualProperties", "elementCount": 1 },
+      { "name": "nodeBypasses", "elementCount": 1 }
+    ]
+  },
+  {
+    "attributeDeclarations": [
+      {
+        "networkAttributes": { "name": { "d": "string" }, "description": { "d": "string" } },
+        "nodes": {
+          "name": { "d": "string" },
+          "stringdb::canonical name": { "d": "string", "a": "cn" },
+          "expression": { "d": "double", "v": 0.0 },
+          "is_target": { "d": "boolean" },
+          "alias": { "d": "list_of_string" }
+        },
+        "edges": {
+          "interaction": { "d": "string", "a": "i", "v": "pp" },
+          "stringdb::score": { "d": "double" },
+          "evidence_count": { "d": "integer" }
+        }
+      }
+    ]
+  },
+  { "networkAttributes": [{ "name": "p53 core", "description": "Hand-written sample shaped after an NDEx CX2 download" }] },
+  {
+    "nodes": [
+      { "id": 101, "x": 0, "y": 0, "v": { "name": "TP53", "cn": "9606.ENSP00000269305", "expression": 2.5, "is_target": true, "alias": ["P53", "LFS1"] } },
+      { "id": 102, "x": 150.5, "y": -75, "v": { "name": "MDM2", "cn": "9606.ENSP00000258149", "is_target": false } },
+      { "id": 103, "x": -60, "y": 210, "v": { "name": "ATM" } }
+    ]
+  },
+  {
+    "edges": [
+      { "id": 201, "s": 101, "t": 102, "v": { "stringdb::score": 0.999, "evidence_count": 12 } },
+      { "id": 202, "s": 103, "t": 101, "v": { "i": "phosphorylation", "stringdb::score": 0.97 } },
+      { "id": 203, "s": 102, "t": 101, "v": { "stringdb::score": 0.8 } }
+    ]
+  },
+  {
+    "visualProperties": [
+      {
+        "default": { "network": { "NETWORK_BACKGROUND_COLOR": "#FFFFFF" }, "node": { "NODE_SHAPE": "ellipse" }, "edge": { "EDGE_WIDTH": 2 } },
+        "nodeMapping": {},
+        "edgeMapping": {}
+      }
+    ]
+  },
+  { "nodeBypasses": [{ "id": 101, "v": { "NODE_BACKGROUND_COLOR": "#C33D35" } }] },
+  { "status": [{ "error": "", "success": true }] }
+]
