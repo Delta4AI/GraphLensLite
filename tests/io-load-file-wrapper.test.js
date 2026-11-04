@@ -89,3 +89,50 @@ describe('IOManager.loadFileWrapper', () => {
     expect(cache.ui.hideLoading).toHaveBeenCalled();
   });
 });
+
+/** A real IOManager over makeCache's spies, so loadFile parses for real. */
+function realIO(cache, events) {
+  const io = new IOManager(cache);
+  io.preProcessData = vi.fn();
+  io.restoreHeatmapFromImport = vi.fn();
+  cache.io = io;
+  cache.gcm.destroyGraphAndRollBackUI = vi.fn(async () => events.push('clear log'));
+  cache.graph.render = vi.fn(async () => events.push('render'));
+  cache.ui.warning = vi.fn((message) => events.push(message));
+  return io;
+}
+
+const graphmlEvent = (text) => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  Object.defineProperty(input, 'files', { value: [new File([text], 'net.graphml')], configurable: true });
+  return { target: input };
+};
+
+const GRAPHML_WITH_SKIPS = `<graphml xmlns="http://graphml.graphdrawing.org/xmlns"><graph>
+  <node id="a"><data key="nope">1</data></node><hyperedge/></graph></graphml>`;
+
+describe('IOManager.loadFileWrapper import notices', () => {
+  it('shows what a file left out after the new graph is up, not before the log is cleared', async () => {
+    const events = [];
+    const cache = makeCache(null);
+    const io = realIO(cache, events);
+
+    await io.loadFileWrapper(graphmlEvent(GRAPHML_WITH_SKIPS));
+
+    const notice = events.findIndex((e) => e.startsWith('Not loaded from this GraphML file'));
+    expect(notice).toBeGreaterThan(events.indexOf('clear log'));
+    expect(notice).toBeGreaterThan(events.indexOf('render'));
+  });
+
+  it('merges more than three notices into one message', () => {
+    const cache = makeCache(null);
+    const io = realIO(cache, []);
+    io.importNotices = ['a', 'b', 'c', 'd'].map((notice) => ({ file: 'net.graphml', notice }));
+
+    io.reportImportNotices();
+
+    expect(cache.ui.warning).toHaveBeenCalledOnce();
+    expect(cache.ui.warning).toHaveBeenCalledWith('4 notes on net.graphml:\n• a\n• b\n• c\n• d');
+  });
+});
