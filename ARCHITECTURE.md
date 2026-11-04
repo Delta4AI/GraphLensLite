@@ -197,7 +197,8 @@ npm start                # Electron app
 npm run serve:api        # standalone ingest service (HTTP API + live viewer)
 npm test                 # vitest unit tests
 npm run test:watch       # vitest in watch mode
-npm run perf             # performance benchmark
+npm run perf             # performance benchmark (acceptance gates)
+npm run perf:sweep       # render sweep: size × styling, see bench/render/README.md
 npm run dist-linux       # build Linux packages
 npm run dist-windows     # build Windows packages
 npm run dist-mac         # build macOS packages
