@@ -17,6 +17,7 @@ import {
   checkAttributeValues,
   interchangeGraph,
   isBlank,
+  exportSummary,
   toCoordinate,
   MAX_IMPORT_ELEMENTS,
 } from './interchange.js';
@@ -288,7 +289,7 @@ function elementLines(tag, attributes, element, keys) {
  * edge shows an end arrow; other edges in a mixed graph say so one by one.
  *
  * @param {object} source see interchangeGraph
- * @returns {string}
+ * @returns {{text: string, nodes: number, edges: number, unplaced: number, directed: number}}
  */
 function toGraphML(source) {
   const graph = interchangeGraph(source, { node: NODE_BUILTINS, edge: EDGE_BUILTINS });
@@ -328,7 +329,7 @@ function toGraphML(source) {
     lines.push(...elementLines('edge', attributes, edge, edgeKeys));
   }
   lines.push('  </graph>', '</graphml>', '');
-  return lines.join('\n');
+  return { text: lines.join('\n'), ...exportSummary(graph) };
 }
 
 export { parseGraphML, toGraphML };

@@ -388,8 +388,19 @@ function interchangeGraph(source, reserved) {
   };
 }
 
+/** What an export carried, for the message after it. */
+function exportSummary(graph) {
+  return {
+    nodes: graph.nodes.length,
+    edges: graph.edges.length,
+    unplaced: graph.nodes.filter((node) => !node.position).length,
+    directed: graph.edges.filter((edge) => edge.directed).length,
+  };
+}
+
 export {
   GraphImport,
+  exportSummary,
   coerceValue,
   checkImportSize,
   checkElementCount,

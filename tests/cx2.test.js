@@ -35,9 +35,9 @@ function sampleGraph() {
 
 describe('CX2 export', () => {
   it('writes a CX2 document with declarations, integer ids and coordinates', () => {
-    const { text, withCoordinates } = toCX2(sampleGraph(), 'demo');
+    const { text, unplaced } = toCX2(sampleGraph(), 'demo');
     const doc = JSON.parse(text);
-    expect(withCoordinates).toBe(true);
+    expect(unplaced).toBe(0);
     expect(doc[0]).toEqual({ CXVersion: '2.0', hasFragments: false });
     expect(doc.at(-1)).toEqual({ status: [{ error: '', success: true }] });
     const aspect = (name) => doc.find((entry) => name in entry)[name];
@@ -60,8 +60,8 @@ describe('CX2 export', () => {
   it('leaves coordinates out unless every node has one', () => {
     const graph = sampleGraph();
     graph.positions.delete('B');
-    const { text, withCoordinates } = toCX2(graph);
-    expect(withCoordinates).toBe(false);
+    const { text, unplaced } = toCX2(graph);
+    expect(unplaced).toBe(1);
     const nodes = JSON.parse(text).find((entry) => 'nodes' in entry).nodes;
     expect(nodes.some((node) => 'x' in node)).toBe(false);
   });

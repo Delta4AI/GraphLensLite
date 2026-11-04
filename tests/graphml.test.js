@@ -54,7 +54,7 @@ function sampleGraph() {
 describe('GraphML round trip', () => {
   it('keeps nodes, edges, typed attributes, groups, labels and positions', () => {
     const source = sampleGraph();
-    const text = toGraphML(source);
+    const { text } = toGraphML(source);
     expect(text).toContain('attr.name="score [omics]" attr.type="double"');
     expect(text).toContain('attr.name="count [omics]" attr.type="long"');
     expect(text).toContain('attr.name="hit [omics]" attr.type="boolean"');
@@ -215,5 +215,52 @@ describe('GraphML hostile and broken input', () => {
     const result = await io.loadFile({ target: { files: [file] } });
     expect(result).toBeNull();
     expect(ui.error).toHaveBeenCalledWith(expect.stringMatching(/^Could not open broken\.graphml: The file is not well-formed XML/));
+  });
+});
+
+describe('IOManager.exportNetwork', () => {
+  function exportingIO() {
+    const ui = { info: vi.fn(), warning: vi.fn(), error: vi.fn() };
+    const data = {
+      nodes: [
+        { id: 'A', style: {}, D4Data: { [NODE]: { omics: { 'a::b': 5 } } } },
+        { id: 'B', style: {}, D4Data: { [NODE]: {} } },
+      ],
+      edges: [{ id: 'A::B', source: 'A', target: 'B', style: { endArrow: true }, D4Data: {} }],
+      filterDefaults: new Map([[`${NODE}::omics::a::b`, {}]]),
+      layouts: { Default: { positions: new Map([['A', { style: { x: 1, y: 2 } }]]) } },
+      selectedLayout: 'Default',
+    };
+    const io = new IOManager({ ui, CFG, data });
+    io.downloadText = vi.fn();
+    return { io, ui };
+  }
+
+  it('says what the file holds and what it leaves out', () => {
+    const { io, ui } = exportingIO();
+    io.exportNetwork('graphml');
+
+    const [text, type, ext] = io.downloadText.mock.calls[0];
+    expect([type, ext]).toEqual(['application/graphml+xml', 'graphml']);
+    expect(text).toContain('attr.name="a::b [omics]"');
+    expect(ui.info).toHaveBeenCalledWith(
+      'Exported 2 nodes and 1 edges as GraphML: every node, with filters not applied; ' +
+        'styles, groups, workspaces and notes are not included.'
+    );
+    expect(ui.warning).toHaveBeenCalledWith('1 nodes have no position yet and are written without coordinates.');
+  });
+
+  it('warns that CX2 drops arrows', () => {
+    const { io, ui } = exportingIO();
+    io.exportNetwork('cx2');
+    expect(ui.warning).toHaveBeenCalledWith(
+      '1 edges have an arrow, which CX2 cannot carry; their source and target are kept.'
+    );
+  });
+
+  it('refuses a format it does not know instead of guessing one', () => {
+    const { io } = exportingIO();
+    expect(() => io.exportNetwork('pdf')).toThrow(/Unknown network export format "pdf"/);
+    expect(io.downloadText).not.toHaveBeenCalled();
   });
 });
