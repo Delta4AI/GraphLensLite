@@ -27,6 +27,11 @@ Look for these markers when reviewing the draft:
   verbatim from the prior draft.
 - `% TODO` — structural placeholder. The heading exists, the body is empty,
   the comment block lists the angles to consider.
+- `% TODO(authors)` / `% CONFIRM(authors)` — a fact or wording only the
+  authors can supply or sign off.
+- `% TODO(figure)` — a change needed in a figure image.
+- `% TODO(freeze)` — a version-dependent fact (versions, counts, sizes,
+  screenshots) to update once at release freeze.
 
 ## Prerequisites
 
@@ -110,6 +115,16 @@ into this directory, or build on Overleaf.
 
 Note: the OUP class does not define the `description` environment — use
 `itemize` in the body.
+
+### Supplementary note: query-language grammar
+
+```bash
+cd supplement && latexmk -pdf dsl_grammar
+```
+
+Standalone `article` document (`supplement/dsl_grammar.tex`) with the EBNF
+grammar of the query DSL, derived from `src/managers/query.js`. Re-check its
+examples whenever the query parser changes.
 
 ### Clean auxiliary files
 
