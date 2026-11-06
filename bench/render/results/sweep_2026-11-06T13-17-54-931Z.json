@@ -1,0 +1,5142 @@
+{
+  "kind": "gll-render-sweep",
+  "startedAt": "2026-11-06T13:17:54.931Z",
+  "config": {
+    "sizes": [
+      1000,
+      5000,
+      10000,
+      25000,
+      50000,
+      100000
+    ],
+    "ratios": [
+      1.5,
+      5
+    ],
+    "variants": [
+      "plain",
+      "heavy",
+      "overlays"
+    ],
+    "runs": 3,
+    "timeoutMs": 240000,
+    "fpsWindowMs": 3000
+  },
+  "environment": {
+    "cpu": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+    "cpuThreads": 24,
+    "memoryGB": 62,
+    "os": "Fedora Linux 44 (KDE Plasma Desktop Edition) (linux 7.2.15-200.fc44.x86_64)",
+    "node": "v22.22.2",
+    "browser": "chromium 148.0.7778.96 (headless)",
+    "browserExecutable": "/home/glory/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome",
+    "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+    "webgl2": true,
+    "glVendor": "Google Inc. (AMD)",
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/148.0.7778.96 Safari/537.36",
+    "screen": {
+      "width": 1600,
+      "height": 900
+    },
+    "devicePixelRatio": 1,
+    "hardwareConcurrency": 24,
+    "viewport": {
+      "width": 1600,
+      "height": 900
+    },
+    "idleFpsCeiling": 59.69555268129206,
+    "nonRepresentative": false,
+    "gllVersion": "1.18.0",
+    "gitCommit": "c931484"
+  },
+  "cells": [
+    {
+      "nodes": 1000,
+      "edges": 1500,
+      "ratio": 1.5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 855.5,
+          "firstInteractionStallMs": 75.5,
+          "settledFps": 59.75500448164751,
+          "wheelZoomFps": 59.85634477254219,
+          "wheelZoomRenderFps": 58.85873902633315,
+          "dragPanFps": 59.98939414025879,
+          "dragPanRenderFps": 59.65796102346178,
+          "select500Ms": 30.299999999813735,
+          "heapUsedMB": 27.269500732421875,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 27.269500732421875
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 841.7000000001863,
+          "firstInteractionStallMs": 81.79999999981374,
+          "settledFps": 59.695552681347365,
+          "wheelZoomFps": 59.750492449113594,
+          "wheelZoomRenderFps": 58.76559422193041,
+          "dragPanFps": 60.09096643538474,
+          "dragPanRenderFps": 59.758972145686485,
+          "select500Ms": 29.59999999962747,
+          "heapUsedMB": 27.30247402191162,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 27.30247402191162
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 838.5,
+          "firstInteractionStallMs": 75.19999999925494,
+          "settledFps": 59.77881837201242,
+          "wheelZoomFps": 59.890146251071684,
+          "wheelZoomRenderFps": 58.566607107401595,
+          "dragPanFps": 60.01923268229228,
+          "dragPanRenderFps": 59.687634711671876,
+          "select500Ms": 26.799999999813735,
+          "heapUsedMB": 27.069689750671387,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 27.069689750671387
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 841.7000000001863,
+          "q1": 840.1000000000931,
+          "q3": 848.6000000000931,
+          "iqr": 8.5,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 75.5,
+          "q1": 75.34999999962747,
+          "q3": 78.64999999990687,
+          "iqr": 3.3000000002793968,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.75500448164751,
+          "q1": 59.725278581497435,
+          "q3": 59.766911426829964,
+          "iqr": 0.0416328453325292,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.85634477254219,
+          "q1": 59.80341861082789,
+          "q3": 59.873245511806935,
+          "iqr": 0.06982690097904509,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.76559422193041,
+          "q1": 58.666100664666004,
+          "q3": 58.81216662413178,
+          "iqr": 0.14606595946577272,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 60.01923268229228,
+          "q1": 60.00431341127553,
+          "q3": 60.055099558838506,
+          "iqr": 0.05078614756297384,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.687634711671876,
+          "q1": 59.67279786756683,
+          "q3": 59.72330342867918,
+          "iqr": 0.05050556111235238,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 29.59999999962747,
+          "q1": 28.199999999720603,
+          "q3": 29.949999999720603,
+          "iqr": 1.75,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 27.269500732421875,
+          "q1": 27.16959524154663,
+          "q3": 27.285987377166748,
+          "iqr": 0.11639213562011719,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 5000,
+      "edges": 7500,
+      "ratio": 1.5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 1291.7000000001863,
+          "firstInteractionStallMs": 96.59999999962747,
+          "settledFps": 59.71337579618941,
+          "wheelZoomFps": 59.78778620937768,
+          "wheelZoomRenderFps": 59.13077756971418,
+          "dragPanFps": 59.97150525163729,
+          "dragPanRenderFps": 59.64017096847907,
+          "select500Ms": 58.59999999962747,
+          "heapUsedMB": 87.3193531036377,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 87.3193531036377
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1336.3999999994412,
+          "firstInteractionStallMs": 98,
+          "settledFps": 59.838436222244525,
+          "wheelZoomFps": 60.0137736529732,
+          "wheelZoomRenderFps": 59.357885416328685,
+          "dragPanFps": 60.0085726532288,
+          "dragPanRenderFps": 59.678855221068204,
+          "select500Ms": 56.799999999813735,
+          "heapUsedMB": 88.38940238952637,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 88.38940238952637
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1353.1000000005588,
+          "firstInteractionStallMs": 94.8999999994412,
+          "settledFps": 59.76690905466454,
+          "wheelZoomFps": 59.72020588623833,
+          "wheelZoomRenderFps": 58.73036821961559,
+          "dragPanFps": 59.95914871185928,
+          "dragPanRenderFps": 59.6297028398161,
+          "select500Ms": 46.30000000074506,
+          "heapUsedMB": 87.6058177947998,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 87.6058177947998
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1336.3999999994412,
+          "q1": 1314.0499999998137,
+          "q3": 1344.75,
+          "iqr": 30.700000000186265,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 96.59999999962747,
+          "q1": 95.74999999953434,
+          "q3": 97.29999999981374,
+          "iqr": 1.5500000002793968,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.76690905466454,
+          "q1": 59.740142425426974,
+          "q3": 59.80267263845453,
+          "iqr": 0.06253021302755712,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.78778620937768,
+          "q1": 59.753996047808,
+          "q3": 59.900779931175435,
+          "iqr": 0.14678388336743353,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 59.13077756971418,
+          "q1": 58.93057289466489,
+          "q3": 59.244331493021434,
+          "iqr": 0.31375859835654296,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.97150525163729,
+          "q1": 59.965326981748284,
+          "q3": 59.990038952433046,
+          "iqr": 0.02471197068476272,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.64017096847907,
+          "q1": 59.63493690414758,
+          "q3": 59.65951309477364,
+          "iqr": 0.02457619062605687,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 56.799999999813735,
+          "q1": 51.5500000002794,
+          "q3": 57.6999999997206,
+          "iqr": 6.1499999994412065,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 87.6058177947998,
+          "q1": 87.46258544921875,
+          "q3": 87.99761009216309,
+          "iqr": 0.5350246429443359,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 10000,
+      "edges": 15000,
+      "ratio": 1.5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 1967.9000000003725,
+          "firstInteractionStallMs": 168.90000000037253,
+          "settledFps": 59.743104650016065,
+          "wheelZoomFps": 59.98342999171499,
+          "wheelZoomRenderFps": 59.32062966031483,
+          "dragPanFps": 60.00461573967965,
+          "dragPanRenderFps": 59.67492004880229,
+          "select500Ms": 80.90000000037253,
+          "heapUsedMB": 161.95717525482178,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 161.95717525482178
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1941.8999999994412,
+          "firstInteractionStallMs": 168,
+          "settledFps": 59.77286312015455,
+          "wheelZoomFps": 59.75964078181308,
+          "wheelZoomRenderFps": 58.76914949813663,
+          "dragPanFps": 60.0026374785668,
+          "dragPanRenderFps": 59.67295265725599,
+          "select500Ms": 68.90000000037253,
+          "heapUsedMB": 136.33721542358398,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 136.33721542358398
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1950.699999999255,
+          "firstInteractionStallMs": 159.29999999981374,
+          "settledFps": 59.79669124972865,
+          "wheelZoomFps": 59.74508762613221,
+          "wheelZoomRenderFps": 59.08125331917518,
+          "dragPanFps": 59.992748129361736,
+          "dragPanRenderFps": 59.66311764513448,
+          "select500Ms": 62.200000000186265,
+          "heapUsedMB": 148.99328231811523,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 148.99328231811523
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1950.699999999255,
+          "q1": 1946.299999999348,
+          "q3": 1959.2999999998137,
+          "iqr": 13.000000000465661,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 168,
+          "q1": 163.64999999990687,
+          "q3": 168.45000000018626,
+          "iqr": 4.800000000279397,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.77286312015455,
+          "q1": 59.75798388508531,
+          "q3": 59.7847771849416,
+          "iqr": 0.026793299856294084,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.75964078181308,
+          "q1": 59.75236420397265,
+          "q3": 59.87153538676404,
+          "iqr": 0.1191711827913906,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 59.08125331917518,
+          "q1": 58.92520140865591,
+          "q3": 59.200941489745006,
+          "iqr": 0.2757400810890971,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 60.0026374785668,
+          "q1": 59.99769280396427,
+          "q3": 60.00362660912322,
+          "iqr": 0.005933805158953476,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.67295265725599,
+          "q1": 59.668035151195234,
+          "q3": 59.67393635302914,
+          "iqr": 0.005901201833907521,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 68.90000000037253,
+          "q1": 65.5500000002794,
+          "q3": 74.90000000037253,
+          "iqr": 9.350000000093132,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 148.99328231811523,
+          "q1": 142.6652488708496,
+          "q3": 155.4752287864685,
+          "iqr": 12.809979915618896,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 25000,
+      "edges": 37500,
+      "ratio": 1.5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 4161.399999999441,
+          "firstInteractionStallMs": 273,
+          "settledFps": 59.772863120099096,
+          "wheelZoomFps": 59.80392156862745,
+          "wheelZoomRenderFps": 58.8235294117647,
+          "dragPanFps": 31.143136297018255,
+          "dragPanRenderFps": 13.434294088909835,
+          "select500Ms": 150.69999999925494,
+          "heapUsedMB": 350.4223442077637,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 350.4223442077637
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 4036.2000000001863,
+          "firstInteractionStallMs": 310.59999999962747,
+          "settledFps": 59.72526378660387,
+          "wheelZoomFps": 59.79850503737406,
+          "wheelZoomRenderFps": 58.82352941176471,
+          "dragPanFps": 32.422277437729214,
+          "dragPanRenderFps": 13.332525301496126,
+          "select500Ms": 159.69999999925494,
+          "heapUsedMB": 365.8704071044922,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 365.8704071044922
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 4094.199999999255,
+          "firstInteractionStallMs": 292.09999999962747,
+          "settledFps": 59.85634477257925,
+          "wheelZoomFps": 59.88219895287958,
+          "wheelZoomRenderFps": 58.90052356020942,
+          "dragPanFps": 31.207930485861088,
+          "dragPanRenderFps": 13.462244523312625,
+          "select500Ms": 163.20000000018626,
+          "heapUsedMB": 352.07480239868164,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 352.07480239868164
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 4094.199999999255,
+          "q1": 4065.1999999997206,
+          "q3": 4127.799999999348,
+          "iqr": 62.59999999962747,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 292.09999999962747,
+          "q1": 282.54999999981374,
+          "q3": 301.34999999962747,
+          "iqr": 18.799999999813735,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.772863120099096,
+          "q1": 59.74906345335148,
+          "q3": 59.814603946339176,
+          "iqr": 0.06554049298769371,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.80392156862745,
+          "q1": 59.80121330300076,
+          "q3": 59.84306026075352,
+          "iqr": 0.04184695775276026,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.82352941176471,
+          "q1": 58.82352941176471,
+          "q3": 58.862026485987066,
+          "iqr": 0.03849707422235582,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 31.207930485861088,
+          "q1": 31.17553339143967,
+          "q3": 31.815103961795153,
+          "iqr": 0.639570570355481,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 13.434294088909835,
+          "q1": 13.383409695202982,
+          "q3": 13.44826930611123,
+          "iqr": 0.06485961090824865,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 159.69999999925494,
+          "q1": 155.19999999925494,
+          "q3": 161.4499999997206,
+          "iqr": 6.250000000465661,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 352.07480239868164,
+          "q1": 351.24857330322266,
+          "q3": 358.9726047515869,
+          "iqr": 7.724031448364258,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 50000,
+      "edges": 75000,
+      "ratio": 1.5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 7692.799999999814,
+          "firstInteractionStallMs": 637.7999999998137,
+          "settledFps": 59.72526378660387,
+          "wheelZoomFps": 42.208006331193175,
+          "wheelZoomRenderFps": 41.21875618280583,
+          "dragPanFps": 57.57913154127565,
+          "dragPanRenderFps": 27.358040400827104,
+          "select500Ms": 560,
+          "heapUsedMB": 804.7727880477905,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 804.7727880477905
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 7758.700000000186,
+          "firstInteractionStallMs": 638.3999999994412,
+          "settledFps": 59.87426404547105,
+          "wheelZoomFps": 41.94604213671341,
+          "wheelZoomRenderFps": 40.99272299724265,
+          "dragPanFps": 57.172223292856266,
+          "dragPanRenderFps": 30.192072974879153,
+          "select500Ms": 496.70000000018626,
+          "heapUsedMB": 809.2360601425171,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 809.2360601425171
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 7673.0999999996275,
+          "firstInteractionStallMs": 630.0999999996275,
+          "settledFps": 59.6896140071517,
+          "wheelZoomFps": 37.51390875854395,
+          "wheelZoomRenderFps": 36.56016531553012,
+          "dragPanFps": 13.502065021708537,
+          "dragPanRenderFps": 5.294927459493544,
+          "select500Ms": 406.30000000074506,
+          "heapUsedMB": 792.8972005844116,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 792.8972005844116
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 7692.799999999814,
+          "q1": 7682.949999999721,
+          "q3": 7725.75,
+          "iqr": 42.8000000002794,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 637.7999999998137,
+          "q1": 633.9499999997206,
+          "q3": 638.0999999996275,
+          "iqr": 4.149999999906868,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.72526378660387,
+          "q1": 59.70743889687778,
+          "q3": 59.79976391603746,
+          "iqr": 0.09232501915968072,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 41.94604213671341,
+          "q1": 39.729975447628675,
+          "q3": 42.077024233953296,
+          "iqr": 2.3470487863246206,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 40.99272299724265,
+          "q1": 38.77644415638639,
+          "q3": 41.10573959002424,
+          "iqr": 2.329295433637853,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 57.172223292856266,
+          "q1": 35.3371441572824,
+          "q3": 57.37567741706596,
+          "iqr": 22.038533259783556,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 27.358040400827104,
+          "q1": 16.326483930160325,
+          "q3": 28.77505668785313,
+          "iqr": 12.448572757692805,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 496.70000000018626,
+          "q1": 451.50000000046566,
+          "q3": 528.3500000000931,
+          "iqr": 76.84999999962747,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 804.7727880477905,
+          "q1": 798.8349943161011,
+          "q3": 807.0044240951538,
+          "iqr": 8.169429779052734,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 100000,
+      "edges": 150000,
+      "ratio": 1.5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 15897.200000000186,
+          "firstInteractionStallMs": 1639.7000000001863,
+          "settledFps": 59.731209556993534,
+          "wheelZoomFps": 19.741387819564924,
+          "wheelZoomRenderFps": 18.096272167934515,
+          "dragPanFps": 4.173622704508025,
+          "dragPanRenderFps": 2.8556365872949647,
+          "select500Ms": 917.5999999996275,
+          "heapUsedMB": 1585.113775253296,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1585.113775253296
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 15698.799999999814,
+          "firstInteractionStallMs": 1461.7000000001863,
+          "settledFps": 59.66587112168523,
+          "wheelZoomFps": 19.564531397917325,
+          "wheelZoomRenderFps": 17.9867466077627,
+          "dragPanFps": 42.51700680271859,
+          "dragPanRenderFps": 13.857394809774949,
+          "select500Ms": 932,
+          "heapUsedMB": 1562.783371925354,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1562.783371925354
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 16002.299999999814,
+          "firstInteractionStallMs": 1468,
+          "settledFps": 59.74310464996065,
+          "wheelZoomFps": 18.675338893002067,
+          "wheelZoomRenderFps": 17.709373088191615,
+          "dragPanFps": 7.363253856942497,
+          "dragPanRenderFps": 3.506311360448808,
+          "select500Ms": 991.7000000001863,
+          "heapUsedMB": 1609.0065031051636,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1609.0065031051636
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 15897.200000000186,
+          "q1": 15798,
+          "q3": 15949.75,
+          "iqr": 151.75,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 1468,
+          "q1": 1464.8500000000931,
+          "q3": 1553.8500000000931,
+          "iqr": 89,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.731209556993534,
+          "q1": 59.69854033933938,
+          "q3": 59.73715710347709,
+          "iqr": 0.038616764137707094,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 19.564531397917325,
+          "q1": 19.119935145459696,
+          "q3": 19.652959608741124,
+          "iqr": 0.5330244632814285,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 17.9867466077627,
+          "q1": 17.848059847977158,
+          "q3": 18.041509387848606,
+          "iqr": 0.1934495398714482,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 7.363253856942497,
+          "q1": 5.768438280725261,
+          "q3": 24.94013032983054,
+          "iqr": 19.171692049105282,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 3.506311360448808,
+          "q1": 3.180973973871886,
+          "q3": 8.681853085111879,
+          "iqr": 5.500879111239993,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 932,
+          "q1": 924.7999999998137,
+          "q3": 961.8500000000931,
+          "iqr": 37.0500000002794,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 1585.113775253296,
+          "q1": 1573.948573589325,
+          "q3": 1597.0601391792297,
+          "iqr": 23.111565589904785,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 1000,
+      "edges": 1500,
+      "ratio": 1.5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 880.6000000005588,
+          "firstInteractionStallMs": 67.70000000018626,
+          "settledFps": 59.731209556993534,
+          "wheelZoomFps": 59.99803285138925,
+          "wheelZoomRenderFps": 59.014458542350084,
+          "dragPanFps": 60.045116772816364,
+          "dragPanRenderFps": 59.713375796170965,
+          "select500Ms": 92.19999999925494,
+          "heapUsedMB": 39.51592540740967,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 39.51592540740967
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 859.6000000005588,
+          "firstInteractionStallMs": 68.09999999962747,
+          "settledFps": 59.84440454819698,
+          "wheelZoomFps": 59.77345530199352,
+          "wheelZoomRenderFps": 58.782735048369325,
+          "dragPanFps": 59.977467028965194,
+          "dragPanRenderFps": 59.64609980781069,
+          "select500Ms": 90,
+          "heapUsedMB": 35.79714107513428,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 35.79714107513428
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 850.1000000005588,
+          "firstInteractionStallMs": 66.59999999962747,
+          "settledFps": 59.77286312015455,
+          "wheelZoomFps": 59.756988247807094,
+          "wheelZoomRenderFps": 58.76103844367697,
+          "dragPanFps": 59.9814422057153,
+          "dragPanRenderFps": 59.650053022258305,
+          "select500Ms": 91.20000000018626,
+          "heapUsedMB": 35.79915142059326,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 35.79915142059326
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 859.6000000005588,
+          "q1": 854.8500000005588,
+          "q3": 870.1000000005588,
+          "iqr": 15.25,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 67.70000000018626,
+          "q1": 67.14999999990687,
+          "q3": 67.89999999990687,
+          "iqr": 0.75,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.77286312015455,
+          "q1": 59.752036338574044,
+          "q3": 59.808633834175765,
+          "iqr": 0.05659749560172145,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.77345530199352,
+          "q1": 59.76522177490031,
+          "q3": 59.88574407669138,
+          "iqr": 0.12052230179106971,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.782735048369325,
+          "q1": 58.77188674602315,
+          "q3": 58.89859679535971,
+          "iqr": 0.12671004933655894,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.9814422057153,
+          "q1": 59.979454617340245,
+          "q3": 60.01327948926583,
+          "iqr": 0.03382487192558159,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.650053022258305,
+          "q1": 59.648076415034495,
+          "q3": 59.681714409214635,
+          "iqr": 0.033637994180139685,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 91.20000000018626,
+          "q1": 90.60000000009313,
+          "q3": 91.6999999997206,
+          "iqr": 1.099999999627471,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 35.79915142059326,
+          "q1": 35.79814624786377,
+          "q3": 37.657538414001465,
+          "iqr": 1.8593921661376953,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 5000,
+      "edges": 7500,
+      "ratio": 1.5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 1456.2000000001863,
+          "firstInteractionStallMs": 164,
+          "settledFps": 59.749053973301,
+          "wheelZoomFps": 57.96237413885903,
+          "wheelZoomRenderFps": 56.968733439335736,
+          "dragPanFps": 48.66572128400447,
+          "dragPanRenderFps": 37.3855872115531,
+          "select500Ms": 118.20000000018626,
+          "heapUsedMB": 92.43339729309082,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 92.43339729309082
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1456.4000000003725,
+          "firstInteractionStallMs": 170.40000000037253,
+          "settledFps": 59.76690905466454,
+          "wheelZoomFps": 53.07820844664977,
+          "wheelZoomRenderFps": 52.0952786606007,
+          "dragPanFps": 60.13406940062723,
+          "dragPanRenderFps": 59.80546792849266,
+          "select500Ms": 119.6000000005588,
+          "heapUsedMB": 92.06329250335693,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 92.06329250335693
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1485.2000000001863,
+          "firstInteractionStallMs": 149,
+          "settledFps": 59.79073243647235,
+          "wheelZoomFps": 54.11925797931721,
+          "wheelZoomRenderFps": 53.14119910017292,
+          "dragPanFps": 59.98230030483907,
+          "dragPanRenderFps": 48.51027565637258,
+          "select500Ms": 129.30000000074506,
+          "heapUsedMB": 92.12795925140381,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 92.12795925140381
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1456.4000000003725,
+          "q1": 1456.3000000002794,
+          "q3": 1470.8000000002794,
+          "iqr": 14.5,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 164,
+          "q1": 156.5,
+          "q3": 167.20000000018626,
+          "iqr": 10.700000000186265,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.76690905466454,
+          "q1": 59.75798151398277,
+          "q3": 59.77882074556844,
+          "iqr": 0.020839231585668472,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 54.11925797931721,
+          "q1": 53.59873321298349,
+          "q3": 56.04081605908812,
+          "iqr": 2.4420828461046327,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 53.14119910017292,
+          "q1": 52.61823888038681,
+          "q3": 55.05496626975433,
+          "iqr": 2.436727389367519,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.98230030483907,
+          "q1": 54.32401079442177,
+          "q3": 60.05818485273315,
+          "iqr": 5.734174058311382,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 48.51027565637258,
+          "q1": 42.947931433962836,
+          "q3": 54.157871792432616,
+          "iqr": 11.20994035846978,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 119.6000000005588,
+          "q1": 118.90000000037253,
+          "q3": 124.45000000065193,
+          "iqr": 5.550000000279397,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 92.12795925140381,
+          "q1": 92.09562587738037,
+          "q3": 92.28067827224731,
+          "iqr": 0.18505239486694336,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 10000,
+      "edges": 15000,
+      "ratio": 1.5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 2272.899999999441,
+          "firstInteractionStallMs": 213.79999999981374,
+          "settledFps": 59.79073243647235,
+          "wheelZoomFps": 28.960324355631045,
+          "wheelZoomRenderFps": 27.994980210443345,
+          "dragPanFps": 19.751365167887673,
+          "dragPanRenderFps": 13.942140118508947,
+          "select500Ms": 172.5,
+          "heapUsedMB": 159.24477005004883,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 159.24477005004883
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 2213.7000000001863,
+          "firstInteractionStallMs": 213.70000000018626,
+          "settledFps": 59.77881837201242,
+          "wheelZoomFps": 28.765690376576043,
+          "wheelZoomRenderFps": 28.111924686199316,
+          "dragPanFps": 32.87433320928494,
+          "dragPanRenderFps": 17.677707480464544,
+          "select500Ms": 175,
+          "heapUsedMB": 145.2444553375244,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 145.2444553375244
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 2244.100000000559,
+          "firstInteractionStallMs": 241.3999999994412,
+          "settledFps": 59.695552681347365,
+          "wheelZoomFps": 28.114396509936984,
+          "wheelZoomRenderFps": 27.14493456131847,
+          "dragPanFps": 21.17127862595655,
+          "dragPanRenderFps": 14.611164122139026,
+          "select500Ms": 211.20000000018626,
+          "heapUsedMB": 160.35008811950684,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 160.35008811950684
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 2244.100000000559,
+          "q1": 2228.9000000003725,
+          "q3": 2258.5,
+          "iqr": 29.59999999962747,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 213.79999999981374,
+          "q1": 213.75,
+          "q3": 227.59999999962747,
+          "iqr": 13.849999999627471,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.77881837201242,
+          "q1": 59.737185526679895,
+          "q3": 59.78477540424238,
+          "iqr": 0.047589877562487004,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 28.765690376576043,
+          "q1": 28.440043443256513,
+          "q3": 28.863007366103545,
+          "iqr": 0.4229639228470319,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 27.994980210443345,
+          "q1": 27.569957385880905,
+          "q3": 28.05345244832133,
+          "iqr": 0.4834950624404257,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 21.17127862595655,
+          "q1": 20.46132189692211,
+          "q3": 27.022805917620744,
+          "iqr": 6.561484020698632,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 14.611164122139026,
+          "q1": 14.276652120323988,
+          "q3": 16.144435801301785,
+          "iqr": 1.867783680977798,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 175,
+          "q1": 173.75,
+          "q3": 193.10000000009313,
+          "iqr": 19.350000000093132,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 159.24477005004883,
+          "q1": 152.24461269378662,
+          "q3": 159.79742908477783,
+          "iqr": 7.552816390991211,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 25000,
+      "edges": 37500,
+      "ratio": 1.5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 4735.0999999996275,
+          "firstInteractionStallMs": 465.29999999981374,
+          "settledFps": 59.83246908656874,
+          "wheelZoomFps": 12.909055702576907,
+          "wheelZoomRenderFps": 11.94087652488364,
+          "dragPanFps": 6.706908115359686,
+          "dragPanRenderFps": 5.550544647194223,
+          "select500Ms": 388.59999999962747,
+          "heapUsedMB": 443.6638526916504,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 443.6638526916504
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 4905.5,
+          "firstInteractionStallMs": 498.8999999994412,
+          "settledFps": 59.731209556993534,
+          "wheelZoomFps": 11.935605950334292,
+          "wheelZoomRenderFps": 11.062268929578124,
+          "dragPanFps": 7.072438919845692,
+          "dragPanRenderFps": 5.572224603514788,
+          "select500Ms": 367.90000000037253,
+          "heapUsedMB": 456.99927520751953,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 456.99927520751953
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 4669.799999999814,
+          "firstInteractionStallMs": 458,
+          "settledFps": 59.766909054719996,
+          "wheelZoomFps": 12.900847769997789,
+          "wheelZoomRenderFps": 11.979358643569375,
+          "dragPanFps": 15.344052558782233,
+          "dragPanRenderFps": 7.347856154909802,
+          "select500Ms": 383,
+          "heapUsedMB": 434.20772075653076,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 434.20772075653076
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 4735.0999999996275,
+          "q1": 4702.449999999721,
+          "q3": 4820.299999999814,
+          "iqr": 117.85000000009313,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 465.29999999981374,
+          "q1": 461.64999999990687,
+          "q3": 482.09999999962747,
+          "iqr": 20.449999999720603,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.766909054719996,
+          "q1": 59.74905930585676,
+          "q3": 59.79968907064437,
+          "iqr": 0.05062976478760817,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 12.900847769997789,
+          "q1": 12.41822686016604,
+          "q3": 12.904951736287348,
+          "iqr": 0.48672487612130766,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 11.94087652488364,
+          "q1": 11.501572727230883,
+          "q3": 11.960117584226508,
+          "iqr": 0.45854485699562453,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 7.072438919845692,
+          "q1": 6.889673517602689,
+          "q3": 11.208245739313963,
+          "iqr": 4.318572221711274,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 5.572224603514788,
+          "q1": 5.561384625354505,
+          "q3": 6.460040379212295,
+          "iqr": 0.8986557538577893,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 383,
+          "q1": 375.45000000018626,
+          "q3": 385.79999999981374,
+          "iqr": 10.349999999627471,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 443.6638526916504,
+          "q1": 438.9357867240906,
+          "q3": 450.33156394958496,
+          "iqr": 11.395777225494385,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 50000,
+      "edges": 75000,
+      "ratio": 1.5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 9255.799999999814,
+          "firstInteractionStallMs": 931.6000000005588,
+          "settledFps": 59.671805072103425,
+          "wheelZoomFps": 6.799020940984498,
+          "wheelZoomRenderFps": 5.983138428066359,
+          "dragPanFps": 51.28842746573595,
+          "dragPanRenderFps": 18.339498305929823,
+          "select500Ms": 538.2000000001863,
+          "heapUsedMB": 711.8403034210205,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 711.8403034210205
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 9361,
+          "firstInteractionStallMs": 955.8000000007451,
+          "settledFps": 59.671805072103425,
+          "wheelZoomFps": 6.84331544946861,
+          "wheelZoomRenderFps": 6.022117595532377,
+          "dragPanFps": 3.452939314591731,
+          "dragPanRenderFps": 2.301959543061154,
+          "select500Ms": 600.5999999996275,
+          "heapUsedMB": 721.5776052474976,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 721.5776052474976
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 10275.800000000745,
+          "firstInteractionStallMs": 1073.7999999998137,
+          "settledFps": 59.719319199805405,
+          "wheelZoomFps": 7.2373182446218,
+          "wheelZoomRenderFps": 6.250411211264282,
+          "dragPanFps": 3.645137213379036,
+          "dragPanRenderFps": 2.430091475586024,
+          "select500Ms": 594.4000000003725,
+          "heapUsedMB": 622.8354225158691,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 622.8354225158691
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 9361,
+          "q1": 9308.399999999907,
+          "q3": 9818.400000000373,
+          "iqr": 510.00000000046566,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 955.8000000007451,
+          "q1": 943.7000000006519,
+          "q3": 1014.8000000002794,
+          "iqr": 71.09999999962747,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.671805072103425,
+          "q1": 59.671805072103425,
+          "q3": 59.69556213595442,
+          "iqr": 0.02375706385099363,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 6.84331544946861,
+          "q1": 6.821168195226554,
+          "q3": 7.040316847045205,
+          "iqr": 0.21914865181865117,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 6.022117595532377,
+          "q1": 6.002628011799368,
+          "q3": 6.13626440339833,
+          "iqr": 0.13363639159896135,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 3.645137213379036,
+          "q1": 3.5490382639853832,
+          "q3": 27.466782339557493,
+          "iqr": 23.91774407557211,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 2.430091475586024,
+          "q1": 2.366025509323589,
+          "q3": 10.384794890757924,
+          "iqr": 8.018769381434335,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 594.4000000003725,
+          "q1": 566.3000000002794,
+          "q3": 597.5,
+          "iqr": 31.199999999720603,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 711.8403034210205,
+          "q1": 667.3378629684448,
+          "q3": 716.708954334259,
+          "iqr": 49.37109136581421,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 100000,
+      "edges": 150000,
+      "ratio": 1.5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 18075.700000000186,
+          "firstInteractionStallMs": 2044.1000000005588,
+          "settledFps": 59.7609561752988,
+          "wheelZoomFps": 3.9804041641151255,
+          "wheelZoomRenderFps": 3.3680342927127986,
+          "dragPanFps": 27.617157158880516,
+          "dragPanRenderFps": 9.781076493770183,
+          "select500Ms": 1123.8999999994412,
+          "heapUsedMB": 1904.491231918335,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1904.491231918335
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 18179.700000000186,
+          "firstInteractionStallMs": 2378.300000000745,
+          "settledFps": 59.743104650016065,
+          "wheelZoomFps": 3.727634194831014,
+          "wheelZoomRenderFps": 2.982107355864811,
+          "dragPanFps": 27.744061036932788,
+          "dragPanRenderFps": 9.826021617247028,
+          "select500Ms": 1125.2999999998137,
+          "heapUsedMB": 1906.462408065796,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1906.462408065796
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 18475.299999999814,
+          "firstInteractionStallMs": 2112.600000000559,
+          "settledFps": 59.71931919975005,
+          "wheelZoomFps": 3.963011889035667,
+          "wheelZoomRenderFps": 3.1704095112285335,
+          "dragPanFps": 33.64597290457049,
+          "dragPanRenderFps": 11.016822986452286,
+          "select500Ms": 1227.1000000005588,
+          "heapUsedMB": 1919.9939098358154,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1919.9939098358154
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 18179.700000000186,
+          "q1": 18127.700000000186,
+          "q3": 18327.5,
+          "iqr": 199.79999999981374,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 2112.600000000559,
+          "q1": 2078.350000000559,
+          "q3": 2245.450000000652,
+          "iqr": 167.10000000009313,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.743104650016065,
+          "q1": 59.731211924883056,
+          "q3": 59.75203041265743,
+          "iqr": 0.02081848777437756,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 3.963011889035667,
+          "q1": 3.845323041933341,
+          "q3": 3.9717080265753966,
+          "iqr": 0.12638498464205572,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 3.1704095112285335,
+          "q1": 3.0762584335466725,
+          "q3": 3.269221901970666,
+          "iqr": 0.1929634684239936,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 27.744061036932788,
+          "q1": 27.680609097906654,
+          "q3": 30.695016970751638,
+          "iqr": 3.014407872844984,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 9.826021617247028,
+          "q1": 9.803549055508604,
+          "q3": 10.421422301849656,
+          "iqr": 0.6178732463410519,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 1125.2999999998137,
+          "q1": 1124.5999999996275,
+          "q3": 1176.2000000001863,
+          "iqr": 51.60000000055879,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 1906.462408065796,
+          "q1": 1905.4768199920654,
+          "q3": 1913.2281589508057,
+          "iqr": 7.751338958740234,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 1000,
+      "edges": 1500,
+      "ratio": 1.5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 1310.4000000003725,
+          "firstInteractionStallMs": 98,
+          "settledFps": 59.8742640455267,
+          "wheelZoomFps": 59.921869827194044,
+          "wheelZoomRenderFps": 59.921869827194044,
+          "dragPanFps": 59.490550534100244,
+          "dragPanRenderFps": 66.721446179129,
+          "select500Ms": 88,
+          "heapUsedMB": 71.05226993560791,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 71.05226993560791
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1336,
+          "firstInteractionStallMs": 85.20000000018626,
+          "settledFps": 59.82650314092475,
+          "wheelZoomFps": 60.116966706977095,
+          "wheelZoomRenderFps": 60.116966706977095,
+          "dragPanFps": 60.053161815381216,
+          "dragPanRenderFps": 60.053161815381216,
+          "select500Ms": 92.5,
+          "heapUsedMB": 40.791565895080566,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 40.791565895080566
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1315.300000000745,
+          "firstInteractionStallMs": 81.29999999981374,
+          "settledFps": 59.766909054719996,
+          "wheelZoomFps": 59.94965553788713,
+          "wheelZoomRenderFps": 59.94965553788713,
+          "dragPanFps": 57.38183232834772,
+          "dragPanRenderFps": 60.94793490242583,
+          "select500Ms": 94.8999999994412,
+          "heapUsedMB": 52.60528373718262,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 52.60528373718262
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1315.300000000745,
+          "q1": 1312.8500000005588,
+          "q3": 1325.6500000003725,
+          "iqr": 12.799999999813735,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 85.20000000018626,
+          "q1": 83.25,
+          "q3": 91.60000000009313,
+          "iqr": 8.350000000093132,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.82650314092475,
+          "q1": 59.79670609782237,
+          "q3": 59.85038359322573,
+          "iqr": 0.05367749540335609,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.94965553788713,
+          "q1": 59.935762682540584,
+          "q3": 60.03331112243211,
+          "iqr": 0.09754843989152562,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 59.94965553788713,
+          "q1": 59.935762682540584,
+          "q3": 60.03331112243211,
+          "iqr": 0.09754843989152562,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.490550534100244,
+          "q1": 58.43619143122398,
+          "q3": 59.77185617474073,
+          "iqr": 1.3356647435167517,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 60.94793490242583,
+          "q1": 60.50054835890352,
+          "q3": 63.834690540777416,
+          "iqr": 3.3341421818738937,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 92.5,
+          "q1": 90.25,
+          "q3": 93.6999999997206,
+          "iqr": 3.4499999997206032,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 52.60528373718262,
+          "q1": 46.69842481613159,
+          "q3": 61.828776836395264,
+          "iqr": 15.130352020263672,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 5000,
+      "edges": 7500,
+      "ratio": 1.5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 3132.5,
+          "firstInteractionStallMs": 348.5,
+          "settledFps": 24.883049666562524,
+          "wheelZoomFps": 20.967065578532246,
+          "wheelZoomRenderFps": 20.967065578532246,
+          "dragPanFps": 15.184184153783699,
+          "dragPanRenderFps": 19.73943939991881,
+          "select500Ms": 155.6000000005588,
+          "heapUsedMB": 138.44794940948486,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 138.44794940948486
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3464.899999999441,
+          "firstInteractionStallMs": 404.80000000074506,
+          "settledFps": 24.19432884932208,
+          "wheelZoomFps": 20.136000528154916,
+          "wheelZoomRenderFps": 20.136000528154916,
+          "dragPanFps": 20.973154362418448,
+          "dragPanRenderFps": 21.27277085331014,
+          "select500Ms": 162,
+          "heapUsedMB": 128.4567232131958,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 128.4567232131958
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3167.2999999998137,
+          "firstInteractionStallMs": 351.5,
+          "settledFps": 24.471417384503834,
+          "wheelZoomFps": 21.13364665804622,
+          "wheelZoomRenderFps": 21.13364665804622,
+          "dragPanFps": 21.9529065046775,
+          "dragPanRenderFps": 21.9529065046775,
+          "select500Ms": 247.30000000074506,
+          "heapUsedMB": 138.80495929718018,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 138.80495929718018
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 3167.2999999998137,
+          "q1": 3149.899999999907,
+          "q3": 3316.0999999996275,
+          "iqr": 166.1999999997206,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 351.5,
+          "q1": 350,
+          "q3": 378.15000000037253,
+          "iqr": 28.15000000037253,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 24.471417384503834,
+          "q1": 24.332873116912957,
+          "q3": 24.67723352553318,
+          "iqr": 0.3443604086202221,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 20.967065578532246,
+          "q1": 20.551533053343583,
+          "q3": 21.050356118289233,
+          "iqr": 0.49882306494565043,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 20.967065578532246,
+          "q1": 20.551533053343583,
+          "q3": 21.050356118289233,
+          "iqr": 0.49882306494565043,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 20.973154362418448,
+          "q1": 18.078669258101073,
+          "q3": 21.463030433547974,
+          "iqr": 3.3843611754469016,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 21.27277085331014,
+          "q1": 20.50610512661447,
+          "q3": 21.612838678993818,
+          "iqr": 1.106733552379346,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 162,
+          "q1": 158.8000000002794,
+          "q3": 204.65000000037253,
+          "iqr": 45.85000000009313,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 138.44794940948486,
+          "q1": 133.45233631134033,
+          "q3": 138.62645435333252,
+          "iqr": 5.1741180419921875,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 10000,
+      "edges": 15000,
+      "ratio": 1.5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 6364.299999999814,
+          "firstInteractionStallMs": 648.5,
+          "settledFps": 12.465241154468652,
+          "wheelZoomFps": 10.106937923838718,
+          "wheelZoomRenderFps": 10.106937923838718,
+          "dragPanFps": 16.049022468631456,
+          "dragPanRenderFps": 16.049022468631456,
+          "select500Ms": 216.70000000018626,
+          "heapUsedMB": 232.31000804901123,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 232.31000804901123
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 5622,
+          "firstInteractionStallMs": 637.6000000005588,
+          "settledFps": 11.710744608175874,
+          "wheelZoomFps": 9.951526435746667,
+          "wheelZoomRenderFps": 9.951526435746667,
+          "dragPanFps": 10.19480340561593,
+          "dragPanRenderFps": 10.19480340561593,
+          "select500Ms": 237,
+          "heapUsedMB": 231.27281856536865,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 231.27281856536865
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 5661.600000000559,
+          "firstInteractionStallMs": 626.4000000003725,
+          "settledFps": 12.807881773399016,
+          "wheelZoomFps": 10.075865339022121,
+          "wheelZoomRenderFps": 10.075865339022121,
+          "dragPanFps": 16.814943899230713,
+          "dragPanRenderFps": 16.814943899230713,
+          "select500Ms": 211.3999999994412,
+          "heapUsedMB": 241.7699613571167,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 241.7699613571167
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 5661.600000000559,
+          "q1": 5641.800000000279,
+          "q3": 6012.950000000186,
+          "iqr": 371.14999999990687,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 637.6000000005588,
+          "q1": 632.0000000004657,
+          "q3": 643.0500000002794,
+          "iqr": 11.049999999813735,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 12.465241154468652,
+          "q1": 12.087992881322263,
+          "q3": 12.636561463933834,
+          "iqr": 0.5485685826115709,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 10.075865339022121,
+          "q1": 10.013695887384394,
+          "q3": 10.091401631430418,
+          "iqr": 0.0777057440460247,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 10.075865339022121,
+          "q1": 10.013695887384394,
+          "q3": 10.091401631430418,
+          "iqr": 0.0777057440460247,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 16.049022468631456,
+          "q1": 13.121912937123692,
+          "q3": 16.431983183931084,
+          "iqr": 3.310070246807392,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 16.049022468631456,
+          "q1": 13.121912937123692,
+          "q3": 16.431983183931084,
+          "iqr": 3.310070246807392,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 216.70000000018626,
+          "q1": 214.04999999981374,
+          "q3": 226.85000000009313,
+          "iqr": 12.800000000279397,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 232.31000804901123,
+          "q1": 231.79141330718994,
+          "q3": 237.03998470306396,
+          "iqr": 5.248571395874023,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 25000,
+      "edges": 37500,
+      "ratio": 1.5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 13143,
+          "firstInteractionStallMs": 1887.9000000003725,
+          "settledFps": 4.808154630251186,
+          "wheelZoomFps": 3.6698283649518597,
+          "wheelZoomRenderFps": 3.6698283649518597,
+          "dragPanFps": 5.476723923325864,
+          "dragPanRenderFps": 5.476723923325864,
+          "select500Ms": 459.90000000037253,
+          "heapUsedMB": 747.640344619751,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 747.640344619751
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 12640.400000000373,
+          "firstInteractionStallMs": 1894.699999999255,
+          "settledFps": 4.793863854266539,
+          "wheelZoomFps": 4.0241448692152915,
+          "wheelZoomRenderFps": 4.0241448692152915,
+          "dragPanFps": 5.595828564161262,
+          "dragPanRenderFps": 5.595828564161262,
+          "select500Ms": 456.8999999985099,
+          "heapUsedMB": 775.0498638153076,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 775.0498638153076
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 13096.900000000373,
+          "firstInteractionStallMs": 1859.9000000003725,
+          "settledFps": 4.863340142011294,
+          "wheelZoomFps": 3.9389164949698623,
+          "wheelZoomRenderFps": 3.9389164949698623,
+          "dragPanFps": 5.557941540559296,
+          "dragPanRenderFps": 5.557941540559296,
+          "select500Ms": 455.5,
+          "heapUsedMB": 776.2652187347412,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 776.2652187347412
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 13096.900000000373,
+          "q1": 12868.650000000373,
+          "q3": 13119.950000000186,
+          "iqr": 251.29999999981374,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 1887.9000000003725,
+          "q1": 1873.9000000003725,
+          "q3": 1891.2999999998137,
+          "iqr": 17.399999999441206,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 4.808154630251186,
+          "q1": 4.801009242258862,
+          "q3": 4.83574738613124,
+          "iqr": 0.03473814387237795,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 3.9389164949698623,
+          "q1": 3.804372429960861,
+          "q3": 3.981530682092577,
+          "iqr": 0.17715825213171588,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 3.9389164949698623,
+          "q1": 3.804372429960861,
+          "q3": 3.981530682092577,
+          "iqr": 0.17715825213171588,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 5.557941540559296,
+          "q1": 5.51733273194258,
+          "q3": 5.576885052360279,
+          "iqr": 0.059552320417698645,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 5.557941540559296,
+          "q1": 5.51733273194258,
+          "q3": 5.576885052360279,
+          "iqr": 0.059552320417698645,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 456.8999999985099,
+          "q1": 456.19999999925494,
+          "q3": 458.3999999994412,
+          "iqr": 2.2000000001862645,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 775.0498638153076,
+          "q1": 761.3451042175293,
+          "q3": 775.6575412750244,
+          "iqr": 14.312437057495117,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 50000,
+      "edges": 75000,
+      "ratio": 1.5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 26547.799999998882,
+          "firstInteractionStallMs": 3897,
+          "settledFps": 2.270147559591374,
+          "wheelZoomFps": 1.9601254480280605,
+          "wheelZoomRenderFps": 1.9601254480280605,
+          "dragPanFps": 2.2642561047826586,
+          "dragPanRenderFps": 2.2642561047826586,
+          "select500Ms": 935.1999999992549,
+          "heapUsedMB": 684.2813758850098,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 684.2813758850098
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 25240.5,
+          "firstInteractionStallMs": 3963.60000000149,
+          "settledFps": 2.3377230577437955,
+          "wheelZoomFps": 1.947907390917388,
+          "wheelZoomRenderFps": 1.947907390917388,
+          "dragPanFps": 2.413844325609199,
+          "dragPanRenderFps": 2.413844325609199,
+          "select500Ms": 947.8999999985099,
+          "heapUsedMB": 685.6389770507812,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 685.6389770507812
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 26793.5,
+          "firstInteractionStallMs": 3981,
+          "settledFps": 2.3107140106312736,
+          "wheelZoomFps": 2.012593082430278,
+          "wheelZoomRenderFps": 2.012593082430278,
+          "dragPanFps": 2.39626919319476,
+          "dragPanRenderFps": 2.39626919319476,
+          "select500Ms": 911.3000000007451,
+          "heapUsedMB": 669.2637519836426,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 669.2637519836426
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 26547.799999998882,
+          "q1": 25894.14999999944,
+          "q3": 26670.64999999944,
+          "iqr": 776.5,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 3963.60000000149,
+          "q1": 3930.300000000745,
+          "q3": 3972.300000000745,
+          "iqr": 42,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 2.3107140106312736,
+          "q1": 2.2904307851113237,
+          "q3": 2.3242185341875343,
+          "iqr": 0.03378774907621063,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 1.9601254480280605,
+          "q1": 1.9540164194727243,
+          "q3": 1.9863592652291693,
+          "iqr": 0.03234284575644497,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 1.9601254480280605,
+          "q1": 1.9540164194727243,
+          "q3": 1.9863592652291693,
+          "iqr": 0.03234284575644497,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 2.39626919319476,
+          "q1": 2.3302626489887093,
+          "q3": 2.4050567594019796,
+          "iqr": 0.07479411041327033,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 2.39626919319476,
+          "q1": 2.3302626489887093,
+          "q3": 2.4050567594019796,
+          "iqr": 0.07479411041327033,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 935.1999999992549,
+          "q1": 923.25,
+          "q3": 941.5499999988824,
+          "iqr": 18.299999998882413,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 684.2813758850098,
+          "q1": 676.7725639343262,
+          "q3": 684.9601764678955,
+          "iqr": 8.187612533569336,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 100000,
+      "edges": 150000,
+      "ratio": 1.5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 53746.60000000149,
+          "firstInteractionStallMs": 8659.599999999627,
+          "settledFps": 1.0562450488513335,
+          "wheelZoomFps": 0.9813061184438279,
+          "wheelZoomRenderFps": 0.9813061184438279,
+          "dragPanFps": 0.9552466924583273,
+          "dragPanRenderFps": 1.05077136170416,
+          "select500Ms": 2538.0999999996275,
+          "heapUsedMB": 1226.1981840133667,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1226.1981840133667
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 53797.90000000037,
+          "firstInteractionStallMs": 9095.599999999627,
+          "settledFps": 0.9909820632250215,
+          "wheelZoomFps": 0.9709916251972326,
+          "wheelZoomRenderFps": 0.9709916251972326,
+          "dragPanFps": 0.9105146228649359,
+          "dragPanRenderFps": 1.0015660851514294,
+          "select500Ms": 1995.4000000003725,
+          "heapUsedMB": 1353.2924222946167,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1353.2924222946167
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 54268.40000000037,
+          "firstInteractionStallMs": 11057.300000000745,
+          "settledFps": 0.6822213125943256,
+          "wheelZoomFps": 0.9747776288534177,
+          "wheelZoomRenderFps": 0.9747776288534177,
+          "dragPanFps": 0.9084880034160072,
+          "dragPanRenderFps": 0.9993368037576079,
+          "select500Ms": 2039.0999999996275,
+          "heapUsedMB": 1353.7697820663452,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1353.7697820663452
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 53797.90000000037,
+          "q1": 53772.25000000093,
+          "q3": 54033.15000000037,
+          "iqr": 260.8999999994412,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 9095.599999999627,
+          "q1": 8877.599999999627,
+          "q3": 10076.450000000186,
+          "iqr": 1198.8500000005588,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 0.9909820632250215,
+          "q1": 0.8366016879096736,
+          "q3": 1.0236135560381774,
+          "iqr": 0.1870118681285038,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 0.9747776288534177,
+          "q1": 0.9728846270253251,
+          "q3": 0.9780418736486227,
+          "iqr": 0.00515724662329764,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 0.9747776288534177,
+          "q1": 0.9728846270253251,
+          "q3": 0.9780418736486227,
+          "iqr": 0.00515724662329764,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 0.9105146228649359,
+          "q1": 0.9095013131404716,
+          "q3": 0.9328806576616315,
+          "iqr": 0.023379344521159973,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 1.0015660851514294,
+          "q1": 1.0004514444545187,
+          "q3": 1.0261687234277947,
+          "iqr": 0.025717278973276025,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 2039.0999999996275,
+          "q1": 2017.25,
+          "q3": 2288.5999999996275,
+          "iqr": 271.34999999962747,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 1353.2924222946167,
+          "q1": 1289.7453031539917,
+          "q3": 1353.531102180481,
+          "iqr": 63.78579902648926,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 1000,
+      "edges": 5000,
+      "ratio": 5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 1070.800000000745,
+          "firstInteractionStallMs": 86,
+          "settledFps": 59.70743357545801,
+          "wheelZoomFps": 59.8426238180329,
+          "wheelZoomRenderFps": 58.85075712491633,
+          "dragPanFps": 60.035158711724314,
+          "dragPanRenderFps": 59.70347275199103,
+          "select500Ms": 33.59999999962747,
+          "heapUsedMB": 56.02289962768555,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 56.02289962768555
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1123.5999999996275,
+          "firstInteractionStallMs": 85,
+          "settledFps": 59.802651250827715,
+          "wheelZoomFps": 59.82482234341431,
+          "wheelZoomRenderFps": 59.1637745827136,
+          "dragPanFps": 59.99337089824329,
+          "dragPanRenderFps": 59.66191581040769,
+          "select500Ms": 38.79999999888241,
+          "heapUsedMB": 59.40481948852539,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 59.40481948852539
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1017.2000000011176,
+          "firstInteractionStallMs": 86.40000000037253,
+          "settledFps": 59.68367651442906,
+          "wheelZoomFps": 59.79517674264949,
+          "wheelZoomRenderFps": 58.804096465147005,
+          "dragPanFps": 60.00857265326566,
+          "dragPanRenderFps": 59.67885522110486,
+          "select500Ms": 30.90000000037253,
+          "heapUsedMB": 56.34128952026367,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 56.34128952026367
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1070.800000000745,
+          "q1": 1044.0000000009313,
+          "q3": 1097.2000000001863,
+          "iqr": 53.19999999925494,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 86,
+          "q1": 85.5,
+          "q3": 86.20000000018626,
+          "iqr": 0.7000000001862645,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.70743357545801,
+          "q1": 59.69555504494353,
+          "q3": 59.75504241314286,
+          "iqr": 0.05948736819932776,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.82482234341431,
+          "q1": 59.8099995430319,
+          "q3": 59.8337230807236,
+          "iqr": 0.023723537691701324,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.85075712491633,
+          "q1": 58.82742679503167,
+          "q3": 59.007265853814964,
+          "iqr": 0.1798390587832941,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 60.00857265326566,
+          "q1": 60.00097177575448,
+          "q3": 60.02186568249499,
+          "iqr": 0.02089390674051117,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.67885522110486,
+          "q1": 59.67038551575628,
+          "q3": 59.69116398654795,
+          "iqr": 0.020778470791668724,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 33.59999999962747,
+          "q1": 32.25,
+          "q3": 36.19999999925494,
+          "iqr": 3.949999999254942,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 56.34128952026367,
+          "q1": 56.18209457397461,
+          "q3": 57.87305450439453,
+          "iqr": 1.6909599304199219,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 5000,
+      "edges": 25000,
+      "ratio": 5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 2175.5,
+          "firstInteractionStallMs": 202.09999999962747,
+          "settledFps": 59.74310464996065,
+          "wheelZoomFps": 59.75964078181308,
+          "wheelZoomRenderFps": 58.76914949813663,
+          "dragPanFps": 60.14143149822642,
+          "dragPanRenderFps": 59.81098407241199,
+          "select500Ms": 76.09999999962747,
+          "heapUsedMB": 162.3634328842163,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 162.3634328842163
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 2124.2000000011176,
+          "firstInteractionStallMs": 180.30000000074506,
+          "settledFps": 59.731209556993534,
+          "wheelZoomFps": 59.73284321768937,
+          "wheelZoomRenderFps": 58.748235911903286,
+          "dragPanFps": 59.98681608437706,
+          "dragPanRenderFps": 59.98681608437706,
+          "select500Ms": 75.09999999962747,
+          "heapUsedMB": 155.89574337005615,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 155.89574337005615
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 2321.800000000745,
+          "firstInteractionStallMs": 189.69999999925494,
+          "settledFps": 59.71337579624476,
+          "wheelZoomFps": 59.73400217815328,
+          "wheelZoomRenderFps": 58.74393584370875,
+          "dragPanFps": 59.97547963815158,
+          "dragPanRenderFps": 59.644123397056816,
+          "select500Ms": 86.90000000037253,
+          "heapUsedMB": 162.73172283172607,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 162.73172283172607
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 2175.5,
+          "q1": 2149.850000000559,
+          "q3": 2248.6500000003725,
+          "iqr": 98.79999999981374,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 189.69999999925494,
+          "q1": 185,
+          "q3": 195.8999999994412,
+          "iqr": 10.899999999441206,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.731209556993534,
+          "q1": 59.72229267661915,
+          "q3": 59.73715710347709,
+          "iqr": 0.014864426857940316,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.73400217815328,
+          "q1": 59.73342269792133,
+          "q3": 59.74682147998318,
+          "iqr": 0.01339878206185574,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.748235911903286,
+          "q1": 58.74608587780602,
+          "q3": 58.75869270501995,
+          "iqr": 0.012606827213936356,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.98681608437706,
+          "q1": 59.98114786126432,
+          "q3": 60.06412379130174,
+          "iqr": 0.08297593003742065,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.81098407241199,
+          "q1": 59.7275537347344,
+          "q3": 59.898900078394526,
+          "iqr": 0.1713463436601259,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 76.09999999962747,
+          "q1": 75.59999999962747,
+          "q3": 81.5,
+          "iqr": 5.900000000372529,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 162.3634328842163,
+          "q1": 159.12958812713623,
+          "q3": 162.5475778579712,
+          "iqr": 3.417989730834961,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 10000,
+      "edges": 50000,
+      "ratio": 5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 3875.0999999996275,
+          "firstInteractionStallMs": 288.59999999962747,
+          "settledFps": 59.85634477252364,
+          "wheelZoomFps": 58.1357583631049,
+          "wheelZoomRenderFps": 57.16141604417018,
+          "dragPanFps": 19.22856158879372,
+          "dragPanRenderFps": 8.609803696474799,
+          "select500Ms": 192.30000000074506,
+          "heapUsedMB": 333.08599853515625,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 333.08599853515625
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 4807.699999999255,
+          "firstInteractionStallMs": 434.2999999988824,
+          "settledFps": 59.77881837195695,
+          "wheelZoomFps": 59.73872513622472,
+          "wheelZoomRenderFps": 58.7540208757375,
+          "dragPanFps": 60.020446525761656,
+          "dragPanRenderFps": 59.69066385254319,
+          "select500Ms": 264.5,
+          "heapUsedMB": 347.86437606811523,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 347.86437606811523
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3715.39999999851,
+          "firstInteractionStallMs": 278.7000000011176,
+          "settledFps": 59.802651250827715,
+          "wheelZoomFps": 59.76950764457511,
+          "wheelZoomRenderFps": 58.77885282173685,
+          "dragPanFps": 60.048170510402066,
+          "dragPanRenderFps": 59.71823550759766,
+          "select500Ms": 189.90000000037253,
+          "heapUsedMB": 333.6301689147949,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 333.6301689147949
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 3875.0999999996275,
+          "q1": 3795.2499999990687,
+          "q3": 4341.399999999441,
+          "iqr": 546.1500000003725,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 288.59999999962747,
+          "q1": 283.65000000037253,
+          "q3": 361.44999999925494,
+          "iqr": 77.79999999888241,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.802651250827715,
+          "q1": 59.79073481139233,
+          "q3": 59.82949801167568,
+          "iqr": 0.03876320028334845,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.73872513622472,
+          "q1": 58.93724174966481,
+          "q3": 59.754116390399915,
+          "iqr": 0.816874640735108,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.7540208757375,
+          "q1": 57.95771845995384,
+          "q3": 58.76643684873717,
+          "iqr": 0.8087183887833334,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 60.020446525761656,
+          "q1": 39.62450405727769,
+          "q3": 60.03430851808186,
+          "iqr": 20.409804460804168,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.69066385254319,
+          "q1": 34.15023377450899,
+          "q3": 59.704449680070425,
+          "iqr": 25.554215905561435,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 192.30000000074506,
+          "q1": 191.1000000005588,
+          "q3": 228.40000000037253,
+          "iqr": 37.299999999813735,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 333.6301689147949,
+          "q1": 333.3580837249756,
+          "q3": 340.7472724914551,
+          "iqr": 7.389188766479492,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 25000,
+      "edges": 125000,
+      "ratio": 5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 9291.5,
+          "firstInteractionStallMs": 779.2000000011176,
+          "settledFps": 59.85037406483791,
+          "wheelZoomFps": 56.31143805743179,
+          "wheelZoomRenderFps": 55.33493913158038,
+          "dragPanFps": 58.81782632584615,
+          "dragPanRenderFps": 34.902885951601014,
+          "select500Ms": 423.09999999962747,
+          "heapUsedMB": 602.6708478927612,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 602.6708478927612
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 9038.599999999627,
+          "firstInteractionStallMs": 787.5,
+          "settledFps": 59.802651250938744,
+          "wheelZoomFps": 56.01328687267964,
+          "wheelZoomRenderFps": 55.36196958346244,
+          "dragPanFps": 57.428617518954674,
+          "dragPanRenderFps": 35.489595095983226,
+          "select500Ms": 516,
+          "heapUsedMB": 586.0351858139038,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 586.0351858139038
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 9359.699999999255,
+          "firstInteractionStallMs": 740.0999999996275,
+          "settledFps": 59.70149253731344,
+          "wheelZoomFps": 56.625878677448355,
+          "wheelZoomRenderFps": 55.6495704243889,
+          "dragPanFps": 30.33338102732866,
+          "dragPanRenderFps": 17.742166261267705,
+          "select500Ms": 415.2999999988824,
+          "heapUsedMB": 695.9841547012329,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 695.9841547012329
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 9291.5,
+          "q1": 9165.049999999814,
+          "q3": 9325.599999999627,
+          "iqr": 160.54999999981374,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 779.2000000011176,
+          "q1": 759.6500000003725,
+          "q3": 783.3500000005588,
+          "iqr": 23.700000000186265,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.802651250938744,
+          "q1": 59.75207189412609,
+          "q3": 59.82651265788833,
+          "iqr": 0.07444076376224018,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 56.31143805743179,
+          "q1": 56.16236246505572,
+          "q3": 56.46865836744007,
+          "iqr": 0.306295902384349,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 55.36196958346244,
+          "q1": 55.348454357521405,
+          "q3": 55.50577000392567,
+          "iqr": 0.157315646404264,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 57.428617518954674,
+          "q1": 43.88099927314167,
+          "q3": 58.12322192240041,
+          "iqr": 14.242222649258743,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 34.902885951601014,
+          "q1": 26.32252610643436,
+          "q3": 35.19624052379212,
+          "iqr": 8.87371441735776,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 423.09999999962747,
+          "q1": 419.19999999925494,
+          "q3": 469.54999999981374,
+          "iqr": 50.35000000055879,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 602.6708478927612,
+          "q1": 594.3530168533325,
+          "q3": 649.3275012969971,
+          "iqr": 54.97448444366455,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 50000,
+      "edges": 250000,
+      "ratio": 5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 18761,
+          "firstInteractionStallMs": 1836.7999999988824,
+          "settledFps": 59.55926146513581,
+          "wheelZoomFps": 36.59800492292189,
+          "wheelZoomRenderFps": 35.62637647364078,
+          "dragPanFps": 5.717837165941579,
+          "dragPanRenderFps": 1.9888129272840274,
+          "select500Ms": 1041.7000000011176,
+          "heapUsedMB": 1837.5387268066406,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1837.5387268066406
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 18711.599999999627,
+          "firstInteractionStallMs": 1778.2000000011176,
+          "settledFps": 59.65993835144124,
+          "wheelZoomFps": 37.14417198078972,
+          "wheelZoomRenderFps": 35.500624548011416,
+          "dragPanFps": 4.977470397150714,
+          "dragPanRenderFps": 1.8338048831607896,
+          "select500Ms": 1025.5999999996275,
+          "heapUsedMB": 1887.970458984375,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1887.970458984375
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 18421,
+          "firstInteractionStallMs": 1755.7999999988824,
+          "settledFps": 59.749053973245594,
+          "wheelZoomFps": 36.504677161765784,
+          "wheelZoomRenderFps": 35.20093869170272,
+          "dragPanFps": 3.3713547227063096,
+          "dragPanRenderFps": 1.4983798767583598,
+          "select500Ms": 1042.9000000003725,
+          "heapUsedMB": 1859.0824508666992,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1859.0824508666992
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 18711.599999999627,
+          "q1": 18566.299999999814,
+          "q3": 18736.299999999814,
+          "iqr": 170,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 1778.2000000011176,
+          "q1": 1767,
+          "q3": 1807.5,
+          "iqr": 40.5,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.65993835144124,
+          "q1": 59.60959990828853,
+          "q3": 59.70449616234342,
+          "iqr": 0.09489625405488766,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 36.59800492292189,
+          "q1": 36.551341042343836,
+          "q3": 36.871088451855805,
+          "iqr": 0.3197474095119688,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 35.500624548011416,
+          "q1": 35.35078161985707,
+          "q3": 35.5635005108261,
+          "iqr": 0.21271889096903607,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 4.977470397150714,
+          "q1": 4.174412559928512,
+          "q3": 5.347653781546146,
+          "iqr": 1.1732412216176344,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 1.8338048831607896,
+          "q1": 1.6660923799595748,
+          "q3": 1.9113089052224086,
+          "iqr": 0.24521652526283377,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 1041.7000000011176,
+          "q1": 1033.6500000003725,
+          "q3": 1042.300000000745,
+          "iqr": 8.650000000372529,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 1859.0824508666992,
+          "q1": 1848.31058883667,
+          "q3": 1873.526454925537,
+          "iqr": 25.215866088867188,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 100000,
+      "edges": 500000,
+      "ratio": 5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 42604.5,
+          "firstInteractionStallMs": 4462.9000000003725,
+          "settledFps": 59.74905397335642,
+          "wheelZoomFps": 16.16361537192809,
+          "wheelZoomRenderFps": 15.174006267524328,
+          "dragPanFps": 22.31932350445076,
+          "dragPanRenderFps": 7.54456005784251,
+          "select500Ms": 2628,
+          "heapUsedMB": 2393.5498008728027,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 500000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 2393.5498008728027
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 41901.300000000745,
+          "firstInteractionStallMs": 4278.200000001118,
+          "settledFps": 59.75500448164751,
+          "wheelZoomFps": 16.148699864884176,
+          "wheelZoomRenderFps": 15.160003954789225,
+          "dragPanFps": 0.5588465407399626,
+          "dragPanRenderFps": 0.5588465407399626,
+          "select500Ms": 3502.699999999255,
+          "heapUsedMB": 2393.2554244995117,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 500000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 2393.2554244995117
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 42109.90000000037,
+          "firstInteractionStallMs": 4369.799999998882,
+          "settledFps": 59.749053973245594,
+          "wheelZoomFps": 16.085614864425178,
+          "wheelZoomRenderFps": 15.100781301297108,
+          "dragPanFps": 8.67219117363654,
+          "dragPanRenderFps": 3.4688764694546155,
+          "select500Ms": 2432.800000000745,
+          "heapUsedMB": 2392.876251220703,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 500000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 2392.876251220703
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 42109.90000000037,
+          "q1": 42005.60000000056,
+          "q3": 42357.200000000186,
+          "iqr": 351.59999999962747,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 4369.799999998882,
+          "q1": 4324,
+          "q3": 4416.3499999996275,
+          "iqr": 92.34999999962747,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.74905397335642,
+          "q1": 59.749053973301,
+          "q3": 59.752029227501964,
+          "iqr": 0.0029752542009617855,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 16.148699864884176,
+          "q1": 16.117157364654677,
+          "q3": 16.156157618406134,
+          "iqr": 0.03900025375145688,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 15.160003954789225,
+          "q1": 15.130392628043166,
+          "q3": 15.167005111156776,
+          "iqr": 0.03661248311360943,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 8.67219117363654,
+          "q1": 4.615518857188252,
+          "q3": 15.49575733904365,
+          "iqr": 10.880238481855397,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 3.4688764694546155,
+          "q1": 2.0138615050972892,
+          "q3": 5.506718263648563,
+          "iqr": 3.4928567585512735,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 2628,
+          "q1": 2530.4000000003725,
+          "q3": 3065.3499999996275,
+          "iqr": 534.9499999992549,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 2393.2554244995117,
+          "q1": 2393.0658378601074,
+          "q3": 2393.402612686157,
+          "iqr": 0.3367748260498047,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 1000,
+      "edges": 5000,
+      "ratio": 5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 1091.5999999996275,
+          "firstInteractionStallMs": 116.09999999962747,
+          "settledFps": 59.70149253731344,
+          "wheelZoomFps": 59.66311764513448,
+          "wheelZoomRenderFps": 58.674226192452686,
+          "dragPanFps": 55.89496945276279,
+          "dragPanRenderFps": 50.69543741064532,
+          "select500Ms": 103.39999999850988,
+          "heapUsedMB": 50.57460689544678,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 50.57460689544678
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1167.6000000014901,
+          "firstInteractionStallMs": 115.5,
+          "settledFps": 59.68367651442906,
+          "wheelZoomFps": 59.02165196471531,
+          "wheelZoomRenderFps": 58.059342421812346,
+          "dragPanFps": 57.21005625654177,
+          "dragPanRenderFps": 30.512030003488942,
+          "select500Ms": 100.20000000111759,
+          "heapUsedMB": 75.25910091400146,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 75.25910091400146
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1097.800000000745,
+          "firstInteractionStallMs": 131.10000000149012,
+          "settledFps": 59.63621906373345,
+          "wheelZoomFps": 59.466781195311576,
+          "wheelZoomRenderFps": 58.80603918203033,
+          "dragPanFps": 58.52869846402587,
+          "dragPanRenderFps": 33.953112368633796,
+          "select500Ms": 97.79999999888241,
+          "heapUsedMB": 54.06816005706787,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 54.06816005706787
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1097.800000000745,
+          "q1": 1094.7000000001863,
+          "q3": 1132.7000000011176,
+          "iqr": 38.00000000093132,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 116.09999999962747,
+          "q1": 115.79999999981374,
+          "q3": 123.6000000005588,
+          "iqr": 7.800000000745058,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.68367651442906,
+          "q1": 59.65994778908126,
+          "q3": 59.692584525871254,
+          "iqr": 0.032636736789996235,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.466781195311576,
+          "q1": 59.24421658001344,
+          "q3": 59.56494942022303,
+          "iqr": 0.3207328402095868,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.674226192452686,
+          "q1": 58.36678430713252,
+          "q3": 58.74013268724151,
+          "iqr": 0.3733483801089932,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 57.21005625654177,
+          "q1": 56.55251285465228,
+          "q3": 57.86937736028382,
+          "iqr": 1.3168645056315427,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 33.953112368633796,
+          "q1": 32.23257118606137,
+          "q3": 42.324274889639554,
+          "iqr": 10.091703703578183,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 100.20000000111759,
+          "q1": 99,
+          "q3": 101.79999999981374,
+          "iqr": 2.7999999998137355,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 54.06816005706787,
+          "q1": 52.321383476257324,
+          "q3": 64.66363048553467,
+          "iqr": 12.342247009277344,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 5000,
+      "edges": 25000,
+      "ratio": 5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 2393,
+          "firstInteractionStallMs": 230.09999999962747,
+          "settledFps": 59.7371565113279,
+          "wheelZoomFps": 18.53854472423915,
+          "wheelZoomRenderFps": 17.920593233431177,
+          "dragPanFps": 25.5446591109368,
+          "dragPanRenderFps": 12.919137941163438,
+          "select500Ms": 203.30000000074506,
+          "heapUsedMB": 162.20320224761963,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 162.20320224761963
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 2443.2000000011176,
+          "firstInteractionStallMs": 229.30000000074506,
+          "settledFps": 59.719319199805405,
+          "wheelZoomFps": 18.454963413846688,
+          "wheelZoomRenderFps": 18.131192125884464,
+          "dragPanFps": 19.283585578206996,
+          "dragPanRenderFps": 11.394846023485952,
+          "select500Ms": 213.09999999962747,
+          "heapUsedMB": 171.22630786895752,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 171.22630786895752
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 2379.9000000003725,
+          "firstInteractionStallMs": 219.2999999988824,
+          "settledFps": 59.75500448164751,
+          "wheelZoomFps": 16.834519625503923,
+          "wheelZoomRenderFps": 16.539177175933677,
+          "dragPanFps": 17.63357432550806,
+          "dragPanRenderFps": 10.87403750072997,
+          "select500Ms": 218.59999999962747,
+          "heapUsedMB": 191.2549057006836,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 191.2549057006836
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 2393,
+          "q1": 2386.4500000001863,
+          "q3": 2418.100000000559,
+          "iqr": 31.65000000037253,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 229.30000000074506,
+          "q1": 224.29999999981374,
+          "q3": 229.70000000018626,
+          "iqr": 5.400000000372529,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.7371565113279,
+          "q1": 59.728237855566654,
+          "q3": 59.74608049648771,
+          "iqr": 0.017842640921053032,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 18.454963413846688,
+          "q1": 17.644741519675307,
+          "q3": 18.496754069042918,
+          "iqr": 0.8520125493676112,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 17.920593233431177,
+          "q1": 17.229885204682425,
+          "q3": 18.025892679657822,
+          "iqr": 0.7960074749753971,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 19.283585578206996,
+          "q1": 18.45857995185753,
+          "q3": 22.414122344571897,
+          "iqr": 3.955542392714367,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 11.394846023485952,
+          "q1": 11.134441762107961,
+          "q3": 12.156991982324694,
+          "iqr": 1.0225502202167327,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 213.09999999962747,
+          "q1": 208.20000000018626,
+          "q3": 215.84999999962747,
+          "iqr": 7.6499999994412065,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 171.22630786895752,
+          "q1": 166.71475505828857,
+          "q3": 181.24060678482056,
+          "iqr": 14.525851726531982,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 10000,
+      "edges": 50000,
+      "ratio": 5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 4305.700000001118,
+          "firstInteractionStallMs": 452.5,
+          "settledFps": 59.77881837195695,
+          "wheelZoomFps": 9.64878425318311,
+          "wheelZoomRenderFps": 8.821745602910271,
+          "dragPanFps": 5.832793259883345,
+          "dragPanRenderFps": 4.320587599913589,
+          "select500Ms": 365.90000000037253,
+          "heapUsedMB": 396.7154769897461,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 396.7154769897461
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 4239.199999999255,
+          "firstInteractionStallMs": 414.1000000014901,
+          "settledFps": 59.808612440235805,
+          "wheelZoomFps": 10.584386426323727,
+          "wheelZoomRenderFps": 9.622169478476115,
+          "dragPanFps": 5.717979315830815,
+          "dragPanRenderFps": 4.723548130468934,
+          "select500Ms": 359.7999999988824,
+          "heapUsedMB": 410.0823850631714,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 410.0823850631714
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 4278,
+          "firstInteractionStallMs": 431.80000000074506,
+          "settledFps": 59.63621906373345,
+          "wheelZoomFps": 10.40123554070299,
+          "wheelZoomRenderFps": 9.455668673366354,
+          "dragPanFps": 4.317691171457789,
+          "dragPanRenderFps": 3.8631973639359165,
+          "select500Ms": 443.2000000011176,
+          "heapUsedMB": 397.0784492492676,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 397.0784492492676
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 4278,
+          "q1": 4258.5999999996275,
+          "q3": 4291.850000000559,
+          "iqr": 33.25000000093132,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 431.80000000074506,
+          "q1": 422.9500000011176,
+          "q3": 442.15000000037253,
+          "iqr": 19.199999999254942,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.77881837195695,
+          "q1": 59.707518717845204,
+          "q3": 59.79371540609638,
+          "iqr": 0.08619668825117799,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 10.40123554070299,
+          "q1": 10.02500989694305,
+          "q3": 10.492810983513358,
+          "iqr": 0.46780108657030794,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 9.455668673366354,
+          "q1": 9.138707138138312,
+          "q3": 9.538919075921235,
+          "iqr": 0.40021193778292385,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 5.717979315830815,
+          "q1": 5.017835243644303,
+          "q3": 5.77538628785708,
+          "iqr": 0.7575510442127769,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 4.320587599913589,
+          "q1": 4.091892481924752,
+          "q3": 4.522067865191262,
+          "iqr": 0.4301753832665094,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 365.90000000037253,
+          "q1": 362.84999999962747,
+          "q3": 404.55000000074506,
+          "iqr": 41.70000000111759,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 397.0784492492676,
+          "q1": 396.89696311950684,
+          "q3": 403.5804171562195,
+          "iqr": 6.6834540367126465,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 25000,
+      "edges": 125000,
+      "ratio": 5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 10544.799999998882,
+          "firstInteractionStallMs": 1285.7999999988824,
+          "settledFps": 59.86828976256695,
+          "wheelZoomFps": 5.282620179609697,
+          "wheelZoomRenderFps": 4.350393089090339,
+          "dragPanFps": 42.81665845243471,
+          "dragPanRenderFps": 17.557910300638696,
+          "select500Ms": 675.4000000003725,
+          "heapUsedMB": 839.6304111480713,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 839.6304111480713
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 10549.900000000373,
+          "firstInteractionStallMs": 1128.7999999988824,
+          "settledFps": 59.65993835133074,
+          "wheelZoomFps": 4.537638517387128,
+          "wheelZoomRenderFps": 3.8211692777996866,
+          "dragPanFps": 2.7676127802212696,
+          "dragPanRenderFps": 1.9988314523820279,
+          "select500Ms": 775.5999999996275,
+          "heapUsedMB": 812.146409034729,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 812.146409034729
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 10470.10000000149,
+          "firstInteractionStallMs": 1428.800000000745,
+          "settledFps": 59.61251862891208,
+          "wheelZoomFps": 4.794757731544939,
+          "wheelZoomRenderFps": 3.9956314429541155,
+          "dragPanFps": 2.173879287588199,
+          "dragPanRenderFps": 1.8633251036470275,
+          "select500Ms": 778.8000000007451,
+          "heapUsedMB": 768.1215028762817,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 768.1215028762817
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 10544.799999998882,
+          "q1": 10507.450000000186,
+          "q3": 10547.349999999627,
+          "iqr": 39.89999999944121,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 1285.7999999988824,
+          "q1": 1207.2999999988824,
+          "q3": 1357.2999999998137,
+          "iqr": 150.00000000093132,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.65993835133074,
+          "q1": 59.63622849012141,
+          "q3": 59.76411405694884,
+          "iqr": 0.12788556682743035,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 4.794757731544939,
+          "q1": 4.6661981244660335,
+          "q3": 5.038688955577318,
+          "iqr": 0.37249083111128467,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 3.9956314429541155,
+          "q1": 3.908400360376901,
+          "q3": 4.173012266022227,
+          "iqr": 0.2646119056453262,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 2.7676127802212696,
+          "q1": 2.4707460339047342,
+          "q3": 22.79213561632799,
+          "iqr": 20.321389582423254,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 1.9988314523820279,
+          "q1": 1.9310782780145277,
+          "q3": 9.778370876510362,
+          "iqr": 7.847292598495834,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 775.5999999996275,
+          "q1": 725.5,
+          "q3": 777.2000000001863,
+          "iqr": 51.700000000186265,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 812.146409034729,
+          "q1": 790.1339559555054,
+          "q3": 825.8884100914001,
+          "iqr": 35.754454135894775,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 50000,
+      "edges": 250000,
+      "ratio": 5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 21566.5,
+          "firstInteractionStallMs": 2553.2999999988824,
+          "settledFps": 59.63621906373345,
+          "wheelZoomFps": 3.141591530269602,
+          "wheelZoomRenderFps": 2.1991140711887214,
+          "dragPanFps": 24.76887186429228,
+          "dragPanRenderFps": 8.64030413870661,
+          "select500Ms": 1536.3999999985099,
+          "heapUsedMB": 2135.4054832458496,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 2135.4054832458496
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 22051.900000000373,
+          "firstInteractionStallMs": 3492.39999999851,
+          "settledFps": 59.75500448153666,
+          "wheelZoomFps": 2.442002442002442,
+          "wheelZoomRenderFps": 1.7094017094017095,
+          "dragPanFps": 24.470061027739874,
+          "dragPanRenderFps": 8.549780359089835,
+          "select500Ms": 1929.1000000014901,
+          "heapUsedMB": 2094.3985557556152,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 2094.3985557556152
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 21947.800000000745,
+          "firstInteractionStallMs": 2640.199999999255,
+          "settledFps": 59.695552681347365,
+          "wheelZoomFps": 3.0444180594886197,
+          "wheelZoomRenderFps": 2.131092641642034,
+          "dragPanFps": 24.908764409433264,
+          "dragPanRenderFps": 8.978740659214315,
+          "select500Ms": 1945.5999999996275,
+          "heapUsedMB": 2087.8777198791504,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 2087.8777198791504
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 21947.800000000745,
+          "q1": 21757.150000000373,
+          "q3": 21999.85000000056,
+          "iqr": 242.70000000018626,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 2640.199999999255,
+          "q1": 2596.7499999990687,
+          "q3": 3066.2999999988824,
+          "iqr": 469.54999999981374,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.695552681347365,
+          "q1": 59.66588587254041,
+          "q3": 59.72527858144201,
+          "iqr": 0.05939270890160486,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 3.0444180594886197,
+          "q1": 2.743210250745531,
+          "q3": 3.0930047948791106,
+          "iqr": 0.3497945441335797,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 2.131092641642034,
+          "q1": 1.9202471755218717,
+          "q3": 2.1651033564153774,
+          "iqr": 0.2448561808935057,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 24.76887186429228,
+          "q1": 24.619466446016077,
+          "q3": 24.83881813686277,
+          "iqr": 0.21935169084669326,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 8.64030413870661,
+          "q1": 8.595042248898222,
+          "q3": 8.809522398960462,
+          "iqr": 0.21448015006223997,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 1929.1000000014901,
+          "q1": 1732.75,
+          "q3": 1937.3500000005588,
+          "iqr": 204.6000000005588,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 2094.3985557556152,
+          "q1": 2091.138137817383,
+          "q3": 2114.9020195007324,
+          "iqr": 23.76388168334961,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 100000,
+      "edges": 500000,
+      "ratio": 5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 48114.5,
+          "firstInteractionStallMs": 7816,
+          "settledFps": 59.713375796134066,
+          "wheelZoomFps": 2.3648349049642388,
+          "wheelZoomRenderFps": 1.4780218156026492,
+          "dragPanFps": 38.287619236237425,
+          "dragPanRenderFps": 21.4542693996158,
+          "select500Ms": 3853.9000000003725,
+          "heapUsedMB": 3056.8097448349,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 500000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 3056.8097448349
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 47646.60000000149,
+          "firstInteractionStallMs": 7012.5999999996275,
+          "settledFps": 59.67774020288221,
+          "wheelZoomFps": 1.3970165934524874,
+          "wheelZoomRenderFps": 0.9313443956349916,
+          "dragPanFps": 38.22453619796266,
+          "dragPanRenderFps": 21.74844300918565,
+          "select500Ms": 4027.800000000745,
+          "heapUsedMB": 3056.4852437973022,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 500000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 3056.4852437973022
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 47370.699999999255,
+          "firstInteractionStallMs": 7063.39999999851,
+          "settledFps": 59.59475566145768,
+          "wheelZoomFps": 1.583169152828388,
+          "wheelZoomRenderFps": 1.055446101885592,
+          "dragPanFps": 38.88253553340957,
+          "dragPanRenderFps": 22.218591733376897,
+          "select500Ms": 3882.800000000745,
+          "heapUsedMB": 3084.859232902527,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 100000,
+            "edges": 500000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 3084.859232902527
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 47646.60000000149,
+          "q1": 47508.65000000037,
+          "q3": 47880.550000000745,
+          "iqr": 371.90000000037253,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 7063.39999999851,
+          "q1": 7037.999999999069,
+          "q3": 7439.699999999255,
+          "iqr": 401.70000000018626,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.67774020288221,
+          "q1": 59.63624793216995,
+          "q3": 59.69555799950814,
+          "iqr": 0.05931006733818833,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 1.583169152828388,
+          "q1": 1.4900928731404377,
+          "q3": 1.9740020288963134,
+          "iqr": 0.4839091557558757,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 1.055446101885592,
+          "q1": 0.9933952487602918,
+          "q3": 1.2667339587441206,
+          "iqr": 0.2733387099838288,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 38.287619236237425,
+          "q1": 38.25607771710004,
+          "q3": 38.5850773848235,
+          "iqr": 0.32899966772345834,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 21.74844300918565,
+          "q1": 21.601356204400723,
+          "q3": 21.983517371281273,
+          "iqr": 0.38216116688055024,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 3882.800000000745,
+          "q1": 3868.350000000559,
+          "q3": 3955.300000000745,
+          "iqr": 86.95000000018626,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 3056.8097448349,
+          "q1": 3056.647494316101,
+          "q3": 3070.8344888687134,
+          "iqr": 14.186994552612305,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 1000,
+      "edges": 5000,
+      "ratio": 5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 1662.199999999255,
+          "firstInteractionStallMs": 222,
+          "settledFps": 43.62050163572049,
+          "wheelZoomFps": 36.90984369484466,
+          "wheelZoomRenderFps": 36.90984369484466,
+          "dragPanFps": 21.514249506353487,
+          "dragPanRenderFps": 30.061006159562407,
+          "select500Ms": 121.09999999962747,
+          "heapUsedMB": 67.30353260040283,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 67.30353260040283
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 2126,
+          "firstInteractionStallMs": 224.19999999925494,
+          "settledFps": 33.05142412756355,
+          "wheelZoomFps": 31.523417395791057,
+          "wheelZoomRenderFps": 31.523417395791057,
+          "dragPanFps": 30.229930684902968,
+          "dragPanRenderFps": 32.97810620171233,
+          "select500Ms": 116.90000000037253,
+          "heapUsedMB": 71.99428272247314,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 71.99428272247314
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1606.0999999996275,
+          "firstInteractionStallMs": 216.7000000011176,
+          "settledFps": 36.446020488533556,
+          "wheelZoomFps": 32.144750795338005,
+          "wheelZoomRenderFps": 32.144750795338005,
+          "dragPanFps": 26.783463574492682,
+          "dragPanRenderFps": 33.08545500378508,
+          "select500Ms": 126.60000000149012,
+          "heapUsedMB": 85.669358253479,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 85.669358253479
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1662.199999999255,
+          "q1": 1634.1499999994412,
+          "q3": 1894.0999999996275,
+          "iqr": 259.95000000018626,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 222,
+          "q1": 219.3500000005588,
+          "q3": 223.09999999962747,
+          "iqr": 3.7499999990686774,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 36.446020488533556,
+          "q1": 34.748722308048556,
+          "q3": 40.033261062127025,
+          "iqr": 5.2845387540784685,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 32.144750795338005,
+          "q1": 31.83408409556453,
+          "q3": 34.52729724509133,
+          "iqr": 2.6932131495268017,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 32.144750795338005,
+          "q1": 31.83408409556453,
+          "q3": 34.52729724509133,
+          "iqr": 2.6932131495268017,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 26.783463574492682,
+          "q1": 24.148856540423083,
+          "q3": 28.506697129697827,
+          "iqr": 4.357840589274744,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 32.97810620171233,
+          "q1": 31.519556180637366,
+          "q3": 33.031780602748704,
+          "iqr": 1.5122244221113377,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 121.09999999962747,
+          "q1": 119,
+          "q3": 123.8500000005588,
+          "iqr": 4.8500000005587935,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 71.99428272247314,
+          "q1": 69.64890766143799,
+          "q3": 78.83182048797607,
+          "iqr": 9.182912826538086,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 5000,
+      "edges": 25000,
+      "ratio": 5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 5064.60000000149,
+          "firstInteractionStallMs": 748.0999999996275,
+          "settledFps": 9.762764815006259,
+          "wheelZoomFps": 6.764374295377678,
+          "wheelZoomRenderFps": 7.408600418746981,
+          "dragPanFps": 12.90942387943776,
+          "dragPanRenderFps": 12.90942387943776,
+          "select500Ms": 241.7999999988824,
+          "heapUsedMB": 277.99576473236084,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 277.99576473236084
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 5128,
+          "firstInteractionStallMs": 765.1999999992549,
+          "settledFps": 9.57762666411605,
+          "wheelZoomFps": 6.626905235253648,
+          "wheelZoomRenderFps": 7.229351165731253,
+          "dragPanFps": 12.689231858827709,
+          "dragPanRenderFps": 12.689231858827709,
+          "select500Ms": 249.5,
+          "heapUsedMB": 278.43412685394287,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 278.43412685394287
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 5156.5,
+          "firstInteractionStallMs": 777.0999999996275,
+          "settledFps": 9.951148905370268,
+          "wheelZoomFps": 5.740363364998549,
+          "wheelZoomRenderFps": 6.314399701498404,
+          "dragPanFps": 12.743761484206477,
+          "dragPanRenderFps": 12.743761484206477,
+          "select500Ms": 251.90000000037253,
+          "heapUsedMB": 272.4383306503296,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 272.4383306503296
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 5128,
+          "q1": 5096.300000000745,
+          "q3": 5142.25,
+          "iqr": 45.94999999925494,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 765.1999999992549,
+          "q1": 756.6499999994412,
+          "q3": 771.1499999994412,
+          "iqr": 14.5,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 9.762764815006259,
+          "q1": 9.670195739561155,
+          "q3": 9.856956860188262,
+          "iqr": 0.18676112062710715,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 6.626905235253648,
+          "q1": 6.183634300126099,
+          "q3": 6.695639765315663,
+          "iqr": 0.5120054651895645,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 7.229351165731253,
+          "q1": 6.771875433614829,
+          "q3": 7.318975792239117,
+          "iqr": 0.547100358624288,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 12.743761484206477,
+          "q1": 12.716496671517092,
+          "q3": 12.826592681822119,
+          "iqr": 0.11009601030502658,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 12.743761484206477,
+          "q1": 12.716496671517092,
+          "q3": 12.826592681822119,
+          "iqr": 0.11009601030502658,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 249.5,
+          "q1": 245.6499999994412,
+          "q3": 250.70000000018626,
+          "iqr": 5.050000000745058,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 277.99576473236084,
+          "q1": 275.2170476913452,
+          "q3": 278.21494579315186,
+          "iqr": 2.9978981018066406,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 10000,
+      "edges": 50000,
+      "ratio": 5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 9973.299999998882,
+          "firstInteractionStallMs": 2014.9000000003725,
+          "settledFps": 4.077305716386331,
+          "wheelZoomFps": 3.155470007257952,
+          "wheelZoomRenderFps": 3.155470007257952,
+          "dragPanFps": 4.963786918165622,
+          "dragPanRenderFps": 4.963786918165622,
+          "select500Ms": 434.3999999985099,
+          "heapUsedMB": 736.782693862915,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 736.782693862915
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 9851.599999999627,
+          "firstInteractionStallMs": 1670.1000000014901,
+          "settledFps": 4.356159609692341,
+          "wheelZoomFps": 3.265019087804203,
+          "wheelZoomRenderFps": 3.265019087804203,
+          "dragPanFps": 5.232986846174437,
+          "dragPanRenderFps": 5.232986846174437,
+          "select500Ms": 440,
+          "heapUsedMB": 773.063006401062,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 773.063006401062
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 9853.599999999627,
+          "firstInteractionStallMs": 1791.8999999985099,
+          "settledFps": 4.211235576522114,
+          "wheelZoomFps": 3.1460391367272296,
+          "wheelZoomRenderFps": 3.1460391367272296,
+          "dragPanFps": 5.105000580113702,
+          "dragPanRenderFps": 5.105000580113702,
+          "select500Ms": 444.40000000037253,
+          "heapUsedMB": 756.5731830596924,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 756.5731830596924
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 9853.599999999627,
+          "q1": 9852.599999999627,
+          "q3": 9913.449999999255,
+          "iqr": 60.84999999962747,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 1791.8999999985099,
+          "q1": 1731,
+          "q3": 1903.3999999994412,
+          "iqr": 172.3999999994412,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 4.211235576522114,
+          "q1": 4.144270646454222,
+          "q3": 4.283697593107227,
+          "iqr": 0.13942694665300515,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 3.155470007257952,
+          "q1": 3.1507545719925907,
+          "q3": 3.2102445475310777,
+          "iqr": 0.059489975538487005,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 3.155470007257952,
+          "q1": 3.1507545719925907,
+          "q3": 3.2102445475310777,
+          "iqr": 0.059489975538487005,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 5.105000580113702,
+          "q1": 5.034393749139662,
+          "q3": 5.1689937131440695,
+          "iqr": 0.13459996400440755,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 5.105000580113702,
+          "q1": 5.034393749139662,
+          "q3": 5.1689937131440695,
+          "iqr": 0.13459996400440755,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 440,
+          "q1": 437.19999999925494,
+          "q3": 442.20000000018626,
+          "iqr": 5.000000000931323,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 756.5731830596924,
+          "q1": 746.6779384613037,
+          "q3": 764.8180947303772,
+          "iqr": 18.140156269073486,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 25000,
+      "edges": 125000,
+      "ratio": 5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 25278.400000000373,
+          "firstInteractionStallMs": 4778,
+          "settledFps": 1.539882968895689,
+          "wheelZoomFps": 1.3969825177614272,
+          "wheelZoomRenderFps": 1.3969825177614272,
+          "dragPanFps": 1.6001280102408193,
+          "dragPanRenderFps": 1.760140811264901,
+          "select500Ms": 1182,
+          "heapUsedMB": 1579.3166007995605,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1579.3166007995605
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 25029.900000000373,
+          "firstInteractionStallMs": 4950.699999999255,
+          "settledFps": 1.5610365282556689,
+          "wheelZoomFps": 1.4391743251299296,
+          "wheelZoomRenderFps": 1.4391743251299296,
+          "dragPanFps": 1.6776271641393563,
+          "dragPanRenderFps": 1.8453898805532918,
+          "select500Ms": 1160.199999999255,
+          "heapUsedMB": 1565.6787338256836,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1565.6787338256836
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 51413.90000000037,
+          "firstInteractionStallMs": 4680.0999999996275,
+          "settledFps": 1.4277555682459568,
+          "wheelZoomFps": 1.2948575656677765,
+          "wheelZoomRenderFps": 1.2948575656677765,
+          "dragPanFps": 1.5978014252389665,
+          "dragPanRenderFps": 1.757581567762863,
+          "select500Ms": 1255.2000000011176,
+          "heapUsedMB": 838.269208908081,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 838.269208908081
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 25278.400000000373,
+          "q1": 25154.150000000373,
+          "q3": 38346.15000000037,
+          "iqr": 13192,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 4778,
+          "q1": 4729.049999999814,
+          "q3": 4864.3499999996275,
+          "iqr": 135.29999999981374,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 1.539882968895689,
+          "q1": 1.483819268570823,
+          "q3": 1.5504597485756788,
+          "iqr": 0.0666404800048559,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 1.3969825177614272,
+          "q1": 1.345920041714602,
+          "q3": 1.4180784214456783,
+          "iqr": 0.0721583797310763,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 1.3969825177614272,
+          "q1": 1.345920041714602,
+          "q3": 1.4180784214456783,
+          "iqr": 0.0721583797310763,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 1.6001280102408193,
+          "q1": 1.598964717739893,
+          "q3": 1.6388775871900878,
+          "iqr": 0.0399128694501949,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 1.760140811264901,
+          "q1": 1.758861189513882,
+          "q3": 1.8027653459090964,
+          "iqr": 0.0439041563952145,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 1182,
+          "q1": 1171.0999999996275,
+          "q3": 1218.6000000005588,
+          "iqr": 47.50000000093132,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 1565.6787338256836,
+          "q1": 1201.9739713668823,
+          "q3": 1572.497667312622,
+          "iqr": 370.52369594573975,
+          "n": 3
+        }
+      },
+      "caveats": [
+        "run 3 load includes a 26 s laptop suspend; medians unaffected"
+      ],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 50000,
+      "edges": 250000,
+      "ratio": 5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 56107.59999999963,
+          "firstInteractionStallMs": 10933.5,
+          "settledFps": 0.7257420712676752,
+          "wheelZoomFps": 0.7112502000390716,
+          "wheelZoomRenderFps": 0.7112502000390716,
+          "dragPanFps": 0.6341441319019794,
+          "dragPanRenderFps": 0.7247361507451193,
+          "select500Ms": 3265.60000000149,
+          "heapUsedMB": 1407.3123140335083,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1407.3123140335083
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 60026.59999999963,
+          "firstInteractionStallMs": 10978.599999999627,
+          "settledFps": 0.5421817393189102,
+          "wheelZoomFps": 0.647951662806072,
+          "wheelZoomRenderFps": 0.647951662806072,
+          "dragPanFps": 0.6441460923337634,
+          "dragPanRenderFps": 0.7361669626671581,
+          "select500Ms": 2521,
+          "heapUsedMB": 1407.4037256240845,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1407.4037256240845
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 56568.59999999963,
+          "firstInteractionStallMs": 11329.900000000373,
+          "settledFps": 0.7845598619176937,
+          "wheelZoomFps": 0.7178106774338269,
+          "wheelZoomRenderFps": 0.7178106774338269,
+          "dragPanFps": 0.6203693856570803,
+          "dragPanRenderFps": 0.7089935836080918,
+          "select500Ms": 2657,
+          "heapUsedMB": 1391.4977731704712,
+          "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1391.4977731704712
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 56568.59999999963,
+          "q1": 56338.09999999963,
+          "q3": 58297.59999999963,
+          "iqr": 1959.5,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 10978.599999999627,
+          "q1": 10956.049999999814,
+          "q3": 11154.25,
+          "iqr": 198.20000000018626,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 0.7257420712676752,
+          "q1": 0.6339619052932928,
+          "q3": 0.7551509665926844,
+          "iqr": 0.12118906129939166,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 0.7112502000390716,
+          "q1": 0.6796009314225717,
+          "q3": 0.7145304387364493,
+          "iqr": 0.03492950731387756,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 0.7112502000390716,
+          "q1": 0.6796009314225717,
+          "q3": 0.7145304387364493,
+          "iqr": 0.03492950731387756,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 0.6341441319019794,
+          "q1": 0.6272567587795299,
+          "q3": 0.6391451121178714,
+          "iqr": 0.011888353338341484,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 0.7247361507451193,
+          "q1": 0.7168648671766056,
+          "q3": 0.7304515567061387,
+          "iqr": 0.013586689529533125,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 2657,
+          "q1": 2589,
+          "q3": 2961.300000000745,
+          "iqr": 372.30000000074506,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 1407.3123140335083,
+          "q1": 1399.4050436019897,
+          "q3": 1407.3580198287964,
+          "iqr": 7.952976226806641,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 100000,
+      "edges": 500000,
+      "ratio": 5,
+      "variant": "overlays",
+      "runs": [],
+      "status": "timeout",
+      "reason": "run 1 exceeded 240000 ms"
+    }
+  ],
+  "finishedAt": "2026-11-06T14:27:10.461Z"
+}
