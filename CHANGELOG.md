@@ -44,6 +44,7 @@ Saved files load unchanged. One behaviour changes on purpose — **with the filt
 
 ### Performance
 
+* **No more freeze on the first mouse move over a large graph.** Graphs with more than 25,000 edges are now drawn without edge hover and edge click, which made the first interaction after loading hang for 0.6 s at 75,000 edges and 1.8 s at 250,000 (Radeon 890M); frame rates are unchanged. A status line says so when it applies; edges stay selectable with a query or the selection panel.
 * **Changing a group's colour or label no longer re-fits its outline.** Every style field counted as part of the outline's shape, so recolouring a group or editing its label re-ran the full outline fit. Only padding, corridor and avoidance change the shape now; everything else just repaints.
 
 ## 1.17.1 — 2026-08-12

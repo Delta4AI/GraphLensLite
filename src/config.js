@@ -326,6 +326,12 @@ const CFG = {
   MAX_NODES_BEFORE_HIDING_LABELS: 1000,
   HIDE_LABELS: false,
 
+// Above this edge count the renderer is built without edge hover/click: sigma's
+// edge picking stalls the first interaction (~0.6 s at 75k edges, ~1.8 s at
+// 250k on a Radeon 890M) while frame rates are unaffected. Edges stay
+// selectable through queries and the selection panel.
+  MAX_EDGES_FOR_EDGE_EVENTS: 25000,
+
 // Hover highlight effect. Controlled only by the manual toggle button (sigma
 // renders hover fast enough that no automatic node/edge-count cutoff is needed).
   DISABLE_HOVER_EFFECT: false,

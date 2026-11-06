@@ -325,6 +325,11 @@ function bitmapLooksBlank(bitmap) {
   return true;
 }
 
+/** Whether a graph of `edgeCount` edges gets sigma edge events (hover/click). */
+function edgeEventsEnabled(edgeCount, cfg) {
+  return edgeCount <= cfg.MAX_EDGES_FOR_EDGE_EVENTS;
+}
+
 class SigmaAdapter {
   /**
    * @param {object} cache  app cache; cache.graphData must hold the graphology graph
@@ -355,9 +360,18 @@ class SigmaAdapter {
     // closure only runs per hover render, by which time it exists.
     const getDraggedNode = () => this.interactions?.draggedNode ?? null;
 
+    // Sigma reads enableEdgeEvents only at construction, so the cutoff is
+    // decided per graph build.
+    const edgeEvents = edgeEventsEnabled(this.graph.size, cache.CFG);
+    if (!edgeEvents) {
+      cache.ui?.info?.(
+        `Edge hover and click are off for graphs with more than ${cache.CFG.MAX_EDGES_FOR_EDGE_EVENTS.toLocaleString('en')} edges; select edges with a query or the selection panel.`
+      );
+    }
+
     this.sigma = new Sigma(this.graph, containerEl, {
       allowInvalidContainer: true,
-      enableEdgeEvents: true,
+      enableEdgeEvents: edgeEvents,
       zIndex: true,
       nodeReducer,
       edgeReducer,
@@ -1104,4 +1118,4 @@ class SigmaAdapter {
   }
 }
 
-export { SigmaAdapter };
+export { SigmaAdapter, edgeEventsEnabled };
