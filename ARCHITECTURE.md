@@ -159,7 +159,8 @@ Business logic and UI:
 - `ui_tooltip.js` — the delegated tooltip layer: strips native `title`s and
   renders them itself, and owns `splitShortcut`, the one parser for the trailing
   "(F)" accelerator the command palette also reads
-- `data_editor.js` — spreadsheet-like data editor (`DataTable`), incl. Excel export
+- `data_editor.js` — spreadsheet-like data editor (`DataTable`): Rows/Type switches, row filter, APG grid keyboard, staged changes with a count bar, Excel import/export
+- `data_editor_forms.js` — the data editor's popovers: + Add menu and its node/edge/column forms, the review list of unsaved changes, the row ⋯ menu
 - `demo_loader.js` — STRING DB protein-interaction demo data
 - `neo4j_loader.js` — Neo4j connector (HTTP transactional Cypher API, no driver dependency)
 - `neo4j_session.js` — Neo4j session extensions: expand selected nodes, merge additional queries

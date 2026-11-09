@@ -411,20 +411,15 @@ const TOUR_STEPS = [
   },
   {
     title: 'Data Editor 🔢',
-    text: `The data editor is a <strong>spreadsheet view</strong> of all nodes and edges.
-           You can edit property values directly in cells, add new elements, or export the data.
+    text: `The data editor is a <strong>spreadsheet view</strong> of the graph's nodes and edges.
+           Choose <strong>Selection | All</strong> and <strong>Nodes | Edges | Both</strong>, filter the rows, and edit cells
+           in place (Enter or typing edits, Escape cancels).
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">✔ Apply</span> — push all changes to the graph
-           <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#EFB0AA;border:1px solid rgba(0,0,0,0.3);">⟳ Reset</span> — discard changes and revert to current graph state
+           Edits are marked until you apply them: amber cells, green new rows, struck-through deletions. The bar under
+           the table counts them, with <strong>Review</strong>, <strong>Discard</strong> and <strong>Apply</strong>.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Node</span>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Edge</span>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Column</span> — add new nodes, edges, or property columns to the table
-           <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">⤒ Import</span> — merge a second Excel file into the current graph. You get a preview of what would change first, and you choose whether new nodes and edges are added or only the existing ones extended
-           <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">⤓ Export</span> — export the data table and styling properties as Excel
+           <strong>+ Add</strong> creates a node, an edge or a property column; <strong>⤒ Import</strong> merges an
+           Excel file (with a preview); <strong>⤓ Export</strong> saves the rows shown as Excel.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the header for usage details.`,
     targets: [{ selector: '#workbench' }, { selector: '#dataToggleBtn' }],
