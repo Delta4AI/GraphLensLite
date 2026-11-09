@@ -5202,6 +5202,16 @@ div[slider] > input[type=range]::-ms-tooltip {
     color: var(--text-strong);
 }
 
+/* A blocked primary drops its fill rather than fading it: faded white on the
+   brand slate was unreadable. */
+.insp-btn.primary:disabled {
+    opacity: 1;
+    background: var(--surface-3);
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
 .data-table-wrapper {
     position: relative;
     flex: 1;
