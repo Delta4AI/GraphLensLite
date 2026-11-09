@@ -380,6 +380,13 @@ body {
     font-weight: 600;
 }
 
+/* No keyboard to press them on: key badges inside buttons go. */
+@media (hover: none) {
+    button kbd {
+        display: none;
+    }
+}
+
 /* Presentation mode's way out where there is no Escape key (touch, phones). */
 #presentationExitBtn {
     display: none;
@@ -1369,6 +1376,20 @@ body {
 }
 
 /* --- Selection context: empty state vs live state --- */
+.sel-hidden-note {
+    margin: 12px 0 0;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent-text);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-strong);
+}
+
+.sel-hidden-note[hidden] {
+    display: none;
+}
+
 .insp-empty {
     margin-top: 14px;
 }
@@ -5694,6 +5715,12 @@ div[slider] > input[type=range]::-ms-tooltip {
     padding: 14px 16px;
 }
 
+.tour-phone-note {
+    margin: 8px 0 0;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-soft);
+}
+
 .tour-body code {
     background: var(--surface-2);
     padding: 1px 5px;
@@ -7700,7 +7727,7 @@ div[slider] > input[type=range]::-ms-tooltip {
    (File, workspace, undo/redo, ▤ Panel, ⋯ More); the inspector becomes a
    bottom sheet (body[data-sheet] = half | full) that the workbench shares —
    inspector.js and workbench.js open one at a time. The 760px figure is
-   repeated in inspector.js and workbench.js (matchMedia).
+   repeated in inspector.js (isPhone).
    ========================================================================== */
 .rail-phone-only {
     display: none !important;

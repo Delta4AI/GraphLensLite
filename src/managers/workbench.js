@@ -6,6 +6,8 @@
  * height.
  */
 
+import { isPhone } from './inspector.js';
+
 // Per-tab remembered height, keyed by tab name. Ergonomics rather than workspace
 // content, so it lives in localStorage and not in the workspace JSON.
 const HEIGHT_KEY = 'gll.workbench.heights';
@@ -101,7 +103,7 @@ class Workbench {
     this.tab = name;
     this.el.removeAttribute('hidden');
     // On a phone the inspector is a bottom sheet on the same edge: one at a time.
-    if (globalThis.matchMedia?.('(max-width: 760px)').matches) this.cache.inspector?.closeSheet?.();
+    if (isPhone()) this.cache.inspector?.closeSheet?.();
     this.#applyHeight();
 
     for (const [other, spec] of Object.entries(TABS)) {

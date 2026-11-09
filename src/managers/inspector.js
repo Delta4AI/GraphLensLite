@@ -22,7 +22,10 @@ const FLASH_MS = 1200;
 
 /** Below this width the inspector is a bottom sheet (style.css has the twin query). */
 const PHONE_QUERY = '(max-width: 760px)';
-const isPhone = () => !!globalThis.matchMedia?.(PHONE_QUERY).matches;
+export const isPhone = () => !!globalThis.matchMedia?.(PHONE_QUERY).matches;
+
+/** Marks the history entry the open sheet pushes. */
+const SHEET_STATE = 'gllSheet';
 
 /** 'filters' → 'Filters', for the id convention both panels and pills follow. */
 const elementId = (prefix, name) => `${prefix}${name[0].toUpperCase()}${name.slice(1)}`;
@@ -52,6 +55,11 @@ class Inspector {
     document.getElementById('inspector')?.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.sheet && isPhone()) this.closeSheet();
     });
+    // The phone's Back gesture closes the sheet: openSheet leaves a history
+    // entry for it to pop.
+    globalThis.addEventListener?.('popstate', (e) => {
+      if (this.sheet && !e.state?.[SHEET_STATE]) this.closeSheet();
+    });
   }
 
   // ------------------------------------------------- phone: the bottom sheet
@@ -63,6 +71,7 @@ class Inspector {
 
   /** @param {'half'|'full'} [detent] */
   openSheet(detent = 'half') {
+    if (isPhone() && !history.state?.[SHEET_STATE]) history.pushState({ [SHEET_STATE]: true }, '');
     document.body.dataset.sheet = detent;
     document.querySelector('.sheet-grab')?.setAttribute('aria-label', detent === 'full' ? 'Shorter panel' : 'Taller panel');
     document.getElementById('panelToggleBtn')?.setAttribute('aria-expanded', 'true');
@@ -74,6 +83,8 @@ class Inspector {
 
   closeSheet() {
     if (!this.sheet) return;
+    // Closed some other way than Back: drop the entry, or Back would do nothing once.
+    if (history.state?.[SHEET_STATE]) history.back();
     const hadFocus = document.getElementById('inspector')?.contains(document.activeElement);
     delete document.body.dataset.sheet;
     const toggle = document.getElementById('panelToggleBtn');
@@ -145,7 +156,12 @@ class Inspector {
    * because "Add to selection" fires just as often against a selection that
    * already exists, and that is the case the hint has to cover.
    */
-  syncToSelection(nodeCount, edgeCount) {
+  /**
+   * @param {number} nodeCount visible selected nodes
+   * @param {number} edgeCount visible selected edges
+   * @param {number} [hiddenCount] selected elements the filters hide
+   */
+  syncToSelection(nodeCount, edgeCount, hiddenCount = 0) {
     const size = `${nodeCount}/${edgeCount}`;
     const changed = size !== this.selectionSize;
     this.selectionSize = size;
@@ -153,7 +169,19 @@ class Inspector {
     // With the sheet closed, the Panel button is the one place that shows a selection.
     const total = nodeCount + edgeCount;
     const count = document.querySelector('#panelToggleBtn .rail-panel-count');
-    if (count) count.textContent = total > 0 ? String(total) : '';
+    if (count) {
+      count.textContent = [total > 0 ? String(total) : '', hiddenCount > 0 ? `${hiddenCount} hidden` : '']
+        .filter(Boolean)
+        .join(' · ');
+    }
+    const note = document.getElementById('selectionHiddenNote');
+    if (note) {
+      note.hidden = hiddenCount === 0;
+      note.textContent =
+        hiddenCount === 1
+          ? '1 selected element is hidden by filters. It stays selected; actions touch only visible ones.'
+          : `${hiddenCount} selected elements are hidden by filters. They stay selected; actions touch only visible ones.`;
+    }
     if (changed && nodeCount + edgeCount > 0) this.flashPill('selection');
   }
 
