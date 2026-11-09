@@ -148,7 +148,9 @@ class DropdownChecklist {
         }
         empty.hidden = shown > 0;
         empty.textContent = `No values match "${search.value.trim()}"`;
-        all.querySelector('.filter-cat-name').textContent = q ? 'All matching' : 'All';
+        const allName = q ? 'All matching' : 'All';
+        all.querySelector('.filter-cat-name').textContent = allName;
+        all.querySelector('input').setAttribute('aria-label', allName);
         this.#syncBoxes();
       });
       el.appendChild(search);
@@ -219,8 +221,8 @@ class DropdownChecklist {
     el.addEventListener('keydown', (ev) => this.#onListKey(ev, el));
     this.listEl = el;
     this.#syncBoxes();
-    // RailMenu focuses the first button; this list has none, so focus the
-    // first field once the menu is in the document.
+    // RailMenu focuses the first button, here an "Only"; move to the first
+    // field once the menu is in the document.
     queueMicrotask(() => el.querySelector('input:not([hidden])')?.focus());
   }
 
@@ -231,6 +233,8 @@ class DropdownChecklist {
     const box = document.createElement('input');
     box.type = 'checkbox';
     if (value !== null) box.value = value;
+    // Named by the value alone: the label also holds the count and "Only".
+    box.setAttribute('aria-label', String(text));
     const name = document.createElement('span');
     name.className = 'filter-cat-name';
     name.textContent = text;
