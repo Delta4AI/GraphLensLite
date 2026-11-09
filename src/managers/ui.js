@@ -257,7 +257,7 @@ class UIManager {
 
   toggleStyleElementsThatRequireAtLeastOneSelectedNodeOrEdge(enable) {
     this.toggleDisabledElements(
-      ['resetSelectedElementsStyleBtn', 'focusSelectionBtn', 'clearSelectionBtn'],
+      ['resetSelectedElementsStyleBtn', 'focusSelectionBtn', 'clearSelectionBtn', 'clearSelectionMenuItem'],
       enable
     );
   }
@@ -303,6 +303,7 @@ class UIManager {
       const elem = document.getElementById(elemID);
       if (elem) {
         enable ? elem.classList.remove('disabled') : elem.classList.add('disabled');
+        elem.setAttribute('aria-disabled', String(!enable));
       } else {
         this.debug('Element not found: ' + elemID);
       }
@@ -488,7 +489,11 @@ class UIManager {
         if (e.key === 'Escape') this.togglePresentationMode();
       };
       document.addEventListener('keydown', this._presentationEscape, true);
-      this.info('Presentation mode — press Escape or ⇧F to bring the interface back');
+      this.info(
+        globalThis.matchMedia?.('(hover: none)').matches
+          ? 'Presentation mode — tap ✕ Exit presentation to bring the interface back'
+          : 'Presentation mode — press Escape or ⇧F to bring the interface back'
+      );
     } else if (this._presentationEscape) {
       document.removeEventListener('keydown', this._presentationEscape, true);
       this._presentationEscape = null;
@@ -519,14 +524,29 @@ class UIManager {
     if (!hint) return;
     const placingNote = !!this.cache.graph?.annotationLayer?.placementOverlay;
     const lasso = !!this.cache.graph?.isInteractionEnabled?.('lasso');
-    const text = placingNote
-      ? 'Placing a note · click the canvas · Escape to cancel'
-      : lasso
-        ? 'Lasso · drag around the elements to select · L or Escape to stop'
-        : '';
-    hint.textContent = text;
+    // Key names mean nothing on a touch screen; the button is the way out there.
+    const keys = !globalThis.matchMedia?.('(hover: none)').matches;
+    let text = '';
+    if (placingNote) text = `Placing a note · click the canvas${keys ? ' · Escape to cancel' : ''}`;
+    else if (lasso) text = `Lasso · drag around the elements to select${keys ? ' · L or Escape to stop' : ''}`;
+    const textEl = hint.querySelector('.mode-hint-text');
+    if (textEl) textEl.textContent = text;
+    const status = document.getElementById('modeStatus');
+    if (status) status.textContent = text;
+    const done = hint.querySelector('.mode-hint-done');
+    if (done) done.textContent = placingNote ? 'Cancel' : 'Done';
     hint.hidden = !text;
-    document.getElementById('lassoMenuItem')?.setAttribute('aria-pressed', String(lasso));
+    const item = document.getElementById('lassoMenuItem');
+    item?.setAttribute('aria-pressed', String(lasso));
+    const label = item?.querySelector('.rail-menu-label');
+    if (label) label.textContent = lasso ? 'Stop lasso' : 'Lasso';
+  }
+
+  /** The mode line's Done / Cancel. */
+  leaveMode() {
+    const layer = this.cache.graph?.annotationLayer;
+    if (layer?.placementOverlay) layer.cancelPlacement();
+    else if (this.cache.graph?.isInteractionEnabled('lasso')) this.toggleLassoSelection();
   }
 
   /**

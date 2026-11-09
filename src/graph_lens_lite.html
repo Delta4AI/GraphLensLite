@@ -113,7 +113,7 @@
        controls the narrow bar hides. -->
   <button id="panelToggleBtn" class="rail-vb rail-phone-only" aria-expanded="false" aria-controls="inspector"
           title="Panel — filters, overlays and the selection" onclick="cache.inspector.toggleSheet()">
-    <span class="rail-vb-g">▤</span><span class="rail-panel-count"></span>
+    <span class="rail-vb-g" aria-hidden="true">▤</span><span class="visually-hidden">Panel</span><span class="rail-panel-count"></span>
   </button>
   <button id="railMoreBtn" class="rail-vb rail-phone-only" aria-label="More"
           title="More — fit, layout, search, selection, workbench, export, theme">
@@ -150,7 +150,8 @@
     <span id="selectionHiddenWarning" class="rail-selchip-warning" style="display: none;"
           title="Filters currently hide part of your selection. Hidden elements stay selected, but actions only touch visible ones."></span>
     <button id="clearSelectionBtn" class="rail-chip-btn red disabled" title="Clear selection"
-            aria-label="Clear selection" onclick="cache.sm.clearSelection()">×</button>
+            aria-label="Clear selection" aria-disabled="true"
+            onclick="cache.sm.clearSelection(); document.getElementById('selectMenuBtn').focus()">×</button>
   </div>
   <span class="rail-spacer"></span>
   <div class="rail-tabs">
@@ -180,11 +181,17 @@
   <button id="darkModeToggleBtn" class="rail-mini" aria-label="Switch to dark mode" title="Switch to dark mode" onclick="cache.ui.toggleDarkMode()">🌙</button>
   <button id="keyboardSheetBtn" class="rail-mini" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onclick="cache.ui.toggleKeyboardSheet()">?</button>
 </header>
+<button type="button" id="presentationExitBtn" onclick="cache.ui.togglePresentationMode()">✕ Exit presentation</button>
 <div id="mainContent">
   <div id="outerGraphContainer">
     <div id="innerGraphContainer"></div>
     <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
-    <div id="modeHint" class="mode-hint" role="status" hidden></div>
+    <!-- Always rendered, so a mode change is announced; the visible line below repeats it. -->
+    <span id="modeStatus" class="visually-hidden" role="status"></span>
+    <div id="modeHint" class="mode-hint" hidden>
+      <span class="mode-hint-text" aria-hidden="true"></span>
+      <button type="button" class="mode-hint-done" onclick="cache.ui.leaveMode()"></button>
+    </div>
     <section id="workbench" aria-label="Workbench" hidden>
       <div class="resize-handle"></div>
       <div class="panel-header panel-header-full-width">
@@ -331,8 +338,8 @@
                     title="Drag a freeform area around the elements you want (L)"
                     onclick="cache.ui.toggleLassoSelection()">➰ Lasso <kbd>L</kbd></button>
             <button type="button" class="insp-btn"
-                    title="Open the rail's Select menu: all/no nodes, all/no edges, or by ID or label"
-                    onclick="document.getElementById('selectMenuBtn').click()">◈ By name or ID</button>
+                    title="Open the selection chip's menu: all/no nodes, all/no edges, or by ID or label"
+                    onclick="cache.rail.openSelectionMenu(this)">◈ By name or ID</button>
             <button type="button" class="insp-btn"
                     title="Write a predicate over any property and turn it into a selection"
                     onclick="cache.ui.toggleQueryEditor()">📝 Query editor</button>
