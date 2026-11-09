@@ -1823,9 +1823,10 @@ h5 {
     display: grid;
     /* The input column has a floor: the card is otherwise only as wide as
        its button row, which left room for a couple of IDs. */
-    grid-template-columns: max-content minmax(240px, 1fr) auto auto;
+    /* The label column matches .prop-row's, so lookups align with the rows above. */
+    grid-template-columns: 84px minmax(240px, 1fr) auto auto;
     align-items: center;
-    gap: 4px 2px;
+    gap: 4px 8px;
     margin-top: 4px;
 }
 
@@ -2203,6 +2204,34 @@ h5 {
     padding: 0 8px;
 }
 
+/* A field's border is its only edge when empty, so it owes 3:1 (WCAG 1.4.11);
+   buttons are named by their text and keep the hairline. */
+.prop-select,
+.prop-text,
+.select-lookup .style-input,
+.prop-ctl .color-hex,
+.prop-ctl .style-input-sm,
+.prop-seg,
+.color-well {
+    border-color: var(--text-faint);
+}
+
+.prop-ctl .is-invalid {
+    border-color: var(--danger-text);
+    box-shadow: 0 0 0 1px var(--danger-text);
+}
+
+/* Forces what follows onto its own line (the palette under a colour well). */
+.prop-break {
+    flex-basis: 100%;
+    height: 0;
+}
+
+/* A row whose every control is unavailable dims its label with them. */
+.prop-row:not(:has(.prop-ctl > :not(.disabled))) > .prop-label {
+    opacity: 0.5;
+}
+
 .prop-select {
     flex: 1 1 96px;
     min-width: 0;
@@ -2238,10 +2267,11 @@ h5 {
     font-family: var(--font-mono, ui-monospace, monospace);
 }
 
+/* The UI face, not the field's monospace: "Mixed" and "None" are words. */
 .prop-ctl ::placeholder {
     color: var(--text-muted);
     font-style: italic;
-    font-family: inherit;
+    font-family: sans-serif;
 }
 
 .prop-ctl .style-slider-container {
@@ -2271,7 +2301,7 @@ h5 {
 }
 
 .style-slider:focus-visible {
-    outline: 2px solid var(--accent-ring);
+    outline: 2px solid var(--accent-text);
     outline-offset: 3px;
 }
 
@@ -2305,14 +2335,19 @@ h5 {
     color: var(--accent-text);
 }
 
+/* The underline carries the state where fill contrast alone is thin (dark). */
 .prop-seg > button[aria-pressed="true"] {
     background: var(--brand-border);
     color: #fff;
+    box-shadow: inset 0 -2px 0 var(--accent-text);
 }
 
+/* Inside the button: the group's overflow clips anything outside. The inner
+   ring keeps it visible on the dark pressed fill. */
 .prop-seg > button:focus-visible {
-    outline: 2px solid var(--accent-ring);
+    outline: 2px solid var(--accent-text);
     outline-offset: -2px;
+    box-shadow: inset 0 0 0 3px var(--bg);
 }
 
 /* Colour: a painted well over the native picker, a hex field, the palette. */
@@ -2343,7 +2378,7 @@ h5 {
 }
 
 .color-well:has(.color-well-input:focus-visible) {
-    outline: 2px solid var(--accent-ring);
+    outline: 2px solid var(--accent-text);
     outline-offset: 1px;
 }
 
@@ -2436,9 +2471,8 @@ h5 {
     box-sizing: border-box;
 }
 
-.prop-more {
-    font-size: 11px;
-    color: var(--text-muted);
+.prop-more[hidden] {
+    display: none;
 }
 
 /* The shared picker behind the chips: present for showPicker(), never seen. */
