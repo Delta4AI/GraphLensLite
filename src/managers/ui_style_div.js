@@ -160,6 +160,10 @@ let propRowSeq = 0;
 function propRow(parent, text, tooltip = undefined) {
   const row = document.createElement("div");
   row.className = "prop-row";
+  // Under a sub-heading the bare label repeats ("Size" for node, label and
+  // badge): the command palette indexes the row by this fuller name.
+  const group = parent.dataset?.propGroup;
+  row.dataset.name = group ? `${group} ${text.toLowerCase()}` : text;
   const label = document.createElement("label");
   label.className = "prop-label";
   label.id = `propLabel${++propRowSeq}`;
@@ -181,6 +185,7 @@ function propSubhead(parent, text) {
   head.className = "prop-subhead";
   head.textContent = text;
   parent.appendChild(head);
+  parent.dataset.propGroup = text;
 }
 
 /**
