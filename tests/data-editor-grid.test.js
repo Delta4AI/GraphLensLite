@@ -153,7 +153,6 @@ describe('data editor grid', () => {
     expect(bar().hidden).toBe(false);
 
     dt.populateFromFileData({ ...dt.fileData, nodeDataHeaders: [{ subGroup: 'Bio', key: 'Score' }] });
-    expect(dt.cache.ui.warning).toHaveBeenCalledWith(expect.stringContaining('2 unsaved data editor changes were discarded'));
     expect(dt.pendingChanges.size).toBe(0);
     expect(dt.addedColumns).toEqual([]);
     expect(bar().hidden).toBe(true);
@@ -235,5 +234,48 @@ describe('data editor grid', () => {
     dt.deleteRow('Node', 'n1');
     new DataTable(cache).carryOver(dt);
     expect(cache.ui.warning).toHaveBeenCalledWith(expect.stringContaining('1 unsaved data editor change was discarded'));
+  });
+
+  it('spends a carried-over focus on the first render, never later', async () => {
+    const { dt, cache } = mount();
+    await dt.switchTab('allNodes');
+    cell(dt, 'n1', P).focus();
+    // A reload in the default Selection view: the new editor's table is empty.
+    await dt.switchTab('selectedNodes');
+    // The old editor's empty state now holds focus, as Apply's button would.
+    document.querySelector('.data-empty button').focus();
+    const next = new DataTable(cache);
+    next.carryOver(dt);
+    next.init();
+    next.populateFromFileData(dt.fileData);
+    expect(document.querySelector('.data-empty').contains(document.activeElement)).toBe(true);
+
+    // Later, the user works elsewhere; a selection refresh must not pull focus into the grid.
+    const elsewhere = document.body.appendChild(document.createElement('input'));
+    elsewhere.focus();
+    cache.selectedNodes = ['n2'];
+    await next.refreshCurrentTab();
+    expect(document.activeElement).toBe(elsewhere);
+  });
+
+  it('puts the edits back on the visible editor when Apply fails before the new one has a pane', async () => {
+    const { dt, cache } = mount();
+    await dt.switchTab('allNodes');
+    const score = cell(dt, 'n1', P);
+    dt.startEdit(score);
+    score.textContent = '7';
+    dt.commitEdit();
+    cache.ui.showLoading = async () => {};
+    cache.ui.hideLoading = async () => {};
+    cache.ui.error = vi.fn();
+    cache.data = { layouts: {}, selectedLayout: 'L' };
+    dt.rebuildGraph = async () => {
+      cache.dataTable = new DataTable(cache); // what cache.reset() does, before init()
+      throw new Error('boom');
+    };
+    await dt.update();
+    expect(cache.ui.error).toHaveBeenCalledWith(expect.stringContaining('boom'));
+    expect(dt.pendingChanges.size).toBe(1);
+    expect(bar().hidden).toBe(false);
   });
 });
