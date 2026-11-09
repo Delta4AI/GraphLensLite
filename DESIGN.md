@@ -99,6 +99,16 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - View preferences that change what is drawn (hover highlight, minimap, notes)
   are switch rows in the Overlays tab, not bar buttons.
 
+## Saving
+
+- File holds **Open graph file…** and, right under it, **Save as JSON** (S),
+  the format that keeps everything. Export lists the other formats.
+- Work is unsaved from the first recorded change after a load or a save, and
+  while the data editor has staged edits. Closing then asks first: the
+  browser's own "Leave site?" prompt on the web, a Close without saving /
+  Cancel dialog in the desktop app. An action that already confirmed it
+  discards everything (start over) does not ask twice.
+
 ## Narrow windows
 
 - 761–860px: the full bar, tighter. ≤760px (phones): the graph takes the whole

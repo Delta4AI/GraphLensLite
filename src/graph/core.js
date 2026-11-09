@@ -254,6 +254,7 @@ class GraphCoreManager {
       // The graph is now settled: this is the state undo winds back to, and
       // the one "Reset to as loaded" restores.
       this.cache.history?.reset({ origin: 'mark' });
+      this.cache.history?.markSaved(); // as loaded = nothing to lose yet
     } catch (errorMsg) {
       this.cache.ui.error(`Error in initial AFTER_RENDER: ${errorMsg}`);
       this.cache.ui.error('Graph setup failed. Please check your input data.');

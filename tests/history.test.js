@@ -58,6 +58,22 @@ describe('History', () => {
     history.reset();
   });
 
+  it('knows when there is work a closed window would lose', async () => {
+    expect(history.unsaved).toBe(false);
+    layoutOf(cache).filters.get('p1').active = false;
+    history.commit('Filter change');
+    expect(history.unsaved).toBe(true);
+
+    history.markSaved(); // the JSON save
+    expect(history.unsaved).toBe(false);
+
+    await history.undo(); // the state now differs from the saved file
+    expect(history.unsaved).toBe(true);
+
+    history.reset({ origin: 'forget' }); // graph torn down: nothing left to lose
+    expect(history.unsaved).toBe(false);
+  });
+
   it('records what changed since the last commit under one label', () => {
     layoutOf(cache).filters.get('p1').active = false;
     history.commit('Filter change');

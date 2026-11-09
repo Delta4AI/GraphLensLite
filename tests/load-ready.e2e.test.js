@@ -22,7 +22,7 @@ describe.skipIf(!E2E)('graph load, end to end', () => {
     await app?.close();
   });
 
-  it('clears the loading overlay only once the load is finished and undo has its baseline', async () => {
+  it('clears the loading overlay only once the load is finished, with undo baselined and nothing unsaved', async () => {
     const { _electron } = await import('playwright');
     app = await _electron.launch({
       executablePath: path.join(ROOT, 'node_modules/electron/dist/electron'),
@@ -51,5 +51,15 @@ describe.skipIf(!E2E)('graph load, end to end', () => {
     await page.waitForFunction(() => !!window.__readyAt, null, { timeout: 90_000, polling: 100 });
 
     expect(await page.evaluate(() => window.__readyAt)).toEqual({ baseline: true, running: false });
+
+    // A graph as loaded has nothing to lose; a change does, until it is saved
+    // (the desktop app reads this on close; a browser tab via beforeunload).
+    const unsaved = () => page.evaluate(() => window.cache.history.unsavedWork);
+    expect(await unsaved()).toBe(false);
+    await page.evaluate(() => {
+      window.cache.data.layouts[window.cache.data.selectedLayout].positions.set('__e2e', { style: { x: 1, y: 1 } });
+      window.cache.history.commit('Move');
+    });
+    expect(await unsaved()).toBe(true);
   }, 120_000);
 });
