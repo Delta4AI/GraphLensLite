@@ -105,7 +105,11 @@ class Cache {
     this.picker = new ColorScalePicker(this);
     this.numericPicker = new NumericScalePicker(this);
     this.piePicker = new PieChartPicker(this);
+    // Every load builds a fresh editor; the view the user chose (and whether
+    // they were working in it) carries over, so Apply does not snap back.
+    const previousDataTable = this.dataTable;
     this.dataTable = new DataTable(this);
+    if (previousDataTable) this.dataTable.carryOver(previousDataTable);
     this.metrics = new NetworkMetrics(this);
     this.assistant = new AssistantManager(this);
     this.history = initHistory(this);

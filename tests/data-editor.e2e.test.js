@@ -89,5 +89,9 @@ describe.skipIf(!E2E)('data editor, end to end', () => {
     await expect.poll(() => page.evaluate((h) =>
       String(window.cache.nodeRef.get('n0').featureValues.get(h)), SCORE)).toBe('12.5');
     expect(await bar.isHidden()).toBe(true);
-  });
+    // The rebuild builds a fresh editor; it keeps the view the user was in.
+    expect(await pane.locator('.data-count').textContent()).toBe('1000 nodes');
+    // Apply's rebuild redraws the table; focus stays in it rather than dropping to <body>.
+    expect(await grid.evaluate((g) => g.contains(document.activeElement))).toBe(true);
+  }, 120_000); // Apply rebuilds the graph
 });

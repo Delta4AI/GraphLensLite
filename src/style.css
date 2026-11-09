@@ -5204,7 +5204,8 @@ div[slider] > input[type=range]::-ms-tooltip {
 
 /* A blocked primary drops its fill rather than fading it: faded white on the
    brand slate was unreadable. */
-.insp-btn.primary:disabled {
+.insp-btn.primary:disabled,
+.insp-btn.primary[aria-disabled="true"] {
     opacity: 1;
     background: var(--surface-3);
     border-color: var(--border-soft);
@@ -5350,7 +5351,7 @@ div[slider] > input[type=range]::-ms-tooltip {
 }
 
 /* Staged rows and cells keep their wash under the pointer. */
-.data-table tbody tr:not(.data-row-added, .data-row-deleted):hover td:not(.data-cell-edited) {
+.data-table tbody tr:not(.data-row-added, .data-row-deleted):hover td:not(.data-cell-edited, .editing) {
     background: var(--row-hover);
 }
 
