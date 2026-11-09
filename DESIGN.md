@@ -84,6 +84,32 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - When a colour is mixed, an **In selection** row lists each distinct colour
   with its count; recolouring one changes only those elements.
 
+## Top bar
+
+- Only everyday, workspace-wide controls sit on the bar: File, workspace,
+  undo/redo, Fit, Layout, Search, the selection chip, the four workbench tabs,
+  Export, theme, help. It has to fit a 900px window with labels hidden (they
+  drop at 1200px); a control that would push it past that belongs somewhere
+  else.
+- The selection chip is the selection's one home: it shows the counts, × clears,
+  and clicking it opens everything that builds, frames or walks back a
+  selection (lasso, select all/none/by name, zoom to, undo/redo selection).
+- Modes without a button of their own (lasso, placing a note) announce
+  themselves in the stage's mode line, with how to leave them.
+- View preferences that change what is drawn (hover highlight, minimap, notes)
+  are switch rows in the Overlays tab, not bar buttons.
+
+## Narrow windows
+
+- 761–860px: the full bar, tighter. ≤760px (phones): the graph takes the whole
+  width; the bar keeps File, workspace, undo/redo, ▤ Panel and ⋯ More, and
+  ⋯ More lists the rest by name (menus it reaches open under ⋯ More).
+- The inspector is a bottom sheet at half or full height, opened by ▤ Panel,
+  closed by ×, Escape or ▤ Panel; the grabber switches heights. It never opens
+  itself: the Panel button shows the selection count instead.
+- The workbench and the sheet share the bottom edge: opening one closes the
+  other.
+
 ## Workbench tabs
 
 - The dark header holds only the tab's title, ⓘ help, ⤢ expand and × close.
