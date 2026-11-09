@@ -4,6 +4,7 @@ import { UIManager } from '../src/managers/ui.js';
 import { createStyleDiv } from '../src/managers/ui_style_div.js';
 import { DEFAULTS, CFG, bubbleGroupStyle } from '../src/config.js';
 import { AnnotationLayer } from '../src/graph/annotation_layer.js';
+import { readFileSync } from 'node:fs';
 import { Minimap } from '../src/graph/minimap.js';
 
 // ==========================================================================
@@ -107,6 +108,22 @@ describe('UIManager overlay layer stack', () => {
     for (const name of ['Groups', 'Heatmap', 'Notes', 'Minimap']) {
       expect(isDead(name)).toBe(false);
       expect(sw(name).getAttribute('aria-disabled')).toBe('false');
+    }
+  });
+
+  // The fixture above is hand-written; this one is the shipped markup, which is
+  // where a native `disabled` attribute — invisible to syncOverlays — once hid.
+  it('leaves the shipped Notes and Minimap switches clickable once a graph exists', () => {
+    const html = readFileSync('src/graph_lens_lite.html', 'utf8');
+    const shipped = new DOMParser().parseFromString(html, 'text/html');
+    for (const name of ['Notes', 'Minimap']) {
+      sw(name).replaceWith(shipped.getElementById(`overlaySwitch${name}`));
+    }
+    const [loaded] = makeUI();
+    loaded.syncOverlays();
+    for (const name of ['Notes', 'Minimap']) {
+      expect(sw(name).disabled).toBe(false);
+      expect(isDead(name)).toBe(false);
     }
   });
 
