@@ -319,15 +319,16 @@ const TOUR_STEPS = [
     title: 'Inspector — Appearance 🎨',
     text: `Appearance lives at the bottom of the inspector's <strong>Selection</strong> context
            (<strong>Y</strong> jumps straight to it). Styles apply <strong>only to selected elements</strong> —
-           select nodes/edges first, then adjust. All styles are <strong>per-workspace</strong>.
+           select nodes/edges first, then adjust. Each control shows the selection's current value,
+           or <em>Mixed</em> when the selected elements differ. All styles are <strong>per-workspace</strong>.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Node Configuration</strong>
-           <br>• Shape, size, fill color, border size &amp; color
+           <strong>Nodes</strong>
+           <br>• Shape, size, fill color, border size &amp; color — <strong>In selection</strong> recolours one colour at a time
            <br>• Label text, font size, placement, color &amp; background
            <br>• <strong>Badges</strong> — small text markers at any corner of a node
            <br>• <strong>Pie-chart nodes</strong> — render a node as a multi-slice pie driven by category data
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Edge Configuration</strong>
+           <strong>Edges</strong>
            <br>• Type (line/quadratic/cubic), width, dash pattern, color
            <br>• Label text, font size, placement, rotation, offset &amp; color
            <br>• <strong>Arrows</strong> — start/end arrows with configurable size and type
