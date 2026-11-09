@@ -11,6 +11,7 @@ import {
   createColorPicker,
   propRow,
   propSubhead,
+  nameControl,
 } from "./appearance_controls.js";
 
 // A labelled checkbox with setChecked/toggle/isChecked, for the Groups pane rows.
@@ -710,6 +711,7 @@ function createStyleDiv(cache) {
     labelInput.dataset.property = `Bubble Set ${group} Label Text`;
     labelInput.classList.add(optionalCSSClass, "prop-text");
     labelInput.style.width = "";
+    nameControl(rowLabel, labelInput, "Label text");
     rowLabel.appendChild(labelInput);
 
     // Label Background (toggle + color)
@@ -810,10 +812,11 @@ function createStyleDiv(cache) {
     resetPosition.setAttribute("aria-label", `Reset the dragged label position of "${name}"`);
     rowResetPosition.appendChild(resetPosition);
 
-    // createSwitch knows nothing of its row: name any checkbox left unnamed after the row label.
+    // createSwitch knows nothing of its row: name any checkbox left unnamed
+    // after its row, section and sub-group included ("Cluster 0 label rotate").
     for (const box of panel.querySelectorAll('.prop-check input:not([aria-label])')) {
-      const label = box.closest(".prop-row")?.querySelector(".prop-label");
-      if (label) box.setAttribute("aria-labelledby", label.id);
+      const ctl = box.closest(".prop-ctl");
+      if (ctl) nameControl(ctl, box, ctl.dataset.labelText);
     }
   }
 
@@ -922,6 +925,7 @@ function createStyleDiv(cache) {
       slider.max = max;
       slider.step = step;
       slider.classList.add("style-slider");
+      nameControl(parent, slider, key);
 
       const valueInput = document.createElement("input");
       valueInput.type = "number";
@@ -929,6 +933,7 @@ function createStyleDiv(cache) {
       valueInput.max = max;
       valueInput.step = step;
       valueInput.classList.add("style-input-sm");
+      nameControl(parent, valueInput, key, "value");
 
       const apply = (raw) => {
         const value = parseFloat(raw);
@@ -987,6 +992,7 @@ function createStyleDiv(cache) {
     const rampSelect = document.createElement("select");
     rampSelect.className = "prop-select";
     rampSelect.title = "Color ramp the density maps through.";
+    nameControl(rowRamp, rampSelect, "Heatmap colors");
     for (const name of Object.keys(D.RAMPS)) {
       const option = document.createElement("option");
       option.value = name;
