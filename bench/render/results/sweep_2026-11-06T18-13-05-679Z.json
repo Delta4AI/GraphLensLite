@@ -1,0 +1,5140 @@
+{
+  "kind": "gll-render-sweep",
+  "startedAt": "2026-11-06T18:13:05.679Z",
+  "config": {
+    "sizes": [
+      1000,
+      5000,
+      10000,
+      25000,
+      50000,
+      100000
+    ],
+    "ratios": [
+      1.5,
+      5
+    ],
+    "variants": [
+      "plain",
+      "heavy",
+      "overlays"
+    ],
+    "runs": 3,
+    "timeoutMs": 240000,
+    "fpsWindowMs": 3000
+  },
+  "environment": {
+    "cpu": "Intel(R) Xeon(R) w5-2465X",
+    "cpuThreads": 28,
+    "memoryGB": 238,
+    "os": "Debian GNU/Linux 13 (trixie) (linux 6.12.113+deb13-amd64)",
+    "node": "v22.23.4",
+    "browser": "chromium 148.0.7778.96 (headless)",
+    "browserExecutable": "/home/matthias/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome",
+    "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+    "webgl2": true,
+    "glVendor": "Google Inc. (NVIDIA)",
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/148.0.7778.96 Safari/537.36",
+    "screen": {
+      "width": 1600,
+      "height": 900
+    },
+    "devicePixelRatio": 1,
+    "hardwareConcurrency": 28,
+    "viewport": {
+      "width": 1600,
+      "height": 900
+    },
+    "idleFpsCeiling": 59.85037406483791,
+    "nonRepresentative": false,
+    "gllVersion": "1.18.0",
+    "gitCommit": "91eb61f"
+  },
+  "cells": [
+    {
+      "nodes": 1000,
+      "edges": 1500,
+      "ratio": 1.5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 826.1000000238419,
+          "firstInteractionStallMs": 69,
+          "settledFps": 59.85634477396956,
+          "wheelZoomFps": 60.00786988410589,
+          "wheelZoomRenderFps": 56.40083945391373,
+          "dragPanFps": 59.997348184454026,
+          "dragPanRenderFps": 59.66587112266146,
+          "select500Ms": 22.600000023841858,
+          "heapUsedMB": 27.163386344909668,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 27.163386344909668
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 718.9000000953674,
+          "firstInteractionStallMs": 69.39999997615814,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 59.99213217985521,
+          "wheelZoomRenderFps": 55.07474429626052,
+          "dragPanFps": 60.0132625994695,
+          "dragPanRenderFps": 59.681697612732094,
+          "select500Ms": 21.800000071525574,
+          "heapUsedMB": 27.164122581481934,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 27.164122581481934
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 731.6000000238419,
+          "firstInteractionStallMs": 68.5,
+          "settledFps": 59.880239520958085,
+          "wheelZoomFps": 59.992001067001176,
+          "wheelZoomRenderFps": 56.99240101365111,
+          "dragPanFps": 59.99077064925477,
+          "dragPanRenderFps": 59.66115103030282,
+          "select500Ms": 21.600000023841858,
+          "heapUsedMB": 27.172545433044434,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 27.172545433044434
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 731.6000000238419,
+          "q1": 725.2500000596046,
+          "q3": 778.8500000238419,
+          "iqr": 53.59999996423721,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 69,
+          "q1": 68.75,
+          "q3": 69.19999998807907,
+          "iqr": 0.44999998807907104,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.87426404407992,
+          "q1": 59.865304409024745,
+          "q3": 59.877251782519004,
+          "iqr": 0.011947373494258784,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.99213217985521,
+          "q1": 59.992066623428194,
+          "q3": 60.000001031980545,
+          "iqr": 0.007934408552351613,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 56.40083945391373,
+          "q1": 55.737791875087126,
+          "q3": 56.696620233782426,
+          "iqr": 0.9588283586952997,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.997348184454026,
+          "q1": 59.9940594168544,
+          "q3": 60.00530539196176,
+          "iqr": 0.011245975107364359,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.66587112266146,
+          "q1": 59.66351107648214,
+          "q3": 59.673784367696776,
+          "iqr": 0.010273291214637936,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 21.800000071525574,
+          "q1": 21.700000047683716,
+          "q3": 22.200000047683716,
+          "iqr": 0.5,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 27.164122581481934,
+          "q1": 27.1637544631958,
+          "q3": 27.168334007263184,
+          "iqr": 0.0045795440673828125,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 5000,
+      "edges": 7500,
+      "ratio": 1.5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 1127,
+          "firstInteractionStallMs": 89.79999995231628,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 59.74310465047774,
+          "wheelZoomRenderFps": 59.07929237658354,
+          "dragPanFps": 60.00659413122321,
+          "dragPanRenderFps": 59.67688757006265,
+          "select500Ms": 36.10000002384186,
+          "heapUsedMB": 87.19654941558838,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 87.19654941558838
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1101.5,
+          "firstInteractionStallMs": 89.10000002384186,
+          "settledFps": 59.86828975967398,
+          "wheelZoomFps": 59.72922750388115,
+          "wheelZoomRenderFps": 58.733740378816464,
+          "dragPanFps": 59.994725737925116,
+          "dragPanRenderFps": 59.66508438771673,
+          "select500Ms": 40,
+          "heapUsedMB": 87.08590793609619,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 87.08590793609619
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1130.7999999523163,
+          "firstInteractionStallMs": 89.80000007152557,
+          "settledFps": 59.8623166745031,
+          "wheelZoomFps": 59.74112180550946,
+          "wheelZoomRenderFps": 58.745436442084305,
+          "dragPanFps": 60.00263747762721,
+          "dragPanRenderFps": 59.67295265632157,
+          "select500Ms": 38.90000009536743,
+          "heapUsedMB": 87.13709735870361,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 87.13709735870361
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1127,
+          "q1": 1114.25,
+          "q3": 1128.8999999761581,
+          "iqr": 14.649999976158142,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 89.79999995231628,
+          "q1": 89.44999998807907,
+          "q3": 89.80000001192093,
+          "iqr": 0.3500000238418579,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.86828975967398,
+          "q1": 59.86530321708854,
+          "q3": 59.87127690187695,
+          "iqr": 0.005973684788415312,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.74112180550946,
+          "q1": 59.7351746546953,
+          "q3": 59.7421132279936,
+          "iqr": 0.006938573298299389,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.745436442084305,
+          "q1": 58.73958841045038,
+          "q3": 58.91236440933392,
+          "iqr": 0.17277599888353734,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 60.00263747762721,
+          "q1": 59.99868160777616,
+          "q3": 60.004615804425214,
+          "iqr": 0.005934196649050705,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.67295265632157,
+          "q1": 59.66901852201915,
+          "q3": 59.67492011319211,
+          "iqr": 0.00590159117295741,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 38.90000009536743,
+          "q1": 37.500000059604645,
+          "q3": 39.450000047683716,
+          "iqr": 1.949999988079071,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 87.13709735870361,
+          "q1": 87.1115026473999,
+          "q3": 87.166823387146,
+          "iqr": 0.05532073974609375,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 10000,
+      "edges": 15000,
+      "ratio": 1.5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 1621.6000000238419,
+          "firstInteractionStallMs": 145.89999997615814,
+          "settledFps": 59.86828975967398,
+          "wheelZoomFps": 59.74188863724892,
+          "wheelZoomRenderFps": 58.751691588012754,
+          "dragPanFps": 59.994725737925116,
+          "dragPanRenderFps": 59.66508438771673,
+          "select500Ms": 55.700000047683716,
+          "heapUsedMB": 138.87532711029053,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 138.87532711029053
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1645.2000000476837,
+          "firstInteractionStallMs": 124.79999995231628,
+          "settledFps": 59.862316667383325,
+          "wheelZoomFps": 59.780803719694454,
+          "wheelZoomRenderFps": 58.784456991032876,
+          "dragPanFps": 59.994725737925116,
+          "dragPanRenderFps": 59.66508438771673,
+          "select500Ms": 69.90000009536743,
+          "heapUsedMB": 141.83846950531006,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 141.83846950531006
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1687.9000000953674,
+          "firstInteractionStallMs": 151.79999995231628,
+          "settledFps": 59.86828976679516,
+          "wheelZoomFps": 59.73319174401811,
+          "wheelZoomRenderFps": 58.73763854828447,
+          "dragPanFps": 59.97495551496726,
+          "dragPanRenderFps": 59.64542279235756,
+          "select500Ms": 70.20000004768372,
+          "heapUsedMB": 141.81259441375732,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 141.81259441375732
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1645.2000000476837,
+          "q1": 1633.4000000357628,
+          "q3": 1666.5500000715256,
+          "iqr": 33.15000003576279,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 145.89999997615814,
+          "q1": 135.3499999642372,
+          "q3": 148.8499999642372,
+          "iqr": 13.5,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.86828975967398,
+          "q1": 59.86530321352865,
+          "q3": 59.86828976323457,
+          "iqr": 0.0029865497059233803,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.74188863724892,
+          "q1": 59.73754019063351,
+          "q3": 59.76134617847168,
+          "iqr": 0.023805987838173337,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.751691588012754,
+          "q1": 58.74466506814861,
+          "q3": 58.768074289522815,
+          "iqr": 0.02340922137420165,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.994725737925116,
+          "q1": 59.984840626446186,
+          "q3": 59.994725737925116,
+          "iqr": 0.009885111478929787,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.66508438771673,
+          "q1": 59.65525359003715,
+          "q3": 59.66508438771673,
+          "iqr": 0.009830797679583725,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 69.90000009536743,
+          "q1": 62.800000071525574,
+          "q3": 70.05000007152557,
+          "iqr": 7.25,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 141.81259441375732,
+          "q1": 140.34396076202393,
+          "q3": 141.8255319595337,
+          "iqr": 1.4815711975097656,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 25000,
+      "edges": 37500,
+      "ratio": 1.5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 3300.7999999523163,
+          "firstInteractionStallMs": 65.29999995231628,
+          "settledFps": 59.85634477396956,
+          "wheelZoomFps": 59.75174963827868,
+          "wheelZoomRenderFps": 58.76138914703649,
+          "dragPanFps": 59.996703477830884,
+          "dragPanRenderFps": 59.66705126091973,
+          "select500Ms": 168.10000002384186,
+          "heapUsedMB": 338.80145835876465,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 338.80145835876465
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3391.5,
+          "firstInteractionStallMs": 65.29999995231628,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 59.742647059291095,
+          "wheelZoomRenderFps": 58.75787815172036,
+          "dragPanFps": 60.02044652668338,
+          "dragPanRenderFps": 59.690663853459846,
+          "select500Ms": 138.5,
+          "heapUsedMB": 347.29115867614746,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 347.29115867614746
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3409.5,
+          "firstInteractionStallMs": 65.10000002384186,
+          "settledFps": 59.8623166745031,
+          "wheelZoomFps": 59.73480372943691,
+          "wheelZoomRenderFps": 58.75016410752312,
+          "dragPanFps": 60.20132903574927,
+          "dragPanRenderFps": 59.54339101350064,
+          "select500Ms": 150.40000009536743,
+          "heapUsedMB": 353.6650333404541,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 353.6650333404541
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 3391.5,
+          "q1": 3346.149999976158,
+          "q3": 3400.5,
+          "iqr": 54.35000002384186,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 65.29999995231628,
+          "q1": 65.19999998807907,
+          "q3": 65.29999995231628,
+          "iqr": 0.09999996423721313,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.8623166745031,
+          "q1": 59.85933072423633,
+          "q3": 59.86829035929151,
+          "iqr": 0.008959635055177273,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.742647059291095,
+          "q1": 59.738725394364,
+          "q3": 59.74719834878489,
+          "iqr": 0.008472954420888357,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.75787815172036,
+          "q1": 58.75402112962174,
+          "q3": 58.75963364937843,
+          "iqr": 0.005612519756688528,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 60.02044652668338,
+          "q1": 60.00857500225713,
+          "q3": 60.11088778121632,
+          "iqr": 0.10231277895918822,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.66705126091973,
+          "q1": 59.60522113721018,
+          "q3": 59.67885755718979,
+          "iqr": 0.07363641997960713,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 150.40000009536743,
+          "q1": 144.45000004768372,
+          "q3": 159.25000005960464,
+          "iqr": 14.800000011920929,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 347.29115867614746,
+          "q1": 343.04630851745605,
+          "q3": 350.4780960083008,
+          "iqr": 7.431787490844727,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 50000,
+      "edges": 75000,
+      "ratio": 1.5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 6425.399999976158,
+          "firstInteractionStallMs": 73.39999997615814,
+          "settledFps": 59.880239520958085,
+          "wheelZoomFps": 53.9303807811734,
+          "wheelZoomRenderFps": 52.94982840333388,
+          "dragPanFps": 59.00570497147515,
+          "dragPanRenderFps": 36.18581907090465,
+          "select500Ms": 406.1999999284744,
+          "heapUsedMB": 823.3719758987427,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 823.3719758987427
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 6640.100000023842,
+          "firstInteractionStallMs": 65.5,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 53.49359397743871,
+          "wheelZoomRenderFps": 52.5029718667454,
+          "dragPanFps": 59.25829453417955,
+          "dragPanRenderFps": 36.46664279026434,
+          "select500Ms": 405.6999999284744,
+          "heapUsedMB": 793.2966508865356,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 793.2966508865356
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 6453.100000023842,
+          "firstInteractionStallMs": 65.60000002384186,
+          "settledFps": 59.85634477396956,
+          "wheelZoomFps": 53.860553713187336,
+          "wheelZoomRenderFps": 52.875299681848546,
+          "dragPanFps": 59.38125389772745,
+          "dragPanRenderFps": 36.744201306881074,
+          "select500Ms": 396.39999997615814,
+          "heapUsedMB": 823.7638292312622,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 823.7638292312622
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 6453.100000023842,
+          "q1": 6439.25,
+          "q3": 6546.600000023842,
+          "iqr": 107.35000002384186,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 65.60000002384186,
+          "q1": 65.55000001192093,
+          "q3": 69.5,
+          "iqr": 3.949999988079071,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.87426404407992,
+          "q1": 59.865304409024745,
+          "q3": 59.877251782519004,
+          "iqr": 0.011947373494258784,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 53.860553713187336,
+          "q1": 53.67707384531302,
+          "q3": 53.89546724718036,
+          "iqr": 0.21839340186734546,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 52.875299681848546,
+          "q1": 52.68913577429697,
+          "q3": 52.912564042591214,
+          "iqr": 0.22342826829424212,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.25829453417955,
+          "q1": 59.13199975282735,
+          "q3": 59.3197742159535,
+          "iqr": 0.18777446312615353,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 36.46664279026434,
+          "q1": 36.326230930584494,
+          "q3": 36.605422048572706,
+          "iqr": 0.27919111798821206,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 405.6999999284744,
+          "q1": 401.0499999523163,
+          "q3": 405.9499999284744,
+          "iqr": 4.899999976158142,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 823.3719758987427,
+          "q1": 808.3343133926392,
+          "q3": 823.5679025650024,
+          "iqr": 15.233589172363281,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 100000,
+      "edges": 150000,
+      "ratio": 1.5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 13617.599999904633,
+          "firstInteractionStallMs": 65.80000007152557,
+          "settledFps": 59.910134797803295,
+          "wheelZoomFps": 25.232919255242237,
+          "wheelZoomRenderFps": 24.262422360809843,
+          "dragPanFps": 5.152902471484346,
+          "dragPanRenderFps": 2.3782626791466215,
+          "select500Ms": 849.1000000238419,
+          "heapUsedMB": 1596.8038024902344,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1596.8038024902344
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 13590.899999976158,
+          "firstInteractionStallMs": 55.199999928474426,
+          "settledFps": 59.84440454675165,
+          "wheelZoomFps": 28.326745718050066,
+          "wheelZoomRenderFps": 27.338603425559945,
+          "dragPanFps": 6.946467385326563,
+          "dragPanRenderFps": 2.688955116900605,
+          "select500Ms": 708,
+          "heapUsedMB": 1573.1029119491577,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1573.1029119491577
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 13802.899999976158,
+          "firstInteractionStallMs": 59,
+          "settledFps": 59.8623166745031,
+          "wheelZoomFps": 28.235603126057647,
+          "wheelZoomRenderFps": 27.25064022631145,
+          "dragPanFps": 52.254261589931495,
+          "dragPanRenderFps": 19.117412776804205,
+          "select500Ms": 894.3999999761581,
+          "heapUsedMB": 1587.7850217819214,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1587.7850217819214
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 13617.599999904633,
+          "q1": 13604.249999940395,
+          "q3": 13710.249999940395,
+          "iqr": 106,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 59,
+          "q1": 57.09999996423721,
+          "q3": 62.40000003576279,
+          "iqr": 5.300000071525574,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.8623166745031,
+          "q1": 59.85336061062738,
+          "q3": 59.88622573615319,
+          "iqr": 0.03286512552581655,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 28.235603126057647,
+          "q1": 26.734261190649942,
+          "q3": 28.28117442205386,
+          "iqr": 1.5469132314039165,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 27.25064022631145,
+          "q1": 25.75653129356065,
+          "q3": 27.2946218259357,
+          "iqr": 1.5380905323750511,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 6.946467385326563,
+          "q1": 6.049684928405455,
+          "q3": 29.60036448762903,
+          "iqr": 23.550679559223575,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 2.688955116900605,
+          "q1": 2.5336088980236133,
+          "q3": 10.903183946852405,
+          "iqr": 8.369575048828791,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 849.1000000238419,
+          "q1": 778.5500000119209,
+          "q3": 871.75,
+          "iqr": 93.19999998807907,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 1587.7850217819214,
+          "q1": 1580.4439668655396,
+          "q3": 1592.2944121360779,
+          "iqr": 11.85044527053833,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 1000,
+      "edges": 1500,
+      "ratio": 1.5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 753.2000000476837,
+          "firstInteractionStallMs": 66.69999992847443,
+          "settledFps": 59.862316667383325,
+          "wheelZoomFps": 59.72328212662129,
+          "wheelZoomRenderFps": 57.732506055733914,
+          "dragPanFps": 59.99868134577638,
+          "dragPanRenderFps": 59.66901826145893,
+          "select500Ms": 82.80000007152557,
+          "heapUsedMB": 39.98438549041748,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 39.98438549041748
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 774.7000000476837,
+          "firstInteractionStallMs": 66.40000009536743,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 59.74310465047774,
+          "wheelZoomRenderFps": 55.428324870165454,
+          "dragPanFps": 59.98483899626573,
+          "dragPanRenderFps": 59.65525196881372,
+          "select500Ms": 78.10000002384186,
+          "heapUsedMB": 40.01645565032959,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 40.01645565032959
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 737.1000000238419,
+          "firstInteractionStallMs": 66.70000004768372,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 59.73120955699353,
+          "wheelZoomRenderFps": 58.07200929152148,
+          "dragPanFps": 59.98879330282153,
+          "dragPanRenderFps": 59.65918454841042,
+          "select500Ms": 77.80000007152557,
+          "heapUsedMB": 40.01603603363037,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 40.01603603363037
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 753.2000000476837,
+          "q1": 745.1500000357628,
+          "q3": 763.9500000476837,
+          "iqr": 18.80000001192093,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 66.69999992847443,
+          "q1": 66.55000001192093,
+          "q3": 66.69999998807907,
+          "iqr": 0.1499999761581421,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.87426404407992,
+          "q1": 59.868290355731624,
+          "q3": 59.87426404407992,
+          "iqr": 0.005973688348298367,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.73120955699353,
+          "q1": 59.72724584180741,
+          "q3": 59.73715710373563,
+          "iqr": 0.00991126192822378,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 57.732506055733914,
+          "q1": 56.58041546294969,
+          "q3": 57.9022576736277,
+          "iqr": 1.3218422106780139,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.98879330282153,
+          "q1": 59.98681614954363,
+          "q3": 59.993737324298955,
+          "iqr": 0.006921174755326831,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.65918454841042,
+          "q1": 59.657218258612076,
+          "q3": 59.66410140493468,
+          "iqr": 0.006883146322600453,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 78.10000002384186,
+          "q1": 77.95000004768372,
+          "q3": 80.45000004768372,
+          "iqr": 2.5,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 40.01603603363037,
+          "q1": 40.000210762023926,
+          "q3": 40.01624584197998,
+          "iqr": 0.016035079956054688,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 5000,
+      "edges": 7500,
+      "ratio": 1.5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 1208,
+          "firstInteractionStallMs": 144.80000007152557,
+          "settledFps": 59.880239520958085,
+          "wheelZoomFps": 59.72526378516428,
+          "wheelZoomRenderFps": 58.72984272207821,
+          "dragPanFps": 60.01846721879574,
+          "dragPanRenderFps": 59.68869542089027,
+          "select500Ms": 98,
+          "heapUsedMB": 88.89900016784668,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 88.89900016784668
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1235.1000000238419,
+          "firstInteractionStallMs": 141.20000004768372,
+          "settledFps": 59.87426405120253,
+          "wheelZoomFps": 59.725263787526686,
+          "wheelZoomRenderFps": 58.729842724401244,
+          "dragPanFps": 59.98879330282153,
+          "dragPanRenderFps": 59.65918454841042,
+          "select500Ms": 99.69999992847443,
+          "heapUsedMB": 88.82054710388184,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 88.82054710388184
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1193.2000000476837,
+          "firstInteractionStallMs": 142.89999997615814,
+          "settledFps": 59.93407251880038,
+          "wheelZoomFps": 59.749053972839235,
+          "wheelZoomRenderFps": 58.75323640662525,
+          "dragPanFps": 60.0026374799854,
+          "dragPanRenderFps": 59.6729526586668,
+          "select500Ms": 97.40000009536743,
+          "heapUsedMB": 89.08978080749512,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 89.08978080749512
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1208,
+          "q1": 1200.6000000238419,
+          "q3": 1221.550000011921,
+          "iqr": 20.94999998807907,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 142.89999997615814,
+          "q1": 142.05000001192093,
+          "q3": 143.85000002384186,
+          "iqr": 1.800000011920929,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.880239520958085,
+          "q1": 59.87725178608031,
+          "q3": 59.90715601987923,
+          "iqr": 0.029904233798923485,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.725263787526686,
+          "q1": 59.72526378634548,
+          "q3": 59.73715888018296,
+          "iqr": 0.011895093837480886,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.729842724401244,
+          "q1": 58.72984272323973,
+          "q3": 58.74153956551325,
+          "iqr": 0.011696842273522634,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 60.0026374799854,
+          "q1": 59.995715391403465,
+          "q3": 60.01055234939057,
+          "iqr": 0.014836957987107269,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.6729526586668,
+          "q1": 59.66606860353861,
+          "q3": 59.680824039778535,
+          "iqr": 0.01475543623992337,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 98,
+          "q1": 97.70000004768372,
+          "q3": 98.84999996423721,
+          "iqr": 1.1499999165534973,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 88.89900016784668,
+          "q1": 88.85977363586426,
+          "q3": 88.9943904876709,
+          "iqr": 0.13461685180664062,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 10000,
+      "edges": 15000,
+      "ratio": 1.5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 1815.7000000476837,
+          "firstInteractionStallMs": 186.39999997615814,
+          "settledFps": 59.86828975967398,
+          "wheelZoomFps": 59.39542754659316,
+          "wheelZoomRenderFps": 58.3999734536335,
+          "dragPanFps": 44.04715636706498,
+          "dragPanRenderFps": 42.427775618275824,
+          "select500Ms": 124.80000007152557,
+          "heapUsedMB": 160.47131156921387,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 160.47131156921387
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1887.6000000238419,
+          "firstInteractionStallMs": 183.29999995231628,
+          "settledFps": 59.86828975967398,
+          "wheelZoomFps": 59.080316406992104,
+          "wheelZoomRenderFps": 58.09564446687557,
+          "dragPanFps": 26.415925029287024,
+          "dragPanRenderFps": 28.617252115060943,
+          "select500Ms": 126.70000004768372,
+          "heapUsedMB": 143.90720558166504,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 143.90720558166504
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1877.7000000476837,
+          "firstInteractionStallMs": 187.60000002384186,
+          "settledFps": 59.8623166745031,
+          "wheelZoomFps": 59.42024227654486,
+          "wheelZoomRenderFps": 58.435376382458486,
+          "dragPanFps": 29.807204464513365,
+          "dragPanRenderFps": 31.709791983524855,
+          "select500Ms": 154.5,
+          "heapUsedMB": 160.26576805114746,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 160.26576805114746
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1877.7000000476837,
+          "q1": 1846.7000000476837,
+          "q3": 1882.6500000357628,
+          "iqr": 35.94999998807907,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 186.39999997615814,
+          "q1": 184.8499999642372,
+          "q3": 187,
+          "iqr": 2.150000035762787,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.86828975967398,
+          "q1": 59.86530321708854,
+          "q3": 59.86828975967398,
+          "iqr": 0.002986542585439622,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.39542754659316,
+          "q1": 59.23787197679263,
+          "q3": 59.40783491156901,
+          "iqr": 0.16996293477637892,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.3999734536335,
+          "q1": 58.24780896025453,
+          "q3": 58.41767491804599,
+          "iqr": 0.1698659577914583,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 29.807204464513365,
+          "q1": 28.111564746900193,
+          "q3": 36.927180415789174,
+          "iqr": 8.81561566888898,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 31.709791983524855,
+          "q1": 30.1635220492929,
+          "q3": 37.06878380090034,
+          "iqr": 6.905261751607441,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 126.70000004768372,
+          "q1": 125.75000005960464,
+          "q3": 140.60000002384186,
+          "iqr": 14.849999964237213,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 160.26576805114746,
+          "q1": 152.08648681640625,
+          "q3": 160.36853981018066,
+          "iqr": 8.282052993774414,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 25000,
+      "edges": 37500,
+      "ratio": 1.5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 3983.9000000953674,
+          "firstInteractionStallMs": 67.19999992847443,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 52.09024552090246,
+          "wheelZoomRenderFps": 51.09489051094891,
+          "dragPanFps": 60.088655393203084,
+          "dragPanRenderFps": 50.238056148415694,
+          "select500Ms": 237.70000004768372,
+          "heapUsedMB": 433.1052837371826,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 433.1052837371826
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3944,
+          "firstInteractionStallMs": 63.5,
+          "settledFps": 59.91611743701668,
+          "wheelZoomFps": 46.78323766585334,
+          "wheelZoomRenderFps": 45.78784963040966,
+          "dragPanFps": 60.0807643065867,
+          "dragPanRenderFps": 57.78259299431289,
+          "select500Ms": 237.09999990463257,
+          "heapUsedMB": 432.9722270965576,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 432.9722270965576
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3870.2000000476837,
+          "firstInteractionStallMs": 72.20000004768372,
+          "settledFps": 59.93407251880038,
+          "wheelZoomFps": 50.8563554027044,
+          "wheelZoomRenderFps": 49.872038846523026,
+          "dragPanFps": 60.01500374907092,
+          "dragPanRenderFps": 45.663589809075695,
+          "select500Ms": 278.5,
+          "heapUsedMB": 433.5608386993408,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 433.5608386993408
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 3944,
+          "q1": 3907.100000023842,
+          "q3": 3963.9500000476837,
+          "iqr": 56.85000002384186,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 67.19999992847443,
+          "q1": 65.34999996423721,
+          "q3": 69.69999998807907,
+          "iqr": 4.350000023841858,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.91611743701668,
+          "q1": 59.8951907405483,
+          "q3": 59.92509497790853,
+          "iqr": 0.029904237360227626,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 50.8563554027044,
+          "q1": 48.81979653427887,
+          "q3": 51.47330046180343,
+          "iqr": 2.653503927524561,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 49.872038846523026,
+          "q1": 47.82994423846634,
+          "q3": 50.48346467873597,
+          "iqr": 2.653520440269631,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 60.0807643065867,
+          "q1": 60.047884027828815,
+          "q3": 60.08470984989489,
+          "iqr": 0.03682582206607776,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 50.238056148415694,
+          "q1": 47.95082297874569,
+          "q3": 54.01032457136429,
+          "iqr": 6.059501592618602,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 237.70000004768372,
+          "q1": 237.39999997615814,
+          "q3": 258.10000002384186,
+          "iqr": 20.700000047683716,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 433.1052837371826,
+          "q1": 433.0387554168701,
+          "q3": 433.3330612182617,
+          "iqr": 0.29430580139160156,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 50000,
+      "edges": 75000,
+      "ratio": 1.5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 7599.600000023842,
+          "firstInteractionStallMs": 77,
+          "settledFps": 59.89817310286896,
+          "wheelZoomFps": 25.474010061209224,
+          "wheelZoomRenderFps": 24.50664259053039,
+          "dragPanFps": 53.561863951256164,
+          "dragPanRenderFps": 21.739815368451033,
+          "select500Ms": 509,
+          "heapUsedMB": 632.4962959289551,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 632.4962959289551
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 7668.700000047684,
+          "firstInteractionStallMs": 68.70000004768372,
+          "settledFps": 59.904153353206645,
+          "wheelZoomFps": 23.535398512080462,
+          "wheelZoomRenderFps": 22.581260734563685,
+          "dragPanFps": 44.43579514091031,
+          "dragPanRenderFps": 18.487885569575823,
+          "select500Ms": 529.1000000238419,
+          "heapUsedMB": 960.0574741363525,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 960.0574741363525
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 7486.099999904633,
+          "firstInteractionStallMs": 68.89999997615814,
+          "settledFps": 59.85634477396956,
+          "wheelZoomFps": 24.67592287970926,
+          "wheelZoomRenderFps": 23.688885964520885,
+          "dragPanFps": 52.310644753069475,
+          "dragPanRenderFps": 21.667130962809843,
+          "select500Ms": 476.60000002384186,
+          "heapUsedMB": 924.1117115020752,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 924.1117115020752
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 7599.600000023842,
+          "q1": 7542.849999964237,
+          "q3": 7634.150000035763,
+          "iqr": 91.30000007152557,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 68.89999997615814,
+          "q1": 68.80000001192093,
+          "q3": 72.94999998807907,
+          "iqr": 4.149999976158142,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.89817310286896,
+          "q1": 59.87725893841926,
+          "q3": 59.9011632280378,
+          "iqr": 0.023904289618542407,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 24.67592287970926,
+          "q1": 24.105660695894862,
+          "q3": 25.07496647045924,
+          "iqr": 0.9693057745643792,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 23.688885964520885,
+          "q1": 23.135073349542285,
+          "q3": 24.097764277525638,
+          "iqr": 0.9626909279833527,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 52.310644753069475,
+          "q1": 48.37321994698989,
+          "q3": 52.93625435216282,
+          "iqr": 4.563034405172928,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 21.667130962809843,
+          "q1": 20.077508266192833,
+          "q3": 21.703473165630438,
+          "iqr": 1.625964899437605,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 509,
+          "q1": 492.80000001192093,
+          "q3": 519.0500000119209,
+          "iqr": 26.25,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 924.1117115020752,
+          "q1": 778.3040037155151,
+          "q3": 942.0845928192139,
+          "iqr": 163.78058910369873,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 100000,
+      "edges": 150000,
+      "ratio": 1.5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 15619.5,
+          "firstInteractionStallMs": 64.89999997615814,
+          "settledFps": 59.92808630072552,
+          "wheelZoomFps": 10.937927262942168,
+          "wheelZoomRenderFps": 10.026433324363655,
+          "dragPanFps": 47.06465196893668,
+          "dragPanRenderFps": 16.720336883701187,
+          "select500Ms": 1007,
+          "heapUsedMB": 1885.6802368164062,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1885.6802368164062
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 15614.899999976158,
+          "firstInteractionStallMs": 61.200000047683716,
+          "settledFps": 59.83246908940271,
+          "wheelZoomFps": 11.183944825540841,
+          "wheelZoomRenderFps": 10.251949423412439,
+          "dragPanFps": 46.56723931890087,
+          "dragPanRenderFps": 16.676105972309095,
+          "select500Ms": 975.3000000715256,
+          "heapUsedMB": 1895.883870124817,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1895.883870124817
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 15474.400000095367,
+          "firstInteractionStallMs": 72.29999995231628,
+          "settledFps": 59.85037406483791,
+          "wheelZoomFps": 11.476426799007443,
+          "wheelZoomRenderFps": 10.54590570719603,
+          "dragPanFps": 46.05387672632767,
+          "dragPanRenderFps": 17.033625638504756,
+          "select500Ms": 969.3999999761581,
+          "heapUsedMB": 1898.4544801712036,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1898.4544801712036
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 15614.899999976158,
+          "q1": 15544.650000035763,
+          "q3": 15617.199999988079,
+          "iqr": 72.54999995231628,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 64.89999997615814,
+          "q1": 63.05000001192093,
+          "q3": 68.59999996423721,
+          "iqr": 5.549999952316284,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.85037406483791,
+          "q1": 59.84142157712031,
+          "q3": 59.889230182781716,
+          "iqr": 0.047808605661408876,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 11.183944825540841,
+          "q1": 11.060936044241505,
+          "q3": 11.330185812274141,
+          "iqr": 0.2692497680326369,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 10.251949423412439,
+          "q1": 10.139191373888046,
+          "q3": 10.398927565304234,
+          "iqr": 0.259736191416188,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 46.56723931890087,
+          "q1": 46.31055802261427,
+          "q3": 46.815945643918774,
+          "iqr": 0.5053876213045001,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 16.720336883701187,
+          "q1": 16.69822142800514,
+          "q3": 16.87698126110297,
+          "iqr": 0.1787598330978284,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 975.3000000715256,
+          "q1": 972.3500000238419,
+          "q3": 991.1500000357628,
+          "iqr": 18.80000001192093,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 1895.883870124817,
+          "q1": 1890.7820534706116,
+          "q3": 1897.1691751480103,
+          "iqr": 6.387121677398682,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 1000,
+      "edges": 1500,
+      "ratio": 1.5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 1025,
+          "firstInteractionStallMs": 80.20000004768372,
+          "settledFps": 59.86828975967398,
+          "wheelZoomFps": 59.854354402859336,
+          "wheelZoomRenderFps": 59.854354402859336,
+          "dragPanFps": 59.01163749144954,
+          "dragPanRenderFps": 62.96772492104392,
+          "select500Ms": 71.39999997615814,
+          "heapUsedMB": 40.914631843566895,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 40.914631843566895
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 979.1000000238419,
+          "firstInteractionStallMs": 86.39999997615814,
+          "settledFps": 59.880239520958085,
+          "wheelZoomFps": 59.85236416885914,
+          "wheelZoomRenderFps": 59.85236416885914,
+          "dragPanFps": 60.004615741558965,
+          "dragPanRenderFps": 62.64218126866046,
+          "select500Ms": 72.20000004768372,
+          "heapUsedMB": 52.099175453186035,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 52.099175453186035
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 957.6000000238419,
+          "firstInteractionStallMs": 80.29999995231628,
+          "settledFps": 59.87426405120253,
+          "wheelZoomFps": 59.87825856679806,
+          "wheelZoomRenderFps": 59.87825856679806,
+          "dragPanFps": 59.333487159960036,
+          "dragPanRenderFps": 64.27794442329004,
+          "select500Ms": 76.39999997615814,
+          "heapUsedMB": 41.39171314239502,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 1500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 41.39171314239502
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 979.1000000238419,
+          "q1": 968.3500000238419,
+          "q3": 1002.0500000119209,
+          "iqr": 33.69999998807907,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 80.29999995231628,
+          "q1": 80.25,
+          "q3": 83.34999996423721,
+          "iqr": 3.099999964237213,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.87426405120253,
+          "q1": 59.87127690543825,
+          "q3": 59.87725178608031,
+          "iqr": 0.005974880642057201,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.854354402859336,
+          "q1": 59.85335928585924,
+          "q3": 59.8663064848287,
+          "iqr": 0.012947198969456508,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 59.854354402859336,
+          "q1": 59.85335928585924,
+          "q3": 59.8663064848287,
+          "iqr": 0.012947198969456508,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.333487159960036,
+          "q1": 59.17256232570479,
+          "q3": 59.6690514507595,
+          "iqr": 0.4964891250547083,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 62.96772492104392,
+          "q1": 62.80495309485219,
+          "q3": 63.622834672166974,
+          "iqr": 0.8178815773147861,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 72.20000004768372,
+          "q1": 71.80000001192093,
+          "q3": 74.30000001192093,
+          "iqr": 2.5,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 41.39171314239502,
+          "q1": 41.15317249298096,
+          "q3": 46.74544429779053,
+          "iqr": 5.59227180480957,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 5000,
+      "edges": 7500,
+      "ratio": 1.5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 1857,
+          "firstInteractionStallMs": 266.10000002384186,
+          "settledFps": 41.465100208301514,
+          "wheelZoomFps": 36.05040676343914,
+          "wheelZoomRenderFps": 36.05040676343914,
+          "dragPanFps": 40.02395134065921,
+          "dragPanRenderFps": 40.02395134065921,
+          "select500Ms": 128.60000002384186,
+          "heapUsedMB": 126.95913696289062,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 126.95913696289062
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1902.1000000238419,
+          "firstInteractionStallMs": 249.39999997615814,
+          "settledFps": 42.8599259682234,
+          "wheelZoomFps": 38.32170580691308,
+          "wheelZoomRenderFps": 38.32170580691308,
+          "dragPanFps": 40.31106173623234,
+          "dragPanRenderFps": 40.31106173623234,
+          "select500Ms": 116.5,
+          "heapUsedMB": 127.01853561401367,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 127.01853561401367
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1878,
+          "firstInteractionStallMs": 271.2000000476837,
+          "settledFps": 36.731857442421834,
+          "wheelZoomFps": 35.474842154326346,
+          "wheelZoomRenderFps": 35.474842154326346,
+          "dragPanFps": 39.52821166719796,
+          "dragPanRenderFps": 39.52821166719796,
+          "select500Ms": 117.29999995231628,
+          "heapUsedMB": 131.20818328857422,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 7500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 131.20818328857422
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1878,
+          "q1": 1867.5,
+          "q3": 1890.050000011921,
+          "iqr": 22.55000001192093,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 266.10000002384186,
+          "q1": 257.75,
+          "q3": 268.6500000357628,
+          "iqr": 10.900000035762787,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 41.465100208301514,
+          "q1": 39.098478825361674,
+          "q3": 42.16251308826246,
+          "iqr": 3.0640342629007833,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 36.05040676343914,
+          "q1": 35.76262445888274,
+          "q3": 37.18605628517611,
+          "iqr": 1.423431826293367,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 36.05040676343914,
+          "q1": 35.76262445888274,
+          "q3": 37.18605628517611,
+          "iqr": 1.423431826293367,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 40.02395134065921,
+          "q1": 39.77608150392858,
+          "q3": 40.16750653844578,
+          "iqr": 0.3914250345171979,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 40.02395134065921,
+          "q1": 39.77608150392858,
+          "q3": 40.16750653844578,
+          "iqr": 0.3914250345171979,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 117.29999995231628,
+          "q1": 116.89999997615814,
+          "q3": 122.94999998807907,
+          "iqr": 6.050000011920929,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 127.01853561401367,
+          "q1": 126.98883628845215,
+          "q3": 129.11335945129395,
+          "iqr": 2.124523162841797,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 10000,
+      "edges": 15000,
+      "ratio": 1.5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 2979.399999976158,
+          "firstInteractionStallMs": 512.3999999761581,
+          "settledFps": 18.890435475144923,
+          "wheelZoomFps": 16.466639222392285,
+          "wheelZoomRenderFps": 16.466639222392285,
+          "dragPanFps": 18.380691234255444,
+          "dragPanRenderFps": 18.380691234255444,
+          "select500Ms": 186.79999995231628,
+          "heapUsedMB": 247.99971199035645,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 247.99971199035645
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3045.600000023842,
+          "firstInteractionStallMs": 549.7999999523163,
+          "settledFps": 19.40805434255216,
+          "wheelZoomFps": 16.930941295479872,
+          "wheelZoomRenderFps": 16.930941295479872,
+          "dragPanFps": 19.05726111384835,
+          "dragPanRenderFps": 19.05726111384835,
+          "select500Ms": 181.10000002384186,
+          "heapUsedMB": 254.07781410217285,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 254.07781410217285
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3151.399999976158,
+          "firstInteractionStallMs": 521.7000000476837,
+          "settledFps": 19.190174629711134,
+          "wheelZoomFps": 16.488046166155332,
+          "wheelZoomRenderFps": 16.488046166155332,
+          "dragPanFps": 19.21575692122517,
+          "dragPanRenderFps": 19.21575692122517,
+          "select500Ms": 194.40000009536743,
+          "heapUsedMB": 248.76579093933105,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 15000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 248.76579093933105
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 3045.600000023842,
+          "q1": 3012.5,
+          "q3": 3098.5,
+          "iqr": 86,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 521.7000000476837,
+          "q1": 517.0500000119209,
+          "q3": 535.75,
+          "iqr": 18.69999998807907,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 19.190174629711134,
+          "q1": 19.040305052428028,
+          "q3": 19.299114486131646,
+          "iqr": 0.2588094337036182,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 16.488046166155332,
+          "q1": 16.47734269427381,
+          "q3": 16.709493730817602,
+          "iqr": 0.23215103654379377,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 16.488046166155332,
+          "q1": 16.47734269427381,
+          "q3": 16.709493730817602,
+          "iqr": 0.23215103654379377,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 19.05726111384835,
+          "q1": 18.718976174051896,
+          "q3": 19.13650901753676,
+          "iqr": 0.41753284348486375,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 19.05726111384835,
+          "q1": 18.718976174051896,
+          "q3": 19.13650901753676,
+          "iqr": 0.41753284348486375,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 186.79999995231628,
+          "q1": 183.94999998807907,
+          "q3": 190.60000002384186,
+          "iqr": 6.650000035762787,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 248.76579093933105,
+          "q1": 248.38275146484375,
+          "q3": 251.42180252075195,
+          "iqr": 3.039051055908203,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 25000,
+      "edges": 37500,
+      "ratio": 1.5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 6843.400000095367,
+          "firstInteractionStallMs": 995.1000000238419,
+          "settledFps": 7.3855243719053085,
+          "wheelZoomFps": 6.23070605232336,
+          "wheelZoomRenderFps": 6.23070605232336,
+          "dragPanFps": 6.49772579597141,
+          "dragPanRenderFps": 6.49772579597141,
+          "select500Ms": 362.90000009536743,
+          "heapUsedMB": 773.3742332458496,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 773.3742332458496
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 6923.5,
+          "firstInteractionStallMs": 975.2999999523163,
+          "settledFps": 7.481529973213081,
+          "wheelZoomFps": 6.452207576876978,
+          "wheelZoomRenderFps": 6.452207576876978,
+          "dragPanFps": 6.289466401708207,
+          "dragPanRenderFps": 6.289466401708207,
+          "select500Ms": 382.1999999284744,
+          "heapUsedMB": 773.8573150634766,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 773.8573150634766
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 6751.100000023842,
+          "firstInteractionStallMs": 992.1000000238419,
+          "settledFps": 7.363092498849516,
+          "wheelZoomFps": 6.537248102865509,
+          "wheelZoomRenderFps": 6.537248102865509,
+          "dragPanFps": 6.2780944727280374,
+          "dragPanRenderFps": 6.2780944727280374,
+          "select500Ms": 370.6999999284744,
+          "heapUsedMB": 751.0990839004517,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 37500,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 751.0990839004517
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 6843.400000095367,
+          "q1": 6797.250000059605,
+          "q3": 6883.450000047684,
+          "iqr": 86.19999998807907,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 992.1000000238419,
+          "q1": 983.6999999880791,
+          "q3": 993.6000000238419,
+          "iqr": 9.900000035762787,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 7.3855243719053085,
+          "q1": 7.374308435377412,
+          "q3": 7.433527172559195,
+          "iqr": 0.05921873718178272,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 6.452207576876978,
+          "q1": 6.3414568146001695,
+          "q3": 6.494727839871244,
+          "iqr": 0.15327102527107428,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 6.452207576876978,
+          "q1": 6.3414568146001695,
+          "q3": 6.494727839871244,
+          "iqr": 0.15327102527107428,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 6.289466401708207,
+          "q1": 6.283780437218122,
+          "q3": 6.393596098839808,
+          "iqr": 0.10981566162168566,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 6.289466401708207,
+          "q1": 6.283780437218122,
+          "q3": 6.393596098839808,
+          "iqr": 0.10981566162168566,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 370.6999999284744,
+          "q1": 366.80000001192093,
+          "q3": 376.4499999284744,
+          "iqr": 9.649999916553497,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 773.3742332458496,
+          "q1": 762.2366585731506,
+          "q3": 773.6157741546631,
+          "iqr": 11.379115581512451,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 50000,
+      "edges": 75000,
+      "ratio": 1.5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 14311.100000023842,
+          "firstInteractionStallMs": 2390,
+          "settledFps": 3.146633102757288,
+          "wheelZoomFps": 2.8641358120949105,
+          "wheelZoomRenderFps": 2.8641358120949105,
+          "dragPanFps": 2.8167793378110777,
+          "dragPanRenderFps": 2.8167793378110777,
+          "select500Ms": 817.1000000238419,
+          "heapUsedMB": 1279.928563117981,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1279.928563117981
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 14293.100000023842,
+          "firstInteractionStallMs": 2249.5,
+          "settledFps": 3.1941228141438214,
+          "wheelZoomFps": 2.6715823782256165,
+          "wheelZoomRenderFps": 2.6715823782256165,
+          "dragPanFps": 2.8483786152497808,
+          "dragPanRenderFps": 2.8483786152497808,
+          "select500Ms": 791.8999999761581,
+          "heapUsedMB": 1252.15265750885,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1252.15265750885
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 14249.700000047684,
+          "firstInteractionStallMs": 2530.8000000715256,
+          "settledFps": 2.9515938607540058,
+          "wheelZoomFps": 2.9340140246280857,
+          "wheelZoomRenderFps": 2.9340140246280857,
+          "dragPanFps": 2.8166572778236243,
+          "dragPanRenderFps": 2.8166572778236243,
+          "select500Ms": 803.8000000715256,
+          "heapUsedMB": 1284.409333229065,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 75000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1284.409333229065
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 14293.100000023842,
+          "q1": 14271.400000035763,
+          "q3": 14302.100000023842,
+          "iqr": 30.69999998807907,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 2390,
+          "q1": 2319.75,
+          "q3": 2460.400000035763,
+          "iqr": 140.6500000357628,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 3.146633102757288,
+          "q1": 3.049113481755647,
+          "q3": 3.1703779584505547,
+          "iqr": 0.12126447669490759,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 2.8641358120949105,
+          "q1": 2.7678590951602633,
+          "q3": 2.899074918361498,
+          "iqr": 0.13121582320123482,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 2.8641358120949105,
+          "q1": 2.7678590951602633,
+          "q3": 2.899074918361498,
+          "iqr": 0.13121582320123482,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 2.8167793378110777,
+          "q1": 2.816718307817351,
+          "q3": 2.8325789765304292,
+          "iqr": 0.01586066871307823,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 2.8167793378110777,
+          "q1": 2.816718307817351,
+          "q3": 2.8325789765304292,
+          "iqr": 0.01586066871307823,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 803.8000000715256,
+          "q1": 797.8500000238419,
+          "q3": 810.4500000476837,
+          "iqr": 12.600000023841858,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 1279.928563117981,
+          "q1": 1266.0406103134155,
+          "q3": 1282.168948173523,
+          "iqr": 16.128337860107422,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 100000,
+      "edges": 150000,
+      "ratio": 1.5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 31560,
+          "firstInteractionStallMs": 5387.700000047684,
+          "settledFps": 1.365747063666049,
+          "wheelZoomFps": 1.2376237623762376,
+          "wheelZoomRenderFps": 1.2376237623762376,
+          "dragPanFps": 1.1318875356605664,
+          "dragPanRenderFps": 1.245076289226623,
+          "select500Ms": 1717.6000000238419,
+          "heapUsedMB": 1966.209451675415,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1966.209451675415
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 31059.5,
+          "firstInteractionStallMs": 5340.200000047684,
+          "settledFps": 1.4052838674118282,
+          "wheelZoomFps": 1.224418401259402,
+          "wheelZoomRenderFps": 1.224418401259402,
+          "dragPanFps": 1.110938298475132,
+          "dragPanRenderFps": 1.2220321283226452,
+          "select500Ms": 1785.3999999761581,
+          "heapUsedMB": 1864.835584640503,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1864.835584640503
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 30698.399999976158,
+          "firstInteractionStallMs": 5239.700000047684,
+          "settledFps": 1.2483615254792064,
+          "wheelZoomFps": 1.2945462615467476,
+          "wheelZoomRenderFps": 1.2945462615467476,
+          "dragPanFps": 1.1604158930528607,
+          "dragPanRenderFps": 1.276457482358147,
+          "select500Ms": 1659.6000000238419,
+          "heapUsedMB": 1846.108404159546,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 150000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1846.108404159546
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 31059.5,
+          "q1": 30878.94999998808,
+          "q3": 31309.75,
+          "iqr": 430.80000001192093,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 5340.200000047684,
+          "q1": 5289.950000047684,
+          "q3": 5363.950000047684,
+          "iqr": 74,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 1.365747063666049,
+          "q1": 1.3070542945726276,
+          "q3": 1.3855154655389386,
+          "iqr": 0.078461170966311,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 1.2376237623762376,
+          "q1": 1.2310210818178198,
+          "q3": 1.2660850119614926,
+          "iqr": 0.03506393014367282,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 1.2376237623762376,
+          "q1": 1.2310210818178198,
+          "q3": 1.2660850119614926,
+          "iqr": 0.03506393014367282,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 1.1318875356605664,
+          "q1": 1.121412917067849,
+          "q3": 1.1461517143567135,
+          "iqr": 0.02473879728886441,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 1.245076289226623,
+          "q1": 1.233554208774634,
+          "q3": 1.260766885792385,
+          "iqr": 0.027212677017750986,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 1717.6000000238419,
+          "q1": 1688.6000000238419,
+          "q3": 1751.5,
+          "iqr": 62.89999997615814,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 1864.835584640503,
+          "q1": 1855.4719944000244,
+          "q3": 1915.522518157959,
+          "iqr": 60.05052375793457,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 1000,
+      "edges": 5000,
+      "ratio": 5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 919.4000000953674,
+          "firstInteractionStallMs": 77.60000002384186,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 59.97600959520863,
+          "wheelZoomRenderFps": 58.64320938198177,
+          "dragPanFps": 59.99472574028268,
+          "dragPanRenderFps": 59.665084390061345,
+          "select500Ms": 29.100000023841858,
+          "heapUsedMB": 47.01976680755615,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 47.01976680755615
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 916.6999999284744,
+          "firstInteractionStallMs": 81.59999990463257,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 59.71139492453143,
+          "wheelZoomRenderFps": 58.05274506551667,
+          "dragPanFps": 59.99868134813427,
+          "dragPanRenderFps": 59.669018263803856,
+          "select500Ms": 29.199999928474426,
+          "heapUsedMB": 47.04125499725342,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 47.04125499725342
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 910.6000000238419,
+          "firstInteractionStallMs": 81.60000002384186,
+          "settledFps": 59.86828976679516,
+          "wheelZoomFps": 59.99600026569534,
+          "wheelZoomRenderFps": 58.66275581534656,
+          "dragPanFps": 60.00065934884813,
+          "dragPanRenderFps": 59.67098539638194,
+          "select500Ms": 28.799999952316284,
+          "heapUsedMB": 47.63548183441162,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 47.63548183441162
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 916.6999999284744,
+          "q1": 913.6499999761581,
+          "q3": 918.0500000119209,
+          "iqr": 4.400000035762787,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 81.59999990463257,
+          "q1": 79.59999996423721,
+          "q3": 81.59999996423721,
+          "iqr": 2,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.87426404407992,
+          "q1": 59.87127690543754,
+          "q3": 59.87426404407992,
+          "iqr": 0.0029871386423820923,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.97600959520863,
+          "q1": 59.84370225987003,
+          "q3": 59.98600493045198,
+          "iqr": 0.14230267058195523,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.64320938198177,
+          "q1": 58.34797722374922,
+          "q3": 58.65298259866417,
+          "iqr": 0.3050053749149484,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.99868134813427,
+          "q1": 59.99670354420847,
+          "q3": 59.9996703484912,
+          "iqr": 0.0029668042827282193,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.669018263803856,
+          "q1": 59.6670513269326,
+          "q3": 59.6700018300929,
+          "iqr": 0.0029505031602994336,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 29.100000023841858,
+          "q1": 28.94999998807907,
+          "q3": 29.149999976158142,
+          "iqr": 0.19999998807907104,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 47.04125499725342,
+          "q1": 47.030510902404785,
+          "q3": 47.33836841583252,
+          "iqr": 0.3078575134277344,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 5000,
+      "edges": 25000,
+      "ratio": 5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 1810.2999999523163,
+          "firstInteractionStallMs": 171.10000002384186,
+          "settledFps": 59.88621619066553,
+          "wheelZoomFps": 59.75897214520608,
+          "wheelZoomRenderFps": 58.762989276119306,
+          "dragPanFps": 59.98483899626573,
+          "dragPanRenderFps": 59.65525196881372,
+          "select500Ms": 66.80000007152557,
+          "heapUsedMB": 162.15293312072754,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 162.15293312072754
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1780.3000000715256,
+          "firstInteractionStallMs": 168.19999992847443,
+          "settledFps": 59.87426405120253,
+          "wheelZoomFps": 59.749053972839235,
+          "wheelZoomRenderFps": 58.75323640662525,
+          "dragPanFps": 59.98483899626573,
+          "dragPanRenderFps": 59.65525196881372,
+          "select500Ms": 62.60000002384186,
+          "heapUsedMB": 162.09715461730957,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 162.09715461730957
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1813.2000000476837,
+          "firstInteractionStallMs": 170.39999997615814,
+          "settledFps": 59.86828975967398,
+          "wheelZoomFps": 59.72922750151844,
+          "wheelZoomRenderFps": 58.73374037649313,
+          "dragPanFps": 60.01450900406365,
+          "dragPanRenderFps": 59.68475895459077,
+          "select500Ms": 71.79999995231628,
+          "heapUsedMB": 162.3465976715088,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 162.3465976715088
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1810.2999999523163,
+          "q1": 1795.300000011921,
+          "q3": 1811.75,
+          "iqr": 16.44999998807907,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 170.39999997615814,
+          "q1": 169.29999995231628,
+          "q3": 170.75,
+          "iqr": 1.4500000476837158,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.87426405120253,
+          "q1": 59.87127690543825,
+          "q3": 59.88024012093403,
+          "iqr": 0.008963215495782606,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.749053972839235,
+          "q1": 59.739140737178836,
+          "q3": 59.754013059022654,
+          "iqr": 0.014872321843817815,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.75323640662525,
+          "q1": 58.74348839155919,
+          "q3": 58.75811284137228,
+          "iqr": 0.01462444981309119,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.98483899626573,
+          "q1": 59.98483899626573,
+          "q3": 59.99967400016469,
+          "iqr": 0.014835003898959087,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.65525196881372,
+          "q1": 59.65525196881372,
+          "q3": 59.670005461702246,
+          "iqr": 0.014753492888523567,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 66.80000007152557,
+          "q1": 64.70000004768372,
+          "q3": 69.30000001192093,
+          "iqr": 4.599999964237213,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 162.15293312072754,
+          "q1": 162.12504386901855,
+          "q3": 162.24976539611816,
+          "iqr": 0.12472152709960938,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 10000,
+      "edges": 50000,
+      "ratio": 5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 3187.600000023842,
+          "firstInteractionStallMs": 65,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 59.73715651040472,
+          "wheelZoomRenderFps": 58.74153723523131,
+          "dragPanFps": 59.98286203847465,
+          "dragPanRenderFps": 59.65328587342809,
+          "select500Ms": 175.70000004768372,
+          "heapUsedMB": 356.2175054550171,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 356.2175054550171
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3117.6999999284744,
+          "firstInteractionStallMs": 65.5,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 59.74112180550946,
+          "wheelZoomRenderFps": 58.745436442084305,
+          "dragPanFps": 59.99868134813427,
+          "dragPanRenderFps": 59.669018263803856,
+          "select500Ms": 132,
+          "heapUsedMB": 333.23865032196045,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 333.23865032196045
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3250.5,
+          "firstInteractionStallMs": 65.60000002384186,
+          "settledFps": 59.880239520958085,
+          "wheelZoomFps": 59.735174062605246,
+          "wheelZoomRenderFps": 58.739587828228494,
+          "dragPanFps": 59.996703477830884,
+          "dragPanRenderFps": 59.66705126091973,
+          "select500Ms": 140.19999992847443,
+          "heapUsedMB": 351.27410316467285,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 351.27410316467285
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 3187.600000023842,
+          "q1": 3152.649999976158,
+          "q3": 3219.050000011921,
+          "iqr": 66.40000003576279,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 65.5,
+          "q1": 65.25,
+          "q3": 65.55000001192093,
+          "iqr": 0.30000001192092896,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.87426404407992,
+          "q1": 59.87426404407992,
+          "q3": 59.877251782519004,
+          "iqr": 0.002987738439081511,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.73715651040472,
+          "q1": 59.736165286504985,
+          "q3": 59.73913915795709,
+          "iqr": 0.002973871452105925,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.74153723523131,
+          "q1": 58.74056253172991,
+          "q3": 58.74348683865781,
+          "iqr": 0.0029243069279019096,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.996703477830884,
+          "q1": 59.98978275815277,
+          "q3": 59.99769241298257,
+          "iqr": 0.007909654829802548,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.66705126091973,
+          "q1": 59.66016856717391,
+          "q3": 59.66803476236179,
+          "iqr": 0.00786619518788001,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 140.19999992847443,
+          "q1": 136.0999999642372,
+          "q3": 157.94999998807907,
+          "iqr": 21.850000023841858,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 351.27410316467285,
+          "q1": 342.25637674331665,
+          "q3": 353.74580430984497,
+          "iqr": 11.48942756652832,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 25000,
+      "edges": 125000,
+      "ratio": 5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 7812,
+          "firstInteractionStallMs": 65.39999997615814,
+          "settledFps": 59.85037406483791,
+          "wheelZoomFps": 59.745087627074106,
+          "wheelZoomRenderFps": 58.74933616662287,
+          "dragPanFps": 60.211232848252344,
+          "dragPanRenderFps": 59.553186587615706,
+          "select500Ms": 464.10000002384186,
+          "heapUsedMB": 941.3416318893433,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 941.3416318893433
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 7537.800000071526,
+          "firstInteractionStallMs": 65.80000007152557,
+          "settledFps": 59.86828976679516,
+          "wheelZoomFps": 59.75833989971607,
+          "wheelZoomRenderFps": 58.77331231895152,
+          "dragPanFps": 13.010668748373666,
+          "dragPanRenderFps": 5.984907624251886,
+          "select500Ms": 387.39999997615814,
+          "heapUsedMB": 942.4937763214111,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 942.4937763214111
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 7845.600000023842,
+          "firstInteractionStallMs": 65.60000002384186,
+          "settledFps": 59.86828975967398,
+          "wheelZoomFps": 59.73319174401811,
+          "wheelZoomRenderFps": 58.73763854828447,
+          "dragPanFps": 60.20529016928694,
+          "dragPanRenderFps": 59.547308855961404,
+          "select500Ms": 450.1999999284744,
+          "heapUsedMB": 941.5758457183838,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 941.5758457183838
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 7812,
+          "q1": 7674.900000035763,
+          "q3": 7828.800000011921,
+          "iqr": 153.89999997615814,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 65.60000002384186,
+          "q1": 65.5,
+          "q3": 65.70000004768372,
+          "iqr": 0.20000004768371582,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.86828975967398,
+          "q1": 59.85933191225594,
+          "q3": 59.86828976323457,
+          "iqr": 0.00895785097863211,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.745087627074106,
+          "q1": 59.73913968554611,
+          "q3": 59.75171376339509,
+          "iqr": 0.012574077848981347,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.74933616662287,
+          "q1": 58.743487357453674,
+          "q3": 58.7613242427872,
+          "iqr": 0.0178368853335229,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 60.20529016928694,
+          "q1": 36.6079794588303,
+          "q3": 60.20826150876964,
+          "iqr": 23.600282049939338,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.547308855961404,
+          "q1": 32.76610824010665,
+          "q3": 59.55024772178855,
+          "iqr": 26.784139481681905,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 450.1999999284744,
+          "q1": 418.7999999523163,
+          "q3": 457.14999997615814,
+          "iqr": 38.35000002384186,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 941.5758457183838,
+          "q1": 941.4587388038635,
+          "q3": 942.0348110198975,
+          "iqr": 0.5760722160339355,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 50000,
+      "edges": 250000,
+      "ratio": 5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 15792.899999976158,
+          "firstInteractionStallMs": 56.699999928474426,
+          "settledFps": 59.862316667383325,
+          "wheelZoomFps": 50.66849727004412,
+          "wheelZoomRenderFps": 49.68781667772069,
+          "dragPanFps": 57.89182684399763,
+          "dragPanRenderFps": 35.45061306739181,
+          "select500Ms": 1119.1999999284744,
+          "heapUsedMB": 1872.0756130218506,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1872.0756130218506
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 15940.199999928474,
+          "firstInteractionStallMs": 64.69999992847443,
+          "settledFps": 59.88621619066553,
+          "wheelZoomFps": 51.330366134555796,
+          "wheelZoomRenderFps": 50.35573892946929,
+          "dragPanFps": 59.57446808510638,
+          "dragPanRenderFps": 35.3518821603928,
+          "select500Ms": 1090.3999999761581,
+          "heapUsedMB": 1836.0662631988525,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1836.0662631988525
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 15839.899999976158,
+          "firstInteractionStallMs": 56.10000002384186,
+          "settledFps": 59.85037406483791,
+          "wheelZoomFps": 50.22137051437343,
+          "wheelZoomRenderFps": 49.23015925422132,
+          "dragPanFps": 59.018328470247255,
+          "dragPanRenderFps": 36.39463588998581,
+          "select500Ms": 1120.3999999761581,
+          "heapUsedMB": 1846.9510326385498,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 1846.9510326385498
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 15839.899999976158,
+          "q1": 15816.399999976158,
+          "q3": 15890.049999952316,
+          "iqr": 73.64999997615814,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 56.699999928474426,
+          "q1": 56.39999997615814,
+          "q3": 60.699999928474426,
+          "iqr": 4.299999952316284,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.862316667383325,
+          "q1": 59.85634536611062,
+          "q3": 59.87426642902443,
+          "iqr": 0.017921062913814012,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 50.66849727004412,
+          "q1": 50.44493389220878,
+          "q3": 50.99943170229996,
+          "iqr": 0.5544978100911777,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 49.68781667772069,
+          "q1": 49.458987965971005,
+          "q3": 50.021777803594986,
+          "iqr": 0.5627898376239813,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.018328470247255,
+          "q1": 58.455077657122445,
+          "q3": 59.296398277676815,
+          "iqr": 0.8413206205543702,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 35.45061306739181,
+          "q1": 35.4012476138923,
+          "q3": 35.9226244786888,
+          "iqr": 0.5213768647965011,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 1119.1999999284744,
+          "q1": 1104.7999999523163,
+          "q3": 1119.7999999523163,
+          "iqr": 15,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 1846.9510326385498,
+          "q1": 1841.5086479187012,
+          "q3": 1859.5133228302002,
+          "iqr": 18.004674911499023,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 100000,
+      "edges": 500000,
+      "ratio": 5,
+      "variant": "plain",
+      "runs": [
+        {
+          "loadMs": 35380.300000071526,
+          "firstInteractionStallMs": 65.89999997615814,
+          "settledFps": 59.86828976679516,
+          "wheelZoomFps": 27.112232030264817,
+          "wheelZoomRenderFps": 26.166456494325345,
+          "dragPanFps": 1.0038346483615277,
+          "dragPanRenderFps": 0.7026842538530694,
+          "select500Ms": 2168.100000023842,
+          "heapUsedMB": 2299.4569721221924,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 500000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 2299.4569721221924
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 35157.5,
+          "firstInteractionStallMs": 56,
+          "settledFps": 59.86828976679516,
+          "wheelZoomFps": 27.63673757890072,
+          "wheelZoomRenderFps": 26.672665337776277,
+          "dragPanFps": 51.51400929726467,
+          "dragPanRenderFps": 18.84658876729195,
+          "select500Ms": 2648.600000023842,
+          "heapUsedMB": 2390.999273300171,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 500000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 2390.999273300171
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 35270.60000002384,
+          "firstInteractionStallMs": 64.20000004768372,
+          "settledFps": 59.934072525937225,
+          "wheelZoomFps": 26.86234685165418,
+          "wheelZoomRenderFps": 25.87957806439854,
+          "dragPanFps": 52.36437945057264,
+          "dragPanRenderFps": 19.476994795639825,
+          "select500Ms": 2560.399999976158,
+          "heapUsedMB": 2299.392493247986,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 500000,
+            "labelsOn": false,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 2299.392493247986
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 35270.60000002384,
+          "q1": 35214.05000001192,
+          "q3": 35325.450000047684,
+          "iqr": 111.40000003576279,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 64.20000004768372,
+          "q1": 60.10000002384186,
+          "q3": 65.05000001192093,
+          "iqr": 4.949999988079071,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.86828976679516,
+          "q1": 59.86828976679516,
+          "q3": 59.90118114636619,
+          "iqr": 0.0328913795710335,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 27.112232030264817,
+          "q1": 26.9872894409595,
+          "q3": 27.37448480458277,
+          "iqr": 0.38719536362327034,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 26.166456494325345,
+          "q1": 26.023017279361945,
+          "q3": 26.419560916050813,
+          "iqr": 0.39654363668886816,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 51.51400929726467,
+          "q1": 26.258921972813102,
+          "q3": 51.93919437391865,
+          "iqr": 25.68027240110555,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 18.84658876729195,
+          "q1": 9.774636510572511,
+          "q3": 19.161791781465887,
+          "iqr": 9.387155270893375,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 2560.399999976158,
+          "q1": 2364.25,
+          "q3": 2604.5,
+          "iqr": 240.25,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 2299.4569721221924,
+          "q1": 2299.424732685089,
+          "q3": 2345.2281227111816,
+          "iqr": 45.80339002609253,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 1000,
+      "edges": 5000,
+      "ratio": 5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 958.3999999761581,
+          "firstInteractionStallMs": 109.5,
+          "settledFps": 59.88621619066553,
+          "wheelZoomFps": 59.72328212425905,
+          "wheelZoomRenderFps": 56.07352599444322,
+          "dragPanFps": 59.96554465752758,
+          "dragPanRenderFps": 59.63424330582853,
+          "select500Ms": 83.20000004768372,
+          "heapUsedMB": 68.57250022888184,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 68.57250022888184
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 962.8000000715256,
+          "firstInteractionStallMs": 110.5,
+          "settledFps": 59.880239520958085,
+          "wheelZoomFps": 59.735174060242066,
+          "wheelZoomRenderFps": 57.412139513454875,
+          "dragPanFps": 59.96951825496668,
+          "dragPanRenderFps": 59.638194949690615,
+          "select500Ms": 87.30000007152557,
+          "heapUsedMB": 68.74120903015137,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 68.74120903015137
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 965.1000000238419,
+          "firstInteractionStallMs": 113.10000002384186,
+          "settledFps": 59.880239520958085,
+          "wheelZoomFps": 59.71931919928874,
+          "wheelZoomRenderFps": 58.06044922153072,
+          "dragPanFps": 59.96705107084019,
+          "dragPanRenderFps": 59.63756177924217,
+          "select500Ms": 81.5,
+          "heapUsedMB": 49.021711349487305,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 49.021711349487305
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 962.8000000715256,
+          "q1": 960.6000000238419,
+          "q3": 963.9500000476837,
+          "iqr": 3.350000023841858,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 110.5,
+          "q1": 110,
+          "q3": 111.80000001192093,
+          "iqr": 1.800000011920929,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.880239520958085,
+          "q1": 59.880239520958085,
+          "q3": 59.88322785581181,
+          "iqr": 0.002988334853725405,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 59.72328212425905,
+          "q1": 59.721300661773896,
+          "q3": 59.72922809225056,
+          "iqr": 0.007927430476662778,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 57.412139513454875,
+          "q1": 56.742832753949045,
+          "q3": 57.736294367492796,
+          "iqr": 0.9934616135437508,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 59.96705107084019,
+          "q1": 59.966297864183886,
+          "q3": 59.968284662903436,
+          "iqr": 0.001986798719549654,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 59.63756177924217,
+          "q1": 59.63590254253535,
+          "q3": 59.63787836446639,
+          "iqr": 0.0019758219310404,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 83.20000004768372,
+          "q1": 82.35000002384186,
+          "q3": 85.25000005960464,
+          "iqr": 2.900000035762787,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 68.57250022888184,
+          "q1": 58.79710578918457,
+          "q3": 68.6568546295166,
+          "iqr": 9.859748840332031,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 5000,
+      "edges": 25000,
+      "ratio": 5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 1971.5,
+          "firstInteractionStallMs": 198.89999997615814,
+          "settledFps": 59.880239520958085,
+          "wheelZoomFps": 54.83923616778195,
+          "wheelZoomRenderFps": 54.186388118165496,
+          "dragPanFps": 22.067400145677787,
+          "dragPanRenderFps": 22.38264871918747,
+          "select500Ms": 152.5,
+          "heapUsedMB": 173.26964378356934,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 173.26964378356934
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 2085.7999999523163,
+          "firstInteractionStallMs": 217.69999992847443,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 55.58643691026079,
+          "wheelZoomRenderFps": 54.9324788289636,
+          "dragPanFps": 20,
+          "dragPanRenderFps": 21.176470588235293,
+          "select500Ms": 161,
+          "heapUsedMB": 161.84322357177734,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 161.84322357177734
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 2067.600000023842,
+          "firstInteractionStallMs": 210.5,
+          "settledFps": 59.8623166745031,
+          "wheelZoomFps": 55.28114880072029,
+          "wheelZoomRenderFps": 54.626934022013536,
+          "dragPanFps": 23.165307635114807,
+          "dragPanRenderFps": 23.165307635114807,
+          "select500Ms": 185.59999990463257,
+          "heapUsedMB": 162.1879997253418,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 162.1879997253418
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 2067.600000023842,
+          "q1": 2019.550000011921,
+          "q3": 2076.699999988079,
+          "iqr": 57.14999997615814,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 210.5,
+          "q1": 204.69999998807907,
+          "q3": 214.0999999642372,
+          "iqr": 9.399999976158142,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.87426404407992,
+          "q1": 59.86829035929151,
+          "q3": 59.877251782519004,
+          "iqr": 0.008961423227496823,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 55.28114880072029,
+          "q1": 55.06019248425112,
+          "q3": 55.43379285549054,
+          "iqr": 0.37360037123941936,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 54.626934022013536,
+          "q1": 54.40666107008951,
+          "q3": 54.77970642548857,
+          "iqr": 0.37304535539905714,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 22.067400145677787,
+          "q1": 21.033700072838894,
+          "q3": 22.616353890396297,
+          "iqr": 1.5826538175574036,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 22.38264871918747,
+          "q1": 21.77955965371138,
+          "q3": 22.773978177151136,
+          "iqr": 0.9944185234397551,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 161,
+          "q1": 156.75,
+          "q3": 173.29999995231628,
+          "iqr": 16.549999952316284,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 162.1879997253418,
+          "q1": 162.01561164855957,
+          "q3": 167.72882175445557,
+          "iqr": 5.713210105895996,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 10000,
+      "edges": 50000,
+      "ratio": 5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 3580.899999976158,
+          "firstInteractionStallMs": 67.5,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 39.86146507189755,
+          "wheelZoomRenderFps": 38.88126511111318,
+          "dragPanFps": 12.28220508426164,
+          "dragPanRenderFps": 6.283918880319908,
+          "select500Ms": 249.70000004768372,
+          "heapUsedMB": 408.97339057922363,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 408.97339057922363
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3593.399999976158,
+          "firstInteractionStallMs": 67.5,
+          "settledFps": 59.880239520958085,
+          "wheelZoomFps": 42.69120031702827,
+          "wheelZoomRenderFps": 41.69838170500436,
+          "dragPanFps": 60.04725029484459,
+          "dragPanRenderFps": 52.82845517743158,
+          "select500Ms": 239.20000004768372,
+          "heapUsedMB": 409.7384672164917,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 409.7384672164917
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3571.2000000476837,
+          "firstInteractionStallMs": 67.5,
+          "settledFps": 59.86828975967398,
+          "wheelZoomFps": 34.899417246127854,
+          "wheelZoomRenderFps": 33.911697890105366,
+          "dragPanFps": 58.09661370566522,
+          "dragPanRenderFps": 32.09757663296421,
+          "select500Ms": 244.5,
+          "heapUsedMB": 387.3292455673218,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 387.3292455673218
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 3580.899999976158,
+          "q1": 3576.050000011921,
+          "q3": 3587.149999976158,
+          "iqr": 11.099999964237213,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 67.5,
+          "q1": 67.5,
+          "q3": 67.5,
+          "iqr": 0,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.87426404407992,
+          "q1": 59.87127690187695,
+          "q3": 59.877251782519004,
+          "iqr": 0.0059748806420500955,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 39.86146507189755,
+          "q1": 37.380441159012705,
+          "q3": 41.27633269446291,
+          "iqr": 3.895891535450204,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 38.88126511111318,
+          "q1": 36.39648150060927,
+          "q3": 40.289823408058766,
+          "iqr": 3.8933419074494964,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 58.09661370566522,
+          "q1": 35.189409394963434,
+          "q3": 59.071932000254904,
+          "iqr": 23.88252260529147,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 32.09757663296421,
+          "q1": 19.19074775664206,
+          "q3": 42.46301590519789,
+          "iqr": 23.27226814855583,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 244.5,
+          "q1": 241.85000002384186,
+          "q3": 247.10000002384186,
+          "iqr": 5.25,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 408.97339057922363,
+          "q1": 398.1513180732727,
+          "q3": 409.35592889785767,
+          "iqr": 11.204610824584961,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 25000,
+      "edges": 125000,
+      "ratio": 5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 8554.700000047684,
+          "firstInteractionStallMs": 70.10000002384186,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 16.639960557497282,
+          "wheelZoomRenderFps": 15.71551830430299,
+          "dragPanFps": 33.51623906273172,
+          "dragPanRenderFps": 14.236986504523209,
+          "select500Ms": 652.5,
+          "heapUsedMB": 795.5600280761719,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 795.5600280761719
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 8691.299999952316,
+          "firstInteractionStallMs": 62,
+          "settledFps": 59.79669125117167,
+          "wheelZoomFps": 17.195261750226074,
+          "wheelZoomRenderFps": 16.239969430769072,
+          "dragPanFps": 34.02970941611272,
+          "dragPanRenderFps": 14.499615316430639,
+          "select500Ms": 573.8000000715256,
+          "heapUsedMB": 769.9342346191406,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 769.9342346191406
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 8983.700000047684,
+          "firstInteractionStallMs": 64.70000004768372,
+          "settledFps": 59.91611743701668,
+          "wheelZoomFps": 18.192083306923195,
+          "wheelZoomRenderFps": 17.25111348070303,
+          "dragPanFps": 34.91514102756697,
+          "dragPanRenderFps": 15.484106020921004,
+          "select500Ms": 529.6000000238419,
+          "heapUsedMB": 714.1460046768188,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 714.1460046768188
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 8691.299999952316,
+          "q1": 8623,
+          "q3": 8837.5,
+          "iqr": 214.5,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 64.70000004768372,
+          "q1": 63.35000002384186,
+          "q3": 67.40000003576279,
+          "iqr": 4.050000011920929,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.87426404407992,
+          "q1": 59.835477647625794,
+          "q3": 59.8951907405483,
+          "iqr": 0.05971309292250737,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 17.195261750226074,
+          "q1": 16.917611153861678,
+          "q3": 17.693672528574634,
+          "iqr": 0.7760613747129561,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 16.239969430769072,
+          "q1": 15.97774386753603,
+          "q3": 16.745541455736053,
+          "iqr": 0.7677975882000219,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 34.02970941611272,
+          "q1": 33.772974239422226,
+          "q3": 34.47242522183984,
+          "iqr": 0.6994509824176163,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 14.499615316430639,
+          "q1": 14.368300910476924,
+          "q3": 14.991860668675821,
+          "iqr": 0.6235597581988976,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 573.8000000715256,
+          "q1": 551.7000000476837,
+          "q3": 613.1500000357628,
+          "iqr": 61.44999998807907,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 769.9342346191406,
+          "q1": 742.0401196479797,
+          "q3": 782.7471313476562,
+          "iqr": 40.707011699676514,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 50000,
+      "edges": 250000,
+      "ratio": 5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 17622,
+          "firstInteractionStallMs": 95,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 9.305842324327683,
+          "wheelZoomRenderFps": 8.433419606421964,
+          "dragPanFps": 19.212295869485803,
+          "dragPanRenderFps": 7.628411595237011,
+          "select500Ms": 1136.2000000476837,
+          "heapUsedMB": 2109.141909599304,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 2109.141909599304
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 17750.5,
+          "firstInteractionStallMs": 75.20000004768372,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 9.340075364459164,
+          "wheelZoomRenderFps": 8.37386067158408,
+          "dragPanFps": 17.372711479353203,
+          "dragPanRenderFps": 6.681812107443539,
+          "select500Ms": 1256,
+          "heapUsedMB": 2095.506411552429,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 2095.506411552429
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 17566,
+          "firstInteractionStallMs": 74.20000004768372,
+          "settledFps": 59.86828975967398,
+          "wheelZoomFps": 9.58485592756589,
+          "wheelZoomRenderFps": 8.686275684356588,
+          "dragPanFps": 17.925462182396995,
+          "dragPanRenderFps": 6.688605291939177,
+          "select500Ms": 1220.3999999761581,
+          "heapUsedMB": 2112.748373031616,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 2112.748373031616
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 17622,
+          "q1": 17594,
+          "q3": 17686.25,
+          "iqr": 92.25,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 75.20000004768372,
+          "q1": 74.70000004768372,
+          "q3": 85.10000002384186,
+          "iqr": 10.399999976158142,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.87426404407992,
+          "q1": 59.87127690187695,
+          "q3": 59.87426404407992,
+          "iqr": 0.0029871422029685846,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 9.340075364459164,
+          "q1": 9.322958844393423,
+          "q3": 9.462465646012527,
+          "iqr": 0.13950680161910434,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 8.433419606421964,
+          "q1": 8.403640139003022,
+          "q3": 8.559847645389276,
+          "iqr": 0.15620750638625402,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 17.925462182396995,
+          "q1": 17.6490868308751,
+          "q3": 18.5688790259414,
+          "iqr": 0.9197921950663002,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 6.688605291939177,
+          "q1": 6.6852086996913584,
+          "q3": 7.158508443588094,
+          "iqr": 0.47329974389673524,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 1220.3999999761581,
+          "q1": 1178.300000011921,
+          "q3": 1238.199999988079,
+          "iqr": 59.89999997615814,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 2109.141909599304,
+          "q1": 2102.3241605758667,
+          "q3": 2110.94514131546,
+          "iqr": 8.620980739593506,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 100000,
+      "edges": 500000,
+      "ratio": 5,
+      "variant": "heavy",
+      "runs": [
+        {
+          "loadMs": 39904.89999997616,
+          "firstInteractionStallMs": 82.30000007152557,
+          "settledFps": 59.82650314231367,
+          "wheelZoomFps": 5.503577325091501,
+          "wheelZoomRenderFps": 4.5323577971341775,
+          "dragPanFps": 37.770367966272396,
+          "dragPanRenderFps": 12.983563988406136,
+          "select500Ms": 3059.399999976158,
+          "heapUsedMB": 3055.5274715423584,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 500000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 3055.5274715423584
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 39421.699999928474,
+          "firstInteractionStallMs": 131.89999997615814,
+          "settledFps": 59.87426404407992,
+          "wheelZoomFps": 5.499205670211957,
+          "wheelZoomRenderFps": 4.582671391843298,
+          "dragPanFps": 33.83072554921354,
+          "dragPanRenderFps": 12.08240198186198,
+          "select500Ms": 2519.100000023842,
+          "heapUsedMB": 3054.5206356048584,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 500000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 3054.5206356048584
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 39672.199999928474,
+          "firstInteractionStallMs": 82.70000004768372,
+          "settledFps": 59.86828975967398,
+          "wheelZoomFps": 5.492661194308702,
+          "wheelZoomRenderFps": 4.5772176619239175,
+          "dragPanFps": 34.79003906300626,
+          "dragPanRenderFps": 11.901855468923195,
+          "select500Ms": 2810.399999976158,
+          "heapUsedMB": 3048.356258392334,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 100000,
+            "edges": 500000,
+            "labelsOn": true,
+            "bubbleOutlines": 0,
+            "flowActive": false,
+            "heatmapOn": false,
+            "heapUsedMB": 3048.356258392334
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 39672.199999928474,
+          "q1": 39546.949999928474,
+          "q3": 39788.549999952316,
+          "iqr": 241.60000002384186,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 82.70000004768372,
+          "q1": 82.50000005960464,
+          "q3": 107.30000001192093,
+          "iqr": 24.799999952316284,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 59.86828975967398,
+          "q1": 59.84739645099383,
+          "q3": 59.87127690187695,
+          "iqr": 0.023880450883126514,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 5.499205670211957,
+          "q1": 5.49593343226033,
+          "q3": 5.5013914976517295,
+          "iqr": 0.005458065391399813,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 4.5772176619239175,
+          "q1": 4.554787729529048,
+          "q3": 4.579944526883608,
+          "iqr": 0.025156797354560112,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 34.79003906300626,
+          "q1": 34.3103823061099,
+          "q3": 36.280203514639325,
+          "iqr": 1.9698212085294244,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 12.08240198186198,
+          "q1": 11.992128725392586,
+          "q3": 12.532982985134058,
+          "iqr": 0.5408542597414723,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 2810.399999976158,
+          "q1": 2664.75,
+          "q3": 2934.899999976158,
+          "iqr": 270.14999997615814,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 3054.5206356048584,
+          "q1": 3051.438446998596,
+          "q3": 3055.0240535736084,
+          "iqr": 3.585606575012207,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 1000,
+      "edges": 5000,
+      "ratio": 5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 1203.5,
+          "firstInteractionStallMs": 234.40000009536743,
+          "settledFps": 59.95085995085994,
+          "wheelZoomFps": 58.425482752929526,
+          "wheelZoomRenderFps": 58.425482752929526,
+          "dragPanFps": 58.80823965261037,
+          "dragPanRenderFps": 67.90564689168822,
+          "select500Ms": 99,
+          "heapUsedMB": 91.50265121459961,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 91.50265121459961
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1216.8999999761581,
+          "firstInteractionStallMs": 222.29999995231628,
+          "settledFps": 55.483998813678475,
+          "wheelZoomFps": 58.5564839801277,
+          "wheelZoomRenderFps": 58.5564839801277,
+          "dragPanFps": 58.35998549289175,
+          "dragPanRenderFps": 71.21896534725774,
+          "select500Ms": 82.60000002384186,
+          "heapUsedMB": 82.76361083984375,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 82.76361083984375
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 1209.5999999046326,
+          "firstInteractionStallMs": 195.69999992847443,
+          "settledFps": 56.37424586950443,
+          "wheelZoomFps": 58.31960461285008,
+          "wheelZoomRenderFps": 58.31960461285008,
+          "dragPanFps": 57.69674590307751,
+          "dragPanRenderFps": 68.57670370194356,
+          "select500Ms": 91.19999992847443,
+          "heapUsedMB": 83.69311904907227,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 1000,
+            "edges": 5000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 83.69311904907227
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 1209.5999999046326,
+          "q1": 1206.5499999523163,
+          "q3": 1213.2499999403954,
+          "iqr": 6.699999988079071,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 222.29999995231628,
+          "q1": 208.99999994039536,
+          "q3": 228.35000002384186,
+          "iqr": 19.350000083446503,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 56.37424586950443,
+          "q1": 55.92912234159145,
+          "q3": 58.162552910182185,
+          "iqr": 2.233430568590734,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 58.425482752929526,
+          "q1": 58.3725436828898,
+          "q3": 58.49098336652861,
+          "iqr": 0.11843968363881174,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 58.425482752929526,
+          "q1": 58.3725436828898,
+          "q3": 58.49098336652861,
+          "iqr": 0.11843968363881174,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 58.35998549289175,
+          "q1": 58.02836569798463,
+          "q3": 58.58411257275106,
+          "iqr": 0.5557468747664274,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 68.57670370194356,
+          "q1": 68.2411752968159,
+          "q3": 69.89783452460065,
+          "iqr": 1.6566592277847576,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 91.19999992847443,
+          "q1": 86.89999997615814,
+          "q3": 95.09999996423721,
+          "iqr": 8.199999988079071,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 83.69311904907227,
+          "q1": 83.22836494445801,
+          "q3": 87.59788513183594,
+          "iqr": 4.36952018737793,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 5000,
+      "edges": 25000,
+      "ratio": 5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 3486.100000023842,
+          "firstInteractionStallMs": 706.6999999284744,
+          "settledFps": 13.635920911025408,
+          "wheelZoomFps": 12.521913348453088,
+          "wheelZoomRenderFps": 13.148009015875743,
+          "dragPanFps": 13.008681881080808,
+          "dragPanRenderFps": 13.008681881080808,
+          "select500Ms": 215.29999995231628,
+          "heapUsedMB": 288.959566116333,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 288.959566116333
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3308.5,
+          "firstInteractionStallMs": 602.7999999523163,
+          "settledFps": 15.184587644572542,
+          "wheelZoomFps": 12.415460515374908,
+          "wheelZoomRenderFps": 13.0689058056578,
+          "dragPanFps": 14.099096506973629,
+          "dragPanRenderFps": 14.099096506973629,
+          "select500Ms": 221.19999992847443,
+          "heapUsedMB": 305.82053565979004,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 305.82053565979004
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 3546.600000023842,
+          "firstInteractionStallMs": 637.6000000238419,
+          "settledFps": 15.80090855186972,
+          "wheelZoomFps": 12.789670818327272,
+          "wheelZoomRenderFps": 13.398702762057143,
+          "dragPanFps": 14.32999941520198,
+          "dragPanRenderFps": 14.622448382859163,
+          "select500Ms": 196,
+          "heapUsedMB": 296.2334232330322,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 5000,
+            "edges": 25000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 296.2334232330322
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 3486.100000023842,
+          "q1": 3397.300000011921,
+          "q3": 3516.350000023842,
+          "iqr": 119.05000001192093,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 637.6000000238419,
+          "q1": 620.1999999880791,
+          "q3": 672.1499999761581,
+          "iqr": 51.94999998807907,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 15.184587644572542,
+          "q1": 14.410254277798975,
+          "q3": 15.492748098221131,
+          "iqr": 1.0824938204221564,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 12.521913348453088,
+          "q1": 12.468686931913998,
+          "q3": 12.65579208339018,
+          "iqr": 0.18710515147618167,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 13.148009015875743,
+          "q1": 13.108457410766771,
+          "q3": 13.273355888966442,
+          "iqr": 0.16489847819967096,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 14.099096506973629,
+          "q1": 13.553889194027217,
+          "q3": 14.214547961087804,
+          "iqr": 0.6606587670605872,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 14.099096506973629,
+          "q1": 13.553889194027217,
+          "q3": 14.360772444916396,
+          "iqr": 0.8068832508891788,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 215.29999995231628,
+          "q1": 205.64999997615814,
+          "q3": 218.24999994039536,
+          "iqr": 12.599999964237213,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 296.2334232330322,
+          "q1": 292.5964946746826,
+          "q3": 301.02697944641113,
+          "iqr": 8.430484771728516,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 10000,
+      "edges": 50000,
+      "ratio": 5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 6440.600000023842,
+          "firstInteractionStallMs": 1005.3000000715256,
+          "settledFps": 7.067762169951859,
+          "wheelZoomFps": 6.319714348816207,
+          "wheelZoomRenderFps": 6.319714348816207,
+          "dragPanFps": 6.3342454647567745,
+          "dragPanRenderFps": 6.3342454647567745,
+          "select500Ms": 374.89999997615814,
+          "heapUsedMB": 734.213189125061,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 734.213189125061
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 6272.700000047684,
+          "firstInteractionStallMs": 1099.1000000238419,
+          "settledFps": 6.329686228547709,
+          "wheelZoomFps": 6.076441635822104,
+          "wheelZoomRenderFps": 6.076441635822104,
+          "dragPanFps": 6.269749711629002,
+          "dragPanRenderFps": 6.269749711629002,
+          "select500Ms": 366.89999997615814,
+          "heapUsedMB": 726.4149522781372,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 726.4149522781372
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 6476.700000047684,
+          "firstInteractionStallMs": 1194.1000000238419,
+          "settledFps": 6.638846737631147,
+          "wheelZoomFps": 6.369619946055951,
+          "wheelZoomRenderFps": 6.369619946055951,
+          "dragPanFps": 6.4064782306695465,
+          "dragPanRenderFps": 6.4064782306695465,
+          "select500Ms": 426.7999999523163,
+          "heapUsedMB": 730.1400079727173,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 10000,
+            "edges": 50000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 730.1400079727173
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 6440.600000023842,
+          "q1": 6356.650000035763,
+          "q3": 6458.650000035763,
+          "iqr": 102,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 1099.1000000238419,
+          "q1": 1052.2000000476837,
+          "q3": 1146.6000000238419,
+          "iqr": 94.39999997615814,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 6.638846737631147,
+          "q1": 6.484266483089428,
+          "q3": 6.8533044537915035,
+          "iqr": 0.36903797070207567,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 6.319714348816207,
+          "q1": 6.198077992319156,
+          "q3": 6.344667147436079,
+          "iqr": 0.1465891551169225,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 6.319714348816207,
+          "q1": 6.198077992319156,
+          "q3": 6.344667147436079,
+          "iqr": 0.1465891551169225,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 6.3342454647567745,
+          "q1": 6.301997588192888,
+          "q3": 6.370361847713161,
+          "iqr": 0.0683642595202727,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 6.3342454647567745,
+          "q1": 6.301997588192888,
+          "q3": 6.370361847713161,
+          "iqr": 0.0683642595202727,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 374.89999997615814,
+          "q1": 370.89999997615814,
+          "q3": 400.8499999642372,
+          "iqr": 29.94999998807907,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 730.1400079727173,
+          "q1": 728.2774801254272,
+          "q3": 732.1765985488892,
+          "iqr": 3.899118423461914,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 25000,
+      "edges": 125000,
+      "ratio": 5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 16910.200000047684,
+          "firstInteractionStallMs": 2916.2000000476837,
+          "settledFps": 2.2428229664672,
+          "wheelZoomFps": 2.3184104977242885,
+          "wheelZoomRenderFps": 2.3184104977242885,
+          "dragPanFps": 2.116643329292488,
+          "dragPanRenderFps": 2.116643329292488,
+          "select500Ms": 956.2000000476837,
+          "heapUsedMB": 1588.1840915679932,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1588.1840915679932
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 16587.600000023842,
+          "firstInteractionStallMs": 2857.5,
+          "settledFps": 2.073971655720705,
+          "wheelZoomFps": 2.397506593143131,
+          "wheelZoomRenderFps": 2.397506593143131,
+          "dragPanFps": 1.8241850452992634,
+          "dragPanRenderFps": 2.00660354982919,
+          "select500Ms": 927.6000000238419,
+          "heapUsedMB": 1587.7463474273682,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1587.7463474273682
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 16669.600000023842,
+          "firstInteractionStallMs": 2870.399999976158,
+          "settledFps": 2.4681201151789387,
+          "wheelZoomFps": 2.2578969946904808,
+          "wheelZoomRenderFps": 2.2578969946904808,
+          "dragPanFps": 2.0898305629601928,
+          "dragPanRenderFps": 2.0898305629601928,
+          "select500Ms": 1019,
+          "heapUsedMB": 1585.2462978363037,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 25000,
+            "edges": 125000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1585.2462978363037
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 16669.600000023842,
+          "q1": 16628.600000023842,
+          "q3": 16789.900000035763,
+          "iqr": 161.30000001192093,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 2870.399999976158,
+          "q1": 2863.949999988079,
+          "q3": 2893.300000011921,
+          "iqr": 29.350000023841858,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 2.2428229664672,
+          "q1": 2.1583973110939523,
+          "q3": 2.3554715408230695,
+          "iqr": 0.19707422972911726,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 2.3184104977242885,
+          "q1": 2.2881537462073847,
+          "q3": 2.3579585454337098,
+          "iqr": 0.0698047992263251,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 2.3184104977242885,
+          "q1": 2.2881537462073847,
+          "q3": 2.3579585454337098,
+          "iqr": 0.0698047992263251,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 2.0898305629601928,
+          "q1": 1.957007804129728,
+          "q3": 2.1032369461263407,
+          "iqr": 0.14622914199661263,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 2.0898305629601928,
+          "q1": 2.0482170563946913,
+          "q3": 2.1032369461263407,
+          "iqr": 0.055019889731649396,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 956.2000000476837,
+          "q1": 941.9000000357628,
+          "q3": 987.6000000238419,
+          "iqr": 45.69999998807907,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 1587.7463474273682,
+          "q1": 1586.496322631836,
+          "q3": 1587.9652194976807,
+          "iqr": 1.4688968658447266,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 50000,
+      "edges": 250000,
+      "ratio": 5,
+      "variant": "overlays",
+      "runs": [
+        {
+          "loadMs": 36749.60000002384,
+          "firstInteractionStallMs": 7066.899999976158,
+          "settledFps": 1.0305559849285615,
+          "wheelZoomFps": 0.9263118892028692,
+          "wheelZoomRenderFps": 0.9263118892028692,
+          "dragPanFps": 0.9020060614826729,
+          "dragPanRenderFps": 0.9922066676309402,
+          "select500Ms": 2532.1999999284744,
+          "heapUsedMB": 1289.7188749313354,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 1289.7188749313354
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 37205.60000002384,
+          "firstInteractionStallMs": 7025.699999928474,
+          "settledFps": 0.9957184108806926,
+          "wheelZoomFps": 0.9265264523199805,
+          "wheelZoomRenderFps": 0.9265264523199805,
+          "dragPanFps": 0.9243852837862822,
+          "dragPanRenderFps": 1.0168238121649105,
+          "select500Ms": 2554.2000000476837,
+          "heapUsedMB": 2521.446859359741,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 2521.446859359741
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        },
+        {
+          "loadMs": 35738.300000071526,
+          "firstInteractionStallMs": 6818.699999928474,
+          "settledFps": 1.0507512871834883,
+          "wheelZoomFps": 0.889442319656139,
+          "wheelZoomRenderFps": 0.889442319656139,
+          "dragPanFps": 0.8168028004667445,
+          "dragPanRenderFps": 0.9334889148191365,
+          "select500Ms": 2104.0999999046326,
+          "heapUsedMB": 2426.8092403411865,
+          "renderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A4000 (0x000024B0)), NVIDIA)",
+          "state": {
+            "nodes": 50000,
+            "edges": 250000,
+            "labelsOn": true,
+            "bubbleOutlines": 4,
+            "flowActive": true,
+            "heatmapOn": true,
+            "heapUsedMB": 2426.8092403411865
+          },
+          "zoomChanged": true,
+          "pageErrors": []
+        }
+      ],
+      "status": "ok",
+      "summary": {
+        "loadMs": {
+          "median": 36749.60000002384,
+          "q1": 36243.950000047684,
+          "q3": 36977.60000002384,
+          "iqr": 733.6499999761581,
+          "n": 3
+        },
+        "firstInteractionStallMs": {
+          "median": 7025.699999928474,
+          "q1": 6922.199999928474,
+          "q3": 7046.299999952316,
+          "iqr": 124.10000002384186,
+          "n": 3
+        },
+        "settledFps": {
+          "median": 1.0305559849285615,
+          "q1": 1.013137197904627,
+          "q3": 1.040653636056025,
+          "iqr": 0.027516438151397926,
+          "n": 3
+        },
+        "wheelZoomFps": {
+          "median": 0.9263118892028692,
+          "q1": 0.9078771044295041,
+          "q3": 0.9264191707614249,
+          "iqr": 0.018542066331920792,
+          "n": 3
+        },
+        "wheelZoomRenderFps": {
+          "median": 0.9263118892028692,
+          "q1": 0.9078771044295041,
+          "q3": 0.9264191707614249,
+          "iqr": 0.018542066331920792,
+          "n": 3
+        },
+        "dragPanFps": {
+          "median": 0.9020060614826729,
+          "q1": 0.8594044309747086,
+          "q3": 0.9131956726344775,
+          "iqr": 0.053791241659768896,
+          "n": 3
+        },
+        "dragPanRenderFps": {
+          "median": 0.9922066676309402,
+          "q1": 0.9628477912250384,
+          "q3": 1.0045152398979253,
+          "iqr": 0.041667448672886964,
+          "n": 3
+        },
+        "select500Ms": {
+          "median": 2532.1999999284744,
+          "q1": 2318.1499999165535,
+          "q3": 2543.199999988079,
+          "iqr": 225.05000007152557,
+          "n": 3
+        },
+        "heapUsedMB": {
+          "median": 2426.8092403411865,
+          "q1": 1858.264057636261,
+          "q3": 2474.128049850464,
+          "iqr": 615.8639922142029,
+          "n": 3
+        }
+      },
+      "caveats": [],
+      "nonRepresentative": false
+    },
+    {
+      "nodes": 100000,
+      "edges": 500000,
+      "ratio": 5,
+      "variant": "overlays",
+      "runs": [],
+      "status": "timeout",
+      "reason": "run 1 exceeded 240000 ms"
+    }
+  ],
+  "finishedAt": "2026-11-06T19:06:37.189Z"
+}
