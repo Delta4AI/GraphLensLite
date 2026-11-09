@@ -19,11 +19,16 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
   `aria-labelledby`), never filled chips; nothing that is not clickable may
   look like a button.
 - Sub-groups inside a section get a small heading with a hairline above it
-  (`propSubhead`: "Label", "Badges", "Start arrow"). The command palette names
+  (`propSubhead`: "Label", "Badges", "Start arrow"; level 3 below). The command palette names
   a row by its sub-group ("Label size") so repeated labels stay distinct.
-- Sections use a flat uppercase header with a 1px hairline below (`.flat-card`,
-  `.appearance-card`). The dark bar is reserved for the Overlays layer stack,
-  where it carries the layer's on/off switch.
+- Headings come in three distinct levels, never two at the same weight:
+  1. Section: an uppercase eyebrow in the accent colour (`.insp-section-title`:
+     "Actions", "Appearance"). Every card sits under one.
+  2. Card: 13px semibold in the text colour with a 1px hairline below
+     (`.flat-card`, `.appearance-card`: "Nodes", "Act on Selection").
+  3. Sub-group: 12px semibold with a soft hairline above (`propSubhead`).
+- The dark bar is reserved for the Overlays layer stack, where it carries the
+  layer's on/off switch.
 
 ## Controls
 
