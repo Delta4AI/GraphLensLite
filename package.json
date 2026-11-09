@@ -99,6 +99,7 @@
     "jsdom": "^29.0.2",
     "playwright": "^1.60.0",
     "prettier": "^3.8.4",
+    "undici": "^7.29.0",
     "vitest": "^4.0.18"
   },
   "dependencies": {
