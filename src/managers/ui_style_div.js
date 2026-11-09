@@ -200,6 +200,9 @@ function createMixedTag() {
 
 // Colours come from loaded files: only plain colour syntax reaches CSS.
 const TRANSPARENT = "#00000000";
+const HEX_COLOR = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+/** Anything the browser parses as a colour; hex only where CSS.supports is missing (jsdom). */
+const isColor = (value) => (globalThis.CSS?.supports ? CSS.supports("color", value) : HEX_COLOR.test(value));
 const isUnsetColor = (c) => c == null || c === "" || String(c).toLowerCase() === TRANSPARENT;
 
 /** "#RRGGBB" for <input type=color>, which takes nothing else; null if not hex. */
@@ -587,10 +590,15 @@ function createStyleDiv(cache) {
       group.appendChild(btn);
     }
     const mixedTag = createMixedTag();
+    mixedTag.id = `${group.getAttribute("aria-labelledby") ?? property.replace(/\W+/g, "")}Mixed`;
     parent.append(group, mixedTag);
     bind(property, (value) => {
       mixedTag.hidden = value !== MIXED;
-      const shown = value === MIXED ? undefined : value ?? defaultValue;
+      // Toggled, not left in place: a describedby target is read even while hidden.
+      if (value === MIXED) group.setAttribute("aria-describedby", mixedTag.id);
+      else group.removeAttribute("aria-describedby");
+      // Nothing selected (undefined) or mixed: no segment is the value.
+      const shown = value === MIXED || value === undefined ? undefined : value ?? defaultValue;
       for (const [v, btn] of buttons) btn.setAttribute("aria-pressed", String(v === shown));
     }, {fallback: defaultValue, target, read});
     return group;
@@ -633,7 +641,17 @@ function createStyleDiv(cache) {
     valueInput.classList.add("style-input-sm");
     nameControl(parent, valueInput, property, "value");
 
+    let shown = typedDefaultValue;
     const showValue = (value) => {
+      shown = value;
+      if (value === undefined) {
+        // Nothing of this kind selected: no value, not a made-up default.
+        slider.classList.remove("is-mixed");
+        slider.value = typedDefaultValue;
+        valueInput.value = "";
+        valueInput.placeholder = "—";
+        return;
+      }
       const mixed = value === MIXED;
       slider.classList.toggle("is-mixed", mixed);
       if (mixed) {
@@ -653,6 +671,7 @@ function createStyleDiv(cache) {
     const commit = (raw) => {
       const value = parseValue(raw);
       if (Number.isNaN(value)) return; // a cleared "Mixed" field applies nothing
+      if (value === shown) return; // already the selection's value: no extra undo step
       showValue(value);
       Promise.resolve(handleStyleChangeEvent(property, value)).catch(reportButtonFailure);
     };
@@ -664,6 +683,13 @@ function createStyleDiv(cache) {
     };
     slider.onchange = () => commit(slider.value);
     valueInput.onchange = () => commit(valueInput.value);
+    valueInput.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      valueInput.onchange = null; // the restore must not commit
+      showValue(shown);
+      valueInput.onchange = () => commit(valueInput.value);
+    });
 
     container.append(slider, valueInput);
     parent.appendChild(container);
@@ -673,7 +699,7 @@ function createStyleDiv(cache) {
         `Map by data: scale ${property} from a numeric property's values (e.g. larger nodes for higher degree)`,
         "set_numeric_scale");
     }
-    bind(property, (value) => showValue(value === undefined || value === null ? typedDefaultValue : value),
+    bind(property, (value) => showValue(value === null ? typedDefaultValue : value),
       {fallback: typedDefaultValue});
     return container;
   }
@@ -707,9 +733,25 @@ function createStyleDiv(cache) {
 
     if (customCSSClass) [well, colorInput].forEach((el) => el.classList.add(customCSSClass));
 
-    const paintWell = (value, entries) => {
+    const pickerName = colorPicker.getAttribute("aria-label");
+    let shown = defaultColor; // what the field shows when nothing is being typed
+    let shownEntries = [];
+    const paintWell = (value, entries = shownEntries) => {
+      shown = value;
+      shownEntries = entries;
       well.classList.remove("is-mixed", "is-unset");
-      if (value === MIXED) {
+      colorInput.classList.remove("is-invalid");
+      colorInput.removeAttribute("aria-invalid");
+      // The native input cannot say "mixed" or "none"; its name has to.
+      colorPicker.setAttribute("aria-label", value === MIXED ? `${pickerName}, currently mixed`
+        : isUnsetColor(value) ? `${pickerName}, currently ${unsetText.toLowerCase()}` : pickerName);
+      if (value === undefined) {
+        // Nothing of this kind selected: show no value rather than a default.
+        well.style.background = "";
+        well.classList.add("is-unset");
+        colorInput.value = "";
+        colorInput.placeholder = "—";
+      } else if (value === MIXED) {
         const key = STYLE_PROPERTIES[property]?.key;
         const shades = key ? colorBuckets(entries ?? [], key).map((b) => b.color) : [];
         well.style.background = mixedSwatchBackground(shades);
@@ -734,6 +776,12 @@ function createStyleDiv(cache) {
     const commit = (value) => {
       const trimmed = String(value).trim();
       if (!trimmed || trimmed === lastCommitted) return;
+      if (!isColor(trimmed)) {
+        colorInput.classList.add("is-invalid");
+        colorInput.setAttribute("aria-invalid", "true");
+        cache.ui.error(`"${trimmed}" is not a colour. Type a hex code like #C33D35, or press Esc to undo the typing.`);
+        return;
+      }
       lastCommitted = trimmed;
       paintWell(trimmed);
       Promise.resolve(handleStyleChangeEvent(property, trimmed)).catch(reportButtonFailure);
@@ -751,13 +799,27 @@ function createStyleDiv(cache) {
       if (event.key === "Enter") {
         event.preventDefault();
         commit(colorInput.value);
+      } else if (event.key === "Escape") {
+        // Back out of the typing: restore what the selection carries, apply nothing.
+        event.preventDefault();
+        paintWell(shown);
+        // The blur that follows must not commit the restored text.
+        lastCommitted = colorInput.value.trim();
       }
+    });
+    colorInput.addEventListener("input", () => {
+      colorInput.classList.remove("is-invalid");
+      colorInput.removeAttribute("aria-invalid");
     });
 
     parent.append(well, colorInput);
 
     const palette = Object.entries(colors);
     if (palette.length) {
+      // The palette always starts its own line, so every colour row wraps alike.
+      const lineBreak = document.createElement("span");
+      lineBreak.className = "prop-break";
+      parent.appendChild(lineBreak);
       const swatches = document.createElement("div");
       swatches.className = "style-color-button-container";
       for (const [name, value] of palette) {
@@ -791,7 +853,7 @@ function createStyleDiv(cache) {
     paintWell(defaultColor);
     bind(property, (value, entries) => {
       lastCommitted = null;
-      paintWell(value === undefined ? defaultColor : value, entries);
+      paintWell(value, entries);
     }, {fallback: null});
   }
 
@@ -811,8 +873,15 @@ function createStyleDiv(cache) {
 
     const chips = document.createElement("div");
     chips.className = "prop-chips";
-    const more = document.createElement("span");
-    more.className = "prop-more";
+    let expanded = false;
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "insp-btn prop-more";
+    more.onclick = () => {
+      expanded = true;
+      refreshStyleControls();
+      chips.children[MAX_CHIPS]?.focus();
+    };
     // One shared picker; it opens for whichever chip was clicked.
     const picker = document.createElement("input");
     picker.type = "color";
@@ -827,15 +896,22 @@ function createStyleDiv(cache) {
       const update = target === "node"
         ? cache.gcm.updateNodes(styleOverride(property, picker.value), [], {ids})
         : cache.gcm.updateEdges(styleOverride(property, picker.value), [], {ids});
-      Promise.resolve(update).then(refreshStyleControls).catch(reportButtonFailure);
+      Promise.resolve(update).then(() => {
+        refreshStyleControls();
+        // The clicked chip was rebuilt away; keep keyboard focus in the row.
+        const next = row.hidden ? document.querySelector(`.color-hex[data-property="${property}"]`)
+          : chips.firstElementChild;
+        next?.focus();
+      }).catch(reportButtonFailure);
     };
     ctl.append(chips, more, picker);
 
     bind(property, (value, entries) => {
       const buckets = value === MIXED ? colorBuckets(entries, key) : [];
       row.hidden = buckets.length < 2;
+      if (row.hidden) expanded = false;
       chips.replaceChildren();
-      for (const bucket of buckets.slice(0, MAX_CHIPS)) {
+      for (const bucket of expanded ? buckets : buckets.slice(0, MAX_CHIPS)) {
         const chip = document.createElement("button");
         chip.type = "button";
         chip.className = "prop-chip";
@@ -854,8 +930,9 @@ function createStyleDiv(cache) {
         };
         chips.appendChild(chip);
       }
-      const hidden = buckets.length - MAX_CHIPS;
-      more.textContent = hidden > 0 ? `+${hidden} more` : "";
+      const hidden = expanded ? 0 : buckets.length - MAX_CHIPS;
+      more.hidden = hidden <= 0;
+      more.textContent = `Show ${hidden} more`;
     });
   }
 
@@ -874,9 +951,18 @@ function createStyleDiv(cache) {
       refreshStyleControls();
     };
 
+    let committedText = "";
+    const commitText = (text) => {
+      if (!text || text === committedText) return;
+      committedText = text;
+      return run({style: {label: true, labelText: text}});
+    };
     const labelInput = createInput(120, "Custom text",
-      `Type a label for the selected ${noun} and press Enter.`, undefined,
-      (text) => run({style: {label: true, labelText: text}}));
+      `Type a label for the selected ${noun}; Enter or leaving the field applies it.`, undefined, commitText);
+    labelInput.addEventListener("focus", () => { committedText = labelInput.value.trim(); });
+    labelInput.addEventListener("change", () => {
+      Promise.resolve(commitText(labelInput.value.trim())).catch(reportButtonFailure);
+    });
     labelInput.classList.add("prop-text");
     labelInput.style.width = "";
     nameControl(parent, labelInput, property);
@@ -962,14 +1048,14 @@ function createStyleDiv(cache) {
 
     const nodes = propRow(selDiv, "Nodes");
     propButton(nodes, "All", "Select all visible nodes",
-      async () => await cache.sm.toggleSelectionForAllNodes(true), "All Nodes").setAttribute("aria-label", "All nodes");
+      async () => await cache.sm.toggleSelectionForAllNodes(true), "All Nodes").setAttribute("aria-label", "All (nodes)");
     propButton(nodes, "None", "Deselect all visible nodes",
-      async () => await cache.sm.toggleSelectionForAllNodes(false), "No Nodes").setAttribute("aria-label", "No nodes");
+      async () => await cache.sm.toggleSelectionForAllNodes(false), "No Nodes").setAttribute("aria-label", "None (nodes)");
     const edges = propRow(selDiv, "Edges");
     propButton(edges, "All", "Select all visible edges",
-      async () => await cache.sm.toggleSelectionForAllEdges(true), "All Edges").setAttribute("aria-label", "All edges");
+      async () => await cache.sm.toggleSelectionForAllEdges(true), "All Edges").setAttribute("aria-label", "All (edges)");
     propButton(edges, "None", "Deselect all visible edges",
-      async () => await cache.sm.toggleSelectionForAllEdges(false), "No Edges").setAttribute("aria-label", "No edges");
+      async () => await cache.sm.toggleSelectionForAllEdges(false), "No Edges").setAttribute("aria-label", "None (edges)");
 
     // One grid for all lookup rows, so labels of different widths still line
     // the inputs and buttons up in columns.

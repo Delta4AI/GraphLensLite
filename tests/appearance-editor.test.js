@@ -103,3 +103,34 @@ describe('"In selection" colour row', () => {
     );
   });
 });
+
+describe('appearance editor typing', () => {
+  it('refuses a value that is not a colour instead of writing it to every node', async () => {
+    const cache = mount([node('a', { fill: '#403C53' }), node('b', { fill: '#C33D35' })]);
+    fillHex().value = '#C3';
+    fillHex().dispatchEvent(new Event('change'));
+    expect(cache.gcm.updateNodes).not.toHaveBeenCalled();
+    expect(cache.ui.error).toHaveBeenCalledWith(expect.stringMatching(/not a colour/));
+    expect(fillHex().getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('applies custom label text when the field is left, not only on Enter', async () => {
+    const cache = mount([node('a'), node('b')]);
+    const text = document.querySelector('[data-label="Node Configuration"] .prop-text');
+    text.dispatchEvent(new Event('focus'));
+    text.value = 'Hub';
+    text.dispatchEvent(new Event('change'));
+    await vi.waitFor(() =>
+      expect(cache.gcm.updateNodes).toHaveBeenCalledWith({ style: { label: true, labelText: 'Hub' } }, undefined)
+    );
+  });
+
+  it('backs out of typing on Escape, restoring the shown value without applying it', () => {
+    const cache = mount([node('a', { size: 30 }), node('b', { size: 30 })]);
+    sizeField().value = '44';
+    sizeField().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(sizeField().value).toBe('30');
+    sizeField().dispatchEvent(new Event('change'));
+    expect(cache.gcm.updateNodes).not.toHaveBeenCalled();
+  });
+});
