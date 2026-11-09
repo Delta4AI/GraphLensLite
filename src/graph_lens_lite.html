@@ -316,15 +316,15 @@
                aria-labelledby="inspectorPillOverlays" hidden>
         <div id="inspectorLayerCards"></div>
         <div class="layer-row">
-          <button type="button" id="overlaySwitchNotes" class="layer-switch" role="switch"
-                  aria-checked="false" disabled aria-label="Notes"
+          <button type="button" id="overlaySwitchNotes" class="layer-switch disabled" role="switch"
+                  aria-checked="false" aria-disabled="true" aria-label="Notes"
                   title="Show or hide every text note (place a new one with ✎ Note on the rail)"
                   onclick="cache.ui.toggleOverlay('notes')"></button>
           <span class="layer-title">Notes</span>
         </div>
         <div class="layer-row">
-          <button type="button" id="overlaySwitchMinimap" class="layer-switch" role="switch"
-                  aria-checked="false" disabled aria-label="Minimap"
+          <button type="button" id="overlaySwitchMinimap" class="layer-switch disabled" role="switch"
+                  aria-checked="false" aria-disabled="true" aria-label="Minimap"
                   title="Show or hide the overview thumbnail in the bottom-right corner"
                   onclick="cache.ui.toggleOverlay('minimap')"></button>
           <span class="layer-title">Minimap</span>
