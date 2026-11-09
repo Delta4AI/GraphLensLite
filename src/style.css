@@ -2098,6 +2098,40 @@ h5 {
     opacity: 1;
 }
 
+/* Act on Selection / Arrange Selection / Select Elements: the same flat
+   section header as the appearance sections, with label | control rows. */
+.card-labeled.flat-card {
+    border: none;
+    box-shadow: none;
+    background: none;
+    padding: 0 0 6px;
+    margin-top: 10px;
+    text-align: left;
+}
+
+.card-labeled.flat-card::before {
+    position: static;
+    display: block;
+    transform: none;
+    height: auto;
+    padding: 4px 0;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    background: none;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* Overlay cards (Groups pane, heatmap) keep their bar but share the rows. */
+.layer-card .prop-row,
+#groupStylePanel .prop-row {
+    padding-inline: 4px;
+}
+
 .prop-row {
     display: grid;
     grid-template-columns: 84px minmax(0, 1fr);
@@ -2152,8 +2186,9 @@ h5 {
 .prop-ctl .insp-btn,
 .prop-select,
 .prop-text,
-.appearance-card .color-hex,
-.appearance-card .style-input-sm {
+.select-lookup .style-input,
+.prop-ctl .color-hex,
+.prop-ctl .style-input-sm {
     height: 24px;
     box-sizing: border-box;
     border: 1px solid var(--border-soft);
@@ -2180,7 +2215,7 @@ h5 {
     padding: 0 6px;
 }
 
-.appearance-card .style-input-sm {
+.prop-ctl .style-input-sm {
     flex: none;
     width: 52px;
     padding: 0 4px;
@@ -2191,13 +2226,13 @@ h5 {
     -moz-appearance: textfield;
 }
 
-.appearance-card .style-input-sm::-webkit-inner-spin-button,
-.appearance-card .style-input-sm::-webkit-outer-spin-button {
+.prop-ctl .style-input-sm::-webkit-inner-spin-button,
+.prop-ctl .style-input-sm::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
 
-.appearance-card .color-hex {
+.prop-ctl .color-hex {
     width: 80px;
     padding: 0 6px;
     font-family: var(--font-mono, ui-monospace, monospace);
@@ -2209,7 +2244,7 @@ h5 {
     font-family: inherit;
 }
 
-.appearance-card .style-slider-container {
+.prop-ctl .style-slider-container {
     flex: 1 1 0;
     min-width: 0;
     height: 24px;
@@ -2217,7 +2252,7 @@ h5 {
     justify-content: flex-start;
 }
 
-.appearance-card .style-slider {
+.prop-ctl .style-slider {
     flex: 1 1 0;
     min-width: 0;
     width: 0;
@@ -2312,7 +2347,7 @@ h5 {
     outline-offset: 1px;
 }
 
-.appearance-card .style-color-button-container {
+.prop-ctl .style-color-button-container {
     gap: 4px;
 }
 
@@ -2440,29 +2475,6 @@ h5 {
     border-left: 4px solid #8ca6d9;
     padding: 10px;
     margin: 10px 0;
-}
-
-.vr {
-    width: 1px;
-    background-color: #C33D35;
-    margin-left: 0.2em;
-    margin-right: 0.2em;
-    align-self: stretch;
-}
-
-.vr-label {
-    color: white;
-    background-color: #878996;
-    border-radius: 5px;
-    padding: 0.09rem;
-    font-size: 11px;
-}
-
-.disabled .vr-label,
-.vr-label.disabled {
-    color: #878996;
-    background-color: transparent;
-    outline: 1px solid #878996;
 }
 
 #loadingOverlay {
@@ -3692,28 +3704,6 @@ input:checked + .checkbox-green::after {
  style button and row
  **************************/
 
-.style-inner-button {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 18px;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 18px;
-    font-size: 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: 3px;
-    cursor: pointer;
-    transition: border 0.2s ease-in-out, color 0.2s ease-in-out, opacity 0.1s ease-in-out;
-}
-
-.style-inner-button:hover {
-    color: var(--accent-text);
-    border: 1px solid var(--accent-text);
-}
-
 .style-color-button-container {
     display: flex;
     flex-wrap: wrap;
@@ -3723,13 +3713,6 @@ input:checked + .checkbox-green::after {
 .style-color-button {
     padding-left: 5px;
     padding-right: 5px;
-}
-
-.style-color-gradient-button {
-    background: linear-gradient(to right, #403C53, #C33D35, #8CA6D9, #EFB0AA, #FFFFFF);
-    width: 24px;
-    height: 18px;
-    color: transparent;
 }
 
 .style-input {
@@ -3990,65 +3973,6 @@ div[slider] > input[type=range]::-ms-tooltip {
  toggle switch css start
  adapted from https://www.w3schools.com/howto/howto_css_switch.asp
  **************************/
-
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 30px;
-    height: 16px;
-}
-
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--border);
-    -webkit-transition: .2s;
-    transition: .2s;
-}
-
-.slider:before {
-    position: absolute;
-    content: "";
-    height: 12px;
-    width: 12px;
-    left: 2px;
-    bottom: 2px;
-    background-color: var(--input-bg);
-    -webkit-transition: .2s;
-    transition: .2s;
-}
-
-input:checked + .slider {
-    background-color: #403C53;
-}
-
-input:focus + .slider {
-    box-shadow: 0 0 1px #403C53;
-}
-
-input:checked + .slider:before {
-    -webkit-transform: translateX(14px);
-    -ms-transform: translateX(14px);
-    transform: translateX(14px);
-}
-
-.slider.round {
-    border-radius: 16px;
-}
-
-.slider.round:before {
-    border-radius: 50%;
-}
 
 /*************************
  Bubble group controls

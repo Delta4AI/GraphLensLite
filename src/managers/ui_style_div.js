@@ -18,21 +18,6 @@ function createNewRow(parent) {
   return row;
 }
 
-function appendVerticalRule(parent, label = undefined, tooltip = undefined, id = undefined, customCSSClass = undefined) {
-  const verticalRule = document.createElement("div");
-  verticalRule.className = "vr";
-  if (customCSSClass) verticalRule.classList.add(customCSSClass);
-  parent.appendChild(verticalRule);
-  appendLabel(parent, label, tooltip, id, customCSSClass);
-}
-
-function appendHorizontalRule(parent, label = undefined, tooltip = undefined, id = undefined, customCSSClass = undefined) {
-  const horizontalRule = document.createElement("hr");
-  horizontalRule.className = "hr";
-  if (customCSSClass) horizontalRule.classList.add(customCSSClass);
-  parent.appendChild(horizontalRule);
-}
-
 function createLabel(labelText, tooltip = undefined) {
   if (labelText) {
     const label = document.createElement("label");
@@ -53,15 +38,13 @@ function appendLabel(parent, labelText, tooltip = undefined, id = undefined, cus
 }
 
 function createSwitch(callback = undefined, inputId = undefined, enabledByDefault = false) {
+  // A checkbox, like the appearance editor's on/off rows.
   const label = document.createElement('label');
-  label.className = 'switch';
+  label.className = 'prop-check';
 
   const input = document.createElement('input');
   input.type = 'checkbox';
   input.checked = enabledByDefault;
-
-  const span = document.createElement('span');
-  span.className = 'slider round';
 
   if (callback) {
     input.addEventListener('change', callback);
@@ -72,7 +55,7 @@ function createSwitch(callback = undefined, inputId = undefined, enabledByDefaul
     label.id = `${inputId}Label`;
   }
 
-  label.append(input, span);
+  label.append(input);
 
   label.setChecked = (checked) => {
     input.checked = checked;
@@ -90,8 +73,7 @@ function createSwitch(callback = undefined, inputId = undefined, enabledByDefaul
 function createColorPicker(defaultColor, title) {
   const colorPicker = document.createElement("input");
   colorPicker.type = "color";
-  colorPicker.classList.add("style-inner-button");
-  colorPicker.style.width = "24px";
+  colorPicker.classList.add("prop-color-input");
   colorPicker.value = defaultColor;
   colorPicker.title = title;
   return colorPicker;
@@ -106,7 +88,7 @@ function createButton(label, tooltip, callback, id = undefined) {
   const btn = document.createElement("button");
   btn.textContent = label;
   btn.title = tooltip;
-  btn.classList.add("style-inner-button");
+  btn.classList.add("insp-btn");
   if (label === "Clear") btn.classList.add("red");
   if (id) {
     btn.id = id;
@@ -802,6 +784,10 @@ function createStyleDiv(cache) {
         "set_continuous_color_scale");
     }
 
+    // bubble_sets.refreshBubbleStyleElements writes the hex field directly
+    // (after a load or ✨ Re-tune); this repaints the well to match.
+    colorInput.syncWell = () => paintWell(colorInput.value || null);
+
     paintWell(defaultColor);
     bind(property, (value, entries) => {
       lastCommitted = null;
@@ -945,45 +931,45 @@ function createStyleDiv(cache) {
   // "Act on Selection" *grows or walks* one you already have, so it lives in
   // the inspector's selection context next to the thing it operates on.
   function createActOnSelectionCard() {
-    const actDiv = createCard("Act on Selection");
+    const actDiv = createCard("Act on Selection", undefined, "flat-card");
 
-    const rowTwo = createNewRow(actDiv);
-    appendButton(rowTwo, "Expand Edges",
-      "Add all edges connected to the currently selected nodes to the selection",
-      async () => await cache.sm.toggleSelectionByNeighbors("expand-edges"));
-    appendButton(rowTwo, "Reduce Edges",
-      "Remove edges that do not connect two selected nodes",
-      async () => await cache.sm.toggleSelectionByNeighbors("reduce-edges"));
+    // The ids are what ui.js gates on (toggleDisabledElements), so they keep
+    // the full names while the row label carries the noun.
+    const edges = propRow(actDiv, "Edges");
+    propButton(edges, "Expand", "Add all edges connected to the currently selected nodes to the selection",
+      async () => await cache.sm.toggleSelectionByNeighbors("expand-edges"), "Expand Edges");
+    propButton(edges, "Reduce", "Remove edges that do not connect two selected nodes",
+      async () => await cache.sm.toggleSelectionByNeighbors("reduce-edges"), "Reduce Edges");
 
-    const rowThree = createNewRow(actDiv);
-    appendButton(rowThree, "Expand Neighbors",
+    const neighbors = propRow(actDiv, "Neighbors");
+    propButton(neighbors, "Expand",
       "Add all directly connected neighbor nodes (and their edges) to the current selection",
-      async () => await cache.sm.toggleSelectionByNeighbors("expand-neighbors"));
-    appendButton(rowThree, "Reduce Neighbors",
-      "Remove the outermost layer of selected neighbor nodes (and their edges) from the ",
-      async () => await cache.sm.toggleSelectionByNeighbors("reduce-neighbors"));
+      async () => await cache.sm.toggleSelectionByNeighbors("expand-neighbors"), "Expand Neighbors");
+    propButton(neighbors, "Reduce",
+      "Remove the outermost layer of selected neighbor nodes (and their edges) from the selection",
+      async () => await cache.sm.toggleSelectionByNeighbors("reduce-neighbors"), "Reduce Neighbors");
 
-    const rowShortestPath = createNewRow(actDiv);
-    appendButton(rowShortestPath, "Shortest Path",
+    propButton(propRow(actDiv, "Path"), "Shortest path",
       "Add the shortest path connecting the two selected nodes — its nodes and the edges between them — to the selection.\nComputed on the visible graph, so it honours active filters.\nRequires exactly two selected nodes.",
-      async () => await cache.sm.selectShortestPathBetweenSelected());
+      async () => await cache.sm.selectShortestPathBetweenSelected(), "Shortest Path");
+    for (const btn of actDiv.querySelectorAll("button")) {
+      btn.setAttribute("aria-label", btn.id.replace(/ (\w)/, (_, c) => ` ${c.toLowerCase()}`));
+    }
   }
 
   function createSelectCard() {
-    const selDiv = createCard("Select Elements");
+    const selDiv = createCard("Select Elements", undefined, "flat-card");
 
-    const rowOne = createNewRow(selDiv);
-    appendButton(rowOne, "All Nodes", "Select all visible nodes",
-      async () => await cache.sm.toggleSelectionForAllNodes(true));
-    appendButton(rowOne, "No Nodes", "Deselect all visible nodes",
-      async () => await cache.sm.toggleSelectionForAllNodes(false));
-    appendVerticalRule(rowOne);
-    appendButton(rowOne, "All Edges", "Select all visible edges",
-      async () => await cache.sm.toggleSelectionForAllEdges(true));
-    appendButton(rowOne, "No Edges", "Deselect all visible edges",
-      async () => await cache.sm.toggleSelectionForAllEdges(false));
-
-    appendHorizontalRule(selDiv);
+    const nodes = propRow(selDiv, "Nodes");
+    propButton(nodes, "All", "Select all visible nodes",
+      async () => await cache.sm.toggleSelectionForAllNodes(true), "All Nodes").setAttribute("aria-label", "All nodes");
+    propButton(nodes, "None", "Deselect all visible nodes",
+      async () => await cache.sm.toggleSelectionForAllNodes(false), "No Nodes").setAttribute("aria-label", "No nodes");
+    const edges = propRow(selDiv, "Edges");
+    propButton(edges, "All", "Select all visible edges",
+      async () => await cache.sm.toggleSelectionForAllEdges(true), "All Edges").setAttribute("aria-label", "All edges");
+    propButton(edges, "None", "Deselect all visible edges",
+      async () => await cache.sm.toggleSelectionForAllEdges(false), "No Edges").setAttribute("aria-label", "No edges");
 
     // One grid for all lookup rows, so labels of different widths still line
     // the inputs and buttons up in columns.
@@ -1032,10 +1018,16 @@ function createStyleDiv(cache) {
     row.className = "select-lookup-row";
     parent.appendChild(row);
     const tooltip = `Comma-separated ${noun}. Enter adds them to the selection.`;
-    appendLabel(row, label, tooltip);
+    const labelEl = document.createElement("label");
+    labelEl.className = "prop-label";
+    labelEl.id = label; // ui.js gates "Node IDs" / "Edge IDs" by this id
+    labelEl.textContent = label;
+    labelEl.title = tooltip;
+    row.appendChild(labelEl);
     const input = createInput(undefined, placeholder, tooltip, undefined, (value) => apply(value, true));
     input.style.width = ""; // the grid column sizes it
     input.id = `${idPrefix}Input`;
+    labelEl.htmlFor = input.id;
     row.appendChild(input);
     for (const add of [true, false]) {
       const btn = createButton(
@@ -1052,24 +1044,18 @@ function createStyleDiv(cache) {
   }
 
   function createArrangeNodesCard() {
-    const arrDiv = createCard("Arrange Selection");
+    const arrDiv = createCard("Arrange Selection", undefined, "flat-card");
+    const arrange = (mode) => async () => await cache.lm.layoutSelectedNodes(mode);
 
-    // Six equally-weighted actions — a 3x2 grid of labelled cells reads as a
-    // palette, where one wrapping row read as an overflow accident.
-    const rowOne = createNewRow(arrDiv);
-    rowOne.classList.add("card-row-grid");
-    appendButton(rowOne, "Shrink", "Move nodes closer together, halving their distance to the center.",
-      async () => await cache.lm.layoutSelectedNodes("shrink"));
-    appendButton(rowOne, "Expand", "Move nodes farther apart, doubling their distance to the center.",
-      async () => await cache.lm.layoutSelectedNodes("expand"));
-    appendButton(rowOne, "Circle", "Arrange nodes evenly in a circular layout around the center.",
-      async () => await cache.lm.layoutSelectedNodes("circle"));
-    appendButton(rowOne, "Force", "Apply a force-directed layout to the selected nodes.",
-      async () => await cache.lm.layoutSelectedNodes("force"));
-    appendButton(rowOne, "Grid", "Apply a uniform grid layout to the selected nodes.",
-      async () => await cache.lm.layoutSelectedNodes("grid"));
-    appendButton(rowOne, "Random", "Apply a random layout to the selected nodes while preserving the original layout bonds.",
-      async () => await cache.lm.layoutSelectedNodes("random"));
+    const spacing = propRow(arrDiv, "Spacing");
+    propButton(spacing, "Shrink", "Move nodes closer together, halving their distance to the center.", arrange("shrink"));
+    propButton(spacing, "Expand", "Move nodes farther apart, doubling their distance to the center.", arrange("expand"));
+    const layout = propRow(arrDiv, "Layout");
+    propButton(layout, "Circle", "Arrange nodes evenly in a circular layout around the center.", arrange("circle"));
+    propButton(layout, "Force", "Apply a force-directed layout to the selected nodes.", arrange("force"));
+    propButton(layout, "Grid", "Apply a uniform grid layout to the selected nodes.", arrange("grid"));
+    propButton(layout, "Random",
+      "Apply a random layout to the selected nodes while preserving the original layout bonds.", arrange("random"));
   }
 
   /** An inspector-style button built through createButton (keeps its failure reporting). */
@@ -1322,38 +1308,32 @@ function createStyleDiv(cache) {
     const name = bs.labelText || group;
 
     // Fill Color
-    const rowFillColor = createNewRow(panel);
-    appendLabel(rowFillColor, "Fill Color");
+    const rowFillColor = propRow(panel, "Fill color");
     createColorControls(rowFillColor, `Bubble Set ${group} Fill Color`, bs.fill, [], false);
 
     // Fill Opacity
-    const rowFillOpacity = createNewRow(panel);
-    appendLabel(rowFillOpacity, "Fill Opacity");
+    const rowFillOpacity = propRow(panel, "Fill opacity");
     createNumericalSlider(rowFillOpacity, `Bubble Set ${group} Fill Opacity`, bs.fillOpacity,
       {min: 0, max: 1, step: 0.01}, `Define the fill opacity of "${name}".`, false);
 
     // Stroke Color
-    const rowStrokeColor = createNewRow(panel);
-    appendLabel(rowStrokeColor, "Stroke Color");
+    const rowStrokeColor = propRow(panel, "Stroke color");
     createColorControls(rowStrokeColor, `Bubble Set ${group} Stroke Color`, bs.stroke, [], false);
 
     // Stroke Opacity
-    const rowStrokeOpacity = createNewRow(panel);
-    appendLabel(rowStrokeOpacity, "Stroke Opacity");
+    const rowStrokeOpacity = propRow(panel, "Stroke opacity");
     createNumericalSlider(rowStrokeOpacity, `Bubble Set ${group} Stroke Opacity`, bs.strokeOpacity,
       {min: 0, max: 1, step: 0.01}, `Define the stroke opacity of "${name}".`, false);
 
     // Padding (node influence field multiplier)
-    const rowPadding = createNewRow(panel);
-    appendLabel(rowPadding, "Padding",
+    const rowPadding = propRow(panel, "Padding",
       "How far the bubble body extends past its member nodes — lower for a tighter hug, higher for more breathing room.");
     createNumericalSlider(rowPadding, `Bubble Set ${group} Padding`, bs.padding ?? 1,
       {min: 0.01, max: 3, step: 0.01},
       `How far "${name}" extends past its member nodes.`, false);
 
     // Corridor Width (virtual-edge influence field multiplier)
-    const rowCorridor = createNewRow(panel);
-    appendLabel(rowCorridor, "Corridor Width",
+    const rowCorridor = propRow(panel, "Corridor",
       "Thickness of the connecting arms that reach outlying member nodes.");
     createNumericalSlider(rowCorridor, `Bubble Set ${group} Corridor Width`, bs.corridor ?? 1,
       {min: 0.01, max: 3, step: 0.01},
@@ -1361,8 +1341,7 @@ function createStyleDiv(cache) {
 
     // Avoidance (non-member field on/off; persisted numeric 0/1 for
     // JSON back-compat — legacy saved values > 0 read as ON)
-    const rowAvoidance = createNewRow(panel);
-    appendLabel(rowAvoidance, "Avoid Other Nodes",
+    const rowAvoidance = propRow(panel, "Avoid nodes",
       "Steer the hull around nodes that are not in the group and carve holes for enclosed ones. " +
       "Two overlapping groups with this on will each route around the other's nodes.");
     const avoidanceSwitch = createSwitch(async () => {
@@ -1374,8 +1353,8 @@ function createStyleDiv(cache) {
     rowAvoidance.appendChild(avoidanceSwitch);
 
     // Label (toggle + text input)
-    const rowLabel = createNewRow(panel);
-    appendLabel(rowLabel, "Label Text");
+    propSubhead(panel, "Label");
+    const rowLabel = propRow(panel, "Text", "Show the group's name on its outline.");
     const enableTextSwitch = createSwitch(async () => {
       await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label`, enableTextSwitch.isChecked());
     }, undefined, bs.label);
@@ -1389,44 +1368,42 @@ function createStyleDiv(cache) {
         cache.bs.renderGroupList();
       });
     labelInput.dataset.property = `Bubble Set ${group} Label Text`;
-    labelInput.classList.add(optionalCSSClass);
+    labelInput.classList.add(optionalCSSClass, "prop-text");
+    labelInput.style.width = "";
     rowLabel.appendChild(labelInput);
 
     // Label Background (toggle + color)
-    const rowLabelBg = createNewRow(panel);
-    appendLabel(rowLabelBg, "Label Background", undefined, undefined, optionalCSSClass);
+    const rowLabelBg = propRow(panel, "Background");
+    rowLabelBg.parentElement.classList.add(optionalCSSClass);
     const enableBackgroundSwitch = createSwitch(async () => {
       await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Background`, enableBackgroundSwitch.isChecked());
     }, undefined, bs.labelBackground);
-    enableBackgroundSwitch.classList.add(optionalCSSClass);
     enableBackgroundSwitch.dataset.property = `Bubble Set ${group} Label Background`;
     enableBackgroundSwitch
       .querySelector("input")
       .setAttribute("aria-label", `Draw a background plate behind the "${name}" label`);
     rowLabelBg.appendChild(enableBackgroundSwitch);
     createColorControls(rowLabelBg, `Bubble Set ${group} Label Background Color`,
-      bs.labelBackgroundFill || bs.fill, [], false, optionalCSSClass);
+      bs.labelBackgroundFill || bs.fill, [], false);
 
     // Label Fill Color
-    const rowLabelFill = createNewRow(panel);
-    appendLabel(rowLabelFill, "Label Color", undefined, undefined, optionalCSSClass);
-    createColorControls(rowLabelFill, `Bubble Set ${group} Label Fill Color`, bs.labelFill, [], false, optionalCSSClass);
+    const rowLabelFill = propRow(panel, "Color");
+    rowLabelFill.parentElement.classList.add(optionalCSSClass);
+    createColorControls(rowLabelFill, `Bubble Set ${group} Label Fill Color`, bs.labelFill, [], false);
 
     // Label Font Size
-    const rowFontSize = createNewRow(panel);
-    appendLabel(rowFontSize, "Label Font Size", undefined, undefined, optionalCSSClass);
+    const rowFontSize = propRow(panel, "Size");
+    rowFontSize.parentElement.classList.add(optionalCSSClass);
     createNumericalSlider(rowFontSize, `Bubble Set ${group} Label Font Size`, bs.labelFontSize,
       {min: 6, max: 36, step: 1}, `Define the label font size for "${name}".`, false);
-    rowFontSize.lastChild.classList.add(optionalCSSClass);
 
     // Label Placement
-    const rowPlacement = createNewRow(panel);
-    appendLabel(rowPlacement, "Label Placement", undefined, undefined, optionalCSSClass);
+    const rowPlacement = propRow(panel, "Position");
+    rowPlacement.parentElement.classList.add(optionalCSSClass);
     const placementDropdown = document.createElement("select");
-    placementDropdown.className = "style-inner-button";
+    placementDropdown.className = "prop-select";
     placementDropdown.dataset.property = `Bubble Set ${group} Label Placement`;
     placementDropdown.setAttribute("aria-label", `Label placement for "${name}"`);
-    placementDropdown.classList.add(optionalCSSClass);
     ['left', 'right', 'top', 'bottom', 'center'].forEach(v => {
       const opt = document.createElement("option");
       opt.value = v;
@@ -1439,13 +1416,12 @@ function createStyleDiv(cache) {
     };
     rowPlacement.appendChild(placementDropdown);
 
-    const rowFontStyle = createNewRow(panel);
-    appendLabel(rowFontStyle, "Label Font Style", undefined, undefined, optionalCSSClass);
+    const rowFontStyle = propRow(panel, "Style");
+    rowFontStyle.parentElement.classList.add(optionalCSSClass);
     const fontStyleDropdown = document.createElement("select");
-    fontStyleDropdown.className = "style-inner-button";
+    fontStyleDropdown.className = "prop-select";
     fontStyleDropdown.dataset.property = `Bubble Set ${group} Label Font Style`;
     fontStyleDropdown.setAttribute("aria-label", `Label font style for "${name}"`);
-    fontStyleDropdown.classList.add(optionalCSSClass);
     for (const v of FONT_STYLES) fontStyleDropdown.appendChild(new Option(v, v));
     fontStyleDropdown.value = bs.labelFontStyle ?? "normal";
     fontStyleDropdown.onchange = async () => {
@@ -1454,51 +1430,51 @@ function createStyleDiv(cache) {
     rowFontStyle.appendChild(fontStyleDropdown);
 
     // Label Close To Path
-    const rowClosePath = createNewRow(panel);
-    appendLabel(rowClosePath, "Close To Path", undefined, undefined, optionalCSSClass);
+    const rowClosePath = propRow(panel, "Hug outline", "Keep the label close to the outline's path.");
+    rowClosePath.parentElement.classList.add(optionalCSSClass);
     const closeToPathSwitch = createSwitch(async () => {
       await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Close To Path`, closeToPathSwitch.isChecked());
     }, undefined, bs.labelCloseToPath);
-    closeToPathSwitch.classList.add(optionalCSSClass);
     closeToPathSwitch.dataset.property = `Bubble Set ${group} Label Close To Path`;
     rowClosePath.appendChild(closeToPathSwitch);
 
     // Label Auto Rotate
-    const rowAutoRotate = createNewRow(panel);
-    appendLabel(rowAutoRotate, "Auto Rotate", undefined, undefined, optionalCSSClass);
+    const rowAutoRotate = propRow(panel, "Rotate", "Turn the label to follow the outline.");
+    rowAutoRotate.parentElement.classList.add(optionalCSSClass);
     const autoRotateSwitch = createSwitch(async () => {
       await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Auto Rotate`, autoRotateSwitch.isChecked());
     }, undefined, bs.labelAutoRotate);
-    autoRotateSwitch.classList.add(optionalCSSClass);
     autoRotateSwitch.dataset.property = `Bubble Set ${group} Label Auto Rotate`;
     rowAutoRotate.appendChild(autoRotateSwitch);
 
     // Label Offset X
-    const rowOffsetX = createNewRow(panel);
-    appendLabel(rowOffsetX, "Label Offset X", undefined, undefined, optionalCSSClass);
+    const rowOffsetX = propRow(panel, "Offset X");
+    rowOffsetX.parentElement.classList.add(optionalCSSClass);
     createNumericalSlider(rowOffsetX, `Bubble Set ${group} Label Offset X`, bs.labelOffsetX,
       {min: -50, max: 50, step: 1}, `Define the label X offset for "${name}".`, false);
-    rowOffsetX.lastChild.classList.add(optionalCSSClass);
 
     // Label Offset Y
-    const rowOffsetY = createNewRow(panel);
-    appendLabel(rowOffsetY, "Label Offset Y", undefined, undefined, optionalCSSClass);
+    const rowOffsetY = propRow(panel, "Offset Y");
+    rowOffsetY.parentElement.classList.add(optionalCSSClass);
     createNumericalSlider(rowOffsetY, `Bubble Set ${group} Label Offset Y`, bs.labelOffsetY,
       {min: -50, max: 50, step: 1}, `Define the label Y offset for "${name}".`, false);
-    rowOffsetY.lastChild.classList.add(optionalCSSClass);
 
     // Dragging the label on the canvas moves it in graph space; this puts it
     // back on its outline (the offsets above stay as they are).
-    const rowResetPosition = createNewRow(panel);
-    appendLabel(rowResetPosition, "Dragged Position",
+    const rowResetPosition = propRow(panel, "Dragged",
       "Drag the label on the canvas to place it; the Offset X/Y sliders above nudge it without dragging.",
       undefined, optionalCSSClass);
     const resetPosition = createButton("Reset",
       `Put the label of "${name}" back on its outline after dragging it.`,
       async () => await cache.bs.setLabelShift(group, 0, 0), `bubbleLabelShiftReset-${group}`);
     resetPosition.setAttribute("aria-label", `Reset the dragged label position of "${name}"`);
-    resetPosition.classList.add(optionalCSSClass);
     rowResetPosition.appendChild(resetPosition);
+
+    // createSwitch knows nothing of its row: name any checkbox left unnamed after the row label.
+    for (const box of panel.querySelectorAll('.prop-check input:not([aria-label])')) {
+      const label = box.closest(".prop-row")?.querySelector(".prop-label");
+      if (label) box.setAttribute("aria-labelledby", label.id);
+    }
   }
 
   // Turn a config card into a collapsible section: replace the floating
@@ -1663,15 +1639,12 @@ function createStyleDiv(cache) {
         + "A single node peaks at the Intensity value — set this just above it to hide isolated nodes."],
     ];
     for (const [label, key, params, tooltip] of sliders) {
-      const row = createNewRow(card);
-      appendLabel(row, label, tooltip);
-      appendHeatmapSlider(row, key, params, tooltip);
+      appendHeatmapSlider(propRow(card, label, tooltip), key, params, tooltip);
     }
 
-    const rowRamp = createNewRow(card);
-    appendLabel(rowRamp, "Colors", "Color ramp the density maps through.");
+    const rowRamp = propRow(card, "Colors", "Color ramp the density maps through.");
     const rampSelect = document.createElement("select");
-    rampSelect.className = "style-inner-button";
+    rampSelect.className = "prop-select";
     rampSelect.title = "Color ramp the density maps through.";
     for (const name of Object.keys(D.RAMPS)) {
       const option = document.createElement("option");
@@ -1684,7 +1657,7 @@ function createStyleDiv(cache) {
     rowRamp.appendChild(rampSelect);
     syncFns.push(() => { rampSelect.value = settings().ramp; });
 
-    const rowReset = createNewRow(card);
+    const rowReset = propRow(card, "Defaults");
     appendButton(rowReset, "Reset", "Restore the heatmap appearance defaults.", () => {
       layer()?.resetSettings();
       syncControls();
