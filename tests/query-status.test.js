@@ -46,11 +46,14 @@ describe('query status line', () => {
     expect(status().state).toBe('synced');
 
     ctx.type('Node filters::g::type IN [a, b]');
-    expect(status()).toEqual({ state: 'edited', text: 'Not applied · Ctrl+Enter filters the graph' });
+    expect(status()).toEqual({
+      state: 'edited',
+      text: 'Not applied · Ctrl+Enter filters the graph · a filter panel change replaces it',
+    });
 
     ctx.type('Node filters::g::type IN [a] AND wat');
     expect(status().state).toBe('error');
-    expect(status().text).toContain('Not recognised: AND, wat.');
+    expect(status().text).toContain('Not recognised: wat.'); // not the AND the highlighter swept in
   });
 
   it('reads Applied while the query locks the panel', () => {
@@ -58,6 +61,11 @@ describe('query status line', () => {
     ctx.type('Node filters::g::type IN [a]');
     ctx.qm.markApplied();
     expect(status().state).toBe('applied');
+
+    // A render pass over a broken edit must not relabel it as applied.
+    ctx.type('Node filters::g::type IN [a] AND wat');
+    ctx.qm.markApplied();
+    expect(status().state).toBe('error');
   });
 
   it('does not run Filter graph on a broken query (Ctrl+Enter bypasses the disabled button)', async () => {

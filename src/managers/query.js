@@ -1,5 +1,6 @@
 import { Popup } from '../utilities/popup.js';
 import { StaticUtilities } from '../utilities/static.js';
+import { hotkeyLabel } from './command_palette.js';
 
 // A filter is "narrowed" when it deviates from its default (loaded) state:
 // a categorical with fewer than all values selected, or a slider whose bounds
@@ -199,8 +200,13 @@ class QueryAST {
   }
 }
 
+// How long an error message waits for the typing to pause before it is
+// rewritten (and announced) again.
+const STATUS_SETTLE_MS = 800;
+
 class QueryManager {
   #validationTimer = 0;
+  #statusTimer = 0;
   #appliedText = '';
 
   constructor(cache) {
@@ -953,28 +959,39 @@ class QueryManager {
     if (!status) return;
     const locked = !!this.cache.EVENT_LOCKS?.FILTERS_LOCKED_BY_MANUAL_QUERY;
     let state, pill, message;
-    if (text.trim() === this.#appliedText.trim()) {
+    if (this.cache.query.valid === false && text.trim()) {
+      [state, pill, message] = ['error', 'Error', `${this.#queryProblem()} Fix the highlighted part to filter or select.`];
+    } else if (text.trim() === this.#appliedText.trim()) {
       [state, pill, message] = locked
         ? ['applied', 'Applied', 'Filtering the graph · the filter panel is locked']
         : ['synced', 'Synced', 'Matches the filter panel'];
     } else if (!text.trim()) {
       [state, pill, message] = ['edited', 'Edited', 'Empty · the graph keeps the last applied query'];
-    } else if (this.cache.query.valid === false) {
-      [state, pill, message] = ['error', 'Error', `${this.#queryProblem()} Fix the highlighted part to filter or select.`];
     } else {
-      [state, pill, message] = ['edited', 'Edited', 'Not applied · Ctrl+Enter filters the graph'];
+      const replaced = locked ? '' : ' · a filter panel change replaces it';
+      [state, pill, message] = ['edited', 'Edited', `Not applied · ${hotkeyLabel('Enter')} filters the graph${replaced}`];
     }
-    status.dataset.state = state;
-    status.querySelector('.query-status-pill').textContent = pill;
-    status.querySelector('.query-status-text').textContent = message;
+    // A role=status line: write only what changed, and let an error message
+    // settle while the user is still typing the word it names.
+    clearTimeout(this.#statusTimer);
+    const write = () => {
+      status.dataset.state = state;
+      status.querySelector('.query-status-pill').textContent = pill;
+      status.querySelector('.query-status-text').textContent = message;
+    };
+    if (status.dataset.state === state && status.querySelector('.query-status-text').textContent === message) return;
+    if (state === 'error' && status.dataset.state === 'error') this.#statusTimer = setTimeout(write, STATUS_SETTLE_MS);
+    else write();
   }
 
   /** The first problem the highlighter marked, in words. */
   #queryProblem() {
     const overlay = this.cache.query.overlay;
+    // The highlighter marks a whole unparsed chunk, keywords included; naming
+    // "AND" as unrecognised would send the user after the wrong word.
     const unrecognized = [...new Set(
       [...(overlay?.querySelectorAll('.q-error-unrecognized') ?? [])].map((el) => el.textContent.trim())
-    )].filter(Boolean);
+    )].filter((t) => t && !/^(AND|OR|NOT)$/i.test(t));
     if (unrecognized.length) {
       const shown = unrecognized.slice(0, 3).join(', ');
       return `Not recognised: ${shown}${unrecognized.length > 3 ? ', …' : ''}.`;
@@ -983,7 +1000,7 @@ class QueryManager {
       return 'A bracket is not closed.';
     if (overlay?.querySelector('.q-error-empty-instruction')) return 'Empty brackets ().';
     if (overlay?.querySelector('.q-error-missing-connector')) return 'AND or OR is missing between two brackets.';
-    return 'The query does not parse.';
+    return 'The query does not parse. Conditions go in (brackets).';
   }
 
   /**

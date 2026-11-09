@@ -211,7 +211,7 @@
         </div>
       </div>
       <div class="wb-content">
-        <div id="queryPane" class="wb-pane">
+        <div id="queryPane" class="editor-panel wb-pane">
           <div class="query-toolbar wb-toolbar">
             <span class="query-status" role="status"><span class="query-status-pill"></span><span class="query-status-text"></span></span>
             <span class="data-gap"></span>
@@ -223,12 +223,13 @@
             <button type="button" id="querySelectBtn" class="insp-btn" onclick="cache.qm.handleQuerySelectEvent()"
                     title="Select the matching elements without hiding anything">Select matches</button>
             <button type="button" id="queryUpdateBtn" class="insp-btn primary" onclick="cache.qm.handleQueryUpdateEvent()"
-                    title="Hide everything the query does not match (Ctrl+Enter). Locks the filter panel">Filter graph</button>
+                    aria-keyshortcuts="Control+Enter Meta+Enter"
+                    title="Hide everything the query does not match (Ctrl+Enter or ⌘Enter in the box). Locks the filter panel">Filter graph</button>
           </div>
-          <div id="queryEditor" class="editor-panel">
+          <div id="queryEditor">
             <div id="queryOverlay" aria-hidden="true"></div>
             <div id="queryTextArea" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true"
-                 aria-label="Query" oninput="cache.qm.handleQueryValidationEvent();"></div>
+                 aria-label="Query" aria-keyshortcuts="Control+Enter Meta+Enter" oninput="cache.qm.handleQueryValidationEvent();"></div>
             <div id="queryCaret" class="custom-caret"></div>
           </div>
         </div>

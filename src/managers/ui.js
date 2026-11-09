@@ -1314,7 +1314,7 @@ class UIManager {
    */
   #filtersLocked() {
     if (!this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return false;
-    this.warning('Filters are driven by your edited query. Unlock filters in the panel to change this.');
+    this.warning('Filters are driven by your edited query. Use Reset to filters in the panel to change this.');
     return true;
   }
 
@@ -1687,10 +1687,10 @@ class UIManager {
     statusBar.innerHTML = `
       <div class="filter-lock-message">
         <span class="filter-lock-icon">🔒</span>
-        <span>Filters are driven by your edited query. Unlock to control them here again.</span>
+        <span>Filters are driven by your edited query. Reset to filters to control them here again.</span>
       </div>
       <button class="filter-unlock-btn" onclick="cache.ui.unlockFiltersAndResetQuery()">
-        Unlock filters
+        Reset to filters
       </button>
     `;
     return statusBar;

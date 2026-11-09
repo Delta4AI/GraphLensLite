@@ -755,6 +755,7 @@ class AssistantManager {
   }
 
   async clearHistory() {
+    if (!this._history.length && !document.getElementById('assistantMessages')?.childElementCount) return
     // One click would otherwise drop a whole conversation with no undo. An
     // empty one has nothing to lose, so it clears without the interruption.
     if (this._history.length) {

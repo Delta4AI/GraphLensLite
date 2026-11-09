@@ -5028,9 +5028,17 @@ div[slider] > input[type=range]::-ms-tooltip {
     min-height: 0;
 }
 
+/* The text box hides its outline for the custom caret, which blinks; the
+   frame carries the focus cue instead. */
+#queryPane:has(#queryTextArea:focus-visible) {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
+}
+
 .wb-toolbar-sep {
     width: 1px;
-    height: 18px;
+    height: 16px;
+    align-self: center;
     background: var(--border-soft);
 }
 
@@ -5063,8 +5071,11 @@ div[slider] > input[type=range]::-ms-tooltip {
     border-color: var(--edited-line);
 }
 
+/* Applied is the state that changes what the graph shows: the only filled pill. */
 .query-status[data-state="applied"] .query-status-pill {
-    color: var(--brand-text);
+    color: #fff;
+    background: var(--brand-border);
+    border-color: var(--brand-border);
 }
 
 .query-status[data-state="error"] .query-status-pill,
@@ -5148,7 +5159,6 @@ div[slider] > input[type=range]::-ms-tooltip {
     background: var(--surface-3);
     border-color: var(--border-soft);
     color: var(--text-muted);
-    font-weight: 400;
 }
 
 .data-table-wrapper {
@@ -6637,7 +6647,8 @@ div[slider] > input[type=range]::-ms-tooltip {
 }
 
 #assistantSendBtn {
-    background-color: #403C53;
+    background-color: var(--brand-border);
+    font-weight: 600;
     color: #fff;
     border: none;
     border-radius: 4px;
