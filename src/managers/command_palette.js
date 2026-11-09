@@ -189,7 +189,7 @@ function collectInspector(out) {
     }
     // A row of inputs is one destination, not one command per field: the label
     // names it and revealing it puts the whole row on screen.
-    for (const label of panel.querySelectorAll('.card-row > label, .prop-row > label')) {
+    for (const label of panel.querySelectorAll('.prop-row > label')) {
       const row = label.parentElement;
       if (!row.querySelector('input, select')) continue;
       const name = clean(row.dataset.name ?? label.textContent);

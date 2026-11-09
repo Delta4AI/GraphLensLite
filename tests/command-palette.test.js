@@ -87,11 +87,12 @@ function dom() {
                 <span class="card-collapse-title">Density heatmap</span>
               </button>
             </div>
-            <div class="card-row">
-              <label>Intensity</label><input id="heatIntensity" type="range">
+            <div class="prop-row">
+              <label>Intensity</label><div class="prop-ctl"><input id="heatIntensity" type="range"></div>
             </div>
-            <div class="card-row">
-              <button id="heatReset" title="Restore the heatmap appearance defaults.">Reset</button>
+            <div class="prop-row">
+              <label>Defaults</label>
+              <div class="prop-ctl"><button id="heatReset" title="Restore the heatmap appearance defaults.">Reset</button></div>
             </div>
           </div>
         </div>
@@ -239,7 +240,7 @@ describe('the index is derived from the DOM', () => {
   it('indexes a row of inputs once, by its label, as a destination', () => {
     const cmd = named(collectCommands(cache), 'Intensity');
     expect(cmd.kind).toBe('reveal');
-    expect(cmd.el.className).toBe('card-row');
+    expect(cmd.el.className).toBe('prop-row');
   });
 
   it('indexes filter properties by name and group, wherever the container lives', () => {
@@ -294,7 +295,7 @@ describe('the index is derived from the DOM', () => {
 
   it('leaves colour swatches out — the row that holds them is the destination', () => {
     const row = document.createElement('div');
-    row.className = 'card-row';
+    row.className = 'prop-row';
     row.innerHTML = `
       <label>Fill Color</label>
       <button class="style-inner-button style-color-button"
