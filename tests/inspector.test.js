@@ -339,6 +339,16 @@ describe('inspector as a bottom sheet (phone width)', () => {
     vi.unstubAllGlobals();
   });
 
+  it('closes on Back: opening leaves a history entry, and Back pops it', () => {
+    const inspector = initInspector({ workbench: { close: vi.fn() } });
+    inspector.openSheet();
+    expect(history.state?.gllSheet).toBe(true);
+
+    globalThis.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+    expect(document.body.dataset.sheet).toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+
   it('counts the selection on the Panel button while the sheet is closed', () => {
     document.getElementById('panelToggleBtn').innerHTML = '<span class="rail-panel-count"></span>';
     const inspector = initInspector();
@@ -347,5 +357,21 @@ describe('inspector as a bottom sheet (phone width)', () => {
     inspector.syncToSelection(0, 0);
     expect(document.querySelector('.rail-panel-count').textContent).toBe('');
     vi.unstubAllGlobals();
+  });
+
+  it('says how many selected elements the filters hide, on the Panel button and in the Selection context', () => {
+    document.getElementById('panelToggleBtn').innerHTML = '<span class="rail-panel-count"></span>';
+    document.getElementById('inspectorSelection').insertAdjacentHTML('afterbegin', '<p id="selectionHiddenNote" hidden></p>');
+    const inspector = initInspector();
+    const note = document.getElementById('selectionHiddenNote');
+
+    inspector.syncToSelection(4, 2, 3);
+    expect(document.querySelector('.rail-panel-count').textContent).toBe('6 · 3 hidden');
+    expect(note.hidden).toBe(false);
+    expect(note.textContent).toMatch(/^3 selected elements are hidden by filters/);
+
+    inspector.syncToSelection(4, 2, 0);
+    expect(document.querySelector('.rail-panel-count').textContent).toBe('6');
+    expect(note.hidden).toBe(true);
   });
 });

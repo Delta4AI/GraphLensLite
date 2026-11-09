@@ -70,6 +70,12 @@ describe.skipIf(!E2E)('narrow layout, end to end', () => {
     await expect.poll(() => page.locator('#inspector').isVisible()).toBe(false);
     expect(await panel.evaluate((el) => el === document.activeElement)).toBe(true);
 
+    // The Back gesture closes the sheet too, and only the sheet.
+    await panel.click();
+    await expect.poll(() => page.locator('#inspector').isVisible()).toBe(true);
+    await page.evaluate(() => history.back());
+    await expect.poll(() => page.locator('#inspector').isVisible()).toBe(false);
+
     // ⋯ More reaches the hidden workbench tabs; the sheet and the workbench take turns.
     await page.click('#railMoreBtn');
     await page.locator('.rail-menu.open').getByRole('button', { name: 'Data' }).click();

@@ -105,8 +105,13 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
   width; the bar keeps File, workspace, undo/redo, ▤ Panel and ⋯ More, and
   ⋯ More lists the rest by name (menus it reaches open under ⋯ More).
 - The inspector is a bottom sheet at half or full height, opened by ▤ Panel,
-  closed by ×, Escape or ▤ Panel; the grabber switches heights. It never opens
-  itself: the Panel button shows the selection count instead.
+  closed by ×, Escape, ▤ Panel or the phone's Back gesture; the grabber switches
+  heights. It never opens itself: the Panel button shows the selection count
+  instead, plus "N hidden" when filters hide part of the selection (the
+  Selection context says the same in a sentence, at every width).
+- The tour opens the sheet for the steps that explain the inspector, points at
+  ⋯ More for rail controls the bar hides, and adds an "On a narrow screen" line
+  where the phone layout differs.
 - The workbench and the sheet share the bottom edge: opening one closes the
   other.
 

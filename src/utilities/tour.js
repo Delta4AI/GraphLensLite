@@ -1,4 +1,5 @@
 import { Popup } from './popup.js';
+import { isPhone } from '../managers/inspector.js';
 
 // Gap between a tour popup and the viewport edge or the element it explains.
 const POPUP_MARGIN = 16;
@@ -171,6 +172,8 @@ const TOUR_STEPS = [
            <br><br>
            On the right: <strong>⤓ Export</strong> (PNG, SVG, JSON model, Excel data, and presentation
            mode for clean screenshots), the theme toggle, and the <strong>?</strong> keyboard cheat sheet. Each tab stays highlighted while its panel is open.`,
+    phoneNote: `The bar keeps File, the workspace, undo/redo, <strong>▤ Panel</strong> (the inspector, with the
+           selection count) and <strong>⋯ More</strong>, which lists everything else by name.`,
     targets: [{ selector: '#rail' }],
     position: 'below',
   },
@@ -290,7 +293,8 @@ const TOUR_STEPS = [
            <br>• <strong>The chip's menu</strong> — all/no nodes, all/no edges, or select by
            <strong>Node/Edge IDs</strong> or <strong>Labels</strong> with an include/exclude switch
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           The <strong>query editor</strong> can also turn any predicate into a selection with 🎯 Select.`,
+           The <strong>query editor</strong> can also turn any predicate into a selection with <strong>Select matches</strong>.`,
+    phoneNote: `The chip's menu is <strong>⋯ More › Selection…</strong>; <strong>▤ Panel</strong> shows the counts.`,
     targets: [{ selector: '#selectionChip' }, { selector: '#selectMenuBtn' }],
     position: 'below',
   },
@@ -527,14 +531,17 @@ class GuidedTour {
 
     const step = TOUR_STEPS[this.currentStep];
 
+    const phone = isPhone();
+    if (phone) this.syncSheet(step);
+
     // execute pre-step action
     if (step.action) {
       await this.executeAction(step.action);
     }
 
-    // create overlay + highlights
-    const targets = step.targets || (step.target ? [{ selector: step.target }] : []);
+    const targets = this.resolveTargets(step, phone);
     const selectors = targets.map((t) => t.selector);
+    const inSheet = phone && selectors.some((sel) => document.querySelector(sel)?.closest('#inspector'));
 
     this.createOverlay(selectors);
     for (const t of targets) {
@@ -550,6 +557,12 @@ class GuidedTour {
     const body = document.createElement('div');
     body.className = 'tour-body';
     body.innerHTML = step.text;
+    if (phone && step.phoneNote) {
+      const note = document.createElement('p');
+      note.className = 'tour-phone-note';
+      note.innerHTML = `<strong>On a narrow screen:</strong> ${step.phoneNote}`;
+      body.appendChild(note);
+    }
     content.appendChild(body);
 
     // --- footer ---
@@ -636,7 +649,9 @@ class GuidedTour {
       const el = document.querySelector(primaryTarget.selector);
       rect = el ? this.getClippedRect(el) : null;
       if (rect) {
-        const pos = this.computePopupPosition(rect, step.position || 'below');
+        // The sheet spans the screen's width, so a popup beside it has no room.
+        const position = inSheet ? 'above' : step.position || 'below';
+        const pos = this.computePopupPosition(rect, position);
         if (step.positionOffset) {
           pos.x += step.positionOffset.x || 0;
           pos.y += step.positionOffset.y || 0;
@@ -649,7 +664,32 @@ class GuidedTour {
     if (this.popup.overlay) {
       this.popup.overlay.style.background = 'transparent';
     }
-    if (rect && step.position === 'above') this.placeAbove(this.popup.popup, rect.top);
+    if (rect && inSheet) this.placeAbove(this.popup.popup, document.getElementById('inspector').getBoundingClientRect().top);
+    else if (rect && step.position === 'above') this.placeAbove(this.popup.popup, rect.top);
+  }
+
+  /** On a phone the inspector is a sheet: open for the steps that explain it, closed for the rest. */
+  syncSheet(step) {
+    const targets = step.targets || (step.target ? [{ selector: step.target }] : []);
+    if (targets.some((t) => document.querySelector(t.selector)?.closest('#inspector'))) {
+      this.cache.inspector?.openSheet?.('half');
+    } else {
+      this.cache.inspector?.closeSheet?.();
+    }
+  }
+
+  /**
+   * The step's targets as they are on screen now. On a phone a rail control
+   * the bar hides is shown through ⋯ More, which lists it. A target that still
+   * has no box is dropped rather than outlined at 0,0.
+   */
+  resolveTargets(step, phone) {
+    const targets = step.targets || (step.target ? [{ selector: step.target }] : []);
+    const shown = (sel) => (document.querySelector(sel)?.getClientRects().length ?? 0) > 0;
+    const resolved = targets.map((t) =>
+      phone && !shown(t.selector) && document.querySelector(t.selector)?.closest('#rail') ? { selector: '#railMoreBtn' } : t
+    );
+    return resolved.filter((t, i) => shown(t.selector) && resolved.findIndex((o) => o.selector === t.selector) === i);
   }
 
   /**
@@ -878,6 +918,7 @@ class GuidedTour {
 
   finish() {
     this.cleanup();
+    if (isPhone()) this.cache.inspector?.closeSheet?.();
 
     // Put the shell back the way a fresh load leaves it.
     this.cache.workbench?.close();
