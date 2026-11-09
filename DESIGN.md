@@ -4,6 +4,16 @@ Decisions and patterns for Graph Lens Lite's interface. Colour, surface and
 z-index values live as tokens at the top of `src/style.css` (`:root` and
 `[data-theme="dark"]`); use them, never literals.
 
+## Colour
+
+- Neutrals lean toward the brand slate in both themes: cool slate greys in
+  light, violet-tinted surfaces in dark. No pure greys.
+- The brand red (`--accent-text`) is the one accent: the selected pill or
+  segment, the focus ring, a narrowed filter, section eyebrows. It also marks
+  destructive actions; a separate indigo accent was considered and declined
+  (2026-11). The brand slate (`--brand-border`) carries checkboxes, primary
+  buttons and the Overlays bars, so a column of defaults stays quiet.
+
 ## Mental model
 
 Filter (what is visible) → Select (the working set) → Act (style, group,
@@ -172,9 +182,6 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 
 ## Known gaps
 
-- Light-mode neutrals are pure greys and the accent is the brand red, which also
-  marks destructive actions. Moving to cool slate neutrals with an indigo accent
-  is an open token-level change.
 - The data editor renders every row (2,500 rows take about 44ms); past
   ~20,000 rows it will need virtual scrolling with `aria-rowcount` /
   `aria-rowindex`.
