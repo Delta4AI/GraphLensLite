@@ -80,6 +80,7 @@ describe('buildGroupStylePanel', () => {
       'Bubble Set g1 Label Fill Color',
       'Bubble Set g1 Label Font Size',
       'Bubble Set g1 Label Placement',
+      'Bubble Set g1 Label Font Style',
     ]) {
       expect(control(panel, property), property).not.toBeNull();
     }
@@ -137,6 +138,7 @@ describe('buildGroupStylePanel', () => {
       labelText: 'Renamed',
       labelFontSize: 9,
       labelPlacement: 'bottom',
+      labelFontStyle: 'italic',
       avoidance: 0,
     });
 
@@ -151,6 +153,21 @@ describe('buildGroupStylePanel', () => {
     expect(control(panel, 'Bubble Set g1 Label Text').value).toBe('Renamed');
     expect(control(panel, 'Bubble Set g1 Label Placement').value).toBe('bottom');
     expect(control(panel, 'Bubble Set g1 Avoidance').querySelector('input').checked).toBe(false);
+    const pressed = [...control(panel, 'Bubble Set g1 Label Font Style').querySelectorAll('[aria-pressed="true"]')];
+    expect(pressed.map((b) => b.dataset.value)).toEqual(['italic']);
+  });
+
+  it('sets a group label\'s font style from segments, as the selection\'s label style does', async () => {
+    const { cache, panel } = mountPanelFor(GROUP_STYLE);
+    const seg = control(panel, 'Bubble Set g1 Label Font Style');
+    expect(seg.tagName).toBe('DIV');
+    expect(seg.querySelector('[aria-pressed="true"]').dataset.value).toBe('normal');
+
+    seg.querySelector('[data-value="bold"]').click();
+    await vi.waitFor(() =>
+      expect(cache.bs.updateBubbleSetStyle).toHaveBeenCalledWith('Bubble Set g1 Label Font Style', 'bold'),
+    );
+    expect(seg.querySelector('[aria-pressed="true"]').dataset.value).toBe('bold');
   });
 
   it('empties the pane for an unknown or cleared group', () => {
