@@ -2,7 +2,8 @@
 
 A map of how the codebase is organised, for contributors and anyone reading the
 source. For build, version, and commit conventions see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md). For interface patterns (inspector rows, controls,
+the Mixed state) see [DESIGN.md](DESIGN.md).
 
 ## What This Is
 
