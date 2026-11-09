@@ -41,6 +41,8 @@ function field(form, label, { list, value = '', readOnly = false } = {}) {
   const error = document.createElement('div');
   error.className = 'data-form-error';
   error.id = `${id}Error`;
+  // Read out even when focus is already in the field (Enter pressed inside it).
+  error.setAttribute('role', 'alert');
   error.hidden = true;
   row.append(lab, input, error);
   form.appendChild(row);
@@ -90,7 +92,7 @@ function buildAddForm(dt, el, mode) {
   if (mode === 'node') {
     fields = { id: field(form, 'ID'), label: field(form, 'Label') };
   } else if (mode === 'edge') {
-    const nodes = datalist(form, (dt.fileData?.nodes ?? []).map((n) => [n.id, n.label]));
+    const nodes = datalist(form, dt.nodeChoices());
     fields = { source: field(form, 'Source', { list: nodes }), target: field(form, 'Target', { list: nodes }) };
     const id = field(form, 'ID', { readOnly: true });
     const sync = () => {
@@ -171,6 +173,9 @@ export function buildReviewList(dt, el) {
   }
   const list = document.createElement('div');
   list.className = 'data-review';
+  const title = document.createElement('h4');
+  title.textContent = `${items.length} unsaved change${items.length === 1 ? '' : 's'}`;
+  list.appendChild(title);
   for (const item of items) {
     const row = document.createElement('div');
     row.className = 'data-review-item';
@@ -198,6 +203,7 @@ export function buildReviewList(dt, el) {
       if (!dt.changeList().length) return dt.reviewMenu.close();
       el.replaceChildren();
       buildReviewList(dt, el);
+      dt.reviewMenu.place();
       el.querySelector('button')?.focus();
     });
     row.append(what, undo, detail);

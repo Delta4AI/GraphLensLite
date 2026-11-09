@@ -144,4 +144,67 @@ describe('data editor grid', () => {
     expect(dt.currentTab).toBe('allEdges'); // the new row is shown, not hidden by the Nodes view
     expect(dt.tableBody.querySelector('tr[data-key="Edge::n1::n3"]').classList.contains('data-row-added')).toBe(true);
   });
+
+  it('starts a newly loaded graph with no staged changes', async () => {
+    const { dt } = mount();
+    await dt.switchTab('allNodes');
+    dt.deleteRow('Node', 'n1');
+    await dt.addColumn({ name: 'Notes', group: 'Meta', isNode: true });
+    expect(bar().hidden).toBe(false);
+
+    dt.populateFromFileData({ ...dt.fileData, nodeDataHeaders: [{ subGroup: 'Bio', key: 'Score' }] });
+    expect(dt.pendingChanges.size).toBe(0);
+    expect(dt.addedColumns).toEqual([]);
+    expect(bar().hidden).toBe(true);
+  });
+
+  it('blocks Apply while a new node owes a value, and says which', async () => {
+    const { dt } = mount();
+    await dt.switchTab('allNodes');
+    await dt.addNode('n9', 'Nine');
+    const apply = document.getElementById('updateDataTableBtn');
+    expect(apply.disabled).toBe(true);
+    expect(bar().textContent).toContain('"n9" requires at least one property value');
+
+    const score = cell(dt, 'n9', P);
+    dt.startEdit(score);
+    score.textContent = '4';
+    dt.commitEdit();
+    expect(apply.disabled).toBe(false);
+  });
+
+  it('stages an added column, so Discard takes it back', async () => {
+    const { dt } = mount();
+    await dt.switchTab('allNodes');
+    await dt.addColumn({ name: 'Notes', group: 'Meta', isNode: true });
+    expect(bar().textContent).toContain('1 new column');
+    expect(dt.headers).toContain('Node filters::Meta::Notes');
+
+    dt.reset(); // what Discard runs once confirmed
+    expect(dt.headers).not.toContain('Node filters::Meta::Notes');
+    expect(dt.fileData.nodeDataHeaders.some((h) => h.key === 'Notes')).toBe(false);
+    expect(bar().hidden).toBe(true);
+  });
+
+  it('keeps a deletion listed after the selection moves on', async () => {
+    const { dt, cache } = mount();
+    cache.selectedNodes = ['n1'];
+    await dt.refreshCurrentTab();
+    dt.deleteRow('Node', 'n1');
+    cache.selectedNodes = ['n2'];
+    await dt.refreshCurrentTab();
+    expect(dt.tableBody.querySelector('tr[data-key="Node::n1"]').classList.contains('data-row-deleted')).toBe(true);
+  });
+
+  it('keeps focus in the table when the last change is undone from Review', async () => {
+    const { dt } = mount();
+    await dt.switchTab('allNodes');
+    dt.deleteRow('Node', 'n2');
+    document.getElementById('dataReviewBtn').click();
+    [...document.querySelectorAll('.data-review button')].find((b) => b.textContent === 'Undo').click();
+    await Promise.resolve();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(dt.table.contains(document.activeElement)).toBe(true);
+    expect(document.querySelector('.data-status').textContent).toBe('No unsaved changes.');
+  });
 });
