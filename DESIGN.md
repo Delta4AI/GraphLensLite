@@ -46,8 +46,12 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
     group (`DropdownChecklist`, built on `RailMenu`), never a native
     multi-select. It shows "All", "None", the one kept value, or "4 of 6"; the
     list has an All box that goes mixed (and acts on the search results while
-    a search is typed), a count per value, search from 10 values, and "Only"
-    on each value (Enter on a focused value, or Alt-click, does the same).
+    a search is typed), a count per value, search from 10 values with a live
+    "3 of 42 values" line under it, and "Only" on each value (Enter on a
+    focused value, or Alt-click, does the same).
+- A control that is frozen (filters held by an edited query) is `disabled`,
+  not just dimmed, so the keyboard skips it too. What only reads (fold a
+  group, switch Node/Edge, search, the row's ⋯ menu) stays live.
   - Number with a range: slider plus number field; arrow keys step.
   - Colour: painted well over the native picker, hex field, palette, then
     **Map…** when the property can be driven by data.
