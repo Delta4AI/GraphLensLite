@@ -10,6 +10,7 @@ import os from 'node:os'
 import path from 'node:path'
 import {execFileSync} from 'node:child_process'
 import {parseArgs} from 'node:util'
+import {Agent, fetch as undiciFetch} from 'undici'
 import {APP_DEFAULT_NUM_CTX, BENCH_DIR, REPO_ROOT, loadGold, prepareGold, runBenchmark, summarize} from './harness.mjs'
 
 const {values: args} = parseArgs({
@@ -84,10 +85,18 @@ const meta = {
   runner: `${os.type()} ${os.release()}, node ${process.version}`,
 }
 
+// Ollama's non-streamed /api/chat sends headers only once generation ends, so
+// Node fetch's default 300 s headersTimeout aborts slow items and drops the
+// whole model. The app (browser fetch) has no such cap; keep one only to
+// surface a hung server.
+const OLLAMA_CALL_TIMEOUT_MS = 30 * 60 * 1000
+const dispatcher = new Agent({headersTimeout: OLLAMA_CALL_TIMEOUT_MS, bodyTimeout: OLLAMA_CALL_TIMEOUT_MS})
+const fetchImpl = (url, init) => undiciFetch(url, {...init, dispatcher})
+
 const total = models.length * repeats * prepared.items.length
 let done = 0
 const {results, failedModels} = await runBenchmark({
-  prepared, models, endpoint, repeats, numCtx,
+  prepared, models, endpoint, repeats, numCtx, fetchImpl,
   onResult: (r) => {
     done++
     const verdict = r.exact ? 'exact' : `J=${r.jaccard.toFixed(2)}`
