@@ -64,7 +64,7 @@ describe('appearance editor ← selection', () => {
     await vi.waitFor(() => expect(cache.gcm.updateNodes).toHaveBeenCalledWith({ style: { size: 25 } }, []));
   });
 
-  it('keeps Map by data on the size row, sending the same scale command as before', async () => {
+  it('keeps Map by data on the size row, sending the numeric-scale command', async () => {
     const cache = mount([node('a')]);
     cache.numericPicker = {};
     document.querySelector('.prop-map-btn[data-property="Node Size"]').click();
@@ -121,7 +121,7 @@ describe('appearance editor typing', () => {
     text.value = 'Hub';
     text.dispatchEvent(new Event('change'));
     await vi.waitFor(() =>
-      expect(cache.gcm.updateNodes).toHaveBeenCalledWith({ style: { label: true, labelText: 'Hub' } }, undefined)
+      expect(cache.gcm.updateNodes).toHaveBeenCalledWith({ style: { label: true, labelText: 'Hub' } }, [])
     );
   });
 
