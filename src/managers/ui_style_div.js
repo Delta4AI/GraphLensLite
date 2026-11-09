@@ -13,37 +13,7 @@ import {
   propSubhead,
 } from "./appearance_controls.js";
 
-// ----------------------------------------------------------- DOM primitives
-// The style div's generic control builders. They only ever needed their
-// arguments, but lived as closures inside createStyleDiv — a 1556-line
-// function whose single export made none of it importable or testable.
-
-function createNewRow(parent) {
-  const row = document.createElement("div");
-  row.classList.add("card-row");
-  parent.appendChild(row);
-  return row;
-}
-
-function createLabel(labelText, tooltip = undefined) {
-  if (labelText) {
-    const label = document.createElement("label");
-    label.textContent = labelText;
-    label.className = "vr-label";
-    label.id = labelText;
-    if (tooltip) label.title = tooltip;
-    return label;
-  }
-  return null;
-}
-
-function appendLabel(parent, labelText, tooltip = undefined, id = undefined, customCSSClass = undefined) {
-  const label = createLabel(labelText, tooltip);
-  if (id) label.id = id;
-  if (customCSSClass) label.classList.add(customCSSClass);
-  if (label) parent.appendChild(label);
-}
-
+// A labelled checkbox with setChecked/toggle/isChecked, for the Groups pane rows.
 function createSwitch(callback = undefined, inputId = undefined, enabledByDefault = false) {
   // A checkbox, like the appearance editor's on/off rows.
   const label = document.createElement('label');
@@ -1073,9 +1043,6 @@ function createStyleDiv(cache) {
 
 export {
   createStyleDiv,
-  createNewRow,
-  createLabel,
-  appendLabel,
   createSwitch,
   createButton,
   createInput,
