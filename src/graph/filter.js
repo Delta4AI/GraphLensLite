@@ -1,31 +1,39 @@
+import { StaticUtilities } from '../utilities/static.js';
+
 class GraphFilterManager {
   constructor(cache) {
     this.cache = cache;
   }
 
   async resetFilters(section, subSection = undefined) {
-    const idPrefix = section + (subSection ? `::${subSection}` : "");
+    const idPrefix = StaticUtilities.propIDPrefix(section, subSection);
     const affectedPropIDs = Array.from(this.cache.propIDs).filter((id) =>
       id.startsWith(idPrefix),
     );
-
-    for (const propID of affectedPropIDs) {
-      this.cache.ui.checkCheckbox(propID, true);
-      const slider = this.cache.propIDToInvertibleRangeSliders.get(propID);
-      const dropdown = this.cache.propIDToDropdownChecklists.get(propID);
-      const boolToggle = this.cache.propIDToBooleanToggles.get(propID);
-
-      if (slider) await slider.reset();
-      if (dropdown) await dropdown.selectAllCategories(true);
-      // A narrowed True/False segment constrains the graph under AND exactly
-      // like a narrowed slider, so it has to widen back to Any here too.
-      if (boolToggle) boolToggle.resetToAny();
-    }
-
+    for (const propID of affectedPropIDs) await this.#resetOne(propID);
     await this.handleFilterEvent(
       "Filtering",
-      `Resetting filters for ${idPrefix} ..`,
+      `Resetting filters for ${[section, subSection].filter(Boolean).join(" › ")} ..`,
     );
+  }
+
+  /** One row back to its loaded default, ticked. */
+  async resetFilter(propID) {
+    await this.#resetOne(propID);
+    await this.handleFilterEvent("Filtering", `Resetting filter ${propID} ..`);
+  }
+
+  async #resetOne(propID) {
+    this.cache.ui.checkCheckbox(propID, true);
+    const slider = this.cache.propIDToInvertibleRangeSliders.get(propID);
+    const dropdown = this.cache.propIDToDropdownChecklists.get(propID);
+    const boolToggle = this.cache.propIDToBooleanToggles.get(propID);
+
+    if (slider) await slider.reset();
+    if (dropdown) await dropdown.selectAllCategories(true);
+    // A narrowed True/False segment constrains the graph under AND exactly
+    // like a narrowed slider, so it has to widen back to Any here too.
+    if (boolToggle) boolToggle.resetToAny();
   }
 
   async handleFilterEvent(

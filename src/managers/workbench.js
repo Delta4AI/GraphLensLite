@@ -128,13 +128,6 @@ class Workbench {
       }
     }
 
-    // Query/data panes toggle the "add to query" affordances scattered
-    // through the filter rows — they only mean something with the query
-    // editor up.
-    document
-      .querySelectorAll('.add-to-query-button')
-      .forEach((btn) => btn.classList.toggle('show', name === 'query'));
-
     if (previous && previous !== name) this.#notify(previous, false);
     this.#notify(name, true);
     this.cache.graph?.resize();
@@ -148,9 +141,6 @@ class Workbench {
     for (const spec of Object.values(TABS)) {
       document.getElementById(spec.btn)?.classList.remove('highlight');
     }
-    document
-      .querySelectorAll('.add-to-query-button')
-      .forEach((btn) => btn.classList.remove('show'));
     this.tab = null;
     // Expansion is an override for the open tab, not a stored preference:
     // leaving it set meant the NEXT tab opened at 100% of the stage, with the

@@ -1658,7 +1658,8 @@ h5 {
     display: none;
 }
 
-#filterContainer .filter-section > .header-card .small-btn,
+#filterContainer .filter-section > .header-card .filter-section-check,
+#filterContainer .filter-section > .header-card .filter-section-reset,
 #filterContainer .filter-section > .header-card .filter-scope-segment {
     pointer-events: auto;
 }
@@ -1749,26 +1750,6 @@ h5 {
     letter-spacing: inherit;
     margin: 0;
     white-space: nowrap;
-}
-
-/* The group triads stay in the DOM and stay tabbable — they carry the
-   "Enable all filters: Nodes > Topology" accessible names. Quieting them is a
-   COLOR change, never opacity: these are non-text controls owing 3:1, and
-   --text-faint at full strength is 3.54:1 while the same token at 30% is
-   ~1.3:1 and fails outright. */
-.sub-header-card .small-btn,
-.filter-section > .header-card .small-btn {
-    border-color: var(--border-soft);
-    color: var(--text-faint);
-    background: transparent;
-}
-
-.sub-header-card .small-btn:hover,
-.sub-header-card .small-btn:focus-visible,
-.filter-section > .header-card .small-btn:hover,
-.filter-section > .header-card .small-btn:focus-visible {
-    border-color: var(--accent-text);
-    color: var(--text-strong);
 }
 
 /*#selectedNodes, #selectedEdges {*/
@@ -2610,10 +2591,9 @@ h5 {
 }
 
 .filter-row-col1 {
-    /* Label column: shared auto width across the sub-group. Nudged down to sit
-       level with the control's first line (slider / dropdown). */
+    /* Label column: shared auto width across the sub-group, its checkbox and
+       name level with the 24px control beside it. */
     min-width: 0;
-    padding-top: 2px;
 }
 
 .filter-row-col2 {
@@ -2643,7 +2623,7 @@ h5 {
 .filter-range-row > div[slider] {
     flex: 1 1 auto;
     min-width: 40px;
-    height: 18px;
+    height: 24px;
     margin: 0;
 }
 
@@ -2662,16 +2642,15 @@ h5 {
     width: auto;
     max-width: 10ch;
     min-width: 0;
-    height: 18px;
-    padding: 0 3px;
+    height: 24px;
+    padding: 0 2px;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     text-align: center;
-    border: 1px solid transparent;
-    border-bottom-color: var(--border-soft);
-    border-radius: 3px;
-    background: transparent;
-    color: var(--text-muted);
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
     box-sizing: border-box;
 }
 
@@ -2687,8 +2666,7 @@ h5 {
 }
 
 .filter-range-row > input:hover {
-    border-color: var(--border-soft);
-    background: var(--surface-3);
+    border-color: var(--text-muted);
 }
 
 /* Focus shows the exact value, so the box needs room for it. */
@@ -3037,6 +3015,7 @@ h5 {
 #filterContainer.locked .header-card button,
 #filterContainer.locked .sub-header-card button,
 #filterContainer.locked .filter-row-col1 label,
+#filterContainer.locked .filter-row-col1 .checkboxWrapper,
 #filterContainer.locked .filter-row-col2,
 #filterContainer.locked .slider-container,
 #filterContainer.locked input[type="number"],
@@ -3399,22 +3378,6 @@ hr {
     border-radius: 3px;
 }
 
-.small-btn {
-    width: 18px;
-    height: 18px;
-    text-align: center;
-    line-height: 16px;
-    font-size: 13px;
-    border: 1px solid var(--border-strong);
-    border-radius: 3px;
-    cursor: pointer;
-    padding: 0;
-    transition: box-shadow 0.2s ease-in-out;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
 .data-source-label {
     font-size: 0.7em;
     color: var(--text-faint);
@@ -3445,26 +3408,6 @@ hr {
     color: var(--accent-text);
 }
 
-.toggle-section-btn {
-    background: var(--surface-3);
-}
-
-.toggle-section-btn:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-.small-btn.red:hover {
-    border: 1px solid var(--brand-border) !important;
-}
-
-.extra-small {
-    width: 14px;
-    height: 14px;
-    line-height: 14px;
-    font-size: 10px;
-}
-
 .mr {
     margin-right: 4px;
 }
@@ -3493,33 +3436,6 @@ hr {
     cursor: not-allowed;
 }
 
-/*************************
- custom checkbox style
- **************************/
-
-.hidden-checkbox {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-    margin: 0;
-    padding: 0;
-    pointer-events: none;
-}
-
-/* A 0x0 transparent input cannot show a ring, but the browser drew one anyway:
-   a black speck floating beside the filter row with no control under it. Hand
-   the ring to the box the user can actually see. */
-.hidden-checkbox:focus-visible {
-    outline: none;
-}
-
-.hidden-checkbox:focus-visible + .checkbox,
-.hidden-checkbox:focus-visible + .custom-checkbox {
-    outline: 2px solid var(--accent-text);
-    outline-offset: 1px;
-}
-
 .checkboxWrapper {
     display: inline-flex;
     align-items: center;
@@ -3537,6 +3453,7 @@ hr {
 .checkboxLabel {
     padding-left: 2px;
     flex-grow: 1;
+    cursor: pointer;
     font-size: 12px;
     /* Long property names wrap (breaking mid-word if unavoidable) so the
        control column never drops below its readable minimum — but clamp at two
@@ -3551,177 +3468,10 @@ hr {
     overflow: hidden;
 }
 
-.checkbox {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    position: relative;
-    text-align: center;
-    line-height: 12px;
-    font-size: 12px;
-    cursor: pointer;
-    font-family: sans-serif;
-    flex-shrink: 0;
-    box-sizing: border-box;
-}
-
-.add-to-query-button {
-    padding: 0;
-    width: 0;
-    height: 14px;
-    font-size: 10px;
-    border: 1px solid var(--brand-border);
-    border-radius: 3px;
-    background: transparent;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-left: 0;
-    box-sizing:border-box;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease-in-out, width 0.2s ease-in-out, margin 0.2s ease-in-out;
-}
-
-.add-to-query-button.show {
-    opacity: 1;
-    pointer-events: auto;
-    width: 14px;
-    margin-left: 1px;
-}
-
-.add-to-query-button.show.tt {
-    display: inline-flex;
-    width: 18px;
-    height: 18px;
-    pointer-events: none;
-}
-
-.add-to-query-button:hover {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 3px;
-}
-
-
-.checkbox-green {
-    color: var(--accent-text);
-    border: 1px solid var(--accent-text);
-    border-radius: 3px;
-}
-
-.checkbox-green:hover {
-    border-color: var(--text);
-}
-
-input:checked + .checkbox-green {
-    color: var(--success-text);
-    border-color: var(--success-text);
-}
-
-input:checked + .checkbox-green::after {
-    color: var(--success-text);
-}
-
-input:checked + .checkbox-red::after {
-    color: var(--accent-text);
-}
-
-input:checked + .checkbox-red::after,
-input:checked + .checkbox-green::after {
-    content: "✔";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
 
 .highlight {
     box-shadow: 0 0 5px #C33D35;
     border-radius: 6px;
-}
-
-/*************************
- +/- (add/remove) from selection buttons
- **************************/
-
-.pm-group {
-    display: inline-flex;
-    width: 18px;
-    height: 18px;
-    margin-left: 1px;
-    margin-right: 1px;
-    box-sizing: border-box;
-    border: 0.08em solid var(--border-strong);
-    border-radius: 999px;
-    overflow: hidden;
-    position: relative;
-    background: var(--surface-3);
-    transition: transform 140ms ease, border-color 140ms ease;
-    transform-origin: right center;
-}
-
-.plus-minus-button {
-    flex: 1;
-    height: 100%;
-    padding: 0;
-    margin: 0;
-    border: 0;
-    background: transparent;
-    font-size: 13px;
-    line-height: 18px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 120ms ease, color 120ms ease;
-}
-
-.plus-minus-button + .plus-minus-button {
-    border-left: 1px solid var(--brand-border);
-}
-
-/* Per-row actions sit on every single filter row, so at full strength they
-   out-shout the properties. Quieted by COLOR, not opacity — they are non-text
-   controls owing 3:1, and dimming the token below --border would fail it.
-   .filter-row is display:contents and therefore has no box to hover, so the
-   transition keys off the controls themselves. */
-#filterContainer .filter-row-col3 .pm-group {
-    border-color: var(--border);
-    background: transparent;
-}
-
-#filterContainer .filter-row-col3 .plus-minus-button {
-    color: var(--text-faint);
-}
-
-#filterContainer .filter-row-col3 .pm-group:hover .plus-minus-button,
-#filterContainer .filter-row-col3 .pm-group:focus-within .plus-minus-button {
-    color: var(--text-strong);
-}
-
-/* Transparent at rest is what keeps these quiet; transparent at 2.5x is a
-   control with the group chip and the row behind it showing through its
-   middle. Opaque the moment it grows. */
-#filterContainer .filter-row-col3 .pm-group:hover,
-#filterContainer .filter-row-col3 .pm-group:focus-within {
-    background: var(--surface-3);
-}
-
-.pm-group:hover,
-.pm-group:focus-within {
-    border-color: var(--accent-text);
-    transform: scale(2.5);
-    z-index: 99;
-}
-
-.pm-group:hover .plus-minus-button + .plus-minus-button {
-    border-left-color: var(--accent-text);
-}
-
-.plus-minus-button:hover {
-    background: #C33D35;
-    color: #fff;
-    cursor: pointer;
 }
 
 /*************************
@@ -4002,28 +3752,37 @@ div[slider] > input[type=range]::-ms-tooltip {
  Bubble group controls
  **************************/
 
-/* The per-filter-row group control. 18px is what filter-row-col3 allows, so it
-   shows ONE colour plus a ring meaning "and others" — N colours are not legible
-   at this size and a conic pie would rebuild the 2x2 quadrant wedges this
-   replaced. The tooltip and the menu carry the exact membership.
-   ponytail: 18px misses WCAG 2.5.8's 24px target — the same app-wide issue the
-   rail's icon buttons have; fix globally, not here. */
+/* The per-filter-row group control: ONE colour plus a ring meaning "and
+   others" — N colours are not legible at this size and a conic pie would
+   rebuild the 2x2 quadrant wedges this replaced. The tooltip and the menu carry
+   the exact membership. 14px painted inside a 24px target (WCAG 2.5.8): the
+   transparent border is the hit area. Unassigned, it is hidden until the row is
+   hovered or the dot itself is focused or open — still tabbable, so the
+   keyboard reaches it, and the row's "…" menu offers "Add to group…" too. */
 .group-chip {
-    width: 18px;
-    height: 18px;
-    flex: 0 0 18px;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
     padding: 0;
     border-radius: 50%;
-    border: 1.5px dashed var(--text-faint);
-    background: transparent;
+    border: 5px solid transparent;
+    background: content-box transparent;
+    box-shadow: inset 0 0 0 1.5px var(--text-faint);
     cursor: pointer;
     display: inline-flex;
     vertical-align: middle;
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    box-sizing: border-box;
+    transition: opacity 0.12s ease;
 }
 
-.group-chip:hover {
-    transform: scale(1.15);
+.group-chip:not(.assigned) {
+    opacity: 0;
+}
+
+.filter-row:hover .group-chip,
+.group-chip:focus-visible,
+.group-chip[aria-expanded="true"] {
+    opacity: 1;
 }
 
 .group-chip:focus-visible {
@@ -4033,10 +3792,8 @@ div[slider] > input[type=range]::-ms-tooltip {
 
 /* A miniature of the bubble: the group's fill inside its stroke colour. */
 .group-chip.assigned {
-    border-style: solid;
-    border-width: 2px;
-    border-color: var(--chip-border, var(--chip-color));
-    background: var(--chip-color);
+    background: content-box var(--chip-color);
+    box-shadow: inset 0 0 0 2px var(--chip-border, var(--chip-color));
 }
 
 /* In several groups: an inset ring reads as "there is more here" without
@@ -4044,7 +3801,7 @@ div[slider] > input[type=range]::-ms-tooltip {
    takes the panel's own background — `--surface-1` was never defined in either
    theme, which made the shadow compute to `none` and the state invisible. */
 .group-chip.multi {
-    box-shadow: inset 0 0 0 2px var(--input-bg);
+    box-shadow: inset 0 0 0 2px var(--chip-border, var(--chip-color)), inset 0 0 0 4px var(--input-bg);
 }
 
 #filterContainer.locked .group-chip {
@@ -4267,150 +4024,187 @@ div[slider] > input[type=range]::-ms-tooltip {
     color: var(--text-muted);
 }
 
-/*************************
- dropdown checklist
- **************************/
-
+/* --------------------------------------------------------------------------
+   Filter rows (Filters tab). Same control vocabulary as the appearance editor:
+   24px fields with a --text-faint border, native checkboxes, 6px radius, and
+   the row's verbs behind one "…" button (ui_components.js createRowActions).
+   -------------------------------------------------------------------------- */
 .dropdown-check-list {
-    display: inline-block;
+    display: block;
+    min-width: 0;
 }
 
-.dropdown-check-list:focus-visible,
-.dropdown-check-list *:focus-visible {
-    outline: none;
-    box-shadow: none;
-}
-
-.dropdown-check-list .anchor {
-    position: relative;
-    cursor: pointer;
-    display: inline-block;
-    /*padding: 5px 5px 5px 10px;*/
-    border: 1px solid var(--border);
-    width: 100%;
-    height: 16px;
-    line-height: 16px;
-    padding: 0 20px 0 4px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    margin: 0;
-    box-sizing: border-box;
-}
-
-.dropdown-check-list .anchor:after {
-    position: absolute;
-    content: "";
-    border-left: 2px solid var(--border-strong);
-    border-top: 2px solid var(--border-strong);
-    padding: 2px;
-    right: 5px;
-    top: 25%;
-    transform: rotate(-135deg);
-}
-
-.dropdown-check-list ul.items {
-    position: fixed;
-    /* Include padding+border in the height so the JS max-height cap (which uses
-       the available space) matches the rendered box and the panel never spills
-       over the anchor when a huge list opens upward. */
-    box-sizing: border-box;
-    padding: 2px;
-    display: none;
-    margin: 0 0 0 3px;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    border-top: none;
-    background-color: var(--input-bg);
-    z-index: var(--z-menu);
-    width: auto;
-    list-style: none;
-    text-align: left;
-    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.5)
-
-}
-
-.dropdown-check-list ul.items li {
-    padding: 3px 5px 3px 5px;
-    font-size: 14px;
-}
-
-.dropdown-check-list ul.items li label {
-    position: relative;
+.filter-cat-trigger {
     display: flex;
     align-items: center;
+    gap: 6px;
+    width: 100%;
+    height: 24px;
+    box-sizing: border-box;
+    padding: 0 6px 0 8px;
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
     cursor: pointer;
 }
 
-.dropdown-check-list ul.items li input[type="checkbox"] {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-    margin: 0;
-    padding: 0;
-    pointer-events: none;
+.filter-cat-trigger:hover {
+    border-color: var(--text-muted);
 }
 
-.custom-checkbox {
-    display: inline-block;
+.filter-cat-trigger[aria-expanded="true"] {
+    border-color: var(--accent-text);
+    box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+/* Narrowed reads in the accent, so a filter that removes values is visible
+   from across the panel without opening it. */
+.filter-cat-trigger.narrowed .filter-cat-summary {
+    color: var(--accent-text);
+    font-weight: 600;
+}
+
+.filter-cat-summary {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.filter-cat-total,
+.filter-cat-count {
+    color: var(--text-muted);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.filter-cat-chevron {
+    color: var(--text-muted);
+    line-height: 1;
+}
+
+.rail-menu.filter-cat-menu {
+    min-width: 200px;
+    max-width: 320px;
+    gap: 0;
+    font-size: 12px;
+}
+
+.filter-cat-search {
+    height: 24px;
+    box-sizing: border-box;
+    margin-bottom: 4px;
+    padding: 0 8px;
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+}
+
+.filter-cat-item {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 2px;
+    min-height: 24px;
+    padding: 0 6px 0 2px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.filter-cat-item:hover {
+    background: var(--surface-3);
+}
+
+.filter-cat-item[hidden] {
+    display: none;
+}
+
+.filter-cat-item input {
     width: 14px;
     height: 14px;
-    flex-shrink: 0;
-    margin-right: 10px;
-    border: 1px solid var(--accent-text);
-    border-radius: 3px;
-    background-color: var(--input-bg);
-    vertical-align: middle;
+    margin: 0 4px;
+    accent-color: var(--accent-text);
+}
+
+.filter-cat-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.filter-cat-all {
+    margin-bottom: 2px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--border-soft);
+    border-radius: 4px 4px 0 0;
+    font-weight: 600;
+}
+
+.filter-row-check,
+.filter-section-check {
+    width: 16px;
+    height: 16px;
+    margin: 4px;
+    accent-color: var(--accent-text);
     cursor: pointer;
-    transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
-.custom-checkbox.checked {
-    background-color: #C33D35;
-    color: white;
-    position: relative;
+.filter-row-col3 {
+    gap: 0;
 }
 
-.custom-checkbox.checked::after {
-    content: "✔";
-    font-size: 14px;
-    color: white;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+.filter-row-spacer {
+    width: 24px;
+    flex: 0 0 24px;
 }
 
-.custom-checkbox:hover {
-    border-color: #A02929;
-    background-color: #FFE5E5;
-}
-
-.dropdown-check-list.visible .items {
-    display: block;
-}
-
-.dropdown-check-list.visible .anchor {
-    color: var(--accent-text);
-}
-
-.dropdown-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    padding: 5px;
-    background-color: var(--surface);
-    border-bottom: 1px solid var(--border);
-}
-
-.dropdown-buttons.button {
-    font-size: 12px;
-    padding: 4px 8px;
-    border: 1px solid var(--border);
-    border-radius: 3px;
+.filter-row-more,
+.filter-section-reset {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
     cursor: pointer;
-    background-color: var(--input-bg);
-    transition: background-color 0.3s ease;
+    display: inline-grid;
+    place-items: center;
+}
+
+.filter-row-more:hover,
+.filter-row-more[aria-expanded="true"],
+.filter-section-reset:hover {
+    border-color: var(--border);
+    background: var(--surface-3);
+    color: var(--text);
+}
+
+.filter-row-more:focus-visible,
+.filter-section-reset:focus-visible,
+.filter-cat-trigger:focus-visible,
+.filter-row-check:focus-visible,
+.filter-section-check:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
+}
+
+/* Inverted ("keep values outside the range"): the kept ends take the accent. */
+[slider].inverted > div > [inverse-left],
+[slider].inverted > div > [inverse-right] {
+    background-color: var(--accent-text);
 }
 
 /*************************

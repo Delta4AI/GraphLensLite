@@ -36,7 +36,6 @@ function workbenchDom() {
     <button id="queryToggleBtn"></button>
     <button id="metricsToggleBtn"></button>
     <button id="assistantToggleBtn"></button>
-    <button class="add-to-query-button"></button>
   `;
 }
 
@@ -159,17 +158,6 @@ describe('workbench tabs', () => {
     expect(cache.dataTable.help).toHaveBeenCalled();
     wb.show('metrics');
     expect(help.hidden).toBe(true);
-  });
-
-  it('reveals the add-to-query affordances only for the query tab', () => {
-    const btn = document.querySelector('.add-to-query-button');
-    wb.show('query');
-    expect(btn.classList.contains('show')).toBe(true);
-    wb.show('data');
-    expect(btn.classList.contains('show')).toBe(false);
-    wb.show('query');
-    wb.close();
-    expect(btn.classList.contains('show')).toBe(false);
   });
 });
 

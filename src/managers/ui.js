@@ -878,9 +878,8 @@ class UIManager {
     header.textContent = section;
     header.className = 'm-0 white';
     headerDiv.appendChild(header);
-    headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(false, section));
+    headerDiv.prepend(this.cache.uiComponents.createSectionCheckbox(section));
     headerDiv.appendChild(this.cache.uiComponents.createSectionResetButton(section));
-    headerDiv.appendChild(this.cache.uiComponents.createSectionToggleButton(true, section));
     const sectionBody = document.createElement('div');
     sectionBody.className = 'filter-section-body';
     this.makeFilterGroupCollapsible(sectionWrap, headerDiv);
@@ -899,10 +898,9 @@ class UIManager {
     subHeader.textContent = subSection;
     subHeader.className = 'm-0 inline';
     subHeaderDiv.append(
+      this.cache.uiComponents.createSectionCheckbox(section, subSection),
       subHeader,
-      this.cache.uiComponents.createSectionToggleButton(false, section, subSection),
-      this.cache.uiComponents.createSectionResetButton(section, subSection),
-      this.cache.uiComponents.createSectionToggleButton(true, section, subSection)
+      this.cache.uiComponents.createSectionResetButton(section, subSection)
     );
     const subBody = document.createElement('div');
     subBody.className = 'filter-subgroup-body';
@@ -954,14 +952,11 @@ class UIManager {
     widget.appendTo(col2);
     const col3 = document.createElement('div');
     col3.className = 'filter-row-col3';
-    if (this.cache.nodeExclusiveProps.has(propID) || this.cache.mixedProps.has(propID)) {
-      col3.appendChild(this.cache.uiComponents.createGroupChip(propID));
-    } else {
-      const placeHolder = document.createElement('div');
-      placeHolder.style.width = '18px';
-      col3.appendChild(placeHolder);
-    }
-    col3.appendChild(this.cache.uiComponents.createAddOrRemoveToSelectionGroup(propID));
+    col3.append(
+      ...this.cache.uiComponents.createRowActions(propID, prop, {
+        groupable: this.cache.nodeExclusiveProps.has(propID) || this.cache.mixedProps.has(propID),
+      })
+    );
     row.appendChild(col3);
     return { row, widget };
   }
@@ -1146,7 +1141,30 @@ class UIManager {
 
     this.renderFilterConstraintCount(andMode, constraining, total);
     UIManager.#renderScopeCounts(perSection, andMode);
+    this.syncSectionCheckboxes(container, layout.filters);
     this.renderBuildUpEmptyState(rule.nothingTicked, rule.includePropertyless);
+  }
+
+  /**
+   * Each section's tri-state box from its filters (APG mixed checkbox): ticked
+   * when every usable filter under it is on, mixed when some are.
+   */
+  syncSectionCheckboxes(
+    container = document.getElementById('filterContainer'),
+    filters = this.cache.data?.layouts?.[this.cache.data?.selectedLayout]?.filters
+  ) {
+    if (!container || !filters) return;
+    for (const box of container.querySelectorAll('.filter-section-check')) {
+      let on = 0;
+      let total = 0;
+      for (const [propID, fo] of filters) {
+        if (!propID.startsWith(box.dataset.prefix) || fo.unusable) continue;
+        total += 1;
+        if (fo.active) on += 1;
+      }
+      box.checked = total > 0 && on === total;
+      box.indeterminate = on > 0 && on < total;
+    }
   }
 
   /**
@@ -1545,7 +1563,7 @@ class UIManager {
     headerDiv.insertBefore(chevron, headerDiv.firstChild);
     headerDiv.classList.add('collapsible-filter-header');
     headerDiv.addEventListener('click', (e) => {
-      if (e.target.closest('button')) return;
+      if (e.target.closest('button, input')) return;
       this.setFilterGroupCollapsed(wrapper, !wrapper.classList.contains('collapsed'));
     });
   }
@@ -1591,19 +1609,18 @@ class UIManager {
 
   checkCheckbox(propID, enable = true) {
     const checkbox = document.getElementById(`filter-${propID}-checkbox`);
-    const span = document.getElementById(`filter-${propID}-checkbox-inner`);
     const wrapper = document.getElementById(`filter-${propID}-checkbox-wrapper`);
 
     checkbox.checked = enable;
     this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID).active = enable;
 
     enable ? this.cache.activeProps.add(propID) : this.cache.activeProps.delete(propID);
-    span.textContent = enable ? '✔' : '';
     wrapper.title = this.cache.uiComponents.getCheckboxTT(enable, propID);
   }
 
+
   async toggleSection(enable, section) {
-    this.toggleCheckboxesForSetOfPropIDs(enable, section);
+    this.toggleCheckboxesForSetOfPropIDs(enable, StaticUtilities.propIDPrefix(section));
     await this.cache.fm.handleFilterEvent(
       `${enable ? 'Showing' : 'Hiding'} Elements`,
       `Nodes and related edges for ${section}`
@@ -1611,7 +1628,7 @@ class UIManager {
   }
 
   async toggleSubSection(enable, section, subSection) {
-    this.toggleCheckboxesForSetOfPropIDs(enable, section + '::' + subSection);
+    this.toggleCheckboxesForSetOfPropIDs(enable, StaticUtilities.propIDPrefix(section, subSection));
     await this.cache.fm.handleFilterEvent(
       `${enable ? 'Showing' : 'Hiding'} Elements`,
       `Nodes and related edges for ${section} ${subSection}`
@@ -1623,16 +1640,7 @@ class UIManager {
       ...this.cache.propToNodes.keys(),
       ...this.cache.propToEdgeIDs.keys(),
     ].filter((propID) => propID.startsWith(propIDPrefixToSearchFor));
-    for (let propID of setOfPropIDs) {
-      let checkbox = document.getElementById(`filter-${propID}-checkbox`);
-      let wrapper = document.getElementById(`filter-${propID}-checkbox-wrapper`);
-      let inner = document.getElementById(`filter-${propID}-checkbox-inner`);
-      checkbox.checked = enable;
-      this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID).active = enable;
-      enable ? this.cache.activeProps.add(propID) : this.cache.activeProps.delete(propID);
-      wrapper.title = this.cache.uiComponents.getCheckboxTT(enable, propID);
-      inner.textContent = enable ? '✔' : '';
-    }
+    for (const propID of setOfPropIDs) this.checkCheckbox(propID, enable);
   }
 
   clearActivePropsCacheOnLayoutChange() {
