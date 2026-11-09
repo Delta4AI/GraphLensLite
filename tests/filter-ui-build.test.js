@@ -50,11 +50,10 @@ function makeUI() {
     propIDToDropdownChecklists: new Map(),
     propIDToBooleanToggles: new Map(),
     uiComponents: {
-      createSectionToggleButton: stub,
+      createSectionCheckbox: stub,
       createSectionResetButton: stub,
       createCheckbox: stub,
-      createGroupChip: stub,
-      createAddOrRemoveToSelectionGroup: stub,
+      createRowActions: () => [stub(), stub()],
       createConstraintCount: stub,
     },
     qm: { updateQueryTextArea: vi.fn() },
@@ -120,9 +119,10 @@ describe('buildFilterUI', () => {
     // just "Showing" — the status line and the loading header both.
     const ui = makeUI();
     ui.buildFilterUI();
-    const box = document
-      .querySelector('[data-prop-id="Node filters::Topology::Type"]')
-      .querySelector('.items input[type="checkbox"]');
+    document
+      .querySelector('[data-prop-id="Node filters::Topology::Type"] .filter-cat-trigger')
+      .click();
+    const box = document.querySelector('.filter-cat-menu .filter-cat-item[data-value] input');
 
     box.checked = false;
     box.dispatchEvent(new Event('change'));

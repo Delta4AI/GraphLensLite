@@ -216,21 +216,21 @@ const TOUR_STEPS = [
                  </div>
                </div>
                <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:2px solid var(--brand-text);background:var(--brand-text);flex-shrink:0;margin-top:2px;"></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;background:var(--surface-3);flex-shrink:0;margin-top:2px;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid var(--brand-text);">−</span></span>
+               <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text-muted);flex-shrink:0;">⋯</span>
              </div>
              <div style="display:flex;align-items:center;gap:8px;">
                <span style="display:inline-block;width:14px;height:14px;border:1px solid var(--accent-text);border-radius:3px;box-sizing:border-box;flex-shrink:0;"></span>
                <span style="font-size:12px;color:var(--brand-text);font-weight:600;">Type</span>
                <select disabled style="flex:1;font-size:11px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--input-bg);">
-                 <option>Enzyme ✓, Receptor ✓, ...</option>
+                 <option>4 of 6</option>
                </select>
-               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:1.5px dashed var(--text-faint);background:transparent;flex-shrink:0;"></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;background:var(--surface-3);flex-shrink:0;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid var(--brand-text);">−</span></span>
+               <span style="display:inline-block;width:16px;flex-shrink:0;"></span>
+               <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text-muted);flex-shrink:0;">⋯</span>
              </div>
            </div>
            • <strong>Numeric properties</strong> get two-thumbed range sliders — drag the left thumb to set
            a minimum threshold (≥), the right thumb for a maximum (≤), double-click to reset
-           <br>• <strong>Categorical properties</strong> get dropdown checklists — check/uncheck values
+           <br>• <strong>Categorical properties</strong> get a checklist with a count per value — Alt-click a value to keep only that one
            <br>• The <strong>checkbox</strong> toggles whether that filter is active.
            The
            <span style="display:inline-flex;gap:2px;padding:2px;border-radius:6px;vertical-align:middle;background:var(--surface-3);font-size:11px;"><span style="padding:1px 9px;border-radius:5px;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,0.18);font-weight:700;color:var(--text-strong);"><span style="color:var(--accent-text);">＋</span> Build up</span><span style="padding:1px 9px;color:var(--text-strong);">− Narrow down</span></span>
@@ -242,14 +242,15 @@ const TOUR_STEPS = [
            its <strong>Complete cases only</strong> option additionally hides elements missing any of those filters.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            <span style="display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:middle;background:var(--brand-text);"></span>
-           <strong>Bubble group chip</strong> — click it to put that filter's matching nodes into a
-           <strong>group</strong>, or to make a new group from the filter. The dot is hollow when the
-           property is in no group, filled with the group's colour when it is in one, and ringed when
+           <strong>Bubble group dot</strong> — click it to put that filter's matching nodes into a
+           <strong>group</strong>, or to make a new group from the filter. The dot appears when you hover the row and is
+           filled with the group's colour when it is in one, and ringed when
            it is in several (hover it to read the names). Groups fed this way are <em>filter-driven</em>:
            they update as the filter changes. Manage them all under <strong>Overlays › Groups</strong>.
            <br><br>
-           <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;vertical-align:middle;background:var(--surface-3);"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid var(--brand-text);">−</span></span>
-           <strong>Selection button</strong> — <strong>+</strong> add or <strong>−</strong> remove all nodes matching that filter property to/from the current selection.
+           <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;vertical-align:middle;color:var(--text-muted);">⋯</span>
+           <strong>Row actions</strong> — add or remove everything the filter matches to/from the selection,
+           keep the values <em>outside</em> a range, add the property to a group, add it to the query, or reset the row.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Every numeric property also carries <strong>exact min/max input boxes</strong> under its slider, so you can type a threshold instead of dragging for it. When the list gets long, fold a whole property group — <em>Classification</em>, <em>Annotation</em>, whatever your spreadsheet calls them — away with the <strong>▾</strong> chevron on its heading.
            <br><br>
@@ -319,15 +320,16 @@ const TOUR_STEPS = [
     title: 'Inspector — Appearance 🎨',
     text: `Appearance lives at the bottom of the inspector's <strong>Selection</strong> context
            (<strong>Y</strong> jumps straight to it). Styles apply <strong>only to selected elements</strong> —
-           select nodes/edges first, then adjust. All styles are <strong>per-workspace</strong>.
+           select nodes/edges first, then adjust. Each control shows the selection's current value,
+           or <em>Mixed</em> when the selected elements differ. All styles are <strong>per-workspace</strong>.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Node Configuration</strong>
-           <br>• Shape, size, fill color, border size &amp; color
+           <strong>Nodes</strong>
+           <br>• Shape, size, fill color, border size &amp; color — <strong>In selection</strong> recolours one colour at a time
            <br>• Label text, font size, placement, color &amp; background
            <br>• <strong>Badges</strong> — small text markers at any corner of a node
            <br>• <strong>Pie-chart nodes</strong> — render a node as a multi-slice pie driven by category data
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Edge Configuration</strong>
+           <strong>Edges</strong>
            <br>• Type (line/quadratic/cubic), width, dash pattern, color
            <br>• Label text, font size, placement, rotation, offset &amp; color
            <br>• <strong>Arrows</strong> — start/end arrows with configurable size and type
@@ -409,20 +411,15 @@ const TOUR_STEPS = [
   },
   {
     title: 'Data Editor 🔢',
-    text: `The data editor is a <strong>spreadsheet view</strong> of all nodes and edges.
-           You can edit property values directly in cells, add new elements, or export the data.
+    text: `The data editor is a <strong>spreadsheet view</strong> of the graph's nodes and edges.
+           Choose <strong>Selection | All</strong> and <strong>Nodes | Edges | Both</strong>, filter the rows, and edit cells
+           in place (Enter or typing edits, Escape cancels).
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">✔ Apply</span> — push all changes to the graph
-           <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#EFB0AA;border:1px solid rgba(0,0,0,0.3);">⟳ Reset</span> — discard changes and revert to current graph state
+           Edits are marked until you apply them: amber cells, green new rows, struck-through deletions. The bar under
+           the table counts them, with <strong>Review</strong>, <strong>Discard</strong> and <strong>Apply</strong>.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Node</span>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Edge</span>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);"><strong>+</strong> Column</span> — add new nodes, edges, or property columns to the table
-           <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">⤒ Import</span> — merge a second Excel file into the current graph. You get a preview of what would change first, and you choose whether new nodes and edges are added or only the existing ones extended
-           <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">⤓ Export</span> — export the data table and styling properties as Excel
+           <strong>+ Add</strong> creates a node, an edge or a property column; <strong>⤒ Import</strong> merges an
+           Excel file (with a preview); <strong>⤓ Export</strong> saves the rows shown as Excel.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the header for usage details.`,
     targets: [{ selector: '#workbench' }, { selector: '#dataToggleBtn' }],
@@ -457,7 +454,7 @@ const TOUR_STEPS = [
            <br>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#C33D35;border:1px solid rgba(0,0,0,0.3);">✗ Clear text</span> — empty the box (⟳ Sync is what hands filtering back to the panel)
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           When the query editor is open, a <span class="add-to-query-button show tt">📝</span> button appears next to each filter checkbox in the filtering panel. Click it to <strong>append</strong> that filter's current range or category selection as a query fragment — a quick way to build complex queries from existing filters.
+           Each filter row's <strong>⋯</strong> menu has <strong>📝 Add to query</strong>: it <strong>appends</strong> that filter's current range or category selection as a query fragment — a quick way to build complex queries from existing filters.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the query editor header for a full syntax reference.`,
     targets: [{ selector: '#workbench' }, { selector: '#queryToggleBtn' }],

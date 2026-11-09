@@ -211,19 +211,6 @@
             <button id="queryClearBtn" class="red" onclick="cache.qm.clearQuery();"
                     title="Empty the query text. The graph stays as it is — use ⟳ Sync to hand it back to the filters">✗ Clear text</button>
           </div>
-          <div class="data-buttons" style="display: none;">
-            <button id="updateDataTableBtn" class="blue" onclick="cache.dataTable.update()"
-                    title="Update the graph after modifying the data table">✔ Apply</button>
-            <button id="resetDataTableBtn" onclick="cache.dataTable.reset()" class="pink"
-                    title="Reset the data table to current graph state">⟳ Reset</button>
-            <button onclick="cache.dataTable.addNode()" class="blue" title="Add a node"><strong>+</strong>&nbsp;Node</button>
-            <button onclick="cache.dataTable.addEdge()" class="blue" title="Add an edge"><strong>+</strong>&nbsp;Edge</button>
-            <button onclick="cache.dataTable.addColumn()" class="blue" title="Add a new property column"><strong>+</strong>&nbsp;Column</button>
-            <button id="importDataTableBtn" onclick="cache.dataTable.importExcel()" class="green"
-                    title="Merge an Excel file into the current graph — preview changes and choose to add new nodes/edges or only extend existing ones">⤒ Import</button>
-            <button id="exportDataTableBtn" onclick="cache.dataTable.exportToExcel()" class="green"
-                    title="Export the data table and styling properties as Excel">⤓ Export</button>
-          </div>
           <div class="assistant-buttons" style="display: none;">
             <button id="assistantSettingsBtn" class="green" title="Configure the endpoint and model"
                     onclick="cache.assistant.openSettings()">⚙ Settings</button>
@@ -246,12 +233,7 @@
           <div id="queryCaret" class="custom-caret"></div>
         </div>
         <div id="dataEditor" class="editor-panel wb-pane" hidden>
-          <div id="dataTableContainer">
-            <table id="dataTable" class="data-table">
-              <thead id="dataTableHead"></thead>
-              <tbody id="dataTableBody"></tbody>
-            </table>
-          </div>
+          <div id="dataTableContainer"></div>
         </div>
         <div id="metricsContainer" class="wb-pane" hidden></div>
         <div id="assistantPane" class="wb-pane" hidden>
@@ -363,6 +345,7 @@
             where you can rename, recolour and restyle them.</div>
         </div>
 
+        <h4 class="insp-section-title" id="inspectorActionsTitle">Actions</h4>
         <div class="insp-act-row">
           <button class="insp-btn disabled" title="Reset the style of selected elements to defaults" id="resetSelectedElementsStyleBtn"
                   onclick="cache.style.resetStyleForSelectedElements()">⟳ Reset style</button>

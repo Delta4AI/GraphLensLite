@@ -405,6 +405,7 @@ class GraphBubbleSetManager {
         default:
           // color, text and select are all plain valued inputs.
           if (value != null) el.value = value;
+          el.syncWell?.();
       }
     }
 

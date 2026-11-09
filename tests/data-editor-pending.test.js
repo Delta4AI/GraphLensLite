@@ -53,13 +53,13 @@ function makeTable() {
   return { dt, cache, table };
 }
 
-/** Type a value into a cell the way the browser does: focus, text, blur. */
+/** Type a value into a cell the way the keyboard does: Enter to edit, text, Enter to commit. */
 function typeInto({ dt, table }, rowIndex, header, text) {
   const col = dt.headers.indexOf(header);
   const cell = table.querySelector(`td[data-row="${rowIndex}"][data-col="${col}"]`);
-  dt.handleCellFocus({ target: cell }, rowIndex, col);
+  dt.startEdit(cell);
   if (text !== undefined) cell.textContent = text;
-  dt.handleCellBlur({ target: cell }, rowIndex, col);
+  dt.commitEdit();
 }
 
 const rows = (dt) => dt.tableData.map((r) => `${r[2]}:${r[3]}`);
@@ -107,13 +107,15 @@ describe('DataTable pending changes', () => {
     expect(out.edges.find((e) => e.id === 'n1').D4Data['Edge filters'].g.w).toBe(5);
   });
 
-  it('a deleted row stays deleted across redraws and is dropped on apply', async () => {
+  it('a deleted row stays marked across redraws and is dropped on apply', async () => {
     const t = makeTable();
     t.cache.selectedNodes = ['n1', 'n2'];
     await t.dt.refreshCurrentTab();
     t.dt.handleDeleteRow(0);
     await t.dt.refreshCurrentTab();
-    expect(rows(t.dt)).toEqual(['Node:n2']);
+    // Listed and marked until Apply, so the deletion can be seen and undone.
+    expect(rows(t.dt)).toEqual(['Node:n1', 'Node:n2']);
+    expect(t.table.querySelector('tr[data-key="Node::n1"]').classList.contains('data-row-deleted')).toBe(true);
     const out = t.dt.getUpdatedFileData();
     expect(out.nodes.map((n) => n.id)).toEqual(['n2']);
     // Its edge goes with it, and the user is told.

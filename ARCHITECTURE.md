@@ -2,7 +2,8 @@
 
 A map of how the codebase is organised, for contributors and anyone reading the
 source. For build, version, and commit conventions see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md). For interface patterns (inspector rows, controls,
+the Mixed state) see [DESIGN.md](DESIGN.md).
 
 ## What This Is
 
@@ -112,8 +113,9 @@ Business logic and UI:
   feature that stores something new on the layout is undoable for free
 - `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, IS FOREIGN,
   comparisons)
-- `ui_components.js` — filter UI (dropdown checklists, invertible range sliders),
-  the per-row group chip, tooltips
+- `ui_components.js` — filter UI (category checklists on `RailMenu`, invertible
+  range sliders, boolean segments), the per-row group dot and ⋯ actions menu,
+  the section tri-state checkboxes, tooltips
 - `group_menu.js` — the one group checklist, opened by both assign sites (a filter
   row assigns a property, the Selection panel assigns nodes); built on `RailMenu`
 - `community_menu.js` — the 🧩 Auto-detect configurator (Louvain weighting,
@@ -129,7 +131,17 @@ Business logic and UI:
   re-parents each card to its single home in the rail or the inspector. The Groups
   card is a list (painted by `bubble_sets.renderGroupList`) over ONE settings pane
   rebuilt for the selected row by `buildGroupStylePanel` — a pane per group would
-  be N × ~20 rows of DOM for a surface showing one group at a time
+  be N × ~20 rows of DOM for a surface showing one group at a time. The Nodes /
+  Edges sections bind each control to a style property; `selection.js` calls
+  `refreshStyleControls` on every selection change so they show the selection's
+  shared value or "Mixed"
+- `appearance_controls.js` — the inspector's control primitives (`propRow`, `createButton`,
+  `createInput`, …) and `createAppearanceControls(cache)`: every selection-bound builder
+  (slider, colour, segmented, label, "In selection" chips) plus `refreshStyleControls`.
+  `ui_style_div.js` arranges them into cards
+- `selection_style_values.js` — pure side of that sync: the editor property →
+  style key table (also what `handleStyleChangeEvent` writes), the shared-or-MIXED
+  reduction, the per-colour buckets behind the "In selection" row, label source
 - `metrics.js` — `NetworkMetrics`: degree/betweenness/closeness/eigenvector centrality, PageRank.
   Computed lazily — only while its workbench tab is visible (`setWorkbenchVisible`)
 - `api_client.js` — client for the standalone ingest service
@@ -147,7 +159,8 @@ Business logic and UI:
 - `ui_tooltip.js` — the delegated tooltip layer: strips native `title`s and
   renders them itself, and owns `splitShortcut`, the one parser for the trailing
   "(F)" accelerator the command palette also reads
-- `data_editor.js` — spreadsheet-like data editor (`DataTable`), incl. Excel export
+- `data_editor.js` — spreadsheet-like data editor (`DataTable`): Rows/Type switches, row filter, APG grid keyboard, staged changes with a count bar, Excel import/export
+- `data_editor_forms.js` — the data editor's popovers: + Add menu and its node/edge/column forms, the review list of unsaved changes, the row ⋯ menu
 - `demo_loader.js` — STRING DB protein-interaction demo data
 - `neo4j_loader.js` — Neo4j connector (HTTP transactional Cypher API, no driver dependency)
 - `neo4j_session.js` — Neo4j session extensions: expand selected nodes, merge additional queries

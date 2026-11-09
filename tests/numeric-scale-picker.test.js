@@ -161,3 +161,16 @@ describe("Map by data: what counts as a value", () => {
     await pending;
   });
 });
+
+// The appearance editor's "In selection" row recolours one colour's nodes out
+// of a larger selection: `ids` must limit the write to exactly those.
+describe("updateNodes with ids", () => {
+  it("styles only the given nodes, leaving the rest of the selection alone", async () => {
+    const cache = cacheWith({ A: 1, B: 2, C: 3 });
+    cache.selectedNodes = ["A", "B", "C"];
+    await cache.gcm.updateNodes({ style: { fill: "#123456" } }, [], { ids: ["A", "C"] });
+    expect(cache.nodeRef.get("A").style.fill).toBe("#123456");
+    expect(cache.nodeRef.get("C").style.fill).toBe("#123456");
+    expect(cache.nodeRef.get("B").style.fill).toBeUndefined();
+  });
+});

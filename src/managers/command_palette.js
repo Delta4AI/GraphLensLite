@@ -189,12 +189,11 @@ function collectInspector(out) {
     }
     // A row of inputs is one destination, not one command per field: the label
     // names it and revealing it puts the whole row on screen.
-    for (const label of panel.querySelectorAll('.card-row > label')) {
+    for (const label of panel.querySelectorAll('.prop-row > label')) {
       const row = label.parentElement;
       if (!row.querySelector('input, select')) continue;
-      out.push(
-        command(label, trailFor(label), { glyph: '⚙', kind: 'reveal', el: row, name: clean(label.textContent) })
-      );
+      const name = clean(row.dataset.name ?? label.textContent);
+      out.push(command(label, trailFor(label), { glyph: '⚙', kind: 'reveal', el: row, name }));
     }
   }
   // The activity log sits below both panels, so the loop above cannot see it.
