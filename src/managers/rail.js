@@ -483,9 +483,33 @@ class Rail {
   }
 
   #buildSelectMenu(el) {
-    // The card re-parented in here carries its own "Select Elements" title, so
-    // the menu adds no header of its own — just the mount and the tooltip that
-    // names the split against the inspector's "Act on selection".
+    // Rows that act on the selection you have; ids are what selection.js and
+    // UIManager toggle (`.disabled`) as the selection and its history change.
+    const row = (id, icon, label, title, run, { close = true } = {}) => {
+      const btn = menuItem({ icon, label, title, onClick: close ? this.#closeAnd(run) : run });
+      btn.id = id;
+      btn.classList.add('disabled');
+      return btn;
+    };
+    const lasso = menuItem({
+      icon: '➰',
+      label: 'Lasso',
+      title: 'Drag a freeform area around elements (L, Escape to stop). Without it: drag on empty canvas holding ⇧ to add, Ctrl/⌘ to replace, both to remove',
+      onClick: this.#closeAnd(() => this.cache.ui.toggleLassoSelection()),
+    });
+    lasso.id = 'lassoMenuItem';
+    el.append(
+      row('focusSelectionBtn', '🔍', 'Zoom to selection', 'Center and zoom to the selection',
+        () => this.cache.gcm.focusSelection()),
+      // Undo/redo stay open: stepping back through several selections is one gesture.
+      row('undoSelectionBtn', '↶', 'Undo selection change', 'Go back to the previous selection',
+        () => this.cache.sm.undoSelection(), { close: false }),
+      row('redoSelectionBtn', '↷', 'Redo selection change', 'Go forward to the next selection',
+        () => this.cache.sm.redoSelection(), { close: false }),
+      lasso,
+      menuSeparator()
+    );
+    // The card re-parented in here carries its own "Select Elements" title.
     const mount = document.createElement('div');
     mount.id = 'selectMenuMount';
     mount.title =
@@ -545,6 +569,13 @@ class Rail {
         label: 'CX2 (Cytoscape, NDEx)',
         title: 'Export nodes, edges, properties and positions as CX2 for Cytoscape or NDEx',
         onClick: this.#closeAnd(() => this.cache.io.exportNetwork('cx2')),
+      }),
+      menuSeparator(),
+      menuItem({
+        icon: '⛶',
+        label: 'Presentation mode',
+        title: 'Hide the rail and the inspector for a clean screenshot (⇧F, Escape to exit)',
+        onClick: this.#closeAnd(() => this.cache.ui.togglePresentationMode()),
       })
     );
   }

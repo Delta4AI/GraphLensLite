@@ -47,4 +47,13 @@ describe('rail ◈ Select menu', () => {
     expect(document.getElementById('Select Elements')).not.toBeNull();
     expect(menuFor(rail, 'selectMenuBtn').contains(card)).toBe(true);
   });
+
+  it('hosts the selection rows selection.js enables by id, even before it is opened', () => {
+    const rail = initRail(makeCache());
+    const menu = menuFor(rail, 'selectMenuBtn');
+    for (const id of ['focusSelectionBtn', 'undoSelectionBtn', 'redoSelectionBtn']) {
+      expect(menu.querySelector(`#${id}`), id).not.toBeNull();
+      expect(document.getElementById(id), id).not.toBeNull(); // static: in the document while closed
+    }
+  });
 });

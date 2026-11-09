@@ -155,12 +155,12 @@ const TOUR_STEPS = [
            on GitHub
            <br><strong>Workspace chip</strong> — which workspace you're in, plus live shown/total counts
            <br><strong>↶ ↷</strong> — undo / redo the last change to the workspace
-           (<strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong>). The selection has its own pair, further along
-           <br><strong>⊡ Fit · ↻ Layout · ➰ Lasso · ✨ Hover · ◈ Select · ✎ Note</strong>
-           — the everyday canvas verbs
+           (<strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong>)
+           <br><strong>⊡ Fit · ↻ Layout</strong> — frame the graph, or lay it out again
            <br><strong>⌕ Search</strong> (<strong>Ctrl+K</strong>) — find any control, node or
            property by name. Each result tells you where it lives, so you only have to look it up once
-           <br><strong>Selection chip</strong> — what's selected, with focus, clear and undo/redo
+           <br><strong>Selection chip</strong> — what's selected; click it to select all, by name, with
+           the lasso, zoom to the selection or undo a selection change
            <br><br>
            The <strong>tab strip</strong> opens the main panels:
            <br><br>
@@ -169,9 +169,8 @@ const TOUR_STEPS = [
            <br>📊 <strong>Metrics</strong> — compute network metrics
            <br>🤖 <strong>Assist</strong> — ask natural-language questions about your graph
            <br><br>
-           On the right: <strong>⤓ Export</strong> (PNG, SVG, JSON model, Excel data),
-           <strong>⛶ presentation mode</strong>, the theme toggle, and the <strong>?</strong> keyboard
-           cheat sheet. Each tab stays highlighted while its panel is open.`,
+           On the right: <strong>⤓ Export</strong> (PNG, SVG, JSON model, Excel data, and presentation
+           mode for clean screenshots), the theme toggle, and the <strong>?</strong> keyboard cheat sheet. Each tab stays highlighted while its panel is open.`,
     targets: [{ selector: '#rail' }],
     position: 'below',
   },
@@ -280,15 +279,15 @@ const TOUR_STEPS = [
   {
     title: 'Making a Selection',
     text: `The rail's <strong>selection chip</strong> always shows the live
-           <strong>node</strong> and <strong>edge</strong> counts, with <strong>🔍</strong> (zoom to the selection),
-           <strong class="tour-red">×</strong> (clear it) and <strong>↶</strong> / <strong>↷</strong>
-           (undo / redo selection changes, up to 25 states). It also warns when active filters are hiding
-           part of what you have selected.
+           <strong>node</strong> and <strong>edge</strong> counts, with <strong class="tour-red">×</strong> to clear
+           it. Click the chip for <strong>Zoom to selection</strong> and <strong>Undo / Redo selection change</strong>
+           (up to 25 states). It also warns when active filters are hiding part of what you have selected.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Three ways to build one:
            <br>• <strong>Click</strong> an element on the canvas, <strong>Shift+click</strong> to add more
-           <br>• <strong>➰ Lasso</strong> (L) — drag a freeform area around what you want
-           <br>• <strong>◈ Select ⌄</strong> — all/no nodes, all/no edges, or select by
+           <br>• <strong>Drag</strong> on empty canvas holding <strong>Shift</strong> (add) or <strong>Ctrl/⌘</strong>
+           (replace) to lasso an area, or turn the lasso on with <strong>L</strong> or from the chip
+           <br>• <strong>The chip's menu</strong> — all/no nodes, all/no edges, or select by
            <strong>Node/Edge IDs</strong> or <strong>Labels</strong> with an include/exclude switch
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            The <strong>query editor</strong> can also turn any predicate into a selection with 🎯 Select.`,
@@ -374,10 +373,13 @@ const TOUR_STEPS = [
            <strong>Radius</strong>, <strong>Contrast</strong> and <strong>Threshold</strong> shape it.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Notes</strong> — free text pinned to graph coordinates, so it pans and zooms with the
-           network. Place one with <strong>✎ Note</strong> on the rail, then click the canvas. Drag to
+           network. Place one with <strong>+ Add note</strong> on the Notes row, then click the canvas. Drag to
            move it, double-click (or <strong>Enter</strong>) to edit the text, single-click for its style
            popover — font size and colour, border, background, shadow, and <strong>✗ Delete note</strong>.
            Notes are per workspace and come along in PNG and SVG exports.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           <strong>Hover highlight</strong> — light up an element's neighbours while the pointer rests on it
+           (<strong>H</strong>).
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Minimap</strong> — the overview thumbnail in the bottom-right corner.`,
     targets: [{ selector: '#inspectorOverlays' }, { selector: '#inspectorPillOverlays' }],
