@@ -134,3 +134,14 @@ describe('appearance editor typing', () => {
     expect(cache.gcm.updateNodes).not.toHaveBeenCalled();
   });
 });
+
+describe('appearance editor names', () => {
+  it('gives repeated row labels distinct accessible names', () => {
+    mount([node('a')]);
+    const names = [...document.querySelectorAll('[data-label="Edge Configuration"] .color-hex')]
+      .map((el) => el.getAttribute('aria-label'));
+    expect(names).toContain('Edge color hex');
+    expect(names).toContain('Edge start arrow color hex');
+    expect(new Set(names).size).toBe(names.length);
+  });
+});

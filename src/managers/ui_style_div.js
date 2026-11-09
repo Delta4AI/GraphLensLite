@@ -146,6 +146,10 @@ function propRow(parent, text, tooltip = undefined) {
   // badge): the command palette indexes the row by this fuller name.
   const group = parent.dataset?.propGroup;
   row.dataset.name = group ? `${group} ${text.toLowerCase()}` : text;
+  // The accessible name carries the section and sub-group too: "Color" alone
+  // names six different edge controls ("Edge start arrow color" names one).
+  const section = parent.dataset?.propSection;
+  const fullName = [section, group?.toLowerCase(), text.toLowerCase()].filter(Boolean).join(" ");
   const label = document.createElement("label");
   label.className = "prop-label";
   label.id = `propLabel${++propRowSeq}`;
@@ -154,7 +158,7 @@ function propRow(parent, text, tooltip = undefined) {
   const ctl = document.createElement("div");
   ctl.className = "prop-ctl";
   ctl.dataset.labelId = label.id;
-  ctl.dataset.labelText = text;
+  ctl.dataset.labelText = fullName.charAt(0).toUpperCase() + fullName.slice(1);
   ctl.rowLabel = label;
   row.append(label, ctl);
   parent.appendChild(row);
@@ -178,7 +182,7 @@ function propSubhead(parent, text) {
 function nameControl(parent, control, fallback, suffix = "") {
   const rowText = parent.dataset?.labelText;
   if (rowText && !suffix) {
-    control.setAttribute("aria-labelledby", parent.dataset.labelId);
+    control.setAttribute("aria-label", rowText);
     const label = parent.rowLabel;
     if (label && !label.htmlFor && /^(INPUT|SELECT)$/.test(control.tagName) && control.type !== "range") {
       control.id ||= `${label.id}Control`;
@@ -958,7 +962,8 @@ function createStyleDiv(cache) {
       return run({style: {label: true, labelText: text}});
     };
     const labelInput = createInput(120, "Custom text",
-      `Type a label for the selected ${noun}; Enter or leaving the field applies it.`, undefined, commitText);
+      `Type a label for the selected ${noun}; Enter or leaving the field applies it.`, undefined,
+      (text) => Promise.resolve(commitText(text)).catch(reportButtonFailure));
     labelInput.addEventListener("focus", () => { committedText = labelInput.value.trim(); });
     labelInput.addEventListener("change", () => {
       Promise.resolve(commitText(labelInput.value.trim())).catch(reportButtonFailure);
@@ -969,9 +974,9 @@ function createStyleDiv(cache) {
     parent.appendChild(labelInput);
 
     const sources = [
-      {value: "id", text: "ID", label: `Label the selected ${noun} with their IDs`},
-      {value: "label", text: "Label", label: `Label the selected ${noun} with their predefined labels`},
-      {value: "none", text: "None", label: `Hide the labels of the selected ${noun}`},
+      {value: "id", text: "ID", label: `ID: label the selected ${noun} with their IDs`},
+      {value: "label", text: "Label", label: `Label: use the selected ${noun}' predefined labels`},
+      {value: "none", text: "None", label: `None: hide the labels of the selected ${noun}`},
     ];
     const pick = async (source) => {
       labelInput.value = "";
@@ -1009,7 +1014,8 @@ function createStyleDiv(cache) {
   const FONT_STYLE_OPTIONS = FONT_STYLES.map((value) => ({
     value,
     text: {normal: "Normal", bold: "B", italic: "I", "bold italic": "BI"}[value] ?? value,
-    label: value[0].toUpperCase() + value.slice(1),
+    // Visible text first (WCAG 2.5.3), then what it means.
+    label: {normal: "Normal", bold: "B (bold)", italic: "I (italic)", "bold italic": "BI (bold italic)"}[value] ?? value,
   }));
 
   // Two cards, split by what they need to already have: "Select Elements"
@@ -1154,6 +1160,7 @@ function createStyleDiv(cache) {
 
   function createNodeConfigCard() {
     const nodeDiv = createCard("Node Configuration", undefined, "appearance-card");
+    nodeDiv.dataset.propSection = "Node";
     const D = cache.DEFAULTS;
 
     createNodeShapeControls(propRow(nodeDiv, "Shape"));
@@ -1205,6 +1212,7 @@ function createStyleDiv(cache) {
 
   function createEdgeConfigCard() {
     const edgeDiv = createCard("Edge Configuration", undefined, "appearance-card");
+    edgeDiv.dataset.propSection = "Edge";
     const D = cache.DEFAULTS;
     const E = D.EDGE;
 
@@ -1392,6 +1400,8 @@ function createStyleDiv(cache) {
     // No heading: the pane sits inside the group's own row, which already
     // carries its name, colour and count.
     const name = bs.labelText || group;
+    panel.dataset.propSection = name;
+    delete panel.dataset.propGroup; // the pane is rebuilt per group
 
     // Fill Color
     const rowFillColor = propRow(panel, "Fill color");
@@ -1639,6 +1649,7 @@ function createStyleDiv(cache) {
   // persisted style sliders which commit on `change`.
   function createHeatmapConfigCard() {
     const card = createCard("Density Heatmap");
+    card.dataset.propSection = "Heatmap";
     const layer = () => cache.graph?.heatmapLayer;
     const D = cache.DEFAULTS.HEATMAP;
     // Build-time fallback for the (startup) window where no adapter exists
