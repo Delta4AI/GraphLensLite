@@ -351,7 +351,7 @@ describe('data editor staging rules', () => {
     dt.trackChange('Edge', 'x1::2', 'Edge filters::Bio::W', '1');
     expect(dt.validateNewElements()).toEqual([]);
     dt.deleteRow('Node', 'x1');
-    expect(dt.validateNewElements()).toEqual([expect.stringContaining('needs node "x1"')]);
+    expect(dt.validateNewElements()).toEqual([expect.stringContaining('needs node "x1": restore it')]);
   });
 
   it('marks an edited edge as going with its deleted node', async () => {
@@ -361,6 +361,42 @@ describe('data editor staging rules', () => {
     dt.deleteRow('Node', '1');
     dt.loadTabData();
     expect(dt.tableBody.querySelector('tr[data-key="Edge::1::2"]').classList.contains('data-row-deleted')).toBe(true);
+  });
+
+  it('takes a blocked Apply to the problem row, even in another view', async () => {
+    const dt = mountNumeric();
+    dt.cache.ui.error = vi.fn();
+    await dt.addEdge('3', '1'); // no property value yet
+    await dt.switchTab('allNodes');
+    await dt.update();
+    expect(dt.currentTab).toBe('allEdges');
+    expect(document.activeElement.closest('tr').dataset.key).toBe('Edge::3::1');
+  });
+
+  it('exports only the rows the filter shows', async () => {
+    const dt = mountNumeric();
+    await dt.switchTab('allNodes');
+    dt.filterText = 'N2';
+    expect(dt.getNodesFromTableData().map((n) => n.id)).toEqual([2]);
+  });
+
+  it('counts every Rows and Type segment', async () => {
+    const dt = mountNumeric();
+    await dt.switchTab('allNodes');
+    const count = (sel) => document.querySelector(`${sel} .data-seg-count`).textContent;
+    expect([count('[data-scope="all"]'), count('[data-kind="Both"]')]).toEqual(['3', '4']);
+  });
+
+  it('commits on Shift+Enter instead of typing a newline, and moves up', async () => {
+    const dt = mountNumeric();
+    await dt.switchTab('allNodes');
+    const at = (id) => dt.tableBody.querySelector(`tr[data-key="Node::${id}"] td[data-col="${dt.headers.indexOf(P)}"]`);
+    at(2).focus();
+    key(at(2), 'Enter');
+    at(2).textContent = '8';
+    key(at(2), 'Enter', { shiftKey: true });
+    expect(dt.pendingChanges.get('Node::2').values[P]).toBe('8');
+    expect(document.activeElement).toBe(at(1));
   });
 
   it('brings a row\'s staged edits back when it is restored', async () => {

@@ -138,8 +138,13 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - Subsets of one table are segmented controls with counts (Rows: Selection |
   All; Type: Nodes | Edges | Both), never a row of tabs.
 - The table is an APG grid: one Tab stop, arrow keys between cells, Enter, F2,
-  typing or double-click to edit, Enter commits and moves down, Tab commits
-  and moves right, Escape cancels. The active cell is ringed for the mouse too.
+  typing or double-click to edit, Enter commits and moves down (Shift+Enter
+  up), Tab commits and moves right, Escape cancels. The active cell is ringed
+  for the mouse too. Keys pressed in the grid never reach app shortcuts.
+- Export saves the rows shown (Rows, Type and the filter). Import is blocked
+  (`aria-disabled`, with the reason) while changes are staged; Apply confirms
+  with "Applied N changes"; a blocked Apply moves to the row that blocks it,
+  switching view or clearing the filter if needed.
 - Edits that only reach the graph together are staged and always visible:
   edited cell = amber wash with the old value in its tooltip, new row = green
   with a "New" pill, deleted row = red strikethrough that stays listed with
