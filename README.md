@@ -48,6 +48,8 @@ With Podman, use `podman build --format docker -t graph-lens-lite .` (the `docke
 | GraphML (`.graphml`) | ✓ | ✓ | nodes, edges, typed attributes, labels, positions, edge direction |
 | CX2 (`.cx2`) | ✓ | ✓ | nodes, edges, typed attributes, names, positions |
 
+Save your work with **File › Save as JSON** (or **S**); the JSON model is the only format that keeps everything. Closing the app with unsaved changes asks first.
+
 GraphML and CX2 are for exchange with Cytoscape, Gephi, yEd, NetworkX, igraph and NDEx. Both formats store nodes, edges, attributes and positions. GLL styles, workspaces and groups are not exported, and visual styles in an imported file are skipped with a notice. On import, attributes go to the *Uncategorized Properties* group; an attribute named `score [omics]` goes to group *omics*, as with Excel column headers.
 
 ## Features

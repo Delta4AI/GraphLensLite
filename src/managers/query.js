@@ -1,5 +1,6 @@
 import { Popup } from '../utilities/popup.js';
 import { StaticUtilities } from '../utilities/static.js';
+import { hotkeyLabel } from './command_palette.js';
 
 // A filter is "narrowed" when it deviates from its default (loaded) state:
 // a categorical with fewer than all values selected, or a slider whose bounds
@@ -199,8 +200,14 @@ class QueryAST {
   }
 }
 
+// How long an error message waits for the typing to pause before it is
+// rewritten (and announced) again.
+const STATUS_SETTLE_MS = 800;
+
 class QueryManager {
   #validationTimer = 0;
+  #statusTimer = 0;
+  #appliedText = '';
 
   constructor(cache) {
     this.cache = cache;
@@ -553,8 +560,8 @@ class QueryManager {
 
   /**
    * Empty the query BOX. It deliberately does not re-apply: the graph keeps
-   * whatever the last applied query did to it, and ⟳ Sync (resetQuery) is the
-   * control that hands filtering back to the filter panel. The button says
+   * whatever the last applied query did to it, and Reset to filters
+   * (resetToFilters) is the control that hands filtering back to the panel. The button says
    * "Clear text" for that reason — as plain "Clear" it read as "un-filter".
    */
   clearQuery() {
@@ -666,9 +673,11 @@ class QueryManager {
     } else {
       this.cache.data.layouts[this.cache.data.selectedLayout]['query'] = undefined;
     }
+    this.updateQueryStatus();
   }
 
   async handleQueryUpdateEvent() {
+    if (this.cache.query.valid === false) return; // Ctrl+Enter reaches here past the disabled button
     this.cache.EVENT_LOCKS.QUERY_UPDATE_EVENT = true;
     this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
     try {
@@ -686,6 +695,7 @@ class QueryManager {
   }
 
   async handleQuerySelectEvent() {
+    if (this.cache.query.valid === false) return;
     await this.cache.ui.showLoading('Updating Selection', `Modifying selection from query`);
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
@@ -931,6 +941,79 @@ class QueryManager {
     el.focus();
   }
 
+  /** The render pass just rebuilt the graph from the box's current text. */
+  markApplied() {
+    this.#appliedText = this.cache.query.text?.textContent ?? '';
+    this.updateQueryStatus();
+  }
+
+  /**
+   * The query toolbar's status line: is the box's text what the graph shows
+   * (Synced, or Applied when it locks the panel), an unapplied edit, or
+   * broken? Every render pass filters by the text in the box, so "applied"
+   * is exactly "the text the last pass read" (markApplied).
+   */
+  updateQueryStatus() {
+    const status = document.querySelector('.query-status');
+    const text = this.cache.query.text?.textContent ?? '';
+    if (!status) return;
+    const locked = !!this.cache.EVENT_LOCKS?.FILTERS_LOCKED_BY_MANUAL_QUERY;
+    let state, pill, message;
+    if (this.cache.query.valid === false && text.trim()) {
+      [state, pill, message] = ['error', 'Error', `${this.#queryProblem()} Fix the highlighted part to filter or select.`];
+    } else if (text.trim() === this.#appliedText.trim()) {
+      [state, pill, message] = locked
+        ? ['applied', 'Applied', 'Filtering the graph · the filter panel is locked']
+        : ['synced', 'Synced', 'Matches the filter panel'];
+    } else if (!text.trim()) {
+      [state, pill, message] = ['edited', 'Edited', 'Empty · the graph keeps the last applied query'];
+    } else {
+      const replaced = locked ? '' : ' · a filter panel change replaces it';
+      [state, pill, message] = ['edited', 'Edited', `Not applied · ${hotkeyLabel('Enter')} filters the graph${replaced}`];
+    }
+    // A role=status line: write only what changed, and let an error message
+    // settle while the user is still typing the word it names.
+    clearTimeout(this.#statusTimer);
+    const write = () => {
+      status.dataset.state = state;
+      status.querySelector('.query-status-pill').textContent = pill;
+      status.querySelector('.query-status-text').textContent = message;
+    };
+    if (status.dataset.state === state && status.querySelector('.query-status-text').textContent === message) return;
+    if (state === 'error' && status.dataset.state === 'error') this.#statusTimer = setTimeout(write, STATUS_SETTLE_MS);
+    else write();
+  }
+
+  /** The first problem the highlighter marked, in words. */
+  #queryProblem() {
+    const overlay = this.cache.query.overlay;
+    // The highlighter marks a whole unparsed chunk, keywords included; naming
+    // "AND" as unrecognised would send the user after the wrong word.
+    const unrecognized = [...new Set(
+      [...(overlay?.querySelectorAll('.q-error-unrecognized') ?? [])].map((el) => el.textContent.trim())
+    )].filter((t) => t && !/^(AND|OR|NOT)$/i.test(t));
+    if (unrecognized.length) {
+      const shown = unrecognized.slice(0, 3).join(', ');
+      return `Not recognised: ${shown}${unrecognized.length > 3 ? ', …' : ''}.`;
+    }
+    if (overlay?.querySelector('.q-error-unmatched-opening-bracket, .q-error-unmatched-closing-bracket'))
+      return 'A bracket is not closed.';
+    if (overlay?.querySelector('.q-error-empty-instruction')) return 'Empty brackets ().';
+    if (overlay?.querySelector('.q-error-missing-connector')) return 'AND or OR is missing between two brackets.';
+    return 'The query does not parse. Conditions go in (brackets).';
+  }
+
+  /**
+   * Hand filtering back to the panel. When a query was filtering the graph the
+   * panel's filters have to be re-applied too, or the graph keeps the query's
+   * result under an unlocked panel.
+   */
+  async resetToFilters() {
+    if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) await this.cache.ui.unlockFiltersAndResetQuery();
+    else this.resetQuery();
+    this.updateQueryStatus();
+  }
+
   resetQuery() {
     delete this.cache.data.layouts[this.cache.data.selectedLayout]['query'];
     this.cache.query.text.textContent = '';
@@ -968,20 +1051,20 @@ class QueryManager {
 
 <div class="alert-warning">
   <strong>⚠️ Important:</strong> Using the filtering UI panel or adding/modifying bubble groups will automatically
-  overwrite the this.cache.query. Any custom logic (AND/NOT operators, nested brackets) will be cleared and replaced
-  with the UI-generated this.cache.query.
+  overwrite the query. Any custom logic (AND/NOT operators, nested brackets) will be cleared and replaced
+  with the UI-generated query.
 </div>
 <div class="alert-info">
   <strong>💡 Tip:</strong> Queries are saved for each workspace and included when exporting the model 💾
 </div>
 
 <h3>Available Actions</h3>
-<p><strong>Header buttons:</strong></p>
+<p><strong>Toolbar</strong> (the line on its left says whether the box matches the filter panel, holds an unapplied edit, is filtering the graph, or has an error):</p>
 <ul>
-  <li><span class="tooltip-dummy-buttons green">🔍 Filter</span> - Apply the query to filter the graph</li>
-  <li><span class="tooltip-dummy-buttons blue">🎯 Select</span> - Select all matching elements (without filtering)</li>
-  <li><span class="tooltip-dummy-buttons pink">⟳ Sync</span> - Sync query with current UI panel settings</li>
-  <li><span class="tooltip-dummy-buttons red">✗ Clear text</span> - Empty the box; the graph keeps the last applied query until you press ⟳ Sync</li>
+  <li><strong>Filter graph</strong> (<kbd>Ctrl</kbd>+<kbd>Enter</kbd> in the box) - Hide everything the query does not match. This locks the filter panel</li>
+  <li><strong>Select matches</strong> - Select all matching elements without hiding anything</li>
+  <li><strong>Reset to filters</strong> - Drop the edited query, unlock the filter panel and filter the graph by the panel again</li>
+  <li><strong>Clear text</strong> - Empty the box; the graph keeps the last applied query</li>
 </ul>
 <p><strong>Filtering panel:</strong></p>
 <ul>

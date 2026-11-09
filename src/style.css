@@ -12,20 +12,20 @@
    ========================================================================== */
 :root {
     --bg: #ffffff;
-    --surface: #f4f4f4;
-    --surface-2: #f0eff4;
-    --surface-3: #e4e3ea;
-    --card-wash: #E4E3EA80;
-    --row-hover: #e6f3ff;
-    --surface-translucent: rgba(244, 244, 244, 0.85);
+    --surface: #f4f5f8;
+    --surface-2: #eef0f4;
+    --surface-3: #e2e5ec;
+    --card-wash: #e2e5ec80;
+    --row-hover: #e8ecfb;
+    --surface-translucent: rgba(244, 245, 248, 0.85);
     --input-bg: #ffffff;
-    --text: #000000;
-    --text-strong: #333333;
-    --text-muted: #666666;
-    --text-faint: #888888;
-    --border: #cccccc;
-    --border-soft: #dddbe2;
-    --border-strong: #000000;
+    --text: #0e1016;
+    --text-strong: #262a35;
+    --text-muted: #586070;
+    --text-faint: #7d8494;
+    --border: #c6cbd5;
+    --border-soft: #dfe2e9;
+    --border-strong: #1d212b;
     --brand-text: #403C53;
     --brand-border: #403C53;
     --accent-text: #C33D35;
@@ -272,7 +272,9 @@ body {
 /* On-state (lasso active, hover highlight enabled). `.highlight` is kept for
    the workbench tabs that still use it; rail buttons all speak `.active`. */
 .rail-vb.highlight,
-.rail-vb.active {
+.rail-vb.active,
+.rail-vb[aria-expanded="true"],
+.rail-selchip-btn[aria-expanded="true"] {
     background: var(--surface-3);
     border-color: var(--accent-text);
 }
@@ -325,7 +327,7 @@ body {
     align-items: center;
     gap: 5px;
     height: 34px;
-    padding: 0 6px 0 10px;
+    padding: 0 4px 0 2px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--input-bg);
@@ -338,6 +340,74 @@ body {
 .rail-selchip.live {
     border-color: var(--accent-text);
     color: var(--text);
+}
+
+/* The chip's main part is the Selection menu's button; × clear sits beside it
+   and only while something is selected. */
+.rail-selchip-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 6px 0 8px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.rail-selchip-btn:hover {
+    background: var(--surface-3);
+}
+
+.rail-selchip-car {
+    color: var(--text-faint);
+}
+
+.rail-selchip:not(.live) #clearSelectionBtn {
+    display: none;
+}
+
+#selectMenuMount {
+    padding: 0 8px;
+}
+
+.rail-menu [aria-pressed="true"] .rail-menu-label {
+    color: var(--accent-text);
+    font-weight: 600;
+}
+
+/* No keyboard to press them on: key badges inside buttons go. */
+@media (hover: none) {
+    button kbd {
+        display: none;
+    }
+}
+
+/* Presentation mode's way out where there is no Escape key (touch, phones). */
+#presentationExitBtn {
+    display: none;
+}
+
+@media (max-width: 760px), (hover: none) {
+    body.presentation #presentationExitBtn {
+        display: block;
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: var(--z-modal);
+        height: 32px;
+        padding: 0 12px;
+        border: 1px solid var(--brand-border);
+        border-radius: 6px;
+        background: var(--brand-border);
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+    }
 }
 
 .rail-selchip-counts,
@@ -744,14 +814,6 @@ body {
     text-overflow: ellipsis;
 }
 
-.panel-header-center-buttons {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-width: 0;
-}
-
 .panel-header-buttons {
     flex: 0 0 auto;
     display: flex;
@@ -775,6 +837,65 @@ body {
     min-width: 20px;
     height: 20px;
     flex-shrink: 0;
+}
+
+/* The stage's line for an active pointer mode (lasso, placing a note), with
+   its own Done/Cancel: phones have no L or Escape key. */
+.mode-hint {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--z-armed-overlay);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 4px 4px 12px;
+    border: 1px solid var(--brand-border);
+    border-radius: 6px;
+    background: var(--brand-border);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.mode-hint-done {
+    pointer-events: auto;
+    height: 24px;
+    padding: 0 10px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+    background: none;
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.mode-hint-done:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.mode-hint[hidden] {
+    display: none;
+}
+
+.layer-row .layer-row-action {
+    margin-left: auto;
+    height: 20px;
+    padding: 0 8px;
+    font-size: 11px;
+}
+
+.layer-row .layer-row-action.active {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+/* A tab without help hides ⓘ; display:flex above would otherwise keep it. */
+.panel-header-btn[hidden] {
+    display: none;
 }
 
 .panel-header-btn:hover {
@@ -1255,6 +1376,20 @@ body {
 }
 
 /* --- Selection context: empty state vs live state --- */
+.sel-hidden-note {
+    margin: 12px 0 0;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent-text);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-strong);
+}
+
+.sel-hidden-note[hidden] {
+    display: none;
+}
+
 .insp-empty {
     margin-top: 14px;
 }
@@ -3024,7 +3159,7 @@ h5 {
 .filter-unlock-btn {
     background-color: #403C53;
     color: white;
-    border: 1px solid #000;
+    border: 1px solid var(--border-strong);
     border-radius: 3px;
     padding: 4px 8px;
     cursor: pointer;
@@ -3343,35 +3478,6 @@ hr {
 
 .tooltip-description {
     margin: 1px;
-}
-
-.tooltip-dummy-buttons {
-    background-color: #403C53;
-    border: 1px solid var(--border-strong);
-    border-radius: 5px;
-    color: white;
-    padding-left: 4px;
-    padding-right: 4px;
-}
-
-.tooltip-dummy-buttons.red {
-    background-color: #C33D35;
-    color: white;
-}
-
-.tooltip-dummy-buttons.blue {
-    background-color: #8CA6D9;
-    color: var(--text);
-}
-
-.tooltip-dummy-buttons.pink {
-    background-color: #EFB0AA;
-    color: var(--text);
-}
-
-.tooltip-dummy-buttons.green {
-    background-color: #015C0C;
-    color: white;
 }
 
 .black {
@@ -5010,106 +5116,6 @@ div[slider] > input[type=range]::-ms-tooltip {
     background: var(--input-bg);
 }
 
-.panel-header-center-buttons .query-buttons {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.panel-header-center-buttons .query-buttons button {
-    height: 24px;
-    cursor: pointer;
-    border-radius: 3px;
-    color: #fff;
-    border: 1px solid rgba(0, 0, 0, 0.3);
-    background-color: #015C0C;
-    font-size: 11px;
-    white-space: nowrap;
-    padding: 2px 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.panel-header-center-buttons .query-buttons button:hover {
-    border-color: rgba(255, 255, 255, 0.6);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.panel-header-center-buttons .query-buttons button:active {
-    transform: translateY(0);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-.panel-header-center-buttons .query-buttons button:disabled {
-    background-color: #2a2733;
-    cursor: not-allowed;
-    opacity: 0.5;
-    color: var(--text-faint);
-    box-shadow: none;
-    transform: none;
-}
-
-.panel-header-center-buttons .query-buttons button.red {
-    background-color: #C33D35 !important;
-    color: white !important;
-}
-
-.panel-header-center-buttons .query-buttons button.red:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .query-buttons button.pink {
-    background-color: #EFB0AA !important;
-    color: black !important;
-}
-
-.panel-header-center-buttons .query-buttons button.pink:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .query-buttons button.blue {
-    background-color: #8CA6D9 !important;
-    color: black !important;
-}
-
-.panel-header-center-buttons .query-buttons button.blue:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .query-buttons button.grey {
-    background-color: #9998AF !important;
-    color: black !important;
-}
-
-.panel-header-center-buttons .query-buttons button.grey:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .query-buttons button.green {
-    background-color: #015C0C !important;
-    color: white !important;
-}
-
-.panel-header-center-buttons .query-buttons button.green:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .query-buttons button.purple {
-    background-color: #015C0C !important;
-    color: white !important;
-}
-
-.panel-header-center-buttons .query-buttons button.purple:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
 /* ==========================================================================
    Data editor (Workbench › Data). Toolbar: Rows | Type switches, filter, count,
    then + Add / Import / Export at the right. The table is an APG grid: one Tab
@@ -5126,6 +5132,7 @@ div[slider] > input[type=range]::-ms-tooltip {
 }
 
 .data-toolbar,
+.wb-toolbar,
 .data-changes {
     display: flex;
     align-items: center;
@@ -5136,7 +5143,8 @@ div[slider] > input[type=range]::-ms-tooltip {
     font-size: 12px;
 }
 
-.data-toolbar {
+.data-toolbar,
+.wb-toolbar {
     border-bottom: 1px solid var(--border-soft);
 }
 
@@ -5144,7 +5152,85 @@ div[slider] > input[type=range]::-ms-tooltip {
     flex: 1;
 }
 
+/* Query and Assistant panes: the tab's toolbar on top, its content below. */
+#queryPane:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+#queryPane #queryEditor {
+    height: auto;
+    min-height: 0;
+}
+
+/* The text box hides its outline for the custom caret, which blinks; the
+   frame carries the focus cue instead. */
+#queryPane:has(#queryTextArea:focus-visible) {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
+}
+
+.wb-toolbar-sep {
+    width: 1px;
+    height: 16px;
+    align-self: center;
+    background: var(--border-soft);
+}
+
+/* What the query box is doing to the graph: Synced / Edited / Applied / Error. */
+.query-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--text-muted);
+}
+
+.query-status-pill {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+    padding: 0 6px;
+    border: 1px solid currentColor;
+    border-radius: 6px;
+}
+
+.query-status-pill:empty {
+    display: none;
+}
+
+.query-status[data-state="edited"] .query-status-pill {
+    color: var(--text-strong);
+    background: var(--edited-wash);
+    border-color: var(--edited-line);
+}
+
+/* Applied is the state that changes what the graph shows: the only filled pill. */
+.query-status[data-state="applied"] .query-status-pill {
+    color: #fff;
+    background: var(--brand-border);
+    border-color: var(--brand-border);
+}
+
+.query-status[data-state="error"] .query-status-pill,
+.query-status[data-state="error"] .query-status-text {
+    color: var(--danger-text);
+}
+
+.query-status[data-state="error"] .query-status-pill {
+    background: var(--deleted-wash);
+}
+
+.query-status code {
+    font-family: "Courier New", monospace;
+}
+
 .data-toolbar .insp-btn,
+.wb-toolbar .insp-btn,
 .data-changes .insp-btn,
 .data-add-form .insp-btn,
 .data-empty .insp-btn,
@@ -5195,7 +5281,8 @@ div[slider] > input[type=range]::-ms-tooltip {
     color: #fff;
 }
 
-.insp-btn:disabled {
+.insp-btn:disabled,
+.insp-btn[aria-disabled="true"] {
     opacity: 0.5;
     cursor: not-allowed;
     border-color: var(--border-soft);
@@ -5210,7 +5297,6 @@ div[slider] > input[type=range]::-ms-tooltip {
     background: var(--surface-3);
     border-color: var(--border-soft);
     color: var(--text-muted);
-    font-weight: 400;
 }
 
 .data-table-wrapper {
@@ -5629,6 +5715,12 @@ div[slider] > input[type=range]::-ms-tooltip {
     padding: 14px 16px;
 }
 
+.tour-phone-note {
+    margin: 8px 0 0;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-soft);
+}
+
 .tour-body code {
     background: var(--surface-2);
     padding: 1px 5px;
@@ -5959,7 +6051,7 @@ div[slider] > input[type=range]::-ms-tooltip {
 
 .assistant-bubble-assistant {
     background-color: var(--surface-3);
-    color: #222;
+    color: var(--text);
     align-self: flex-start;
     border-bottom-left-radius: 2px;
 }
@@ -6280,7 +6372,7 @@ div[slider] > input[type=range]::-ms-tooltip {
 
 .assistant-bubble-queries {
     background-color: var(--surface-2);
-    color: #222;
+    color: var(--text);
     align-self: stretch;
     border: 1px solid #d8d4e8;
     padding: 8px 10px;
@@ -6699,7 +6791,8 @@ div[slider] > input[type=range]::-ms-tooltip {
 }
 
 #assistantSendBtn {
-    background-color: #403C53;
+    background-color: var(--brand-border);
+    font-weight: 600;
     color: #fff;
     border: none;
     border-radius: 4px;
@@ -6792,7 +6885,7 @@ div[slider] > input[type=range]::-ms-tooltip {
     min-height: 1.2em;
     font-size: 0.78rem;
     line-height: 1.3;
-    color: #777;
+    color: var(--text-muted);
 }
 
 .assistant-settings-status[data-kind="checking"] {
@@ -7626,4 +7719,160 @@ div[slider] > input[type=range]::-ms-tooltip {
     border-bottom-width: 2px;
     border-radius: 4px;
     white-space: nowrap;
+}
+
+/* ==========================================================================
+   Narrow windows. 761–860px: the full rail fits once its spacing tightens.
+   ≤760px (phones): the graph takes the whole width under a five-control bar
+   (File, workspace, undo/redo, ▤ Panel, ⋯ More); the inspector becomes a
+   bottom sheet (body[data-sheet] = half | full) that the workbench shares —
+   inspector.js and workbench.js open one at a time. The 760px figure is
+   repeated in inspector.js (isPhone).
+   ========================================================================== */
+.rail-phone-only {
+    display: none !important;
+}
+
+@media (max-width: 860px) {
+    #rail {
+        gap: 3px;
+        padding: 0 6px;
+    }
+
+    #rail > .rail-div {
+        display: none;
+    }
+}
+
+@media (max-width: 760px) {
+    .rail-phone-only {
+        display: flex !important;
+    }
+
+    #rail > :not(#appMenuBtn, #workspaceChip, .rail-hist, .rail-phone-only) {
+        display: none !important;
+    }
+
+    #rail .rail-wschip {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .rail-panel-count {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--accent-text);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Every rail menu drops down full width under the bar, whichever control
+       opened it (⋯ More reaches menus whose own anchor is hidden). */
+    .rail-menu {
+        left: 8px !important;
+        right: 8px;
+        top: 56px !important;
+        max-height: calc(100dvh - 64px);
+    }
+
+    /* Half height shares the screen with the stage (the graph resizes into
+       the top half); full height covers it. */
+    body[data-sheet="half"] #mainContent {
+        flex-direction: column;
+    }
+
+    body[data-sheet="half"] #outerGraphContainer {
+        min-height: 0;
+    }
+
+    #inspector {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: auto;
+        min-width: 0;
+        height: 55dvh;
+        z-index: calc(var(--z-workbench) + 1);
+        border-left: none;
+        border-top: 1px solid var(--border);
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.18);
+    }
+
+    body:not([data-sheet]) #inspector {
+        display: none;
+    }
+
+    body[data-sheet="half"] #inspector {
+        position: static;
+        flex: 0 0 55dvh;
+    }
+
+    .mode-hint {
+        white-space: normal;
+        max-width: calc(100% - 24px);
+        width: max-content;
+        text-align: center;
+    }
+
+    #innerGraphContainer .gll-minimap {
+        transform: scale(0.6);
+        transform-origin: bottom right;
+    }
+
+    body[data-sheet="full"] #inspector {
+        height: calc(100dvh - 52px);
+    }
+
+    .inspector-resize-handle {
+        display: none;
+    }
+
+    .insp-pills-row {
+        position: relative;
+        padding-top: 28px;
+    }
+
+    .sheet-grab {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 88px;
+        height: 28px;
+        padding: 0;
+        border: none;
+        background: none;
+        cursor: pointer;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .sheet-grab::before {
+        content: "";
+        width: 36px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--text-faint);
+    }
+
+    .sheet-close {
+        margin-left: auto;
+        width: 40px;
+        height: 40px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        background: none;
+        color: var(--text-strong);
+        font-size: 18px;
+        cursor: pointer;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .sheet-close:hover {
+        background: var(--surface-3);
+        border-color: var(--border);
+    }
 }

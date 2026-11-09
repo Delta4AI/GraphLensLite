@@ -340,6 +340,7 @@ function createAppearanceControls(cache) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.textContent = text;
+      btn.dataset.value = value;
       btn.setAttribute("aria-pressed", "false");
       if (label) {
         btn.setAttribute("aria-label", label);

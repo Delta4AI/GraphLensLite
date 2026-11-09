@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { initWorkbench, TAB_NAMES } from '../src/managers/workbench.js';
 
 // ==========================================================================
@@ -17,15 +18,12 @@ function workbenchDom() {
         <div class="resize-handle"></div>
         <div class="panel-header">
           <span id="workbenchTitle"></span>
-          <div class="query-buttons"></div>
-          <div class="data-toolbar" style="display: none;"></div>
-          <div class="assistant-buttons" style="display: none;"></div>
           <button id="workbenchHelpBtn"></button>
           <button id="workbenchExpandBtn" aria-pressed="false">⤢</button>
           <button id="workbenchCloseBtn"></button>
         </div>
         <div class="wb-content">
-          <div id="queryEditor" class="wb-pane"></div>
+          <div id="queryPane" class="wb-pane"></div>
           <div id="dataEditor" class="wb-pane" hidden></div>
           <div id="metricsContainer" class="wb-pane" hidden></div>
           <div id="assistantPane" class="wb-pane" hidden></div>
@@ -50,7 +48,7 @@ function makeCache() {
   };
 }
 
-const paneOf = { data: 'dataEditor', query: 'queryEditor', metrics: 'metricsContainer', assistant: 'assistantPane' };
+const paneOf = { data: 'dataEditor', query: 'queryPane', metrics: 'metricsContainer', assistant: 'assistantPane' };
 const visible = (tab) => !document.getElementById(paneOf[tab]).hasAttribute('hidden');
 const highlighted = (id) => document.getElementById(id).classList.contains('highlight');
 
@@ -101,8 +99,10 @@ describe('workbench tabs', () => {
 
     const el = document.getElementById('workbench');
     const before = parseFloat(el.style.height);
+    const valueBefore = Number(handle.getAttribute('aria-valuenow'));
     handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
     expect(parseFloat(el.style.height)).toBeGreaterThan(before);
+    expect(Number(handle.getAttribute('aria-valuenow'))).toBeGreaterThan(valueBefore);
 
     handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     expect(parseFloat(el.style.height)).toBe(before);
@@ -139,13 +139,14 @@ describe('workbench tabs', () => {
     expect(TAB_NAMES.some((t) => highlighted(`${t}ToggleBtn`))).toBe(false);
   });
 
-  it('swaps the tab-scoped toolbar with the tab', () => {
-    wb.show('query');
-    expect(document.querySelector('.query-buttons').style.display).toBe('flex');
-    expect(document.querySelector('.data-toolbar').style.display).toBe('none');
-    wb.show('data');
-    expect(document.querySelector('.query-buttons').style.display).toBe('none');
-    expect(document.querySelector('.data-toolbar').style.display).toBe('flex');
+  it('keeps every tab toolbar inside its own pane, so it shows and hides with the tab', () => {
+    const shell = new DOMParser().parseFromString(
+      readFileSync('src/graph_lens_lite.html', 'utf8'), 'text/html');
+    // The data toolbar is rendered by DataTable into its pane at runtime.
+    for (const spec of Object.values(wb.tabs).filter((t) => t.toolbar && t.pane !== 'dataEditor')) {
+      expect(shell.getElementById(spec.pane)?.querySelector(spec.toolbar), spec.title).not.toBeNull();
+    }
+    expect(shell.querySelector('#workbench .panel-header button:not(.panel-header-btn)')).toBeNull();
   });
 
   it('routes the help button to the open tab, and hides it where there is no help', () => {

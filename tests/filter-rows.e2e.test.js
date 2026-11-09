@@ -85,5 +85,5 @@ describe.skipIf(!E2E)('filter rows, end to end', () => {
     expect(await page.evaluate(([prop, name]) => window.cache.selectedNodes.some(
       (n) => String(window.cache.nodeRef.get(n.id ?? n).featureValues.get(prop)) === name), [CLUSTER, valueName]))
       .toBe(false);
-  });
+  }, 60_000); // a full Electron interaction runs ~4.7s, at vitest's 5s default
 });

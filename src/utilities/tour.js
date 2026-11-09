@@ -1,4 +1,5 @@
 import { Popup } from './popup.js';
+import { isPhone } from '../managers/inspector.js';
 
 // Gap between a tour popup and the viewport edge or the element it explains.
 const POPUP_MARGIN = 16;
@@ -150,17 +151,17 @@ const TOUR_STEPS = [
     title: 'The Rail',
     text: `Everything session-level lives on the <strong>rail</strong> at the top:
            <br><br>
-           <strong>The logo</strong>, far left — the app menu: load data (Excel, JSON, or the STRING
-           database), download the Excel template, take this tour, start over, or open the project
-           on GitHub
+           <strong>📂 File</strong>, far left — open data (Excel, JSON, GraphML, CX2, the STRING database
+           or Neo4j), <strong>Save as JSON</strong> (<strong>S</strong>) to keep everything, download the
+           Excel template, take this tour or start over. Closing with unsaved changes asks first
            <br><strong>Workspace chip</strong> — which workspace you're in, plus live shown/total counts
            <br><strong>↶ ↷</strong> — undo / redo the last change to the workspace
-           (<strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong>). The selection has its own pair, further along
-           <br><strong>⊡ Fit · ↻ Layout · ➰ Lasso · ✨ Hover · ◈ Select · ✎ Note</strong>
-           — the everyday canvas verbs
+           (<strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong>)
+           <br><strong>⊡ Fit · ↻ Layout</strong> — frame the graph, or lay it out again
            <br><strong>⌕ Search</strong> (<strong>Ctrl+K</strong>) — find any control, node or
            property by name. Each result tells you where it lives, so you only have to look it up once
-           <br><strong>Selection chip</strong> — what's selected, with focus, clear and undo/redo
+           <br><strong>Selection chip</strong> — what's selected; click it to select all, by name, with
+           the lasso, zoom to the selection or undo a selection change
            <br><br>
            The <strong>tab strip</strong> opens the main panels:
            <br><br>
@@ -169,9 +170,10 @@ const TOUR_STEPS = [
            <br>📊 <strong>Metrics</strong> — compute network metrics
            <br>🤖 <strong>Assist</strong> — ask natural-language questions about your graph
            <br><br>
-           On the right: <strong>⤓ Export</strong> (PNG, SVG, JSON model, Excel data),
-           <strong>⛶ presentation mode</strong>, the theme toggle, and the <strong>?</strong> keyboard
-           cheat sheet. Each tab stays highlighted while its panel is open.`,
+           On the right: <strong>⤓ Export</strong> (PNG, SVG, JSON model, Excel data, and presentation
+           mode for clean screenshots), the theme toggle, and the <strong>?</strong> keyboard cheat sheet. Each tab stays highlighted while its panel is open.`,
+    phoneNote: `The bar keeps File, the workspace, undo/redo, <strong>▤ Panel</strong> (the inspector, with the
+           selection count) and <strong>⋯ More</strong>, which lists everything else by name.`,
     targets: [{ selector: '#rail' }],
     position: 'below',
   },
@@ -273,25 +275,26 @@ const TOUR_STEPS = [
            <br>• <strong>Click + drag a node</strong> — moves that node
            <br>• <strong>Click + drag selected nodes</strong> — moves the entire selection
            <br><br>
-           The <strong>minimap</strong> (bottom-right corner) shows an overview of the entire graph. Click or drag inside it to quickly navigate to different parts of the network — the inspector's <strong>Overlays</strong> tab hides it, along with everything else drawn over the graph. For a chrome-free screenshot, <strong>⛶ presentation mode</strong> (⇧F) hides the rail and the inspector.`,
+           The <strong>minimap</strong> (bottom-right corner) shows an overview of the entire graph. Click or drag inside it to quickly navigate to different parts of the network — the inspector's <strong>Overlays</strong> tab hides it, along with everything else drawn over the graph. For a chrome-free screenshot, <strong>presentation mode</strong> (<strong>⤓ Export</strong> menu, or ⇧F) hides the rail and the inspector.`,
     targets: [{ selector: '#innerGraphContainer' }, { selector: '.gll-minimap' }],
     position: 'left',
   },
   {
     title: 'Making a Selection',
     text: `The rail's <strong>selection chip</strong> always shows the live
-           <strong>node</strong> and <strong>edge</strong> counts, with <strong>🔍</strong> (zoom to the selection),
-           <strong class="tour-red">×</strong> (clear it) and <strong>↶</strong> / <strong>↷</strong>
-           (undo / redo selection changes, up to 25 states). It also warns when active filters are hiding
-           part of what you have selected.
+           <strong>node</strong> and <strong>edge</strong> counts, with <strong class="tour-red">×</strong> to clear
+           it. Click the chip for <strong>Zoom to selection</strong> and <strong>Undo / Redo selection change</strong>
+           (up to 25 states). It also warns when active filters are hiding part of what you have selected.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Three ways to build one:
            <br>• <strong>Click</strong> an element on the canvas, <strong>Shift+click</strong> to add more
-           <br>• <strong>➰ Lasso</strong> (L) — drag a freeform area around what you want
-           <br>• <strong>◈ Select ⌄</strong> — all/no nodes, all/no edges, or select by
+           <br>• <strong>Drag</strong> on empty canvas holding <strong>Shift</strong> (add) or <strong>Ctrl/⌘</strong>
+           (replace) to lasso an area, or turn the lasso on with <strong>L</strong> or from the chip
+           <br>• <strong>The chip's menu</strong> — all/no nodes, all/no edges, or select by
            <strong>Node/Edge IDs</strong> or <strong>Labels</strong> with an include/exclude switch
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           The <strong>query editor</strong> can also turn any predicate into a selection with 🎯 Select.`,
+           The <strong>query editor</strong> can also turn any predicate into a selection with <strong>Select matches</strong>.`,
+    phoneNote: `The chip's menu is <strong>⋯ More › Selection…</strong>; <strong>▤ Panel</strong> shows the counts.`,
     targets: [{ selector: '#selectionChip' }, { selector: '#selectMenuBtn' }],
     position: 'below',
   },
@@ -374,10 +377,13 @@ const TOUR_STEPS = [
            <strong>Radius</strong>, <strong>Contrast</strong> and <strong>Threshold</strong> shape it.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Notes</strong> — free text pinned to graph coordinates, so it pans and zooms with the
-           network. Place one with <strong>✎ Note</strong> on the rail, then click the canvas. Drag to
+           network. Place one with <strong>+ Add note</strong> on the Notes row, then click the canvas. Drag to
            move it, double-click (or <strong>Enter</strong>) to edit the text, single-click for its style
            popover — font size and colour, border, background, shadow, and <strong>✗ Delete note</strong>.
            Notes are per workspace and come along in PNG and SVG exports.
+           <hr style="margin:6px 0;border-color:var(--border-soft);">
+           <strong>Hover highlight</strong> — light up an element's neighbours while the pointer rests on it
+           (<strong>H</strong>).
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Minimap</strong> — the overview thumbnail in the bottom-right corner.`,
     targets: [{ selector: '#inspectorOverlays' }, { selector: '#inspectorPillOverlays' }],
@@ -446,13 +452,11 @@ const TOUR_STEPS = [
            The query <strong>syncs with the filter panel</strong> — changing filters updates the query text, and vice versa.
            When you manually edit the query, filters get <strong>locked</strong> (🔒) to prevent conflicts.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">🔍 Filter</span> — apply the query to filter the graph (hide non-matching elements)
-           <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">🎯 Select</span> — apply the query to select matching elements without filtering
-           <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#EFB0AA;border:1px solid rgba(0,0,0,0.3);">⟳ Sync</span> — reset the query to match the current filter panel state
-           <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#C33D35;border:1px solid rgba(0,0,0,0.3);">✗ Clear text</span> — empty the box (⟳ Sync is what hands filtering back to the panel)
+           The toolbar's status line tells you whether the box matches the filter panel, holds an edit you have not applied, or is filtering the graph.
+           <br><strong>Filter graph</strong> (<kbd>Ctrl</kbd>+<kbd>Enter</kbd>) — hide everything the query does not match
+           <br><strong>Select matches</strong> — select the matching elements without hiding anything
+           <br><strong>Reset to filters</strong> — drop the edited query and let the filter panel drive the graph again
+           <br><strong>Clear text</strong> — empty the box; the graph keeps the last applied query
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Each filter row's <strong>⋯</strong> menu has <strong>📝 Add to query</strong>: it <strong>appends</strong> that filter's current range or category selection as a query fragment — a quick way to build complex queries from existing filters.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
@@ -468,7 +472,7 @@ const TOUR_STEPS = [
            <br>• <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">📝 Open in query editor</span> drops it into the editor for review
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Setup &amp; privacy</strong>
-           <br>The assistant talks to an <strong>Ollama</strong> server you control, local by default. Every message ships a snapshot of the current graph state, so use a local endpoint for sensitive data. Click <strong>⚙ Settings</strong> in the workbench toolbar to configure the endpoint and pick a model. Results vary by model. Tested with <code>qwen3.5:9b</code>.
+           <br>The assistant talks to an <strong>Ollama</strong> server you control, local by default. Every message ships a snapshot of the current graph state, so use a local endpoint for sensitive data. Click <strong>⚙ Settings</strong> at the top of the assistant pane to configure the endpoint and pick a model. Results vary by model. Tested with <code>qwen3.5:9b</code>.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            The <strong>budget pill</strong> at the bottom shows how much of the model's context window the next request will consume. Click it for a per-section breakdown.`,
     targets: [{ selector: '#workbench' }, { selector: '#assistantToggleBtn' }],
@@ -527,14 +531,17 @@ class GuidedTour {
 
     const step = TOUR_STEPS[this.currentStep];
 
+    const phone = isPhone();
+    if (phone) this.syncSheet(step);
+
     // execute pre-step action
     if (step.action) {
       await this.executeAction(step.action);
     }
 
-    // create overlay + highlights
-    const targets = step.targets || (step.target ? [{ selector: step.target }] : []);
+    const targets = this.resolveTargets(step, phone);
     const selectors = targets.map((t) => t.selector);
+    const inSheet = phone && selectors.some((sel) => document.querySelector(sel)?.closest('#inspector'));
 
     this.createOverlay(selectors);
     for (const t of targets) {
@@ -550,6 +557,12 @@ class GuidedTour {
     const body = document.createElement('div');
     body.className = 'tour-body';
     body.innerHTML = step.text;
+    if (phone && step.phoneNote) {
+      const note = document.createElement('p');
+      note.className = 'tour-phone-note';
+      note.innerHTML = `<strong>On a narrow screen:</strong> ${step.phoneNote}`;
+      body.appendChild(note);
+    }
     content.appendChild(body);
 
     // --- footer ---
@@ -636,7 +649,9 @@ class GuidedTour {
       const el = document.querySelector(primaryTarget.selector);
       rect = el ? this.getClippedRect(el) : null;
       if (rect) {
-        const pos = this.computePopupPosition(rect, step.position || 'below');
+        // The sheet spans the screen's width, so a popup beside it has no room.
+        const position = inSheet ? 'above' : step.position || 'below';
+        const pos = this.computePopupPosition(rect, position);
         if (step.positionOffset) {
           pos.x += step.positionOffset.x || 0;
           pos.y += step.positionOffset.y || 0;
@@ -649,7 +664,32 @@ class GuidedTour {
     if (this.popup.overlay) {
       this.popup.overlay.style.background = 'transparent';
     }
-    if (rect && step.position === 'above') this.placeAbove(this.popup.popup, rect.top);
+    if (rect && inSheet) this.placeAbove(this.popup.popup, document.getElementById('inspector').getBoundingClientRect().top);
+    else if (rect && step.position === 'above') this.placeAbove(this.popup.popup, rect.top);
+  }
+
+  /** On a phone the inspector is a sheet: open for the steps that explain it, closed for the rest. */
+  syncSheet(step) {
+    const targets = step.targets || (step.target ? [{ selector: step.target }] : []);
+    if (targets.some((t) => document.querySelector(t.selector)?.closest('#inspector'))) {
+      this.cache.inspector?.openSheet?.('half');
+    } else {
+      this.cache.inspector?.closeSheet?.();
+    }
+  }
+
+  /**
+   * The step's targets as they are on screen now. On a phone a rail control
+   * the bar hides is shown through ⋯ More, which lists it. A target that still
+   * has no box is dropped rather than outlined at 0,0.
+   */
+  resolveTargets(step, phone) {
+    const targets = step.targets || (step.target ? [{ selector: step.target }] : []);
+    const shown = (sel) => (document.querySelector(sel)?.getClientRects().length ?? 0) > 0;
+    const resolved = targets.map((t) =>
+      phone && !shown(t.selector) && document.querySelector(t.selector)?.closest('#rail') ? { selector: '#railMoreBtn' } : t
+    );
+    return resolved.filter((t, i) => shown(t.selector) && resolved.findIndex((o) => o.selector === t.selector) === i);
   }
 
   /**
@@ -878,6 +918,7 @@ class GuidedTour {
 
   finish() {
     this.cleanup();
+    if (isPhone()) this.cache.inspector?.closeSheet?.();
 
     // Put the shell back the way a fresh load leaves it.
     this.cache.workbench?.close();

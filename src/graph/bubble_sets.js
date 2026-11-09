@@ -45,7 +45,7 @@ const GROUP_STYLE_FIELDS = Object.freeze({
   'Label Background Color': { field: 'labelBackgroundFill', kind: 'color' },
   'Label Fill Color': { field: 'labelFill', kind: 'color' },
   'Label Font Size': { field: 'labelFontSize', kind: 'slider' },
-  'Label Font Style': { field: 'labelFontStyle', kind: 'select' },
+  'Label Font Style': { field: 'labelFontStyle', kind: 'segments', read: (v) => v ?? 'normal' },
   'Label Close To Path': { field: 'labelCloseToPath', kind: 'switch' },
   'Label Auto Rotate': { field: 'labelAutoRotate', kind: 'switch' },
   'Label Offset X': { field: 'labelOffsetX', kind: 'slider' },
@@ -402,6 +402,11 @@ class GraphBubbleSetManager {
           if (numInput) numInput.value = value;
           break;
         }
+        case 'segments':
+          for (const btn of el.querySelectorAll('button[data-value]')) {
+            btn.setAttribute('aria-pressed', String(btn.dataset.value === value));
+          }
+          break;
         default:
           // color, text and select are all plain valued inputs.
           if (value != null) el.value = value;

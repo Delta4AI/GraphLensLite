@@ -801,6 +801,10 @@ async function executeNeo4jImport(cache, config, deps = {}) {
     // Only now is the connection form done with: cancelling the checklist used
     // to leave the user with a closed popup and a password to retype.
     if (!exclusions) return false;
+    // Asked here, before the connection form closes and not only inside
+    // applyGraph: a refusal there would still get the Neo4j label stamped over
+    // the graph that stays.
+    if (!(await (cache.dataTable?.confirmDiscard() ?? true))) return false;
     deps.onFetched?.();
 
     let rendered = false;

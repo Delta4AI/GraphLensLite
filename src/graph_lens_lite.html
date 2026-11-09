@@ -109,27 +109,23 @@
     <button id="historyRedoBtn" class="rail-mini disabled" aria-label="Redo"
             title="Nothing to redo" onclick="cache.history.redo()">↷</button>
   </div>
+  <!-- Phone layout only (≤760px): the inspector as a bottom sheet, and the
+       controls the narrow bar hides. -->
+  <button id="panelToggleBtn" class="rail-vb rail-phone-only" aria-expanded="false" aria-controls="inspector"
+          title="Panel — filters, overlays and the selection" onclick="cache.inspector.toggleSheet()">
+    <span class="rail-vb-g" aria-hidden="true">▤</span><span class="visually-hidden">Panel</span><span class="rail-panel-count"></span>
+  </button>
+  <button id="railMoreBtn" class="rail-vb rail-phone-only" aria-label="More"
+          title="More — fit, layout, search, selection, workbench, export, theme">
+    <span class="rail-vb-g">⋯</span>
+  </button>
   <div class="rail-div"></div>
-  <button class="rail-vb" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">
+  <button id="fitBtn" class="rail-vb" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">
     <span class="rail-vb-g">⊡</span><span class="rail-vb-t">Fit</span>
   </button>
   <button id="relayoutBtn" class="rail-vb"
           title="Layout — re-layout the workspace, remove overlaps, hide disconnected elements">
     <span class="rail-vb-g">↻</span><span class="rail-vb-t"><span id="layoutTypeLabel">Layout</span> ⌄</span>
-  </button>
-  <button id="lassoToggleBtn" class="rail-vb" title="Toggle lasso selection: drag to select elements. Without it, drag on empty canvas holding ⇧ to add, Ctrl/⌘ to replace, both to remove (L)" onclick="cache.ui.toggleLassoSelection()">
-    <span class="rail-vb-g">➰</span><span class="rail-vb-t">Lasso</span>
-  </button>
-  <button id="hoverToggleBtn" class="rail-vb active" title="Disable hover highlight effect (H)" onclick="cache.ui.toggleHoverEffect(this)">
-    <span class="rail-vb-g">✨</span><span class="rail-vb-t">Hover</span>
-  </button>
-  <button id="selectMenuBtn" class="rail-vb"
-          title="Select — all/no nodes and edges, or select by ID or label">
-    <span class="rail-vb-g">◈</span><span class="rail-vb-t">Select ⌄</span>
-  </button>
-  <button id="noteToggleBtn" class="rail-vb" title="Place a text note: click the canvas to place, drag to move, double-click to edit, single-click for style and delete"
-          onclick="cache.ui.startTextAnnotation()">
-    <span class="rail-vb-g">✎</span><span class="rail-vb-t">Note</span>
   </button>
   <!-- With the verbs, not after the selection chip: search acts on the whole
        workspace like they do, and the chip's width changes with the selection,
@@ -139,22 +135,23 @@
     <span class="rail-vb-g">⌕</span><span class="rail-vb-t">Search</span>
   </button>
   <div class="rail-div"></div>
+  <!-- The chip is the selection's one home: it shows what is selected and opens
+       everything that builds, walks back or frames a selection (Rail #buildSelectMenu). -->
   <div id="selectionChip" class="rail-selchip">
-    <span class="rail-selchip-empty">Nothing selected</span>
-    <span class="rail-selchip-counts">
-      <strong id="selectedNodes">0</strong>&nbsp;nodes <span class="rail-selchip-sep">·</span>
-      <strong id="selectedEdges">0</strong>&nbsp;edges
-    </span>
-    <button id="focusSelectionBtn" class="rail-chip-btn disabled" title="Center and zoom to the selection"
-            aria-label="Center and zoom to the selection" onclick="cache.gcm.focusSelection()">🔍</button>
-    <button id="clearSelectionBtn" class="rail-chip-btn red disabled" title="Clear selection"
-            aria-label="Clear selection" onclick="cache.sm.clearSelection()">×</button>
+    <button id="selectMenuBtn" class="rail-selchip-btn"
+            title="Selection — select all or none, by ID or label, or with the lasso; zoom to it; undo a selection change">
+      <span class="rail-selchip-empty">Nothing selected</span>
+      <span class="rail-selchip-counts">
+        <strong id="selectedNodes">0</strong>&nbsp;nodes <span class="rail-selchip-sep">·</span>
+        <strong id="selectedEdges">0</strong>&nbsp;edges
+      </span>
+      <span class="rail-selchip-car" aria-hidden="true">⌄</span>
+    </button>
     <span id="selectionHiddenWarning" class="rail-selchip-warning" style="display: none;"
           title="Filters currently hide part of your selection. Hidden elements stay selected, but actions only touch visible ones."></span>
-    <button id="undoSelectionBtn" class="rail-chip-btn disabled" title="Undo selection"
-            aria-label="Undo selection" onclick="cache.sm.undoSelection()">↶</button>
-    <button id="redoSelectionBtn" class="rail-chip-btn disabled" title="Redo selection"
-            aria-label="Redo selection" onclick="cache.sm.redoSelection()">↷</button>
+    <button id="clearSelectionBtn" class="rail-chip-btn red disabled" title="Clear selection"
+            aria-label="Clear selection" aria-disabled="true"
+            onclick="cache.sm.clearSelection(); document.getElementById('selectMenuBtn').focus()">×</button>
   </div>
   <span class="rail-spacer"></span>
   <div class="rail-tabs">
@@ -181,43 +178,25 @@
           title="Export — PNG, SVG, JSON model, Excel data (P: PNG, S: JSON)">
     <span class="rail-vb-g">⤓</span><span class="rail-vb-t">Export</span>
   </button>
-  <!-- Presentation mode is app chrome, not an overlay: it hides the shell
-       rather than drawing anything over the graph, so it sits with the other
-       chrome toggles. No state glyph — the rail is gone while it is on.
-       ⛶ is this codebase's fullscreen mark everywhere else (popup.js,
-       interactions.js, core.js, ui_components.js), so it belongs on the button
-       with no text label. Fit, which is labelled "Fit", took ⊡ in exchange. -->
-  <button id="presentationToggleBtn" class="rail-mini" aria-label="Presentation mode"
-          title="Presentation mode — hide the rail and the inspector for a clean screenshot (⇧F, Escape to exit)"
-          onclick="cache.ui.togglePresentationMode()">⛶</button>
   <button id="darkModeToggleBtn" class="rail-mini" aria-label="Switch to dark mode" title="Switch to dark mode" onclick="cache.ui.toggleDarkMode()">🌙</button>
   <button id="keyboardSheetBtn" class="rail-mini" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onclick="cache.ui.toggleKeyboardSheet()">?</button>
 </header>
+<button type="button" id="presentationExitBtn" onclick="cache.ui.togglePresentationMode()">✕ Exit presentation</button>
 <div id="mainContent">
   <div id="outerGraphContainer">
     <div id="innerGraphContainer"></div>
     <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+    <!-- Always rendered, so a mode change is announced; the visible line below repeats it. -->
+    <span id="modeStatus" class="visually-hidden" role="status"></span>
+    <div id="modeHint" class="mode-hint" hidden>
+      <span class="mode-hint-text" aria-hidden="true"></span>
+      <button type="button" class="mode-hint-done" onclick="cache.ui.leaveMode()"></button>
+    </div>
     <section id="workbench" aria-label="Workbench" hidden>
       <div class="resize-handle"></div>
       <div class="panel-header panel-header-full-width">
         <span id="workbenchTitle" class="panel-header-text">Query Editor</span>
-        <div class="panel-header-center-buttons">
-          <div class="query-buttons">
-            <button id="queryUpdateBtn" class="purple disabled" onclick="cache.qm.handleQueryUpdateEvent()"
-                    title="Apply the query to filter the graph">🔍 Filter</button>
-            <button id="querySelectBtn" class="blue disabled" onclick="cache.qm.handleQuerySelectEvent()"
-                    title="Apply the query to select nodes in the graph without filtering">🎯 Select</button>
-            <button id="queryResetBtn" class="pink" onclick="cache.qm.resetQuery();" title="Reset query to match UI filters">⟳ Sync</button>
-            <button id="queryClearBtn" class="red" onclick="cache.qm.clearQuery();"
-                    title="Empty the query text. The graph stays as it is — use ⟳ Sync to hand it back to the filters">✗ Clear text</button>
-          </div>
-          <div class="assistant-buttons" style="display: none;">
-            <button id="assistantSettingsBtn" class="green" title="Configure the endpoint and model"
-                    onclick="cache.assistant.openSettings()">⚙ Settings</button>
-            <button id="assistantClearBtn" class="red" title="Clear the conversation"
-                    onclick="cache.assistant.clearHistory()">🗑 Clear</button>
-          </div>
-        </div>
+        <span class="data-gap"></span>
         <div class="panel-header-buttons">
           <button id="workbenchHelpBtn" class="panel-header-btn info-btn" title="Display query editor help" onclick="cache.qm.showQueryHelp();">🛈</button>
           <button id="workbenchExpandBtn" class="panel-header-btn" title="Expand to full height"
@@ -227,16 +206,39 @@
         </div>
       </div>
       <div class="wb-content">
-        <div id="queryEditor" class="editor-panel wb-pane">
-          <div id="queryOverlay" aria-hidden="true"></div>
-          <div id="queryTextArea" contenteditable="true" spellcheck="false" oninput="cache.qm.handleQueryValidationEvent();"></div>
-          <div id="queryCaret" class="custom-caret"></div>
+        <div id="queryPane" class="editor-panel wb-pane">
+          <div class="query-toolbar wb-toolbar">
+            <span class="query-status" role="status"><span class="query-status-pill"></span><span class="query-status-text"></span></span>
+            <span class="data-gap"></span>
+            <button type="button" id="queryClearBtn" class="insp-btn" onclick="cache.qm.clearQuery();"
+                    title="Empty the query box. The graph stays as it is">Clear text</button>
+            <button type="button" id="queryResetBtn" class="insp-btn" onclick="cache.qm.resetToFilters();"
+                    title="Drop the edited query, unlock the filter panel and filter the graph by the panel again">Reset to filters</button>
+            <span class="wb-toolbar-sep" aria-hidden="true"></span>
+            <button type="button" id="querySelectBtn" class="insp-btn" onclick="cache.qm.handleQuerySelectEvent()"
+                    title="Select the matching elements without hiding anything">Select matches</button>
+            <button type="button" id="queryUpdateBtn" class="insp-btn primary" onclick="cache.qm.handleQueryUpdateEvent()"
+                    aria-keyshortcuts="Control+Enter Meta+Enter"
+                    title="Hide everything the query does not match (Ctrl+Enter or ⌘Enter in the box). Locks the filter panel">Filter graph</button>
+          </div>
+          <div id="queryEditor">
+            <div id="queryOverlay" aria-hidden="true"></div>
+            <div id="queryTextArea" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true"
+                 aria-label="Query" aria-keyshortcuts="Control+Enter Meta+Enter" oninput="cache.qm.handleQueryValidationEvent();"></div>
+            <div id="queryCaret" class="custom-caret"></div>
+          </div>
         </div>
         <div id="dataEditor" class="editor-panel wb-pane" hidden>
           <div id="dataTableContainer"></div>
         </div>
         <div id="metricsContainer" class="wb-pane" hidden></div>
         <div id="assistantPane" class="wb-pane" hidden>
+          <div class="assistant-toolbar wb-toolbar">
+            <span class="data-gap"></span>
+            <button type="button" id="assistantSettingsBtn" class="insp-btn" title="Configure the endpoint and model"
+                    onclick="cache.assistant.openSettings()">⚙ Settings</button>
+            <button type="button" id="assistantClearBtn" class="insp-btn" onclick="cache.assistant.clearHistory()">Clear conversation</button>
+          </div>
           <div id="assistantMessages"></div>
           <div id="assistantEmptyState">
             <div class="assistant-empty-state-title">Graph Assistant</div>
@@ -271,6 +273,8 @@
   <aside id="inspector">
     <div class="inspector-resize-handle"></div>
     <div class="insp-pills-row">
+      <button type="button" class="sheet-grab rail-phone-only" aria-label="Taller panel"
+              onclick="cache.inspector.cycleSheet()"></button>
       <div class="insp-pills" role="tablist" aria-label="Inspector context">
       <button id="inspectorPillFilters" class="insp-pill active" role="tab" aria-selected="true"
               aria-controls="inspectorFilters" tabindex="0"
@@ -282,6 +286,8 @@
               aria-controls="inspectorSelection" tabindex="-1"
               title="Everything that acts on the current selection: actions, arrange, appearance">Selection</button>
       </div>
+      <button type="button" class="sheet-close rail-phone-only" aria-label="Close panel"
+              onclick="cache.inspector.closeSheet()">×</button>
     </div>
     <div id="inspectorBody">
       <section id="inspectorFilters" class="insp-panel" role="tabpanel" tabindex="0"
@@ -298,11 +304,20 @@
                aria-labelledby="inspectorPillOverlays" hidden>
         <div id="inspectorLayerCards"></div>
         <div class="layer-row">
+          <button type="button" id="hoverToggleBtn" class="layer-switch" role="switch" aria-checked="true"
+                  aria-label="Hover highlight" title="Highlight an element's neighbours while the pointer rests on it (H)"
+                  onclick="cache.ui.toggleHoverEffect(this)"></button>
+          <span class="layer-title">Hover highlight</span>
+        </div>
+        <div class="layer-row">
           <button type="button" id="overlaySwitchNotes" class="layer-switch disabled" role="switch"
                   aria-checked="false" aria-disabled="true" aria-label="Notes"
-                  title="Show or hide every text note (place a new one with ✎ Note on the rail)"
+                  title="Show or hide every text note"
                   onclick="cache.ui.toggleOverlay('notes')"></button>
           <span class="layer-title">Notes</span>
+          <button type="button" id="noteToggleBtn" class="insp-btn layer-row-action" aria-pressed="false"
+                  title="Place a text note: click the canvas to place, drag to move, double-click to edit, single-click for style and delete"
+                  onclick="cache.ui.startTextAnnotation()">+ Add note</button>
         </div>
         <div class="layer-row">
           <button type="button" id="overlaySwitchMinimap" class="layer-switch disabled" role="switch"
@@ -315,6 +330,7 @@
 
       <section id="inspectorSelection" class="insp-panel" role="tabpanel" tabindex="0"
                aria-labelledby="inspectorPillSelection" hidden>
+        <p id="selectionHiddenNote" class="sel-hidden-note" role="status" hidden></p>
         <div class="insp-empty">
           <div class="insp-empty-title">Nothing selected</div>
           <div class="insp-empty-hint">Click an element on the canvas, or:</div>
@@ -323,8 +339,8 @@
                     title="Drag a freeform area around the elements you want (L)"
                     onclick="cache.ui.toggleLassoSelection()">➰ Lasso <kbd>L</kbd></button>
             <button type="button" class="insp-btn"
-                    title="Open the rail's Select menu: all/no nodes, all/no edges, or by ID or label"
-                    onclick="document.getElementById('selectMenuBtn').click()">◈ By name or ID</button>
+                    title="Open the selection chip's menu: all/no nodes, all/no edges, or by ID or label"
+                    onclick="cache.rail.openSelectionMenu(this)">◈ By name or ID</button>
             <button type="button" class="insp-btn"
                     title="Write a predicate over any property and turn it into a selection"
                     onclick="cache.ui.toggleQueryEditor()">📝 Query editor</button>

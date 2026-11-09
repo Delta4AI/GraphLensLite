@@ -6,6 +6,8 @@
  * height.
  */
 
+import { isPhone } from './inspector.js';
+
 // Per-tab remembered height, keyed by tab name. Ergonomics rather than workspace
 // content, so it lives in localStorage and not in the workspace JSON.
 const HEIGHT_KEY = 'gll.workbench.heights';
@@ -13,11 +15,13 @@ const MIN_HEIGHT_PX = 120;
 const KEYBOARD_RESIZE_STEP_PX = 24;
 const KEYBOARD_RESIZE_COARSE = 4; // Shift+arrow, for crossing the stage quickly
 const DEFAULT_HEIGHT_FRACTION = 0.35;
+// A phone's toolbars wrap to several lines; at 0.35 a table had room for less than one row.
+const PHONE_HEIGHT_FRACTION = 0.6;
 
 /**
- * Static per-tab wiring. `pane` and `toolbar` are shown/hidden together; the
- * rail `btn` gets `.highlight` while its tab is the visible one. Visibility
- * side effects (metrics' lazy compute gate, the assistant's budget poller)
+ * Static per-tab wiring. Each `toolbar` lives inside its `pane` (the command
+ * palette indexes its controls); the rail `btn` gets `.highlight` while its
+ * tab is the visible one. Visibility side effects (metrics' lazy compute gate, the assistant's budget poller)
  * are NOT here — they live on the managers that own that state, reached
  * through #notify.
  */
@@ -32,8 +36,8 @@ const TABS = {
   },
   query: {
     title: 'Query Editor',
-    pane: 'queryEditor',
-    toolbar: '.query-buttons',
+    pane: 'queryPane',
+    toolbar: '.query-toolbar',
     btn: 'queryToggleBtn',
     help: (cache) => cache.qm.showQueryHelp(),
     helpTitle: 'Display query editor help',
@@ -46,7 +50,7 @@ const TABS = {
   assistant: {
     title: 'Graph Assistant',
     pane: 'assistantPane',
-    toolbar: '.assistant-buttons',
+    toolbar: '.assistant-toolbar',
     btn: 'assistantToggleBtn',
   },
 };
@@ -100,14 +104,14 @@ class Workbench {
 
     this.tab = name;
     this.el.removeAttribute('hidden');
+    // On a phone the inspector is a bottom sheet on the same edge: one at a time.
+    if (isPhone()) this.cache.inspector?.closeSheet?.();
     this.#applyHeight();
 
     for (const [other, spec] of Object.entries(TABS)) {
       const active = other === name;
       const pane = document.getElementById(spec.pane);
       pane?.toggleAttribute('hidden', !active);
-      const toolbar = spec.toolbar && document.querySelector(spec.toolbar);
-      if (toolbar) toolbar.style.display = active ? 'flex' : 'none';
       const tabBtn = document.getElementById(spec.btn);
       tabBtn?.classList.toggle('highlight', active);
       // The class is the only thing that said "this tab is the open one";
@@ -178,7 +182,7 @@ class Workbench {
   #currentHeight() {
     const stage = this.#stageHeight();
     // ⤢ takes the whole stage; the drag handle is the way to a partial view.
-    return this.expanded ? stage : (this.heights[this.tab] ?? stage * DEFAULT_HEIGHT_FRACTION);
+    return this.expanded ? stage : (this.heights[this.tab] ?? stage * (isPhone() ? PHONE_HEIGHT_FRACTION : DEFAULT_HEIGHT_FRACTION));
   }
 
   #applyHeight() {
@@ -194,6 +198,14 @@ class Workbench {
   #setHeight(height) {
     this.el.style.height = `${height}px`;
     this.el.parentElement?.style.setProperty('--workbench-height', `${height}px`);
+    // A focusable separator must report its value: the share of the stage the panel takes.
+    const handle = this.el.querySelector('.resize-handle');
+    const stage = this.#stageHeight();
+    if (handle && stage > 0) {
+      const percent = Math.round((height / stage) * 100);
+      handle.setAttribute('aria-valuenow', String(percent));
+      handle.setAttribute('aria-valuetext', `${percent}% of the graph area`);
+    }
   }
 
   #clamp(height) {
@@ -229,6 +241,8 @@ class Workbench {
     handle.setAttribute('role', 'separator');
     handle.setAttribute('aria-orientation', 'horizontal');
     handle.setAttribute('aria-label', 'Resize the workbench');
+    handle.setAttribute('aria-valuemin', '0');
+    handle.setAttribute('aria-valuemax', '100');
     handle.tabIndex = 0;
     handle.addEventListener('keydown', (e) => {
       const step = KEYBOARD_RESIZE_STEP_PX * (e.shiftKey ? KEYBOARD_RESIZE_COARSE : 1);

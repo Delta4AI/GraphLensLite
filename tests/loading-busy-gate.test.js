@@ -212,4 +212,12 @@ describe("hotkey handler — gated on ui.isBusy()", () => {
     await pressKey("s", modifiers);
     expect(exportJSON).not.toHaveBeenCalled();
   });
+
+  // The data editor's grid: a read-only cell has focus, not a text field.
+  it("leaves keys typed in a grid to the grid", async () => {
+    document.body.innerHTML = '<table role="grid"><tbody><tr><td tabindex="0">n1</td></tr></tbody></table>';
+    document.querySelector("td").focus();
+    await pressKey("s");
+    expect(exportJSON).not.toHaveBeenCalled();
+  });
 });
