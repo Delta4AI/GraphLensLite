@@ -2,7 +2,6 @@ import {StaticUtilities} from "../utilities/static.js";
 import {attachCommunityMenu} from "./community_menu.js";
 import {BADGE_SLOTS, summarizeBadges} from "../graph/badges.js";
 import {safePaint} from "../graph/shape_textures.js";
-import {FONT_STYLES} from "../graph/label_renderers.js";
 import {
   createAppearanceControls,
   setButtonFailureReporter,
@@ -760,16 +759,22 @@ function createStyleDiv(cache) {
 
     const rowFontStyle = propRow(panel, "Style");
     rowFontStyle.parentElement.classList.add(optionalCSSClass);
-    const fontStyleDropdown = document.createElement("select");
-    fontStyleDropdown.className = "prop-select";
-    fontStyleDropdown.dataset.property = `Bubble Set ${group} Label Font Style`;
-    fontStyleDropdown.setAttribute("aria-label", `Label font style for "${name}"`);
-    for (const v of FONT_STYLES) fontStyleDropdown.appendChild(new Option(v, v));
-    fontStyleDropdown.value = bs.labelFontStyle ?? "normal";
-    fontStyleDropdown.onchange = async () => {
-      await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Font Style`, fontStyleDropdown.value);
+    // The same segmented B / I control as the selection's label style. A group
+    // row is not a selection style, so its pressed state is kept here.
+    const fontStyleProperty = `Bubble Set ${group} Label Font Style`;
+    const pressFontStyle = (value) => {
+      for (const btn of fontStyleSeg.querySelectorAll("button[data-value]")) {
+        btn.setAttribute("aria-pressed", String(btn.dataset.value === value));
+      }
     };
-    rowFontStyle.appendChild(fontStyleDropdown);
+    const fontStyleSeg = createSegmentedControls(rowFontStyle, fontStyleProperty, "normal", FONT_STYLE_OPTIONS, {
+      onPick: async (value) => {
+        await cache.bs.updateBubbleSetStyle(fontStyleProperty, value);
+        pressFontStyle(value);
+      },
+    });
+    fontStyleSeg.dataset.property = fontStyleProperty;
+    pressFontStyle(bs.labelFontStyle ?? "normal");
 
     // Label Close To Path
     const rowClosePath = propRow(panel, "Hug outline", "Keep the label close to the outline's path.");

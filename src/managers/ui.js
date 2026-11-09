@@ -257,7 +257,7 @@ class UIManager {
 
   toggleStyleElementsThatRequireAtLeastOneSelectedNodeOrEdge(enable) {
     this.toggleDisabledElements(
-      ['resetSelectedElementsStyleBtn', 'focusSelectionBtn', 'clearSelectionBtn'],
+      ['resetSelectedElementsStyleBtn', 'focusSelectionBtn', 'clearSelectionBtn', 'clearSelectionMenuItem'],
       enable
     );
   }
@@ -303,6 +303,7 @@ class UIManager {
       const elem = document.getElementById(elemID);
       if (elem) {
         enable ? elem.classList.remove('disabled') : elem.classList.add('disabled');
+        elem.setAttribute('aria-disabled', String(!enable));
       } else {
         this.debug('Element not found: ' + elemID);
       }
@@ -472,6 +473,9 @@ class UIManager {
       'Reload'
     );
     if (confirmed) {
+      // Already confirmed: the unload guard must not ask a second time.
+      this.cache.history?.markSaved();
+      this.cache.dataTable?.reset();
       location.reload();
     }
   }
@@ -488,7 +492,11 @@ class UIManager {
         if (e.key === 'Escape') this.togglePresentationMode();
       };
       document.addEventListener('keydown', this._presentationEscape, true);
-      this.info('Presentation mode — press Escape or ⇧F to bring the interface back');
+      this.info(
+        globalThis.matchMedia?.('(hover: none)').matches
+          ? 'Presentation mode — tap ✕ Exit presentation to bring the interface back'
+          : 'Presentation mode — press Escape or ⇧F to bring the interface back'
+      );
     } else if (this._presentationEscape) {
       document.removeEventListener('keydown', this._presentationEscape, true);
       this._presentationEscape = null;
@@ -497,9 +505,8 @@ class UIManager {
   }
 
   async toggleLassoSelection() {
-    const lassoBtn = document.getElementById('lassoToggleBtn');
-    const enableLasso = !lassoBtn.classList.contains('active');
-    lassoBtn.classList.toggle('active', enableLasso);
+    if (!this.cache.graph) return;
+    const enableLasso = !this.cache.graph.isInteractionEnabled('lasso');
 
     // The lasso overlay owns the pointer while active (camera pan and node
     // drag are swallowed by it); tooltip clicks are routed away too. Hover
@@ -507,8 +514,42 @@ class UIManager {
     this.cache.graph.setInteractionEnabled('lasso', enableLasso);
     this.cache.graph.setInteractionEnabled('drag', !enableLasso);
     this.cache.graph.setInteractionEnabled('tooltip', !enableLasso);
+    this.syncModeHint();
+  }
 
-    this.info(enableLasso ? 'Switched to lasso selection mode' : 'Switched to click and drag mode');
+  /**
+   * The stage's line for a mode that changes what a click or drag does. The
+   * lasso and note tools have no rail button of their own, so this is the one
+   * place that says they are on and how to leave them.
+   */
+  syncModeHint() {
+    const hint = document.getElementById('modeHint');
+    if (!hint) return;
+    const placingNote = !!this.cache.graph?.annotationLayer?.placementOverlay;
+    const lasso = !!this.cache.graph?.isInteractionEnabled?.('lasso');
+    // Key names mean nothing on a touch screen; the button is the way out there.
+    const keys = !globalThis.matchMedia?.('(hover: none)').matches;
+    let text = '';
+    if (placingNote) text = `Placing a note · click the canvas${keys ? ' · Escape to cancel' : ''}`;
+    else if (lasso) text = `Lasso · drag around the elements to select${keys ? ' · L or Escape to stop' : ''}`;
+    const textEl = hint.querySelector('.mode-hint-text');
+    if (textEl) textEl.textContent = text;
+    const status = document.getElementById('modeStatus');
+    if (status) status.textContent = text;
+    const done = hint.querySelector('.mode-hint-done');
+    if (done) done.textContent = placingNote ? 'Cancel' : 'Done';
+    hint.hidden = !text;
+    const item = document.getElementById('lassoMenuItem');
+    item?.setAttribute('aria-pressed', String(lasso));
+    const label = item?.querySelector('.rail-menu-label');
+    if (label) label.textContent = lasso ? 'Stop lasso' : 'Lasso';
+  }
+
+  /** The mode line's Done / Cancel. */
+  leaveMode() {
+    const layer = this.cache.graph?.annotationLayer;
+    if (layer?.placementOverlay) layer.cancelPlacement();
+    else if (this.cache.graph?.isInteractionEnabled('lasso')) this.toggleLassoSelection();
   }
 
   /**
@@ -531,13 +572,15 @@ class UIManager {
     // brings its own layer back rather than failing quietly.
     if (!layer.visible) this.setOverlayVisible('notes', true);
     layer.armPlacement();
-    this.info('Click the canvas to place a text note — Escape to cancel');
   }
 
   /** The armed look on the note button. Driven from the layer, which owns every
    * route out of placement (the placing click, Escape, hiding the layer). */
   setNotePlacementActive(active) {
-    document.getElementById('noteToggleBtn')?.classList.toggle('active', active);
+    const btn = document.getElementById('noteToggleBtn');
+    btn?.classList.toggle('active', active);
+    btn?.setAttribute('aria-pressed', String(active));
+    this.syncModeHint();
   }
 
   // What a manual query freezes. Folding a group, switching Node/Edge, the
@@ -735,15 +778,9 @@ class UIManager {
     if (btn) this.#paintHoverToggle(btn, !this.cache.CFG.DISABLE_HOVER_EFFECT);
   }
 
-  /**
-   * The on/off look for the rail's Hover button. Plain `.active`, like the
-   * lasso and note buttons beside it — the old green/red pair painted OFF in
-   * the app's loudest colour, so "off" shouted louder than "on".
-   */
+  /** The Overlays tab's Hover highlight switch. */
   #paintHoverToggle(btn, on) {
-    btn.classList.remove('green', 'red', 'highlight');
-    btn.classList.toggle('active', on);
-    btn.title = on ? 'Disable hover highlight effect (H)' : 'Enable hover highlight effect (H)';
+    btn.setAttribute('aria-checked', String(on));
   }
 
   buildUI() {
@@ -756,6 +793,13 @@ class UIManager {
       requestAnimationFrame(() => this.cache.qm.validateAlignment())
     );
     this.cache.query.sizeObserver.observe(this.cache.query.editorDiv);
+
+    this.cache.query.text.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      this.cache.qm.handleQueryValidationEvent(true); // the debounced pass may not have run yet
+      this.cache.qm.handleQueryUpdateEvent();
+    });
 
     this.cache.query.text.addEventListener('scroll', () => {
       this.cache.query.overlay.scrollTop = this.cache.query.text.scrollTop;
@@ -1307,7 +1351,7 @@ class UIManager {
    */
   #filtersLocked() {
     if (!this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return false;
-    this.warning('Filters are driven by your edited query. Unlock filters in the panel to change this.');
+    this.warning('Filters are driven by your edited query. Use Reset to filters in the panel to change this.');
     return true;
   }
 
@@ -1680,10 +1724,10 @@ class UIManager {
     statusBar.innerHTML = `
       <div class="filter-lock-message">
         <span class="filter-lock-icon">🔒</span>
-        <span>Filters are driven by your edited query. Unlock to control them here again.</span>
+        <span>Filters are driven by your edited query. Reset to filters to control them here again.</span>
       </div>
       <button class="filter-unlock-btn" onclick="cache.ui.unlockFiltersAndResetQuery()">
-        Unlock filters
+        Reset to filters
       </button>
     `;
     return statusBar;
@@ -1710,6 +1754,7 @@ class UIManager {
         control.disabled = isLocked;
       }
     }
+    this.cache.qm?.updateQueryStatus?.();
   }
 
   async unlockFiltersAndResetQuery() {

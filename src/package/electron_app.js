@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Menu } = require('electron');
+const { app, BrowserWindow, shell, Menu, dialog } = require('electron');
 const path = require('path');
 
 // In development the asset cache only ever serves stale JS/CSS — there is nothing
@@ -7,6 +7,13 @@ const path = require('path');
 if (!app.isPackaged) {
   app.commandLine.appendSwitch('disable-http-cache');
 }
+
+const UNSAVED_CHECK_TIMEOUT_MS = 2000;
+// Set by a quit (Cmd+Q, app menu) so a close that had to ask can resume it.
+let quitting = false;
+app.on('before-quit', () => {
+  quitting = true;
+});
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -22,6 +29,37 @@ function createWindow() {
   });
 
   win.loadFile(path.join(__dirname, '..', 'graph_lens_lite.html'));
+
+  // Closing would lose unsaved work (history.js unsavedWork): ask first.
+  let mayClose = false;
+  win.on('close', (event) => {
+    if (mayClose) return;
+    event.preventDefault();
+    // A page that is stuck or gone cannot answer: ask rather than guess either way.
+    const noAnswer = new Promise((resolve) => setTimeout(() => resolve(true), UNSAVED_CHECK_TIMEOUT_MS));
+    Promise.race([win.webContents.executeJavaScript('!!window.cache?.history?.unsavedWork'), noAnswer])
+      .catch(() => true)
+      .then((unsaved) => {
+        const leave =
+          !unsaved ||
+          dialog.showMessageBoxSync(win, {
+            type: 'question',
+            buttons: ['Close without saving', 'Cancel'],
+            defaultId: 1,
+            cancelId: 1,
+            title: 'Unsaved changes',
+            message: 'This graph has changes that are not saved.',
+            detail: 'Save it with File › Save as JSON (S) to keep them.',
+          }) === 0;
+        if (!leave) {
+          quitting = false;
+          return;
+        }
+        mayClose = true;
+        win.close();
+        if (quitting) app.quit(); // Cmd+Q was held up by the question; finish it
+      });
+  });
 
   // Clear any entries left over from a previous run before the switch took effect.
   if (!app.isPackaged) {

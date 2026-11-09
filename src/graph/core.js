@@ -200,6 +200,10 @@ class GraphCoreManager {
   async initialAfterRenderEvent() {
     if (this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_RUNNING) return;
 
+    // The overlay is the "ready" signal: the render() below would clear it
+    // before persisting, hide-disconnected and the undo baseline, and an edit
+    // in that gap became part of the baseline (not undoable).
+    this.cache.ui.holdLoading();
     try {
       this.cache.ui.debug('ONCE AFTER RENDER');
       await this.cache.ui.showLoading('Post-processing', 'Post-processing ..');
@@ -250,12 +254,14 @@ class GraphCoreManager {
       // The graph is now settled: this is the state undo winds back to, and
       // the one "Reset to as loaded" restores.
       this.cache.history?.reset({ origin: 'mark' });
+      this.cache.history?.markSaved(); // as loaded = nothing to lose yet
     } catch (errorMsg) {
       this.cache.ui.error(`Error in initial AFTER_RENDER: ${errorMsg}`);
       this.cache.ui.error('Graph setup failed. Please check your input data.');
-      await this.cache.ui.hideLoading();
     } finally {
       this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_RUNNING = false;
+      this.cache.ui.releaseLoading();
+      await this.cache.ui.hideLoading();
     }
   }
 
@@ -681,6 +687,7 @@ class GraphCoreManager {
 
     this.cache.bubbleSetChanged = false;
     this.cache.qm.decodeQueryAndBuildAST();
+    this.cache.qm.markApplied?.();
 
     const rule = visibilityRule(
       this.cache.data.layouts[this.cache.data.selectedLayout],
@@ -790,6 +797,7 @@ class GraphCoreManager {
     this.cache.ui?.closeAnchoredPopovers?.();
     await this.cache.graph?.destroy();
     this.cache.graph = null;
+    this.cache.ui?.syncModeHint?.(); // a lasso or note mode ends with its graph
     // Drop renderer-cycle state with the instance: the graphology model is
     // rebuilt by createGraphInstance, plugin stubs are re-registered there.
     this.cache.graphData = null;
@@ -819,7 +827,10 @@ class GraphCoreManager {
         activeElement.tagName === 'INPUT' ||
         activeElement.tagName === 'TEXTAREA' ||
         activeElement.tagName === 'SELECT' ||
-        activeElement.isContentEditable
+        activeElement.isContentEditable ||
+        // A grid's letters start an edit, and its read-only cells must not
+        // fire app shortcuts either (WCAG 2.1.4); Ctrl+Z there is not graph undo.
+        activeElement.closest?.('[role="grid"]')
       ) {
         return;
       }

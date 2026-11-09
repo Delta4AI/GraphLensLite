@@ -310,3 +310,68 @@ describe('inspector pills honour the role=tab keyboard contract', () => {
     expect(inspector.context).toBe('filters');
   });
 });
+
+describe('inspector as a bottom sheet (phone width)', () => {
+  beforeEach(() => {
+    inspectorDom();
+    document.body.insertAdjacentHTML('beforeend', '<button id="panelToggleBtn" aria-expanded="false"></button>');
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    delete document.body.dataset.sheet;
+  });
+
+  it('opens at half height, closes the workbench, and hands focus back on Escape', () => {
+    const workbench = { close: vi.fn() };
+    const inspector = initInspector({ workbench });
+    const toggle = document.getElementById('panelToggleBtn');
+
+    inspector.toggleSheet();
+    expect(document.body.dataset.sheet).toBe('half');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(workbench.close).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(pill('filters'));
+
+    inspector.cycleSheet();
+    expect(document.body.dataset.sheet).toBe('full');
+
+    pill('filters').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.body.dataset.sheet).toBeUndefined();
+    expect(document.activeElement).toBe(toggle);
+    vi.unstubAllGlobals();
+  });
+
+  it('closes on Back: opening leaves a history entry, and Back pops it', () => {
+    const inspector = initInspector({ workbench: { close: vi.fn() } });
+    inspector.openSheet();
+    expect(history.state?.gllSheet).toBe(true);
+
+    globalThis.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+    expect(document.body.dataset.sheet).toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+
+  it('counts the selection on the Panel button while the sheet is closed', () => {
+    document.getElementById('panelToggleBtn').innerHTML = '<span class="rail-panel-count"></span>';
+    const inspector = initInspector();
+    inspector.syncToSelection(4, 2);
+    expect(document.querySelector('.rail-panel-count').textContent).toBe('6');
+    inspector.syncToSelection(0, 0);
+    expect(document.querySelector('.rail-panel-count').textContent).toBe('');
+    vi.unstubAllGlobals();
+  });
+
+  it('says how many selected elements the filters hide, on the Panel button and in the Selection context', () => {
+    document.getElementById('panelToggleBtn').innerHTML = '<span class="rail-panel-count"></span>';
+    document.getElementById('inspectorSelection').insertAdjacentHTML('afterbegin', '<p id="selectionHiddenNote" hidden></p>');
+    const inspector = initInspector();
+    const note = document.getElementById('selectionHiddenNote');
+
+    inspector.syncToSelection(4, 2, 3);
+    expect(document.querySelector('.rail-panel-count').textContent).toBe('6 · 3 hidden');
+    expect(note.hidden).toBe(false);
+    expect(note.textContent).toMatch(/^3 selected elements are hidden by filters/);
+
+    inspector.syncToSelection(4, 2, 0);
+    expect(document.querySelector('.rail-panel-count').textContent).toBe('6');
+    expect(note.hidden).toBe(true);
+  });
+});

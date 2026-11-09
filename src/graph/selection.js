@@ -410,7 +410,7 @@ class GraphSelectionManager {
     // Swap the inspector's Selection context between its empty state
     // (instructions) and its active state, and flash its pill when the
     // selection changed while another context is up.
-    this.cache.inspector?.syncToSelection(selectedNodesCount, selectedEdgesCount);
+    this.cache.inspector?.syncToSelection(selectedNodesCount, selectedEdgesCount, hiddenSelectedCount);
     if (atLeastOneNodeOrEdgeSelected) {
       // Open the appearance card(s) matching the selection (additive).
       this.cache.ui.syncStylingCardsToSelection(atLeastOneNodeSelected, atLeastOneEdgeSelected);
@@ -443,6 +443,8 @@ class GraphSelectionManager {
         this.cache.dataTable.currentTab === 'selectedElements'
       ) {
         this.cache.dataTable.refreshCurrentTab();
+      } else {
+        this.cache.dataTable.syncCounts();
       }
     }
   }

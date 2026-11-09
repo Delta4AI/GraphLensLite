@@ -95,6 +95,15 @@ describe("applyGraph", () => {
     expect(cache.gcm.resetEventLocks).toHaveBeenCalled();
   });
 
+  it("leaves the loaded graph alone when the user keeps staged data editor changes", async () => {
+    const cache = makeCache();
+    cache.graph = { render: vi.fn() };
+    cache.dataTable = { confirmDiscard: vi.fn().mockResolvedValue(false) };
+    expect(await applyGraph(cache, VALID)).toBe(false);
+    expect(cache.gcm.destroyGraphAndRollBackUI).not.toHaveBeenCalled();
+    expect(cache.ui.setDataSourceLabel).not.toHaveBeenCalled();
+  });
+
   it("returns false and reports an error for a payload without nodes/edges", async () => {
     const cache = makeCache();
     const ok = await applyGraph(cache, { foo: 1 });

@@ -1307,6 +1307,7 @@ class IOManager {
     a.download = this.buildExportFilename('json');
     a.click();
     URL.revokeObjectURL(url);
+    this.cache.history?.markSaved();
     await this.cache.ui.hideLoading();
     await new Promise((resolve) => requestAnimationFrame(resolve));
   }

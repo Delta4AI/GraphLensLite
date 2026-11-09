@@ -19,7 +19,7 @@ function makeCache() {
       selectedLayout: 'Default',
       layouts: { Default: { positions: new Map(), filters: new Map([['p', { active: true }]]) } },
     },
-    ui: { debug() {}, showLoading: async () => {}, hideLoading: async () => {}, error: vi.fn(), clearLog() {} },
+    ui: { debug() {}, showLoading: async () => {}, hideLoading: async () => {}, holdLoading() {}, releaseLoading() {}, error: vi.fn(), clearLog() {} },
     metrics: { updateMetricUI: async () => {} },
     graph: { render: async () => {}, destroy: async () => {} },
     INSTANCES: {},

@@ -107,6 +107,11 @@ function snapshot(cache, signature = undefined) {
 }
 
 class History {
+  // Changes recorded since the graph loaded, and how many of them the last
+  // save covered: they differ while there is work a closed window would lose.
+  #edits = 0;
+  #savedAt = 0;
+
   constructor(cache) {
     this.cache = cache;
     this.past = [];
@@ -125,6 +130,20 @@ class History {
 
   get canRedo() {
     return this.future.length > 0;
+  }
+
+  /** True while something changed since the graph was loaded or last saved. */
+  get unsaved() {
+    return this.#edits !== this.#savedAt;
+  }
+
+  /** What closing the window would lose: unsaved changes or staged data editor edits. */
+  get unsavedWork() {
+    return this.unsaved || (this.cache.dataTable?.stagedCount ?? 0) > 0;
+  }
+
+  markSaved() {
+    this.#savedAt = this.#edits;
   }
 
   /** The action ↶ would take back, for the button's tooltip. */
@@ -159,6 +178,9 @@ class History {
     this.baseline = snapshot(this.cache);
     this.syncButtons();
 
+    // A new workspace or a merged graph is work; a teardown leaves nothing to lose.
+    if (origin === 'replace' || origin === 'rebase') this.#edits += 1;
+    if (origin === 'forget') this.markSaved();
     if (origin === 'forget' || origin === 'rebase') this.origins.clear();
     const current = currentLayout(this.cache);
     if (!current || !origin || origin === 'forget') return;
@@ -194,6 +216,7 @@ class History {
     while (this.past.length > this.#depth()) this.past.shift();
     this.future = [];
     this.baseline = after;
+    this.#edits += 1;
     this.syncButtons();
   }
 
@@ -246,6 +269,8 @@ class History {
     if (!done) {
       // The snapshot's workspace is gone — the entry is unusable, drop it.
       this.future.pop();
+    } else {
+      this.#edits += 1;
     }
     this.syncButtons();
     return done;
@@ -261,6 +286,8 @@ class History {
     });
     if (!done) {
       this.past.pop();
+    } else {
+      this.#edits += 1;
     }
     this.syncButtons();
     return done;
@@ -323,6 +350,17 @@ function setTitle(id, verb, label, hotkey) {
 export function initHistory(cache) {
   const history = new History(cache);
   history.syncButtons();
+  // Closing the tab or reloading would lose unsaved work without a word: the
+  // browser shows its own "Leave site?" prompt. The desktop app asks from its
+  // main process instead (electron_app.js reads unsavedWork on close).
+  if (!globalThis.navigator?.userAgent?.includes('Electron')) {
+    globalThis.addEventListener?.('beforeunload', (e) => {
+      if (history.unsavedWork) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+  }
   return history;
 }
 

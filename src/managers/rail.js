@@ -114,6 +114,19 @@ class RailMenu {
   }
 
   /**
+   * Open under another control than the menu's own anchor, for as long as it
+   * is open: the phone layout hides Layout, Export and the selection chip and
+   * reaches their menus from ⋯ More, where placement and the focus return on
+   * close have to use the button that is actually on screen.
+   */
+  openFrom(anchor) {
+    if (this.isOpen) this.close();
+    this._home = this.anchor;
+    this.anchor = anchor;
+    this.open();
+  }
+
+  /**
    * Position under the anchor, or above it when there is no room below: an
    * anchor at the bottom edge (a status bar's button) would otherwise be
    * covered by its own menu once the clamp pushes it back up. Public so a menu
@@ -150,6 +163,10 @@ class RailMenu {
     }
     if (!this.staticBuild) this.el.remove();
     if (hadFocus) this.anchor.focus();
+    if (this._home) {
+      this.anchor = this._home;
+      this._home = null;
+    }
   }
 
   /**
@@ -238,6 +255,59 @@ class Rail {
     if (exportMenuBtn) {
       this.menus.push(new RailMenu(exportMenuBtn, (el) => this.#buildExportMenu(el)));
     }
+    const moreBtn = document.getElementById('railMoreBtn');
+    if (moreBtn) this.menus.push(new RailMenu(moreBtn, (el) => this.#buildMoreMenu(el)));
+  }
+
+  /** The selection menu, opened under `anchor` (the Selection tab's "By name or ID"). */
+  openSelectionMenu(anchor) {
+    this.#menuOf('selectMenuBtn')?.openFrom(anchor);
+  }
+
+  /** The menu anchored to `id`, to open it from ⋯ More. */
+  #menuOf(id) {
+    return this.menus.find((m) => (m._home ?? m.anchor).id === id);
+  }
+
+  /**
+   * Phone layout: everything the narrow bar hides, by name. Plain buttons are
+   * clicked; the ones with menus open them under ⋯ More itself.
+   */
+  #buildMoreMenu(el) {
+    const more = document.getElementById('railMoreBtn');
+    const header = (text) => {
+      const h = document.createElement('div');
+      h.className = 'rail-menu-header';
+      h.textContent = text;
+      return h;
+    };
+    const click = (id) => this.#closeAnd(() => document.getElementById(id)?.click());
+    const submenu = (id) => () => {
+      this.closeMenus();
+      this.#menuOf(id)?.openFrom(more);
+    };
+    const tab = (id, icon, label) => menuItem({ icon, label, onClick: click(id) });
+    el.append(
+      menuItem({
+        icon: '▤',
+        label: 'Panel: filters, overlays, selection',
+        onClick: this.#closeAnd(() => this.cache.inspector?.openSheet()),
+      }),
+      header('View'),
+      menuItem({ icon: '⊡', label: 'Fit graph', onClick: click('fitBtn') }),
+      menuItem({ icon: '↻', label: 'Layout…', onClick: submenu('relayoutBtn') }),
+      menuItem({ icon: '⌕', label: 'Search', onClick: click('cmdkBtn') }),
+      menuItem({ icon: '◈', label: 'Selection…', onClick: submenu('selectMenuBtn') }),
+      header('Workbench'),
+      tab('dataToggleBtn', '🔢', 'Data'),
+      tab('queryToggleBtn', '📝', 'Query'),
+      tab('metricsToggleBtn', '📊', 'Metrics'),
+      tab('assistantToggleBtn', '🤖', 'Assistant'),
+      menuSeparator(),
+      menuItem({ icon: '⤓', label: 'Export…', onClick: submenu('exportMenuBtn') }),
+      menuItem({ icon: '◐', label: 'Switch theme', onClick: click('darkModeToggleBtn') }),
+      menuItem({ icon: '?', label: 'Keyboard shortcuts', onClick: click('keyboardSheetBtn') })
+    );
   }
 
   closeMenus() {
@@ -277,8 +347,10 @@ class Rail {
    */
   async #replacingGraph(lead, action) {
     if (!this.cache.initialized) return action();
+    const staged = this.cache.dataTable?.stagedCount ?? 0;
+    const edits = staged ? ` and ${staged} unsaved data editor change${staged === 1 ? '' : 's'}` : '';
     const confirmed = await Popup.confirm(
-      `${lead} replaces the loaded graph, discarding every workspace, style and group in it. Continue?`,
+      `${lead} replaces the loaded graph, discarding every workspace, style and group in it${edits}. Continue?`,
       'Discard and continue'
     );
     if (confirmed) action();
@@ -296,6 +368,12 @@ class Rail {
             document.getElementById('fileInput')?.click()
           )
         ),
+      }),
+      menuItem({
+        icon: '💾',
+        label: 'Save as JSON',
+        title: 'Save the full graph — data, styles, workspaces — as a JSON file you can open again (S)',
+        onClick: this.#closeAnd(() => this.cache.io.exportGraphAsJSON()),
       }),
       menuItem({
         icon: '📥',
@@ -481,9 +559,37 @@ class Rail {
   }
 
   #buildSelectMenu(el) {
-    // The card re-parented in here carries its own "Select Elements" title, so
-    // the menu adds no header of its own — just the mount and the tooltip that
-    // names the split against the inspector's "Act on selection".
+    // Rows that act on the selection you have; ids are what selection.js and
+    // UIManager toggle (`.disabled`) as the selection and its history change.
+    const row = (id, icon, label, title, run, { close = true } = {}) => {
+      const btn = menuItem({ icon, label, title, onClick: close ? this.#closeAnd(run) : run });
+      btn.id = id;
+      btn.classList.add('disabled');
+      btn.setAttribute('aria-disabled', 'true');
+      return btn;
+    };
+    const lasso = menuItem({
+      icon: '➰',
+      label: 'Lasso',
+      title: 'Drag a freeform area around elements (L, Escape to stop). Without it: drag on empty canvas holding ⇧ to add, Ctrl/⌘ to replace, both to remove',
+      onClick: this.#closeAnd(() => this.cache.ui.toggleLassoSelection()),
+    });
+    lasso.id = 'lassoMenuItem';
+    el.append(
+      row('focusSelectionBtn', '🔍', 'Zoom to selection', 'Center and zoom to the selection',
+        () => this.cache.gcm.focusSelection()),
+      // The chip's × is hidden on a phone; the menu is reachable there.
+      row('clearSelectionMenuItem', '×', 'Clear selection', 'Deselect everything',
+        () => this.cache.sm.clearSelection()),
+      // Undo/redo stay open: stepping back through several selections is one gesture.
+      row('undoSelectionBtn', '↶', 'Undo selection change', 'Go back to the previous selection',
+        () => this.cache.sm.undoSelection(), { close: false }),
+      row('redoSelectionBtn', '↷', 'Redo selection change', 'Go forward to the next selection',
+        () => this.cache.sm.redoSelection(), { close: false }),
+      lasso,
+      menuSeparator()
+    );
+    // The card re-parented in here carries its own "Select Elements" title.
     const mount = document.createElement('div');
     mount.id = 'selectMenuMount';
     mount.title =
@@ -543,6 +649,13 @@ class Rail {
         label: 'CX2 (Cytoscape, NDEx)',
         title: 'Export nodes, edges, properties and positions as CX2 for Cytoscape or NDEx',
         onClick: this.#closeAnd(() => this.cache.io.exportNetwork('cx2')),
+      }),
+      menuSeparator(),
+      menuItem({
+        icon: '⛶',
+        label: 'Presentation mode',
+        title: 'Hide the rail and the inspector for a clean screenshot (⇧F, Escape to exit)',
+        onClick: this.#closeAnd(() => this.cache.ui.togglePresentationMode()),
       })
     );
   }
