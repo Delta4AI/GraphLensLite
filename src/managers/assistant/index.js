@@ -172,6 +172,13 @@ class AssistantManager {
     // Empty-state chips: toggle the `has-selection` class so CSS can swap
     // "How do I select nodes?" for the selection-gated chips. This piggybacks
     // on the existing dirty-key poll — no separate observer needed.
+    const clearBtn = document.getElementById('assistantClearBtn')
+    if (clearBtn) {
+      // Bubbles count too: a failed first request leaves an error bubble and no history.
+      const nothing = !this._history.length && !document.getElementById('assistantMessages')?.childElementCount
+      clearBtn.setAttribute('aria-disabled', String(nothing))
+      clearBtn.title = nothing ? 'Nothing to clear yet' : 'Clear the conversation'
+    }
     const empty = document.getElementById('assistantEmptyState')
     const hasSelection = (inputs.selection.nodes + inputs.selection.edges) > 0
     if (empty) empty.classList.toggle('has-selection', hasSelection)

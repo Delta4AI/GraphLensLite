@@ -15,9 +15,9 @@ const KEYBOARD_RESIZE_COARSE = 4; // Shift+arrow, for crossing the stage quickly
 const DEFAULT_HEIGHT_FRACTION = 0.35;
 
 /**
- * Static per-tab wiring. `pane` and `toolbar` are shown/hidden together; the
- * rail `btn` gets `.highlight` while its tab is the visible one. Visibility
- * side effects (metrics' lazy compute gate, the assistant's budget poller)
+ * Static per-tab wiring. Each `toolbar` lives inside its `pane` (the command
+ * palette indexes its controls); the rail `btn` gets `.highlight` while its
+ * tab is the visible one. Visibility side effects (metrics' lazy compute gate, the assistant's budget poller)
  * are NOT here — they live on the managers that own that state, reached
  * through #notify.
  */
@@ -32,8 +32,8 @@ const TABS = {
   },
   query: {
     title: 'Query Editor',
-    pane: 'queryEditor',
-    toolbar: '.query-buttons',
+    pane: 'queryPane',
+    toolbar: '.query-toolbar',
     btn: 'queryToggleBtn',
     help: (cache) => cache.qm.showQueryHelp(),
     helpTitle: 'Display query editor help',
@@ -46,7 +46,7 @@ const TABS = {
   assistant: {
     title: 'Graph Assistant',
     pane: 'assistantPane',
-    toolbar: '.assistant-buttons',
+    toolbar: '.assistant-toolbar',
     btn: 'assistantToggleBtn',
   },
 };
@@ -106,8 +106,6 @@ class Workbench {
       const active = other === name;
       const pane = document.getElementById(spec.pane);
       pane?.toggleAttribute('hidden', !active);
-      const toolbar = spec.toolbar && document.querySelector(spec.toolbar);
-      if (toolbar) toolbar.style.display = active ? 'flex' : 'none';
       const tabBtn = document.getElementById(spec.btn);
       tabBtn?.classList.toggle('highlight', active);
       // The class is the only thing that said "this tab is the open one";

@@ -201,23 +201,7 @@
       <div class="resize-handle"></div>
       <div class="panel-header panel-header-full-width">
         <span id="workbenchTitle" class="panel-header-text">Query Editor</span>
-        <div class="panel-header-center-buttons">
-          <div class="query-buttons">
-            <button id="queryUpdateBtn" class="purple disabled" onclick="cache.qm.handleQueryUpdateEvent()"
-                    title="Apply the query to filter the graph">🔍 Filter</button>
-            <button id="querySelectBtn" class="blue disabled" onclick="cache.qm.handleQuerySelectEvent()"
-                    title="Apply the query to select nodes in the graph without filtering">🎯 Select</button>
-            <button id="queryResetBtn" class="pink" onclick="cache.qm.resetQuery();" title="Reset query to match UI filters">⟳ Sync</button>
-            <button id="queryClearBtn" class="red" onclick="cache.qm.clearQuery();"
-                    title="Empty the query text. The graph stays as it is — use ⟳ Sync to hand it back to the filters">✗ Clear text</button>
-          </div>
-          <div class="assistant-buttons" style="display: none;">
-            <button id="assistantSettingsBtn" class="green" title="Configure the endpoint and model"
-                    onclick="cache.assistant.openSettings()">⚙ Settings</button>
-            <button id="assistantClearBtn" class="red" title="Clear the conversation"
-                    onclick="cache.assistant.clearHistory()">🗑 Clear</button>
-          </div>
-        </div>
+        <span class="data-gap"></span>
         <div class="panel-header-buttons">
           <button id="workbenchHelpBtn" class="panel-header-btn info-btn" title="Display query editor help" onclick="cache.qm.showQueryHelp();">🛈</button>
           <button id="workbenchExpandBtn" class="panel-header-btn" title="Expand to full height"
@@ -227,16 +211,38 @@
         </div>
       </div>
       <div class="wb-content">
-        <div id="queryEditor" class="editor-panel wb-pane">
-          <div id="queryOverlay" aria-hidden="true"></div>
-          <div id="queryTextArea" contenteditable="true" spellcheck="false" oninput="cache.qm.handleQueryValidationEvent();"></div>
-          <div id="queryCaret" class="custom-caret"></div>
+        <div id="queryPane" class="wb-pane">
+          <div class="query-toolbar wb-toolbar">
+            <span class="query-status" role="status"><span class="query-status-pill"></span><span class="query-status-text"></span></span>
+            <span class="data-gap"></span>
+            <button type="button" id="queryClearBtn" class="insp-btn" onclick="cache.qm.clearQuery();"
+                    title="Empty the query box. The graph stays as it is">Clear text</button>
+            <button type="button" id="queryResetBtn" class="insp-btn" onclick="cache.qm.resetToFilters();"
+                    title="Drop the edited query, unlock the filter panel and filter the graph by the panel again">Reset to filters</button>
+            <span class="wb-toolbar-sep" aria-hidden="true"></span>
+            <button type="button" id="querySelectBtn" class="insp-btn" onclick="cache.qm.handleQuerySelectEvent()"
+                    title="Select the matching elements without hiding anything">Select matches</button>
+            <button type="button" id="queryUpdateBtn" class="insp-btn primary" onclick="cache.qm.handleQueryUpdateEvent()"
+                    title="Hide everything the query does not match (Ctrl+Enter). Locks the filter panel">Filter graph</button>
+          </div>
+          <div id="queryEditor" class="editor-panel">
+            <div id="queryOverlay" aria-hidden="true"></div>
+            <div id="queryTextArea" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true"
+                 aria-label="Query" oninput="cache.qm.handleQueryValidationEvent();"></div>
+            <div id="queryCaret" class="custom-caret"></div>
+          </div>
         </div>
         <div id="dataEditor" class="editor-panel wb-pane" hidden>
           <div id="dataTableContainer"></div>
         </div>
         <div id="metricsContainer" class="wb-pane" hidden></div>
         <div id="assistantPane" class="wb-pane" hidden>
+          <div class="assistant-toolbar wb-toolbar">
+            <span class="data-gap"></span>
+            <button type="button" id="assistantSettingsBtn" class="insp-btn" title="Configure the endpoint and model"
+                    onclick="cache.assistant.openSettings()">⚙ Settings</button>
+            <button type="button" id="assistantClearBtn" class="insp-btn" onclick="cache.assistant.clearHistory()">Clear conversation</button>
+          </div>
           <div id="assistantMessages"></div>
           <div id="assistantEmptyState">
             <div class="assistant-empty-state-title">Graph Assistant</div>

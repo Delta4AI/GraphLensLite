@@ -757,6 +757,13 @@ class UIManager {
     );
     this.cache.query.sizeObserver.observe(this.cache.query.editorDiv);
 
+    this.cache.query.text.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      this.cache.qm.handleQueryValidationEvent(true); // the debounced pass may not have run yet
+      this.cache.qm.handleQueryUpdateEvent();
+    });
+
     this.cache.query.text.addEventListener('scroll', () => {
       this.cache.query.overlay.scrollTop = this.cache.query.text.scrollTop;
       this.cache.query.overlay.scrollLeft = this.cache.query.text.scrollLeft;
@@ -1710,6 +1717,7 @@ class UIManager {
         control.disabled = isLocked;
       }
     }
+    this.cache.qm?.updateQueryStatus?.();
   }
 
   async unlockFiltersAndResetQuery() {
