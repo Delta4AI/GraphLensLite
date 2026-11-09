@@ -84,12 +84,43 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - When a colour is mixed, an **In selection** row lists each distinct colour
   with its count; recolouring one changes only those elements.
 
+## Editable tables (Data editor)
+
+- A workbench tab keeps its toolbar inside its pane, not in the dark header:
+  view switches and the filter on the left, a count next to them, then the
+  tab's actions as `.insp-btn` at the right. One filled `.insp-btn.primary`
+  per surface, for the action the surface exists for.
+- Subsets of one table are segmented controls with counts (Rows: Selection |
+  All; Type: Nodes | Edges | Both), never a row of tabs.
+- The table is an APG grid: one Tab stop, arrow keys between cells, Enter, F2,
+  typing or double-click to edit, Enter commits and moves down, Tab commits
+  and moves right, Escape cancels. The active cell is ringed for the mouse too.
+- Edits that only reach the graph together are staged and always visible:
+  edited cell = amber wash with the old value in its tooltip, new row = green
+  with a "New" pill, deleted row = red strikethrough that stays listed with
+  ↺ Restore. Colours come from the `--edited-*`, `--added-*`, `--deleted-*`
+  tokens; the pill and the bar say it in words too.
+- A bar under the table exists only while something is staged: "N unsaved
+  changes", the breakdown (or the first problem blocking Apply), **Review**
+  (each change with its own Undo), **Discard** (confirms, since nothing else
+  keeps the work), **Apply N changes**. Deleting a row never confirms; it is
+  staged and undoable.
+- Adding something is a small form in a popover with an explicit button and
+  the error under its field, never a text prompt or a toast.
+- An empty view says why in one sentence and offers the one way out ("Show
+  all 1000 nodes", "Clear filter").
+
 ## Known gaps
 
 - Light-mode neutrals are pure greys and the accent is the brand red, which also
   marks destructive actions. Moving to cool slate neutrals with an indigo accent
   is an open token-level change.
-- The workbench (Data, Query, Metrics, Assistant) has not been moved onto
-  these patterns yet.
+- The Query and Assistant toolbars still sit in the workbench's dark header
+  as coloured buttons; only the Data tab follows the table pattern above.
+  Query's four actions (Apply, Select, Sync, Clear text) need their own
+  review, not just a restyle.
+- The data editor renders every row (2,500 rows take about 44ms); past
+  ~20,000 rows it will need virtual scrolling with `aria-rowcount` /
+  `aria-rowindex`.
 - Filter rows add matches to the selection in two clicks (⋯ › Add matches);
   the old inline ± did it in one.
