@@ -38,7 +38,7 @@ node bench/assistant/run.mjs \
 | `--gold` | `gold.json` | gold-set file |
 | `--out` | `results/` | output directory |
 
-Each run writes `results/<timestamp>.json` (metadata plus one record per item × model × repeat) and `results/<timestamp>.md` (summary tables per model and per model × tier). If a model's Ollama calls fail (model missing, out of memory, unreachable), that model's partial results are dropped and listed under `failedModels`, the other models still run, and the exit code is 1.
+Each run writes `results/<timestamp>.json` (metadata plus one record per item × model × repeat) and `results/<timestamp>.md` (summary tables per model and per model × tier). If a model's Ollama calls fail (model missing, out of memory, unreachable), that model's partial results are dropped and listed under `failedModels`, the other models still run, and the exit code is 1. A reply Ollama aborts for looping (`token repeat limit reached`) is not a failure of the run: the app retries once, as in the panel, and if that also loops the item is scored as no query (`degenerateCalls` in the record counts the aborted calls).
 
 Node prints a `MODULE_TYPELESS_PACKAGE_JSON` warning because `package.json` has no `"type"` field. It is harmless; add `--no-warnings` to hide it.
 
