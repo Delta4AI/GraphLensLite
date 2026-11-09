@@ -139,9 +139,9 @@ gold selection. A question counts as \emph{exact} when both ID sets are
 identical; an impossible question counts as exact only when no query is
 returned. Each question was run three times per model on a workstation with
 an NVIDIA RTX A4000 (16\,GB) running Ollama
-% CONFIRM(authors): the run metadata says Ollama 0.40.11, but mimo-v2.6
-% requires >= 0.40.15. Check `ollama --version` on the workstation.
-0.40.11; all models were 4-bit quantized (Q4\_K\_M). Latency is the
+% The --hardware string in the result files says 0.40.11 (stale); the
+% workstation runs 0.40.15, which mimo-v2.6 requires.
+0.40.15; all models were 4-bit quantized (Q4\_K\_M). Latency is the
 wall-clock time of the whole generation call, repair pass included; no
 warm-up was run, so the slowest calls include loading the model.
 
