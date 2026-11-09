@@ -25,7 +25,7 @@ const TABS = {
   data: {
     title: 'Data Editor',
     pane: 'dataEditor',
-    toolbar: '.data-buttons',
+    toolbar: '.data-toolbar',
     btn: 'dataToggleBtn',
     help: (cache) => cache.dataTable.help(),
     helpTitle: 'Display data editor help',

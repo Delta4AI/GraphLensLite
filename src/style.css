@@ -32,6 +32,13 @@
     --accent-ring: rgba(195, 61, 53, 0.35);
     --success-text: #015C0C;
     --danger-text: #8a2d2d;
+    /* Data editor: a cell, row or deletion staged but not yet applied. */
+    --edited-wash: #fff3d6;
+    --edited-line: #b07a0a;
+    --added-wash: #e7f5e9;
+    --added-line: #2f7d3b;
+    --deleted-wash: #fbe9e8;
+    --deleted-line: #b4443c;
     color-scheme: light;
 
     /* Stacking order, bottom to top. Theme-independent, so they live here once
@@ -79,6 +86,12 @@
     --accent-ring: rgba(224, 99, 91, 0.45);
     --success-text: #58c06a;
     --danger-text: #d98a84;
+    --edited-wash: #3a3020;
+    --edited-line: #d9a53c;
+    --added-wash: #1f3324;
+    --added-line: #58c06a;
+    --deleted-wash: #3a2224;
+    --deleted-line: #e0635b;
     color-scheme: dark;
 }
 
@@ -4997,7 +5010,6 @@ div[slider] > input[type=range]::-ms-tooltip {
     background: var(--input-bg);
 }
 
-.panel-header-center-buttons .data-buttons,
 .panel-header-center-buttons .query-buttons {
     display: flex;
     flex-direction: row;
@@ -5007,7 +5019,6 @@ div[slider] > input[type=range]::-ms-tooltip {
     justify-content: center;
 }
 
-.panel-header-center-buttons .data-buttons button,
 .panel-header-center-buttons .query-buttons button {
     height: 24px;
     cursor: pointer;
@@ -5025,20 +5036,17 @@ div[slider] > input[type=range]::-ms-tooltip {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-.panel-header-center-buttons .data-buttons button:hover,
 .panel-header-center-buttons .query-buttons button:hover {
     border-color: rgba(255, 255, 255, 0.6);
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.panel-header-center-buttons .data-buttons button:active,
 .panel-header-center-buttons .query-buttons button:active {
     transform: translateY(0);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-.panel-header-center-buttons .data-buttons button:disabled,
 .panel-header-center-buttons .query-buttons button:disabled {
     background-color: #2a2733;
     cursor: not-allowed;
@@ -5048,351 +5056,496 @@ div[slider] > input[type=range]::-ms-tooltip {
     transform: none;
 }
 
-.panel-header-center-buttons .data-buttons button.red,
 .panel-header-center-buttons .query-buttons button.red {
     background-color: #C33D35 !important;
     color: white !important;
 }
 
-.panel-header-center-buttons .data-buttons button.red:hover,
 .panel-header-center-buttons .query-buttons button.red:hover {
     border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
-.panel-header-center-buttons .data-buttons button.pink,
 .panel-header-center-buttons .query-buttons button.pink {
     background-color: #EFB0AA !important;
     color: black !important;
 }
 
-.panel-header-center-buttons .data-buttons button.pink:hover,
 .panel-header-center-buttons .query-buttons button.pink:hover {
     border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
-.panel-header-center-buttons .data-buttons button.blue,
 .panel-header-center-buttons .query-buttons button.blue {
     background-color: #8CA6D9 !important;
     color: black !important;
 }
 
-.panel-header-center-buttons .data-buttons button.blue:hover,
 .panel-header-center-buttons .query-buttons button.blue:hover {
     border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
-.panel-header-center-buttons .data-buttons button.grey,
 .panel-header-center-buttons .query-buttons button.grey {
     background-color: #9998AF !important;
     color: black !important;
 }
 
-.panel-header-center-buttons .data-buttons button.grey:hover,
 .panel-header-center-buttons .query-buttons button.grey:hover {
     border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
-.panel-header-center-buttons .data-buttons button.green,
 .panel-header-center-buttons .query-buttons button.green {
     background-color: #015C0C !important;
     color: white !important;
 }
 
-.panel-header-center-buttons .data-buttons button.green:hover,
 .panel-header-center-buttons .query-buttons button.green:hover {
     border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
-.panel-header-center-buttons .data-buttons button.purple,
 .panel-header-center-buttons .query-buttons button.purple {
     background-color: #015C0C !important;
     color: white !important;
 }
 
-.panel-header-center-buttons .data-buttons button.purple:hover,
 .panel-header-center-buttons .query-buttons button.purple:hover {
     border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
+/* ==========================================================================
+   Data editor (Workbench › Data). Toolbar: Rows | Type switches, filter, count,
+   then + Add / Import / Export at the right. The table is an APG grid: one Tab
+   stop, the active cell ringed. Staged changes are marked per kind (edited
+   cell, added row, deleted row) and counted in the bar under the table, which
+   exists only while something is staged.
+   ========================================================================== */
 #dataTableContainer {
     height: 100%;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--border);
     background: var(--input-bg);
     overflow: hidden;
 }
 
-.data-table-warning-banner {
-    background: #fff3cd;
-    border-bottom: 2px solid #ffc107;
-    padding: 8px 12px;
-    font-size: 12px;
-    color: #856404;
-    text-align: center;
+.data-toolbar,
+.data-changes {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 6px 8px;
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    position: relative;
+    font-size: 12px;
 }
 
-.data-table-warning-close {
-    background: none;
-    border: none;
-    font-size: 20px;
-    font-weight: bold;
-    color: #856404;
-    cursor: pointer;
-    padding: 0;
-    width: 24px;
+.data-toolbar {
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.data-gap {
+    flex: 1;
+}
+
+.data-toolbar .insp-btn,
+.data-changes .insp-btn,
+.data-add-form .insp-btn {
     height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-    position: absolute;
-    right: 8px;
+    box-sizing: border-box;
 }
 
-.data-table-warning-close:hover {
-    background: rgba(133, 100, 4, 0.1);
-    color: #664d03;
+.data-seg-count {
+    margin-left: 1px;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.prop-seg > button[aria-pressed="true"] .data-seg-count {
+    color: inherit;
+    opacity: 0.8;
+}
+
+.data-filter {
+    height: 24px;
+    box-sizing: border-box;
+    width: 200px;
+    max-width: 100%;
+    padding: 0 8px;
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+}
+
+.data-count {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* The one filled button per surface: the action the surface exists for. */
+.insp-btn.primary {
+    background: var(--brand-border);
+    border-color: var(--brand-border);
+    color: #fff;
+    font-weight: 600;
+}
+
+.insp-btn.primary:hover {
+    border-color: var(--accent-text);
+    color: #fff;
+}
+
+.insp-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: var(--border-soft);
+    color: var(--text-strong);
 }
 
 .data-table-wrapper {
+    position: relative;
     flex: 1;
+    min-height: 0;
     overflow: auto;
 }
 
 .data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: Arial, sans-serif;
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
     font-size: 12px;
 }
 
-.data-table th {
-    background-color: var(--surface-3);
-    border: 1px solid var(--border);
-    padding: 2px 4px;
-    text-align: left;
-    font-weight: bold;
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    vertical-align: top;
-    cursor: pointer;
-}
-
+.data-table th,
 .data-table td {
-    border: 1px solid var(--border);
-    padding: 4px 8px;
-    min-width: 80px;
-    max-width: 200px;
+    height: 26px;
+    box-sizing: border-box;
+    max-width: 240px;
+    padding: 0 8px;
+    border-right: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-soft);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
+    background: var(--input-bg);
 }
 
-.data-table td:focus {
-    outline: 2px solid var(--brand-border);
-    background-color: var(--surface-3);
+.data-table thead th {
+    position: sticky;
+    z-index: 2;
+    background: var(--surface);
+    color: var(--text-strong);
+    font-weight: 600;
 }
 
-.data-table td.editing {
-    background-color: #fff9c4;
-    border: 2px solid var(--brand-border);
-    white-space: normal;
-    text-overflow: clip;
-    overflow: visible;
-    word-wrap: break-word;
+.data-group-row th {
+    top: 0;
+    height: 20px;
+    color: var(--text-muted);
+    font-size: 11px;
 }
 
-.data-table tr:nth-child(even) {
-    background-color: var(--surface);
+.data-head-row th {
+    top: 20px;
+    border-bottom-color: var(--border);
 }
 
-.data-table tr:hover {
-    background-color: var(--row-hover);
-}
-
-.data-table input {
+.data-sort {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     width: 100%;
-    border: none;
-    padding: 2px;
-    font-family: inherit;
-    font-size: inherit;
-    background: transparent;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
 }
 
-.data-table input:focus {
-    outline: none;
+/* Only the sorted column shows its arrow; the others on hover or focus. */
+.data-sort-arrow {
+    visibility: hidden;
+    color: var(--text-faint);
+    font-size: 10px;
+}
+
+.data-head-row th:hover .data-sort-arrow,
+.data-sort:focus .data-sort-arrow {
+    visibility: visible;
+}
+
+.data-head-row th[aria-sort] .data-sort-arrow {
+    visibility: visible;
+    color: var(--accent-text);
+}
+
+/* Row actions and ID stay put while the property columns scroll. */
+.data-table .data-act {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 32px;
+    min-width: 32px;
+    max-width: 32px;
+    padding: 0 3px;
+    text-align: center;
+}
+
+.data-table .data-id {
+    position: sticky;
+    left: 32px;
+    z-index: 1;
+    box-shadow: inset -1px 0 0 var(--border);
+}
+
+.data-table thead .data-act,
+.data-table thead .data-id {
+    z-index: 3;
+}
+
+.data-row-btn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.data-row-btn:hover,
+.data-row-btn[aria-expanded="true"] {
+    border-color: var(--border);
+    background: var(--surface-3);
+    color: var(--text);
 }
 
 .data-table td.readonly {
-  background-color: var(--surface);
-  color: var(--text-muted);
-  cursor: not-allowed;
+    color: var(--text-muted);
 }
 
-.data-table td.readonly:hover {
-  background-color: var(--surface);
+.data-table tbody tr:hover td {
+    background: var(--row-hover);
 }
 
-
-.data-table-sortable-header {
-  display: block;
-  cursor: pointer;
-  user-select: none;
-  min-height: 24px;
-  position: relative;
-  padding-right: 20px;
+/* The active cell. :focus, not :focus-visible: a clicked cell is the cell the
+   next key acts on, so it has to show for the mouse too. */
+.data-table td:focus,
+.data-table th:focus,
+.data-table .data-sort:focus,
+.data-table .data-row-btn:focus {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
 }
 
-.data-table-sortable-header:hover {
-  background-color: var(--surface-3);
+.data-table td.editing {
+    max-width: none;
+    overflow: visible;
+    white-space: pre-wrap;
+    background: var(--input-bg);
+    cursor: text;
+    box-shadow: inset 0 0 0 1px var(--accent-text);
 }
 
-.data-table-header-text {
-  width: 100%;
-  display: block;
+.data-table td.data-cell-edited {
+    background: var(--edited-wash);
+    box-shadow: inset 2px 0 0 var(--edited-line);
 }
 
-.data-table-header-group-badge {
-  background-color: #403c53;
-  border: 1px solid var(--border-strong);
-  border-radius: 5px;
-  color: white;
-  padding: 2px 6px;
-  font-size: 10px;
-  font-weight: bold;
-  white-space: nowrap;
-  display: inline-block;
-  margin-right: 0;
-  margin-top: 1px;
-  margin-bottom: 2px;
-  line-height: 1.2;
+.data-table .data-row-added td {
+    background: var(--added-wash);
 }
 
-.data-table-header-property {
-  display: inline-block;
-  font-size: 12px;
-  margin-top: 1px;
-  line-height: 1.3;
+.data-table .data-row-added td.data-act {
+    box-shadow: inset 3px 0 0 var(--added-line);
 }
 
-.data-table-header-property.size-xs {
-  font-size: 9px;
+.data-table .data-row-deleted td {
+    background: var(--deleted-wash);
+    color: var(--text-muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--deleted-line);
 }
 
-.data-table-header-property.size-s {
-  font-size: 10px;
+.data-table .data-row-deleted td.data-act {
+    box-shadow: inset 3px 0 0 var(--deleted-line);
+    text-decoration: none;
 }
 
-.data-table-header-property.size-m {
-  font-size: 11px;
+/* Colour is never the only signal: the ID cell says New / Deleted in words. */
+.data-pill {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 5px;
+    border: 1px solid currentColor;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 14px;
+    vertical-align: 1px;
 }
 
-.data-table-header-property.size-l {
-  font-size: 12px;
+.data-pill.added {
+    color: var(--added-line);
 }
 
-.data-table-sort-indicator {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  font-size: 10px;
-  color: var(--brand-text);
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(64, 60, 83, 0.1);
-  border: 1px solid var(--brand-border);
-  border-radius: 3px;
-  font-weight: bold;
-  transition: all 0.2s ease;
+.data-pill.deleted {
+    color: var(--deleted-line);
 }
 
-.data-table-sortable-header:hover .data-table-sort-indicator {
-  background: rgba(64, 60, 83, 0.2);
-  border-color: var(--brand-border);
-}
-
-.data-table th:hover {
-  background-color: var(--surface-3);
-}
-
-.data-table th.data-table-delete-row-column {
-  cursor: default;
-}
-
-
-.data-table-delete-row-column {
-    width: 20px !important;
-    min-width: 20px !important;
-    max-width: 20px !important;
+.data-empty {
+    padding: 32px 16px;
+    color: var(--text-muted);
+    font-size: 13px;
     text-align: center;
-    padding: 2px !important;
 }
 
-.data-table-delete-row-btn {
-    background-color: #C33D35;
-    color: white;
-    border: none;
-    border-radius: 3px;
-    width: 18px;
-    height: 18px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    display: flex;
+.data-empty p {
+    margin: 0 0 10px;
+}
+
+.data-changes {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.data-changes[hidden] {
+    display: none;
+}
+
+.data-changes-count {
+    font-weight: 600;
+}
+
+.data-changes-meta {
+    color: var(--text-muted);
+}
+
+.data-changes-meta.problem {
+    color: var(--danger-text);
+}
+
+/* The + Add forms and the review list live in RailMenus. */
+.data-add-form {
+    width: 260px;
+    padding: 4px 6px;
+    font-size: 12px;
+}
+
+.data-add-form h4 {
+    margin: 0 0 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.data-form-row {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 4px 8px;
     align-items: center;
-    justify-content: center;
-    line-height: 1;
+    margin-bottom: 6px;
 }
 
-.data-table-delete-row-btn:hover {
-    background-color: #ff0000;
+.data-form-row > label,
+.data-form-row > span {
+    color: var(--text-muted);
 }
 
-.data-table-delete-row-btn.tt {
-    display: inline-flex;
+.data-form-row input {
+    height: 24px;
+    box-sizing: border-box;
+    min-width: 0;
+    padding: 0 8px;
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
 }
 
-.data-table-tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 2px solid var(--border);
-  flex-shrink: 0;
-  overflow-x: auto;
-  background: var(--input-bg);
+.data-form-row input[readonly] {
+    background: var(--surface);
+    color: var(--text-muted);
 }
 
-.data-table-tab {
-  padding: 8px 16px;
-  background: var(--surface);
-  border: none;
-  border-top: 2px solid transparent;
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s ease;
+.data-form-row input[aria-invalid="true"] {
+    border-color: var(--danger-text);
 }
 
-.data-table-tab:hover {
-  background: var(--surface-3);
+.data-form-error {
+    grid-column: 2;
+    color: var(--danger-text);
+    font-size: 11px;
 }
 
-.data-table-tab.active {
-  background: var(--input-bg);
-  border-top-color: #4CAF50;
-  font-weight: bold;
+.data-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.data-review {
+    width: 320px;
+    max-height: 300px;
+    overflow: auto;
+}
+
+.data-review-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 8px;
+    align-items: center;
+    padding: 6px 4px;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 12px;
+}
+
+.data-review-item:last-child {
+    border-bottom: 0;
+}
+
+.data-review-what {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.data-review-detail {
+    grid-column: 1 / -1;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.data-review-detail del {
+    color: var(--deleted-line);
+}
+
+.data-review-detail ins {
+    color: var(--added-line);
+    text-decoration: none;
+}
+
+.data-review-empty {
+    padding: 8px;
+    color: var(--text-muted);
+}
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 /*************************
