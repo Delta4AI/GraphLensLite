@@ -681,6 +681,7 @@ class GraphCoreManager {
 
     this.cache.bubbleSetChanged = false;
     this.cache.qm.decodeQueryAndBuildAST();
+    this.cache.qm.markApplied?.();
 
     const rule = visibilityRule(
       this.cache.data.layouts[this.cache.data.selectedLayout],

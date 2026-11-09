@@ -446,13 +446,11 @@ const TOUR_STEPS = [
            The query <strong>syncs with the filter panel</strong> — changing filters updates the query text, and vice versa.
            When you manually edit the query, filters get <strong>locked</strong> (🔒) to prevent conflicts.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#015C0C;border:1px solid rgba(0,0,0,0.3);">🔍 Filter</span> — apply the query to filter the graph (hide non-matching elements)
-           <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">🎯 Select</span> — apply the query to select matching elements without filtering
-           <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#EFB0AA;border:1px solid rgba(0,0,0,0.3);">⟳ Sync</span> — reset the query to match the current filter panel state
-           <br>
-           <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#C33D35;border:1px solid rgba(0,0,0,0.3);">✗ Clear text</span> — empty the box (⟳ Sync is what hands filtering back to the panel)
+           The toolbar's status line tells you whether the box matches the filter panel, holds an edit you have not applied, or is filtering the graph.
+           <br><strong>Filter graph</strong> (<kbd>Ctrl</kbd>+<kbd>Enter</kbd>) — hide everything the query does not match
+           <br><strong>Select matches</strong> — select the matching elements without hiding anything
+           <br><strong>Reset to filters</strong> — drop the edited query and let the filter panel drive the graph again
+           <br><strong>Clear text</strong> — empty the box; the graph keeps the last applied query
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Each filter row's <strong>⋯</strong> menu has <strong>📝 Add to query</strong>: it <strong>appends</strong> that filter's current range or category selection as a query fragment — a quick way to build complex queries from existing filters.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
@@ -468,7 +466,7 @@ const TOUR_STEPS = [
            <br>• <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">📝 Open in query editor</span> drops it into the editor for review
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            <strong>Setup &amp; privacy</strong>
-           <br>The assistant talks to an <strong>Ollama</strong> server you control, local by default. Every message ships a snapshot of the current graph state, so use a local endpoint for sensitive data. Click <strong>⚙ Settings</strong> in the workbench toolbar to configure the endpoint and pick a model. Results vary by model. Tested with <code>qwen3.5:9b</code>.
+           <br>The assistant talks to an <strong>Ollama</strong> server you control, local by default. Every message ships a snapshot of the current graph state, so use a local endpoint for sensitive data. Click <strong>⚙ Settings</strong> at the top of the assistant pane to configure the endpoint and pick a model. Results vary by model. Tested with <code>qwen3.5:9b</code>.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            The <strong>budget pill</strong> at the bottom shows how much of the model's context window the next request will consume. Click it for a per-section breakdown.`,
     targets: [{ selector: '#workbench' }, { selector: '#assistantToggleBtn' }],

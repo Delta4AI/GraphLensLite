@@ -744,14 +744,6 @@ body {
     text-overflow: ellipsis;
 }
 
-.panel-header-center-buttons {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-width: 0;
-}
-
 .panel-header-buttons {
     flex: 0 0 auto;
     display: flex;
@@ -775,6 +767,11 @@ body {
     min-width: 20px;
     height: 20px;
     flex-shrink: 0;
+}
+
+/* A tab without help hides ⓘ; display:flex above would otherwise keep it. */
+.panel-header-btn[hidden] {
+    display: none;
 }
 
 .panel-header-btn:hover {
@@ -3345,35 +3342,6 @@ hr {
     margin: 1px;
 }
 
-.tooltip-dummy-buttons {
-    background-color: #403C53;
-    border: 1px solid var(--border-strong);
-    border-radius: 5px;
-    color: white;
-    padding-left: 4px;
-    padding-right: 4px;
-}
-
-.tooltip-dummy-buttons.red {
-    background-color: #C33D35;
-    color: white;
-}
-
-.tooltip-dummy-buttons.blue {
-    background-color: #8CA6D9;
-    color: var(--text);
-}
-
-.tooltip-dummy-buttons.pink {
-    background-color: #EFB0AA;
-    color: var(--text);
-}
-
-.tooltip-dummy-buttons.green {
-    background-color: #015C0C;
-    color: white;
-}
-
 .black {
     color: var(--text);
 }
@@ -5010,106 +4978,6 @@ div[slider] > input[type=range]::-ms-tooltip {
     background: var(--input-bg);
 }
 
-.panel-header-center-buttons .query-buttons {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.panel-header-center-buttons .query-buttons button {
-    height: 24px;
-    cursor: pointer;
-    border-radius: 3px;
-    color: #fff;
-    border: 1px solid rgba(0, 0, 0, 0.3);
-    background-color: #015C0C;
-    font-size: 11px;
-    white-space: nowrap;
-    padding: 2px 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.panel-header-center-buttons .query-buttons button:hover {
-    border-color: rgba(255, 255, 255, 0.6);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.panel-header-center-buttons .query-buttons button:active {
-    transform: translateY(0);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-.panel-header-center-buttons .query-buttons button:disabled {
-    background-color: #2a2733;
-    cursor: not-allowed;
-    opacity: 0.5;
-    color: var(--text-faint);
-    box-shadow: none;
-    transform: none;
-}
-
-.panel-header-center-buttons .query-buttons button.red {
-    background-color: #C33D35 !important;
-    color: white !important;
-}
-
-.panel-header-center-buttons .query-buttons button.red:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .query-buttons button.pink {
-    background-color: #EFB0AA !important;
-    color: black !important;
-}
-
-.panel-header-center-buttons .query-buttons button.pink:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .query-buttons button.blue {
-    background-color: #8CA6D9 !important;
-    color: black !important;
-}
-
-.panel-header-center-buttons .query-buttons button.blue:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .query-buttons button.grey {
-    background-color: #9998AF !important;
-    color: black !important;
-}
-
-.panel-header-center-buttons .query-buttons button.grey:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .query-buttons button.green {
-    background-color: #015C0C !important;
-    color: white !important;
-}
-
-.panel-header-center-buttons .query-buttons button.green:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .query-buttons button.purple {
-    background-color: #015C0C !important;
-    color: white !important;
-}
-
-.panel-header-center-buttons .query-buttons button.purple:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
 /* ==========================================================================
    Data editor (Workbench › Data). Toolbar: Rows | Type switches, filter, count,
    then + Add / Import / Export at the right. The table is an APG grid: one Tab
@@ -5126,6 +4994,7 @@ div[slider] > input[type=range]::-ms-tooltip {
 }
 
 .data-toolbar,
+.wb-toolbar,
 .data-changes {
     display: flex;
     align-items: center;
@@ -5136,7 +5005,8 @@ div[slider] > input[type=range]::-ms-tooltip {
     font-size: 12px;
 }
 
-.data-toolbar {
+.data-toolbar,
+.wb-toolbar {
     border-bottom: 1px solid var(--border-soft);
 }
 
@@ -5144,7 +5014,74 @@ div[slider] > input[type=range]::-ms-tooltip {
     flex: 1;
 }
 
+/* Query and Assistant panes: the tab's toolbar on top, its content below. */
+#queryPane:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+#queryPane #queryEditor {
+    height: auto;
+    min-height: 0;
+}
+
+.wb-toolbar-sep {
+    width: 1px;
+    height: 18px;
+    background: var(--border-soft);
+}
+
+/* What the query box is doing to the graph: Synced / Edited / Applied / Error. */
+.query-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--text-muted);
+}
+
+.query-status-pill {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+    padding: 0 6px;
+    border: 1px solid currentColor;
+    border-radius: 6px;
+}
+
+.query-status-pill:empty {
+    display: none;
+}
+
+.query-status[data-state="edited"] .query-status-pill {
+    color: var(--text-strong);
+    background: var(--edited-wash);
+    border-color: var(--edited-line);
+}
+
+.query-status[data-state="applied"] .query-status-pill {
+    color: var(--brand-text);
+}
+
+.query-status[data-state="error"] .query-status-pill,
+.query-status[data-state="error"] .query-status-text {
+    color: var(--danger-text);
+}
+
+.query-status[data-state="error"] .query-status-pill {
+    background: var(--deleted-wash);
+}
+
+.query-status code {
+    font-family: "Courier New", monospace;
+}
+
 .data-toolbar .insp-btn,
+.wb-toolbar .insp-btn,
 .data-changes .insp-btn,
 .data-add-form .insp-btn,
 .data-empty .insp-btn,
@@ -5195,7 +5132,8 @@ div[slider] > input[type=range]::-ms-tooltip {
     color: #fff;
 }
 
-.insp-btn:disabled {
+.insp-btn:disabled,
+.insp-btn[aria-disabled="true"] {
     opacity: 0.5;
     cursor: not-allowed;
     border-color: var(--border-soft);
