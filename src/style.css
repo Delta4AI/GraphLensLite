@@ -3049,6 +3049,12 @@ h5 {
     cursor: not-allowed !important;
 }
 
+/* Folding a group and switching Node/Edge read, not filter: they stay live. */
+#filterContainer.locked :is(.filter-group-chevron, .filter-scope) {
+    pointer-events: auto !important;
+    cursor: pointer;
+}
+
 /* Keep range inputs invisible when locked to prevent browser default disabled styling from showing */
 #filterContainer.locked input[type="range"] {
     opacity: 0 !important;
@@ -4187,9 +4193,14 @@ div[slider] > input[type=range]::-ms-tooltip {
     }
 }
 
-.filter-cat-empty {
-    padding: 4px 6px;
+.filter-cat-status {
+    padding: 0 6px 2px;
+    font-size: 11px;
     color: var(--text-muted);
+}
+
+.filter-cat-status:empty {
+    padding: 0;
 }
 
 .filter-cat-all {

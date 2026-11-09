@@ -100,7 +100,7 @@ describe('category list', () => {
 });
 
 describe('category list search', () => {
-  it('scopes All to the values the search shows, and says when nothing matches', async () => {
+  it('scopes All to the values the search shows and announces how many match', async () => {
     const cache = makeCache();
     const values = Array.from({ length: 12 }, (_, i) => (i < 3 ? `protein ${i}` : `gene ${i}`));
     cache.data.filterDefaults.get(PROP).categories = new Set(values);
@@ -120,10 +120,11 @@ describe('category list search', () => {
     expect(list.selectedCategories.size).toBe(9);
     expect([...list.selectedCategories].some((v) => v.startsWith('protein'))).toBe(false);
 
+    const status = document.querySelector('.filter-cat-menu [role="status"]');
+    expect(status.textContent).toBe('3 of 12 values');
     search.value = 'zzz';
     search.dispatchEvent(new Event('input'));
-    expect(document.querySelector('.filter-cat-empty').hidden).toBe(false);
-    expect(document.querySelector('.filter-cat-empty').textContent).toContain('zzz');
+    expect(status.textContent).toContain('No values match "zzz"');
   });
 });
 
@@ -151,5 +152,39 @@ describe('section checkbox', () => {
     await vi.waitFor(() => expect(ui.toggleSubSection).toHaveBeenCalledWith(true, 'Node filters', 'Topology'));
     expect(box.checked).toBe(true);
     expect(box.indeterminate).toBe(false);
+  });
+});
+
+describe('locked filters', () => {
+  it('take filter controls out of the Tab order and give them back on unlock', () => {
+    const cache = makeCache();
+    document.body.innerHTML = `
+      <div id="filterLockStatusBar"></div>
+      <div id="filterContainer">
+        <div class="header-card"><button class="filter-group-chevron"></button>
+          <div class="filter-scope"><button class="filter-scope-segment"></button></div></div>
+        <div class="sub-header-card"></div>
+        <div class="filter-row"><div class="filter-row-col1"><input type="checkbox"></div>
+          <div class="filter-row-col2"></div><div class="filter-row-col3"><button class="filter-row-more"></button></div></div>
+      </div>`;
+    const ui = Object.create(UIManager.prototype);
+    ui.cache = cache;
+    cache.ui = ui;
+    const components = new UIComponentManager(cache);
+    document.querySelector('.sub-header-card').append(components.createSectionCheckbox('Node filters', 'Topology'));
+    const list = new DropdownChecklist(PROP, cache);
+    list.appendTo(document.querySelector('.filter-row-col2'));
+    const frozen = [list.anchor, document.querySelector('.filter-section-check'),
+      document.querySelector('.filter-row-col1 input')];
+    const live = [...document.querySelectorAll('.filter-group-chevron, .filter-scope-segment, .filter-row-more')];
+
+    cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
+    ui.updateFilterLockState();
+    expect(frozen.map((el) => el.disabled)).toEqual([true, true, true]);
+    expect(live.some((el) => el.disabled)).toBe(false);
+
+    cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;
+    ui.updateFilterLockState();
+    expect(frozen.some((el) => el.disabled)).toBe(false);
   });
 });

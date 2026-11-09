@@ -132,6 +132,7 @@ class DropdownChecklist {
   #buildList(el) {
     const prop = StaticUtilities.decodePropHashId(this.propID).slice(-1)[0];
     const { counts, carriers } = this.#countValues();
+    let status;
 
     if (this.categories.size >= DropdownChecklist.SEARCH_FROM) {
       const search = document.createElement('input');
@@ -146,14 +147,21 @@ class DropdownChecklist {
           item.hidden = q !== '' && !item.dataset.value.toLowerCase().includes(q);
           if (!item.hidden) shown += 1;
         }
-        empty.hidden = shown > 0;
-        empty.textContent = `No values match "${search.value.trim()}"`;
+        // A live region, so a screen reader hears what the typing did.
+        status.textContent = !q ? ''
+          : shown ? `${shown} of ${this.categories.size} values`
+          : `No values match "${search.value.trim()}"`;
         const allName = q ? 'All matching' : 'All';
         all.querySelector('.filter-cat-name').textContent = allName;
         all.querySelector('input').setAttribute('aria-label', allName);
         this.#syncBoxes();
       });
       el.appendChild(search);
+      // Present (empty) from the start: a live region added mid-change is not read.
+      status = document.createElement('div');
+      status.className = 'filter-cat-status';
+      status.setAttribute('role', 'status');
+      el.appendChild(status);
     }
 
     const all = this.#item('All', null, carriers);
@@ -178,9 +186,6 @@ class DropdownChecklist {
       );
     });
     el.appendChild(all);
-    const empty = document.createElement('div');
-    empty.className = 'filter-cat-empty';
-    empty.hidden = true;
 
     const group = document.createElement('div');
     group.setAttribute('role', 'group');
@@ -217,7 +222,6 @@ class DropdownChecklist {
       group.appendChild(item);
     }
     el.appendChild(group);
-    el.appendChild(empty);
     el.addEventListener('keydown', (ev) => this.#onListKey(ev, el));
     this.listEl = el;
     this.#syncBoxes();

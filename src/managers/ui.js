@@ -540,6 +540,13 @@ class UIManager {
     document.getElementById('noteToggleBtn')?.classList.toggle('active', active);
   }
 
+  // What a manual query freezes. Folding a group, switching Node/Edge, the
+  // property search and each row's ⋯ menu stay live: they read, not filter.
+  static LOCKABLE_FILTER_CONTROLS = [
+    ':is(.header-card, .sub-header-card) :is(input, button):not(.filter-group-chevron, .filter-scope-segment)',
+    ':is(.filter-row-col1, .filter-row-col2, .filter-toolbar-join) :is(input, button)',
+  ].join(', ');
+
   // ------------------------------------------------------- the overlay stack
 
   /**
@@ -822,6 +829,7 @@ class UIManager {
     }
 
     this.buildFilterScopeToggle(div);
+    this.updateFilterLockState();
 
     this.cache.qm.updateQueryTextArea();
   }
@@ -1696,17 +1704,11 @@ class UIManager {
         container.classList.remove('locked');
       }
 
-      // Disable/enable all range inputs programmatically to fully prevent interaction
-      const rangeInputs = container.querySelectorAll('input[type="range"]');
-      rangeInputs.forEach((input) => {
-        input.disabled = isLocked;
-      });
-
-      // Disable/enable number inputs
-      const numberInputs = container.querySelectorAll('input[type="number"]');
-      numberInputs.forEach((input) => {
-        input.disabled = isLocked;
-      });
+      // The CSS dims these and blocks the mouse; disabling also takes them out
+      // of the Tab order, where a toggle used to be silently reverted.
+      for (const control of container.querySelectorAll(UIManager.LOCKABLE_FILTER_CONTROLS)) {
+        control.disabled = isLocked;
+      }
     }
   }
 
