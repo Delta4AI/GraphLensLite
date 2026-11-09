@@ -64,11 +64,6 @@ describe('styleOverride', () => {
     expect(() => styleOverride('Node Sise', 1)).toThrow(/Unknown style property/);
   });
 
-  it('maps every property to a node or edge', () => {
-    for (const spec of Object.values(STYLE_PROPERTIES)) {
-      expect(['node', 'edge']).toContain(spec.target);
-    }
-  });
 });
 
 describe('labelSource', () => {

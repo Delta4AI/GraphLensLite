@@ -532,9 +532,9 @@ class GraphCoreManager {
    * @param {string[]} commands
    * @param {object} [options]
    * @param {object} [options.badge]  for 'badge_set': {placement, color, text}
-   * @param {string[]} [options.ids]  nodes to update instead of the selection
    *   or {placement, color, property} to take each node's text from a column;
    *   for 'badge_remove': {placement}
+   * @param {string[]} [options.ids]  nodes to update instead of the selection
    */
   async updateNodes(overrides = {}, commands = [], { badge, ids } = {}) {
     const targets = ids ?? this.cache.selectedNodes;
@@ -635,7 +635,7 @@ class GraphCoreManager {
     if (targets.length) this.cache.history?.commit('Node style change');
     if (nodesWithoutBadgeValue > 0) {
       this.cache.ui.info(
-        `${nodesWithoutBadgeValue} of ${this.cache.selectedNodes.length} selected nodes have no ` +
+        `${nodesWithoutBadgeValue} of ${targets.length} selected nodes have no ` +
           `value for that column, so they got no badge there.`
       );
     }
