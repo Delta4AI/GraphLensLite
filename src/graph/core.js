@@ -826,7 +826,10 @@ class GraphCoreManager {
         activeElement.tagName === 'INPUT' ||
         activeElement.tagName === 'TEXTAREA' ||
         activeElement.tagName === 'SELECT' ||
-        activeElement.isContentEditable
+        activeElement.isContentEditable ||
+        // A grid's letters start an edit, and its read-only cells must not
+        // fire app shortcuts either (WCAG 2.1.4); Ctrl+Z there is not graph undo.
+        activeElement.closest?.('[role="grid"]')
       ) {
         return;
       }

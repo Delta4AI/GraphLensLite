@@ -473,8 +473,10 @@ class DataTable {
   /** What a row is in the pending changes: 'deleted', 'added', 'edited' or ''. */
   #rowState(type, id) {
     const change = this.pendingChanges.get(rowKey(type, id));
-    if (!change) return type === 'Edge' && this.#deletedEnd(id) ? 'cascade' : '';
-    if (change.action === 'delete') return 'deleted';
+    if (change?.action === 'delete') return 'deleted';
+    // Goes with its node on Apply, whatever was edited on it.
+    if (type === 'Edge' && this.#deletedEnd(id)) return 'cascade';
+    if (!change) return '';
     return this.#elementFor(type, id) ? 'edited' : 'added';
   }
 
@@ -1037,7 +1039,9 @@ class DataTable {
     this.rowMenu?.close();
     const key = rowKey(type, id);
     if (this.#elementFor(type, id)) {
-      this.pendingChanges.set(key, { type, id, action: 'delete' });
+      // Restore brings the row's staged edits back with it.
+      const restoreValues = this.pendingChanges.get(key)?.values;
+      this.pendingChanges.set(key, { type, id, action: 'delete', restoreValues });
       this.activeCell = { key, col: 'act' };
     } else {
       this.pendingChanges.delete(key);
@@ -1049,7 +1053,14 @@ class DataTable {
 
   restoreRow(type, id) {
     const key = rowKey(type, id);
-    if (this.pendingChanges.get(key)?.action === 'delete') this.pendingChanges.delete(key);
+    const change = this.pendingChanges.get(key);
+    if (change?.action === 'delete') {
+      if (Object.keys(change.restoreValues ?? {}).length) {
+        this.pendingChanges.set(key, { type, id, action: 'edit', values: change.restoreValues });
+      } else {
+        this.pendingChanges.delete(key);
+      }
+    }
     this.activeCell = { key, col: 'act' };
     this.loadTabData();
     this.notifyPendingChanges();
@@ -1283,6 +1294,7 @@ class DataTable {
     this.#removeColumnHeader(column);
     this.addedColumns = this.addedColumns.filter((c) => c !== column);
     for (const [key, change] of this.pendingChanges) {
+      if (change.action === 'delete') delete change.restoreValues?.[column.header];
       if (change.action === 'delete' || !Object.hasOwn(change.values, column.header)) continue;
       delete change.values[column.header];
       if (this.#elementFor(change.type, change.id) && !Object.keys(change.values).length) this.pendingChanges.delete(key);
@@ -1312,7 +1324,8 @@ class DataTable {
   hasElement(type, id) {
     const change = this.pendingChanges.get(rowKey(type, id));
     if (change) return change.action !== 'delete';
-    return (type === 'Node' ? this.cache.nodeRef : this.cache.edgeRef).has(id);
+    // Keyed by text: a typed "5" finds a loaded node whose id is the number 5.
+    return !!this.#elementFor(type, id);
   }
 
   /**
@@ -1538,6 +1551,13 @@ class DataTable {
       if (!hasProperty) {
         errors.push(`• ${change.type} "${change.id}" requires at least one property value`);
       }
+      if (change.type === 'Edge') {
+        for (const end of String(change.id).split('::')) {
+          if (!this.hasElement('Node', end)) {
+            errors.push(`• Edge "${change.id}" needs node "${end}", which is staged for deletion or was removed`);
+          }
+        }
+      }
     }
 
     return errors;
@@ -1654,7 +1674,8 @@ class DataTable {
   }
 
   createEdge(id) {
-    const [source, target] = id.split('::');
+    // The loaded node's own id, so a typed "5" stays the number 5 when the file has numeric ids.
+    const [source, target] = id.split('::').map((end) => this.#elementFor('Node', end)?.id ?? end);
     return {
       id: id,
       source: source,
