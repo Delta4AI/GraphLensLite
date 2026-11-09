@@ -1127,12 +1127,12 @@ body {
 }
 
 .insp-section-title {
-    margin: 14px 0 6px 0;
+    margin: 18px 0 4px 0;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--text-muted);
+    color: var(--accent-text);
 }
 
 /* --text-muted, not --text-faint. These are prose, so they owe 4.5:1, and #888
@@ -2056,7 +2056,7 @@ h5 {
 
 .appearance-card > .card-collapse-bar {
     background: none;
-    color: var(--text-muted);
+    color: var(--text);
     padding: 0;
     border-bottom: 1px solid var(--border);
     border-radius: 0;
@@ -2067,11 +2067,12 @@ h5 {
     color: var(--accent-text);
 }
 
+/* Inspector heading levels: section (.insp-section-title, accent eyebrow) >
+   card (this and .flat-card::before, 13px semibold) > sub-group (.prop-subhead). */
 .appearance-card .card-collapse-header {
-    padding: 4px 0;
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    padding: 5px 0 4px;
+    font-size: 13px;
+    font-weight: 600;
 }
 
 .appearance-card .card-collapse-title {
@@ -2081,6 +2082,9 @@ h5 {
 .appearance-card .layer-count {
     flex: 1 1 auto;
     text-align: left;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-muted);
     font-family: var(--font-mono, ui-monospace, monospace);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
@@ -2103,16 +2107,14 @@ h5 {
     display: block;
     transform: none;
     height: auto;
-    padding: 4px 0;
+    padding: 5px 0 4px;
     margin-bottom: 2px;
     border-bottom: 1px solid var(--border);
     border-radius: 0;
     background: none;
-    color: var(--text-muted);
-    font-size: 11px;
-    font-weight: bold;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
 }
 
 /* Overlay cards (Groups pane, heatmap) keep their bar but share the rows. */
@@ -2156,9 +2158,9 @@ h5 {
     margin: 8px 0 2px;
     padding-top: 6px;
     border-top: 1px solid var(--border-soft);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
-    color: var(--text-muted);
+    color: var(--text-strong);
 }
 
 .prop-mixed {
