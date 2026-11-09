@@ -38,6 +38,7 @@ Saved files load unchanged. One behaviour changes on purpose — **with the filt
 * **The first edit after loading a graph can be undone.** The loading overlay cleared while the post-load work was still running, and an edit made in that moment became part of undo's starting point.
 * **Reset to filters (formerly Sync) re-applies the filter panel.** After a hand-written query had filtered the graph, Sync unlocked the panel and rewrote the query but left the graph showing the query's result.
 * **The data editor keeps every edit it accepts.** Keys typed on a read-only cell no longer fire app shortcuts (D closed the editor, S and P exported, Ctrl+Z undid a graph change). Numeric node ids work in the add forms, where "5" was not found and a new edge to node 5 vanished on Apply. A new edge whose node is then deleted blocks Apply instead of disappearing, an edited edge whose node is deleted shows that it goes with it, and restoring a deleted row keeps its staged edits.
+* **The assistant's answers are readable in dark mode.** Its answer bubbles and query list kept a near-black text colour on the dark surface.
 
 ### Security
 
@@ -53,6 +54,7 @@ Saved files load unchanged. One behaviour changes on purpose — **with the filt
 * **Select Elements: separate ＋ Add and − Remove buttons** next to each Node IDs, Edge IDs and label box, in place of one Include/Exclude button flipped by a switch. Enter always adds; before, it followed the switch, so a switch left on Exclude made Enter remove what was typed. The boxes are wider, too.
 * **The app menu opens from a 📂 File button** at the left of the toolbar, instead of from the Delta4 logo, which gave no hint that it was a menu.
 * **Renamed and moved controls.** Query: *Filter*, *Select* and *Sync* are now *Filter graph*, *Select matches* and *Reset to filters*. The rail's *Lasso*, *Hover*, *Select*, *Note* and presentation buttons moved: lasso and selection to the selection chip's menu, hover highlight and notes to **Overlays**, presentation mode to **Export**. Their keys (L, H, ⇧F) are unchanged. A filter row's *add matches to the selection* takes two clicks now (**⋯ › Add matches**).
+* **Light mode uses cool slate greys** instead of pure greys, leaning toward the brand slate as dark mode already did. Text gains contrast; the red accent is unchanged.
 * **Data editor Export saves the rows shown**, so a typed filter narrows the export too; before, it exported the whole *Rows* and *Type* view.
 * **The ingest service deploys with `just` instead of shell scripts.** `install-service.sh` and `update-service.sh` are gone; `just deploy` replaces both, and `just status`, `logs`, `down` and `uninstall` cover the rest (see [SERVICE.md](SERVICE.md)). The service no longer needs `npm install` on the server, and node upgrades are picked up on the next deploy.
 
