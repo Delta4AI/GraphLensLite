@@ -48,7 +48,7 @@ const PANE_HTML = `
     <button type="button" id="importDataTableBtn" class="insp-btn"
             title="Merge an Excel file into the current graph — preview the changes first">⤒ Import</button>
     <button type="button" id="exportDataTableBtn" class="insp-btn"
-            title="Export the rows shown here, with their styling, as Excel">⤓ Export</button>
+            title="Export the applied data for this Rows and Type view, with styling, as Excel">⤓ Export</button>
   </div>
   <div class="data-table-wrapper">
     <table id="dataTable" class="data-table" role="grid" aria-label="Graph data" aria-describedby="dataGridHint">
@@ -94,6 +94,25 @@ class DataTable {
     this.cache = cache;
   }
 
+  /**
+   * Take over the view of the editor this one replaces (cache.reset() builds a
+   * new one on every load, Apply's rebuild included). Staged changes do not
+   * carry over: they belong to the old graph, so losing them is said out loud.
+   */
+  carryOver(previous) {
+    this.currentTab = previous.currentTab;
+    this.filterText = previous.filterText;
+    this.activeCell = previous.activeCell;
+    const active = document.activeElement;
+    this.restoreFocus = !!(previous.table?.contains(active) || previous.changesBar?.contains(active));
+    const { total } = previous.#changeCounts();
+    if (total) {
+      this.cache.ui.warning?.(
+        `${total} unsaved data editor change${total === 1 ? ' was' : 's were'} discarded because the graph was replaced.`
+      );
+    }
+  }
+
   get scope() {
     return this.currentTab.startsWith('selected') ? 'selection' : 'all';
   }
@@ -126,6 +145,7 @@ class DataTable {
       if (!btn) return;
       await this.switchTab(SCOPE_TABS[btn.dataset.scope ?? this.scope][btn.dataset.kind ?? this.kind]);
     });
+    this.filterInput.value = this.filterText;
     this.filterInput.addEventListener('input', () => {
       this.filterText = this.filterInput.value;
       this.render();
@@ -374,7 +394,14 @@ class DataTable {
 
     this.fileData = structuredClone(fileData);
     // Staged edits belong to the graph they were made on: a newly loaded graph
-    // (or the rebuild after Apply) starts clean, never with another file's edits.
+    // starts clean, never with another file's edits. Apply clears them itself
+    // before its rebuild, so anything left here is work the user loses.
+    const { total } = this.#changeCounts();
+    if (total) {
+      this.cache.ui.warning?.(
+        `${total} unsaved data editor change${total === 1 ? ' was' : 's were'} discarded because the graph was replaced.`
+      );
+    }
     this.pendingChanges.clear();
     this.addedColumns = [];
     this.notifyPendingChanges();
@@ -587,7 +614,9 @@ class DataTable {
     const apply = this.changesBar.querySelector('#updateDataTableBtn');
     apply.textContent = `Apply ${total} ${noun}`;
     // Blocked while a new row still owes a value; the line beside it says which.
-    apply.disabled = problems.length > 0;
+    // aria-disabled, not disabled: it stays in the Tab order and a click jumps
+    // to the row that blocks it.
+    apply.setAttribute('aria-disabled', String(problems.length > 0));
   }
 
   /** One always-present live region; only a changed message is written, so redraws stay quiet. */
@@ -613,10 +642,16 @@ class DataTable {
       this.emptyEl.hidden = !empty;
       this.emptyEl.replaceChildren(...(empty ?? []));
     }
+    // Emptying the table under focus would drop it to <body> (Apply's rebuild,
+    // a selection refresh, a sort): note it and put focus back after.
+    const hadFocus = !!this.table?.contains(document.activeElement) && !this.editing;
     this.table?.toggleAttribute('hidden', !!empty);
     this.tableHead.replaceChildren();
     this.tableBody.replaceChildren();
-    if (empty) return;
+    if (empty) {
+      if (hadFocus) this.filterInput?.focus();
+      return;
+    }
 
     const cols = this.#visibleColumns();
     this.tableHead.append(this.#groupHeaderRow(cols), this.#headerRow(cols));
@@ -626,10 +661,16 @@ class DataTable {
     this.table?.setAttribute('aria-rowcount', String(rows.length + 2));
     // scrollIntoView honours scroll-padding: keep the active cell clear of the
     // frozen ⋯ + ID columns (the sticky header's height is fixed in CSS).
+    // Widths, not offsetLeft: a stuck cell's offsetLeft grows with the scroll.
+    const actHead = this.tableHead.querySelector('.data-head-row .data-act');
     const idHead = this.tableHead.querySelector('.data-head-row .data-id');
     const wrapper = this.table?.parentElement;
-    if (idHead && wrapper) wrapper.style.scrollPaddingLeft = `${idHead.offsetLeft + idHead.offsetWidth}px`;
+    if (actHead && idHead && wrapper) wrapper.style.scrollPaddingLeft = `${actHead.offsetWidth + idHead.offsetWidth}px`;
     this.#placeRovingFocus();
+    if (hadFocus || this.restoreFocus) {
+      this.restoreFocus = false;
+      this.focusActiveCell();
+    }
   }
 
   #groupHeaderRow(cols) {
@@ -1037,7 +1078,7 @@ class DataTable {
     this.#syncChangesBar();
     if (this.onPendingChangesCallback) {
       // The pending changes are the whole difference from the loaded data.
-      this.onPendingChangesCallback({ hasPendingChanges: this.pendingChanges.size > 0 });
+      this.onPendingChangesCallback({ hasPendingChanges: this.#changeCounts().total > 0 });
     }
   }
 
@@ -1295,9 +1336,21 @@ class DataTable {
         this.cache.ui.error('No data to update with.');
         return;
       }
-      // The rebuild repopulates the table, which clears the staged changes;
-      // if it throws first, they are still here to retry.
-      await this.rebuildGraph(updatedFileData);
+      // Taken out before the rebuild (which repopulates the table) and put back
+      // if it throws, so a failed Apply can be retried.
+      const staged = { changes: new Map(this.pendingChanges), columns: [...this.addedColumns] };
+      this.pendingChanges.clear();
+      this.addedColumns = [];
+      try {
+        await this.rebuildGraph(updatedFileData);
+      } catch (err) {
+        // The rebuild may already have swapped in a new editor (cache.reset()).
+        const current = this.cache.dataTable ?? this;
+        current.pendingChanges = staged.changes;
+        current.addedColumns = staged.columns;
+        current.notifyPendingChanges();
+        throw err;
+      }
     } catch (err) {
       this.cache.ui.error(`Error updating graph: ${err}`);
     } finally {
@@ -1360,9 +1413,6 @@ class DataTable {
     // Refresh UI to update node/edge counts and filter availability
     this.cache.ui.refreshUI();
 
-    // Reload data table with updated fileData to ensure headers are in sync
-    this.fileData = updatedFileData;
-    this.loadTabData();
   }
 
   /** Open a file picker and merge the chosen Excel file into the loaded graph. */
@@ -1371,7 +1421,7 @@ class DataTable {
       this.cache.ui.error('Load a graph before importing.');
       return;
     }
-    if (this.pendingChanges.size > 0) {
+    if (this.#changeCounts().total > 0) {
       this.cache.ui.error('Apply or discard the unsaved data editor changes before importing.');
       return;
     }

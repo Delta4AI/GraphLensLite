@@ -153,6 +153,7 @@ describe('data editor grid', () => {
     expect(bar().hidden).toBe(false);
 
     dt.populateFromFileData({ ...dt.fileData, nodeDataHeaders: [{ subGroup: 'Bio', key: 'Score' }] });
+    expect(dt.cache.ui.warning).toHaveBeenCalledWith(expect.stringContaining('2 unsaved data editor changes were discarded'));
     expect(dt.pendingChanges.size).toBe(0);
     expect(dt.addedColumns).toEqual([]);
     expect(bar().hidden).toBe(true);
@@ -163,14 +164,14 @@ describe('data editor grid', () => {
     await dt.switchTab('allNodes');
     await dt.addNode('n9', 'Nine');
     const apply = document.getElementById('updateDataTableBtn');
-    expect(apply.disabled).toBe(true);
+    expect(apply.getAttribute('aria-disabled')).toBe('true'); // still focusable; a click jumps to n9
     expect(bar().textContent).toContain('"n9" requires at least one property value');
 
     const score = cell(dt, 'n9', P);
     dt.startEdit(score);
     score.textContent = '4';
     dt.commitEdit();
-    expect(apply.disabled).toBe(false);
+    expect(apply.getAttribute('aria-disabled')).toBe('false');
   });
 
   it('stages an added column, so Discard takes it back', async () => {
@@ -206,5 +207,33 @@ describe('data editor grid', () => {
     expect(document.activeElement).not.toBe(document.body);
     expect(dt.table.contains(document.activeElement)).toBe(true);
     expect(document.querySelector('.data-status').textContent).toBe('No unsaved changes.');
+  });
+
+  it('keeps focus on its cell when a selection change redraws the rows', async () => {
+    const { dt, cache } = mount();
+    cache.selectedNodes = ['n1', 'n2'];
+    await dt.refreshCurrentTab();
+    const score = cell(dt, 'n2', P);
+    score.focus();
+    cache.selectedNodes = ['n2', 'n3'];
+    await dt.refreshCurrentTab();
+    expect(document.activeElement).toBe(cell(dt, 'n2', P));
+    expect(document.activeElement).not.toBe(score); // a rebuilt cell, focused again
+  });
+
+  it('hands its view to the editor that replaces it on a reload, and says what was lost', async () => {
+    const { dt, cache } = mount();
+    await dt.switchTab('allEdges');
+    dt.filterText = 'x';
+    const next = new DataTable(cache);
+    next.carryOver(dt);
+    expect(next.currentTab).toBe('allEdges');
+    expect(next.filterText).toBe('x');
+    expect(cache.ui.warning).not.toHaveBeenCalled();
+
+    await dt.switchTab('allNodes');
+    dt.deleteRow('Node', 'n1');
+    new DataTable(cache).carryOver(dt);
+    expect(cache.ui.warning).toHaveBeenCalledWith(expect.stringContaining('1 unsaved data editor change was discarded'));
   });
 });
