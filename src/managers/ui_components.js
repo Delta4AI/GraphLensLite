@@ -1260,7 +1260,7 @@ class UIComponentManager {
   }
 
   /**
-   * The row's verbs behind one labelled "…" button. Selection, grouping,
+   * The row's verbs behind one labelled "⋯" button. Selection, grouping,
    * inversion and the query are five actions; inline they crowded the row end
    * into 8px targets (NN/g: more than two actions go in a menu beside the item).
    * The group dot stays inline because it also shows state.
@@ -1274,7 +1274,7 @@ class UIComponentManager {
     const more = document.createElement('button');
     more.type = 'button';
     more.className = 'filter-row-more';
-    more.textContent = '…';
+    more.textContent = '⋯';
     more.setAttribute('aria-label', `${prop} actions`);
     more.title = `Actions for ${prop}: selection, inversion, group, query`;
     const menu = new RailMenu(more, (el) => {

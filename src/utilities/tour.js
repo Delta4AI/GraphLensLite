@@ -216,7 +216,7 @@ const TOUR_STEPS = [
                  </div>
                </div>
                <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:2px solid var(--brand-text);background:var(--brand-text);flex-shrink:0;margin-top:2px;"></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text-muted);flex-shrink:0;">…</span>
+               <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text-muted);flex-shrink:0;">⋯</span>
              </div>
              <div style="display:flex;align-items:center;gap:8px;">
                <span style="display:inline-block;width:14px;height:14px;border:1px solid var(--accent-text);border-radius:3px;box-sizing:border-box;flex-shrink:0;"></span>
@@ -225,7 +225,7 @@ const TOUR_STEPS = [
                  <option>4 of 6</option>
                </select>
                <span style="display:inline-block;width:16px;flex-shrink:0;"></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text-muted);flex-shrink:0;">…</span>
+               <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text-muted);flex-shrink:0;">⋯</span>
              </div>
            </div>
            • <strong>Numeric properties</strong> get two-thumbed range sliders — drag the left thumb to set
@@ -248,7 +248,7 @@ const TOUR_STEPS = [
            it is in several (hover it to read the names). Groups fed this way are <em>filter-driven</em>:
            they update as the filter changes. Manage them all under <strong>Overlays › Groups</strong>.
            <br><br>
-           <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;vertical-align:middle;color:var(--text-muted);">…</span>
+           <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;vertical-align:middle;color:var(--text-muted);">⋯</span>
            <strong>Row actions</strong> — add or remove everything the filter matches to/from the selection,
            keep the values <em>outside</em> a range, add the property to a group, add it to the query, or reset the row.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
@@ -459,7 +459,7 @@ const TOUR_STEPS = [
            <br>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#C33D35;border:1px solid rgba(0,0,0,0.3);">✗ Clear text</span> — empty the box (⟳ Sync is what hands filtering back to the panel)
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           Each filter row's <strong>…</strong> menu has <strong>📝 Add to query</strong>: it <strong>appends</strong> that filter's current range or category selection as a query fragment — a quick way to build complex queries from existing filters.
+           Each filter row's <strong>⋯</strong> menu has <strong>📝 Add to query</strong>: it <strong>appends</strong> that filter's current range or category selection as a query fragment — a quick way to build complex queries from existing filters.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the query editor header for a full syntax reference.`,
     targets: [{ selector: '#workbench' }, { selector: '#queryToggleBtn' }],

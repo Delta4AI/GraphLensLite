@@ -985,7 +985,7 @@ class QueryManager {
 </ul>
 <p><strong>Filtering panel:</strong></p>
 <ul>
-  <li><strong>… › 📝 Add to query</strong> on a filter row - Add that filter's current setting to the query</li>
+  <li><strong>⋯ › 📝 Add to query</strong> on a filter row - Add that filter's current setting to the query</li>
   <li>Under <strong>⚙ Details</strong>: an <strong>OR / AND</strong> toggle sets how active filters combine (OR = match any, AND = match all). AND counts only the filters you've narrowed. The <strong>Complete cases only</strong> option makes AND also hide elements missing any of those filters.</li>
 </ul>
 
