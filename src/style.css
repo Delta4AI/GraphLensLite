@@ -102,6 +102,11 @@ body, html {
     outline-offset: 1px;
 }
 
+/* One checkbox colour app-wide: the interactive accent, as on focus rings. */
+input[type="checkbox"] {
+    accent-color: var(--accent-text);
+}
+
 /* Shell: rail on top, main content flexes, bottom bar rises from below. */
 body {
     display: flex;
@@ -1590,6 +1595,7 @@ h5 {
     font: inherit;
     font-size: 11px;
     font-weight: 600;
+    min-height: 24px;
     padding: 3px 11px;
     border: none;
     background: var(--surface-3);
@@ -2400,7 +2406,6 @@ h5 {
     width: 16px;
     height: 16px;
     margin: 0;
-    accent-color: var(--brand-border);
 }
 
 /* "In selection": one chip per distinct colour, with its count. */
@@ -3758,7 +3763,7 @@ div[slider] > input[type=range]::-ms-tooltip {
    the exact membership. 14px painted inside a 24px target (WCAG 2.5.8): the
    transparent border is the hit area. Unassigned, it is hidden until the row is
    hovered or the dot itself is focused or open — still tabbable, so the
-   keyboard reaches it, and the row's "…" menu offers "Add to group…" too. */
+   keyboard reaches it, and the row's "⋯" menu offers "Add to group…" too. */
 .group-chip {
     width: 24px;
     height: 24px;
@@ -3951,25 +3956,6 @@ div[slider] > input[type=range]::-ms-tooltip {
     border-color: var(--danger-text);
 }
 
-.group-row-more {
-    flex: 0 0 auto;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: none;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 14px;
-    line-height: 1;
-    cursor: pointer;
-}
-
-.group-row-more:hover {
-    background: var(--surface-3);
-    color: var(--text-strong);
-}
-
 /* The line the old UI never showed: a group can be fed by a live filter AND a
    hand-picked node set at the same time. Two parts, so "follows a filter" and
    "someone put these here" do not run together into one cryptic string. */
@@ -4027,7 +4013,7 @@ div[slider] > input[type=range]::-ms-tooltip {
 /* --------------------------------------------------------------------------
    Filter rows (Filters tab). Same control vocabulary as the appearance editor:
    24px fields with a --text-faint border, native checkboxes, 6px radius, and
-   the row's verbs behind one "…" button (ui_components.js createRowActions).
+   the row's verbs behind one "⋯" button (ui_components.js createRowActions).
    -------------------------------------------------------------------------- */
 .dropdown-check-list {
     display: block;
@@ -4131,7 +4117,6 @@ div[slider] > input[type=range]::-ms-tooltip {
     width: 14px;
     height: 14px;
     margin: 0 4px;
-    accent-color: var(--accent-text);
 }
 
 .filter-cat-name {
@@ -4149,11 +4134,11 @@ div[slider] > input[type=range]::-ms-tooltip {
 }
 
 .filter-row-check,
-.filter-section-check {
+.filter-section-check,
+.filter-strict-checkbox input {
     width: 16px;
     height: 16px;
     margin: 4px;
-    accent-color: var(--accent-text);
     cursor: pointer;
 }
 
@@ -4167,6 +4152,7 @@ div[slider] > input[type=range]::-ms-tooltip {
 }
 
 .filter-row-more,
+.group-row-more,
 .filter-section-reset {
     width: 24px;
     height: 24px;
@@ -4186,19 +4172,12 @@ div[slider] > input[type=range]::-ms-tooltip {
 
 .filter-row-more:hover,
 .filter-row-more[aria-expanded="true"],
+.group-row-more:hover,
+.group-row-more[aria-expanded="true"],
 .filter-section-reset:hover {
     border-color: var(--border);
     background: var(--surface-3);
     color: var(--text);
-}
-
-.filter-row-more:focus-visible,
-.filter-section-reset:focus-visible,
-.filter-cat-trigger:focus-visible,
-.filter-row-check:focus-visible,
-.filter-section-check:focus-visible {
-    outline: 2px solid var(--accent-text);
-    outline-offset: 1px;
 }
 
 /* Inverted ("keep values outside the range"): the kept ends take the accent. */
