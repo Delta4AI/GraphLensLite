@@ -299,3 +299,76 @@ describe('data editor grid', () => {
     expect(bar().hidden).toBe(false);
   });
 });
+
+describe('data editor staging rules', () => {
+  // Numeric ids, as a JSON file with `"id": 1` loads them, and one edge 1 → 2.
+  function mountNumeric() {
+    document.body.innerHTML = '<div id="dataTableContainer"></div>';
+    const nodes = [1, 2, 3].map((id) => ({ id, label: `N${id}`, D4Data: { 'Node filters': { Bio: { Score: id } } } }));
+    const edges = [{ id: '1::2', source: 1, target: 2, D4Data: { 'Edge filters': { Bio: { W: 1 } } } }];
+    const cache = {
+      CFG,
+      ui: { error: (m) => { throw new Error(m); }, warning: vi.fn(), info: vi.fn() },
+      selectedNodes: [],
+      selectedEdges: [],
+      nodeRef: new Map(nodes.map((n) => [n.id, n])),
+      edgeRef: new Map(edges.map((e) => [e.id, e])),
+      style: { getNodeStyleOrDefaults: () => ({}), getEdgeStyleOrDefaults: () => ({}) },
+      data: { layouts: {}, selectedLayout: 'Default' },
+      gcm: {
+        *traverseD4Data(e) {
+          for (const [section, subs] of Object.entries(e.D4Data ?? {}))
+            for (const [sub, props] of Object.entries(subs))
+              for (const [prop, value] of Object.entries(props)) yield [section, sub, prop, value];
+        },
+      },
+    };
+    const dt = new DataTable(cache);
+    dt.init();
+    dt.populateFromFileData({
+      nodeDataHeaders: [{ subGroup: 'Bio', key: 'Score' }],
+      edgeDataHeaders: [{ subGroup: 'Bio', key: 'W' }],
+      nodes,
+      edges,
+    });
+    return dt;
+  }
+
+  it('finds numeric node ids typed as text, and keeps a new edge to them on Apply', async () => {
+    const dt = mountNumeric();
+    expect(await dt.addNode('3')).toMatchObject({ message: 'Node "3" already exists.' });
+    expect(await dt.addEdge('3', '1')).toBeNull();
+    dt.trackChange('Edge', '3::1', 'Edge filters::Bio::W', '5');
+    const edge = dt.getUpdatedFileData().edges.find((e) => e.id === '3::1');
+    expect(edge).toMatchObject({ source: 3, target: 1 });
+  });
+
+  it('blocks Apply for a new edge whose node is gone', async () => {
+    const dt = mountNumeric();
+    await dt.addNode('x1', 'X');
+    dt.trackChange('Node', 'x1', 'Node filters::Bio::Score', '1');
+    await dt.addEdge('x1', '2');
+    dt.trackChange('Edge', 'x1::2', 'Edge filters::Bio::W', '1');
+    expect(dt.validateNewElements()).toEqual([]);
+    dt.deleteRow('Node', 'x1');
+    expect(dt.validateNewElements()).toEqual([expect.stringContaining('needs node "x1"')]);
+  });
+
+  it('marks an edited edge as going with its deleted node', async () => {
+    const dt = mountNumeric();
+    await dt.switchTab('allEdges');
+    dt.trackChange('Edge', '1::2', 'Edge filters::Bio::W', '7');
+    dt.deleteRow('Node', '1');
+    dt.loadTabData();
+    expect(dt.tableBody.querySelector('tr[data-key="Edge::1::2"]').classList.contains('data-row-deleted')).toBe(true);
+  });
+
+  it('brings a row\'s staged edits back when it is restored', async () => {
+    const dt = mountNumeric();
+    await dt.switchTab('allNodes');
+    dt.trackChange('Node', 2, 'Node filters::Bio::Score', '9');
+    dt.deleteRow('Node', 2);
+    dt.restoreRow('Node', 2);
+    expect(dt.pendingChanges.get('Node::2')).toMatchObject({ action: 'edit', values: { 'Node filters::Bio::Score': '9' } });
+  });
+});
