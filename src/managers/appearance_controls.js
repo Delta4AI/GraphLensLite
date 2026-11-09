@@ -797,4 +797,5 @@ export {
   createColorPicker,
   propRow,
   propSubhead,
+  nameControl,
 };

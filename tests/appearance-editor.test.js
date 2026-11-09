@@ -145,3 +145,14 @@ describe('appearance editor names', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 });
+
+describe('heatmap card names', () => {
+  it('names every heatmap slider and number field after its row', () => {
+    mount([node('a')]);
+    const card = document.querySelector('[data-label="Density Heatmap"]');
+    const unnamed = [...card.querySelectorAll('input, select')].filter((el) =>
+      !el.getAttribute('aria-label') && !el.getAttribute('aria-labelledby'));
+    expect(unnamed).toHaveLength(0);
+    expect(card.querySelector('input[type="range"]').getAttribute('aria-label')).toMatch(/^Heatmap /);
+  });
+});
