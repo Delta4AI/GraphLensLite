@@ -151,9 +151,9 @@ const TOUR_STEPS = [
     title: 'The Rail',
     text: `Everything session-level lives on the <strong>rail</strong> at the top:
            <br><br>
-           <strong>The logo</strong>, far left — the app menu: load data (Excel, JSON, or the STRING
-           database), download the Excel template, take this tour, start over, or open the project
-           on GitHub
+           <strong>📂 File</strong>, far left — open data (Excel, JSON, GraphML, CX2, the STRING database
+           or Neo4j), <strong>Save as JSON</strong> (<strong>S</strong>) to keep everything, download the
+           Excel template, take this tour or start over. Closing with unsaved changes asks first
            <br><strong>Workspace chip</strong> — which workspace you're in, plus live shown/total counts
            <br><strong>↶ ↷</strong> — undo / redo the last change to the workspace
            (<strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong>)
@@ -275,7 +275,7 @@ const TOUR_STEPS = [
            <br>• <strong>Click + drag a node</strong> — moves that node
            <br>• <strong>Click + drag selected nodes</strong> — moves the entire selection
            <br><br>
-           The <strong>minimap</strong> (bottom-right corner) shows an overview of the entire graph. Click or drag inside it to quickly navigate to different parts of the network — the inspector's <strong>Overlays</strong> tab hides it, along with everything else drawn over the graph. For a chrome-free screenshot, <strong>⛶ presentation mode</strong> (⇧F) hides the rail and the inspector.`,
+           The <strong>minimap</strong> (bottom-right corner) shows an overview of the entire graph. Click or drag inside it to quickly navigate to different parts of the network — the inspector's <strong>Overlays</strong> tab hides it, along with everything else drawn over the graph. For a chrome-free screenshot, <strong>presentation mode</strong> (<strong>⤓ Export</strong> menu, or ⇧F) hides the rail and the inspector.`,
     targets: [{ selector: '#innerGraphContainer' }, { selector: '.gll-minimap' }],
     position: 'left',
   },
