@@ -100,6 +100,8 @@ class Workbench {
 
     this.tab = name;
     this.el.removeAttribute('hidden');
+    // On a phone the inspector is a bottom sheet on the same edge: one at a time.
+    if (globalThis.matchMedia?.('(max-width: 760px)').matches) this.cache.inspector?.closeSheet?.();
     this.#applyHeight();
 
     for (const [other, spec] of Object.entries(TABS)) {

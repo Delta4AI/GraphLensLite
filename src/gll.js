@@ -483,7 +483,7 @@ window.addEventListener("DOMContentLoaded", () => {
   initTheme(document, window);
   cache.reset();
   cache.rail = initRail(cache);
-  cache.inspector = initInspector();
+  cache.inspector = initInspector(cache);
   cache.workbench = initWorkbench(cache);
   initFilterSearch();
   cache.palette = initCommandPalette(cache);

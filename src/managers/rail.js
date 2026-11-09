@@ -114,6 +114,19 @@ class RailMenu {
   }
 
   /**
+   * Open under another control than the menu's own anchor, for as long as it
+   * is open: the phone layout hides Layout, Export and the selection chip and
+   * reaches their menus from ⋯ More, where placement and the focus return on
+   * close have to use the button that is actually on screen.
+   */
+  openFrom(anchor) {
+    if (this.isOpen) this.close();
+    this._home = this.anchor;
+    this.anchor = anchor;
+    this.open();
+  }
+
+  /**
    * Position under the anchor, or above it when there is no room below: an
    * anchor at the bottom edge (a status bar's button) would otherwise be
    * covered by its own menu once the clamp pushes it back up. Public so a menu
@@ -150,6 +163,10 @@ class RailMenu {
     }
     if (!this.staticBuild) this.el.remove();
     if (hadFocus) this.anchor.focus();
+    if (this._home) {
+      this.anchor = this._home;
+      this._home = null;
+    }
   }
 
   /**
@@ -238,6 +255,49 @@ class Rail {
     if (exportMenuBtn) {
       this.menus.push(new RailMenu(exportMenuBtn, (el) => this.#buildExportMenu(el)));
     }
+    const moreBtn = document.getElementById('railMoreBtn');
+    if (moreBtn) this.menus.push(new RailMenu(moreBtn, (el) => this.#buildMoreMenu(el)));
+  }
+
+  /** The menu anchored to `id`, to open it from ⋯ More. */
+  #menuOf(id) {
+    return this.menus.find((m) => (m._home ?? m.anchor).id === id);
+  }
+
+  /**
+   * Phone layout: everything the narrow bar hides, by name. Plain buttons are
+   * clicked; the ones with menus open them under ⋯ More itself.
+   */
+  #buildMoreMenu(el) {
+    const more = document.getElementById('railMoreBtn');
+    const header = (text) => {
+      const h = document.createElement('div');
+      h.className = 'rail-menu-header';
+      h.textContent = text;
+      return h;
+    };
+    const click = (id) => this.#closeAnd(() => document.getElementById(id)?.click());
+    const submenu = (id) => () => {
+      this.closeMenus();
+      this.#menuOf(id)?.openFrom(more);
+    };
+    const tab = (id, icon, label) => menuItem({ icon, label, onClick: click(id) });
+    el.append(
+      header('View'),
+      menuItem({ icon: '⊡', label: 'Fit graph', onClick: click('fitBtn') }),
+      menuItem({ icon: '↻', label: 'Layout…', onClick: submenu('relayoutBtn') }),
+      menuItem({ icon: '⌕', label: 'Search', onClick: click('cmdkBtn') }),
+      menuItem({ icon: '◈', label: 'Selection…', onClick: submenu('selectMenuBtn') }),
+      header('Workbench'),
+      tab('dataToggleBtn', '🔢', 'Data'),
+      tab('queryToggleBtn', '📝', 'Query'),
+      tab('metricsToggleBtn', '📊', 'Metrics'),
+      tab('assistantToggleBtn', '🤖', 'Assistant'),
+      menuSeparator(),
+      menuItem({ icon: '⤓', label: 'Export…', onClick: submenu('exportMenuBtn') }),
+      menuItem({ icon: '◐', label: 'Switch theme', onClick: click('darkModeToggleBtn') }),
+      menuItem({ icon: '?', label: 'Keyboard shortcuts', onClick: click('keyboardSheetBtn') })
+    );
   }
 
   closeMenus() {
