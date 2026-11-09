@@ -84,12 +84,26 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - When a colour is mixed, an **In selection** row lists each distinct colour
   with its count; recolouring one changes only those elements.
 
+## Workbench tabs
+
+- The dark header holds only the tab's title, ⓘ help, ⤢ expand and × close.
+  Every tab's own actions sit in a `.wb-toolbar` inside its pane: state or view
+  switches on the left, then the actions as neutral `.insp-btn` at the right.
+  One filled `.insp-btn.primary` per surface, for the action the surface exists
+  for; buttons are never colour-coded by action.
+- A toolbar that drives the graph says what it is doing in words, on its left.
+  The query toolbar's status pill reads **Synced** (box = filter panel),
+  **Edited** (not applied yet), **Applied** (the query filters the graph and
+  locks the panel) or **Error**, followed by the problem it found
+  ("Not recognised: …").
+- A blocked action keeps focus (`aria-disabled`) and its reason is shown inline,
+  not only in a tooltip. Actions with a keyboard path say so in their tooltip
+  (Ctrl/⌘+Enter = Filter graph).
+
 ## Editable tables (Data editor)
 
-- A workbench tab keeps its toolbar inside its pane, not in the dark header:
-  view switches and the filter on the left, a count next to them, then the
-  tab's actions as `.insp-btn` at the right. One filled `.insp-btn.primary`
-  per surface, for the action the surface exists for.
+- The Data tab's toolbar: Rows and Type switches and the filter on the left, a
+  count next to them, + Add / Import / Export at the right.
 - Subsets of one table are segmented controls with counts (Rows: Selection |
   All; Type: Nodes | Edges | Both), never a row of tabs.
 - The table is an APG grid: one Tab stop, arrow keys between cells, Enter, F2,
@@ -115,10 +129,6 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - Light-mode neutrals are pure greys and the accent is the brand red, which also
   marks destructive actions. Moving to cool slate neutrals with an indigo accent
   is an open token-level change.
-- The Query and Assistant toolbars still sit in the workbench's dark header
-  as coloured buttons; only the Data tab follows the table pattern above.
-  Query's four actions (Apply, Select, Sync, Clear text) need their own
-  review, not just a restyle.
 - The data editor renders every row (2,500 rows take about 44ms); past
   ~20,000 rows it will need virtual scrolling with `aria-rowcount` /
   `aria-rowindex`.
