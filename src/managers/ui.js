@@ -473,6 +473,9 @@ class UIManager {
       'Reload'
     );
     if (confirmed) {
+      // Already confirmed: the unload guard must not ask a second time.
+      this.cache.history?.markSaved();
+      this.cache.dataTable?.reset();
       location.reload();
     }
   }

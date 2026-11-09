@@ -370,6 +370,12 @@ class Rail {
         ),
       }),
       menuItem({
+        icon: '💾',
+        label: 'Save as JSON',
+        title: 'Save the full graph — data, styles, workspaces — as a JSON file you can open again (S)',
+        onClick: this.#closeAnd(() => this.cache.io.exportGraphAsJSON()),
+      }),
+      menuItem({
         icon: '📥',
         label: 'Download Excel template',
         onClick: this.#closeAnd(() => this.cache.io.downloadExcelTemplate()),
