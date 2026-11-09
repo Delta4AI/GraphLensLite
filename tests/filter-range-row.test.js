@@ -98,14 +98,14 @@ describe('numeric filter row', () => {
     // fixed per slider to the widest endpoint ("7630" plus glyph slack).
     const { parent, slider } = mount();
     const [low, high] = boxes(parent);
-    expect(low.size).toBe(5);
-    expect(high.size).toBe(5);
+    expect(low.size).toBe(6);
+    expect(high.size).toBe(6);
 
     slider.sliderStart.value = '0';
     slider.handleThresholdOnInputEvent(true);
 
     expect(low.value).toBe('0');
-    expect(low.size).toBe(5);
+    expect(low.size).toBe(6);
   });
 
   it('pads integer-valued numbers on float columns to the fixed precision', () => {

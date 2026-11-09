@@ -216,21 +216,21 @@ const TOUR_STEPS = [
                  </div>
                </div>
                <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:2px solid var(--brand-text);background:var(--brand-text);flex-shrink:0;margin-top:2px;"></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;background:var(--surface-3);flex-shrink:0;margin-top:2px;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid var(--brand-text);">−</span></span>
+               <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text-muted);flex-shrink:0;">…</span>
              </div>
              <div style="display:flex;align-items:center;gap:8px;">
                <span style="display:inline-block;width:14px;height:14px;border:1px solid var(--accent-text);border-radius:3px;box-sizing:border-box;flex-shrink:0;"></span>
                <span style="font-size:12px;color:var(--brand-text);font-weight:600;">Type</span>
                <select disabled style="flex:1;font-size:11px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--input-bg);">
-                 <option>Enzyme ✓, Receptor ✓, ...</option>
+                 <option>4 of 6</option>
                </select>
-               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:1.5px dashed var(--text-faint);background:transparent;flex-shrink:0;"></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;background:var(--surface-3);flex-shrink:0;"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid var(--brand-text);">−</span></span>
+               <span style="display:inline-block;width:16px;flex-shrink:0;"></span>
+               <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text-muted);flex-shrink:0;">…</span>
              </div>
            </div>
            • <strong>Numeric properties</strong> get two-thumbed range sliders — drag the left thumb to set
            a minimum threshold (≥), the right thumb for a maximum (≤), double-click to reset
-           <br>• <strong>Categorical properties</strong> get dropdown checklists — check/uncheck values
+           <br>• <strong>Categorical properties</strong> get a checklist with a count per value — Alt-click a value to keep only that one
            <br>• The <strong>checkbox</strong> toggles whether that filter is active.
            The
            <span style="display:inline-flex;gap:2px;padding:2px;border-radius:6px;vertical-align:middle;background:var(--surface-3);font-size:11px;"><span style="padding:1px 9px;border-radius:5px;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,0.18);font-weight:700;color:var(--text-strong);"><span style="color:var(--accent-text);">＋</span> Build up</span><span style="padding:1px 9px;color:var(--text-strong);">− Narrow down</span></span>
@@ -242,14 +242,15 @@ const TOUR_STEPS = [
            its <strong>Complete cases only</strong> option additionally hides elements missing any of those filters.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            <span style="display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:middle;background:var(--brand-text);"></span>
-           <strong>Bubble group chip</strong> — click it to put that filter's matching nodes into a
-           <strong>group</strong>, or to make a new group from the filter. The dot is hollow when the
-           property is in no group, filled with the group's colour when it is in one, and ringed when
+           <strong>Bubble group dot</strong> — click it to put that filter's matching nodes into a
+           <strong>group</strong>, or to make a new group from the filter. The dot appears when you hover the row and is
+           filled with the group's colour when it is in one, and ringed when
            it is in several (hover it to read the names). Groups fed this way are <em>filter-driven</em>:
            they update as the filter changes. Manage them all under <strong>Overlays › Groups</strong>.
            <br><br>
-           <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;vertical-align:middle;background:var(--surface-3);"><span style="flex:1;text-align:center;">+</span><span style="flex:1;text-align:center;border-left:1px solid var(--brand-text);">−</span></span>
-           <strong>Selection button</strong> — <strong>+</strong> add or <strong>−</strong> remove all nodes matching that filter property to/from the current selection.
+           <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;vertical-align:middle;color:var(--text-muted);">…</span>
+           <strong>Row actions</strong> — add or remove everything the filter matches to/from the selection,
+           keep the values <em>outside</em> a range, add the property to a group, add it to the query, or reset the row.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Every numeric property also carries <strong>exact min/max input boxes</strong> under its slider, so you can type a threshold instead of dragging for it. When the list gets long, fold a whole property group — <em>Classification</em>, <em>Annotation</em>, whatever your spreadsheet calls them — away with the <strong>▾</strong> chevron on its heading.
            <br><br>
@@ -458,7 +459,7 @@ const TOUR_STEPS = [
            <br>
            <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#fff;background:#C33D35;border:1px solid rgba(0,0,0,0.3);">✗ Clear text</span> — empty the box (⟳ Sync is what hands filtering back to the panel)
            <hr style="margin:6px 0;border-color:var(--border-soft);">
-           When the query editor is open, a <span class="add-to-query-button show tt">📝</span> button appears next to each filter checkbox in the filtering panel. Click it to <strong>append</strong> that filter's current range or category selection as a query fragment — a quick way to build complex queries from existing filters.
+           Each filter row's <strong>…</strong> menu has <strong>📝 Add to query</strong>: it <strong>appends</strong> that filter's current range or category selection as a query fragment — a quick way to build complex queries from existing filters.
            <hr style="margin:6px 0;border-color:var(--border-soft);">
            Click the <strong style="color:#8CA6D9">🛈</strong> button in the query editor header for a full syntax reference.`,
     targets: [{ selector: '#workbench' }, { selector: '#queryToggleBtn' }],
