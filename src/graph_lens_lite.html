@@ -117,20 +117,6 @@
           title="Layout — re-layout the workspace, remove overlaps, hide disconnected elements">
     <span class="rail-vb-g">↻</span><span class="rail-vb-t"><span id="layoutTypeLabel">Layout</span> ⌄</span>
   </button>
-  <button id="lassoToggleBtn" class="rail-vb" title="Toggle lasso selection: drag to select elements. Without it, drag on empty canvas holding ⇧ to add, Ctrl/⌘ to replace, both to remove (L)" onclick="cache.ui.toggleLassoSelection()">
-    <span class="rail-vb-g">➰</span><span class="rail-vb-t">Lasso</span>
-  </button>
-  <button id="hoverToggleBtn" class="rail-vb active" title="Disable hover highlight effect (H)" onclick="cache.ui.toggleHoverEffect(this)">
-    <span class="rail-vb-g">✨</span><span class="rail-vb-t">Hover</span>
-  </button>
-  <button id="selectMenuBtn" class="rail-vb"
-          title="Select — all/no nodes and edges, or select by ID or label">
-    <span class="rail-vb-g">◈</span><span class="rail-vb-t">Select ⌄</span>
-  </button>
-  <button id="noteToggleBtn" class="rail-vb" title="Place a text note: click the canvas to place, drag to move, double-click to edit, single-click for style and delete"
-          onclick="cache.ui.startTextAnnotation()">
-    <span class="rail-vb-g">✎</span><span class="rail-vb-t">Note</span>
-  </button>
   <!-- With the verbs, not after the selection chip: search acts on the whole
        workspace like they do, and the chip's width changes with the selection,
        which used to slide this button around under the pointer. -->
@@ -139,22 +125,22 @@
     <span class="rail-vb-g">⌕</span><span class="rail-vb-t">Search</span>
   </button>
   <div class="rail-div"></div>
+  <!-- The chip is the selection's one home: it shows what is selected and opens
+       everything that builds, walks back or frames a selection (Rail #buildSelectMenu). -->
   <div id="selectionChip" class="rail-selchip">
-    <span class="rail-selchip-empty">Nothing selected</span>
-    <span class="rail-selchip-counts">
-      <strong id="selectedNodes">0</strong>&nbsp;nodes <span class="rail-selchip-sep">·</span>
-      <strong id="selectedEdges">0</strong>&nbsp;edges
-    </span>
-    <button id="focusSelectionBtn" class="rail-chip-btn disabled" title="Center and zoom to the selection"
-            aria-label="Center and zoom to the selection" onclick="cache.gcm.focusSelection()">🔍</button>
-    <button id="clearSelectionBtn" class="rail-chip-btn red disabled" title="Clear selection"
-            aria-label="Clear selection" onclick="cache.sm.clearSelection()">×</button>
+    <button id="selectMenuBtn" class="rail-selchip-btn"
+            title="Selection — select all or none, by ID or label, or with the lasso; zoom to it; undo a selection change">
+      <span class="rail-selchip-empty">Nothing selected</span>
+      <span class="rail-selchip-counts">
+        <strong id="selectedNodes">0</strong>&nbsp;nodes <span class="rail-selchip-sep">·</span>
+        <strong id="selectedEdges">0</strong>&nbsp;edges
+      </span>
+      <span class="rail-selchip-car" aria-hidden="true">⌄</span>
+    </button>
     <span id="selectionHiddenWarning" class="rail-selchip-warning" style="display: none;"
           title="Filters currently hide part of your selection. Hidden elements stay selected, but actions only touch visible ones."></span>
-    <button id="undoSelectionBtn" class="rail-chip-btn disabled" title="Undo selection"
-            aria-label="Undo selection" onclick="cache.sm.undoSelection()">↶</button>
-    <button id="redoSelectionBtn" class="rail-chip-btn disabled" title="Redo selection"
-            aria-label="Redo selection" onclick="cache.sm.redoSelection()">↷</button>
+    <button id="clearSelectionBtn" class="rail-chip-btn red disabled" title="Clear selection"
+            aria-label="Clear selection" onclick="cache.sm.clearSelection()">×</button>
   </div>
   <span class="rail-spacer"></span>
   <div class="rail-tabs">
@@ -181,15 +167,6 @@
           title="Export — PNG, SVG, JSON model, Excel data (P: PNG, S: JSON)">
     <span class="rail-vb-g">⤓</span><span class="rail-vb-t">Export</span>
   </button>
-  <!-- Presentation mode is app chrome, not an overlay: it hides the shell
-       rather than drawing anything over the graph, so it sits with the other
-       chrome toggles. No state glyph — the rail is gone while it is on.
-       ⛶ is this codebase's fullscreen mark everywhere else (popup.js,
-       interactions.js, core.js, ui_components.js), so it belongs on the button
-       with no text label. Fit, which is labelled "Fit", took ⊡ in exchange. -->
-  <button id="presentationToggleBtn" class="rail-mini" aria-label="Presentation mode"
-          title="Presentation mode — hide the rail and the inspector for a clean screenshot (⇧F, Escape to exit)"
-          onclick="cache.ui.togglePresentationMode()">⛶</button>
   <button id="darkModeToggleBtn" class="rail-mini" aria-label="Switch to dark mode" title="Switch to dark mode" onclick="cache.ui.toggleDarkMode()">🌙</button>
   <button id="keyboardSheetBtn" class="rail-mini" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onclick="cache.ui.toggleKeyboardSheet()">?</button>
 </header>
@@ -197,6 +174,7 @@
   <div id="outerGraphContainer">
     <div id="innerGraphContainer"></div>
     <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+    <div id="modeHint" class="mode-hint" role="status" hidden></div>
     <section id="workbench" aria-label="Workbench" hidden>
       <div class="resize-handle"></div>
       <div class="panel-header panel-header-full-width">
@@ -305,11 +283,20 @@
                aria-labelledby="inspectorPillOverlays" hidden>
         <div id="inspectorLayerCards"></div>
         <div class="layer-row">
+          <button type="button" id="hoverToggleBtn" class="layer-switch" role="switch" aria-checked="true"
+                  aria-label="Hover highlight" title="Highlight an element's neighbours while the pointer rests on it (H)"
+                  onclick="cache.ui.toggleHoverEffect(this)"></button>
+          <span class="layer-title">Hover highlight</span>
+        </div>
+        <div class="layer-row">
           <button type="button" id="overlaySwitchNotes" class="layer-switch disabled" role="switch"
                   aria-checked="false" aria-disabled="true" aria-label="Notes"
-                  title="Show or hide every text note (place a new one with ✎ Note on the rail)"
+                  title="Show or hide every text note"
                   onclick="cache.ui.toggleOverlay('notes')"></button>
           <span class="layer-title">Notes</span>
+          <button type="button" id="noteToggleBtn" class="insp-btn layer-row-action" aria-pressed="false"
+                  title="Place a text note: click the canvas to place, drag to move, double-click to edit, single-click for style and delete"
+                  onclick="cache.ui.startTextAnnotation()">+ Add note</button>
         </div>
         <div class="layer-row">
           <button type="button" id="overlaySwitchMinimap" class="layer-switch disabled" role="switch"

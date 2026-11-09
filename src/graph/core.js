@@ -791,6 +791,7 @@ class GraphCoreManager {
     this.cache.ui?.closeAnchoredPopovers?.();
     await this.cache.graph?.destroy();
     this.cache.graph = null;
+    this.cache.ui?.syncModeHint?.(); // a lasso or note mode ends with its graph
     // Drop renderer-cycle state with the instance: the graphology model is
     // rebuilt by createGraphInstance, plugin stubs are re-registered there.
     this.cache.graphData = null;

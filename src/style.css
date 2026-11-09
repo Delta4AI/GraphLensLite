@@ -325,7 +325,7 @@ body {
     align-items: center;
     gap: 5px;
     height: 34px;
-    padding: 0 6px 0 10px;
+    padding: 0 4px 0 2px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--input-bg);
@@ -338,6 +338,35 @@ body {
 .rail-selchip.live {
     border-color: var(--accent-text);
     color: var(--text);
+}
+
+/* The chip's main part is the Selection menu's button; × clear sits beside it
+   and only while something is selected. */
+.rail-selchip-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 6px 0 8px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.rail-selchip-btn:hover {
+    background: var(--surface-3);
+}
+
+.rail-selchip-car {
+    color: var(--text-faint);
+}
+
+.rail-selchip:not(.live) #clearSelectionBtn {
+    display: none;
 }
 
 .rail-selchip-counts,
@@ -770,6 +799,40 @@ body {
 }
 
 /* A tab without help hides ⓘ; display:flex above would otherwise keep it. */
+/* The stage's line for an active pointer mode (lasso, placing a note). */
+.mode-hint {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--z-minimap);
+    padding: 4px 12px;
+    border: 1px solid var(--brand-border);
+    border-radius: 6px;
+    background: var(--brand-border);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.mode-hint[hidden] {
+    display: none;
+}
+
+.layer-row-action {
+    margin-left: auto;
+    height: 20px;
+    padding: 0 8px;
+    font-size: 11px;
+}
+
+.layer-row-action.active {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
 .panel-header-btn[hidden] {
     display: none;
 }

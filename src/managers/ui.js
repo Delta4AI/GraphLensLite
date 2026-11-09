@@ -497,9 +497,8 @@ class UIManager {
   }
 
   async toggleLassoSelection() {
-    const lassoBtn = document.getElementById('lassoToggleBtn');
-    const enableLasso = !lassoBtn.classList.contains('active');
-    lassoBtn.classList.toggle('active', enableLasso);
+    if (!this.cache.graph) return;
+    const enableLasso = !this.cache.graph.isInteractionEnabled('lasso');
 
     // The lasso overlay owns the pointer while active (camera pan and node
     // drag are swallowed by it); tooltip clicks are routed away too. Hover
@@ -507,8 +506,27 @@ class UIManager {
     this.cache.graph.setInteractionEnabled('lasso', enableLasso);
     this.cache.graph.setInteractionEnabled('drag', !enableLasso);
     this.cache.graph.setInteractionEnabled('tooltip', !enableLasso);
+    this.syncModeHint();
+  }
 
-    this.info(enableLasso ? 'Switched to lasso selection mode' : 'Switched to click and drag mode');
+  /**
+   * The stage's line for a mode that changes what a click or drag does. The
+   * lasso and note tools have no rail button of their own, so this is the one
+   * place that says they are on and how to leave them.
+   */
+  syncModeHint() {
+    const hint = document.getElementById('modeHint');
+    if (!hint) return;
+    const placingNote = !!this.cache.graph?.annotationLayer?.placementOverlay;
+    const lasso = !!this.cache.graph?.isInteractionEnabled?.('lasso');
+    const text = placingNote
+      ? 'Placing a note · click the canvas · Escape to cancel'
+      : lasso
+        ? 'Lasso · drag around the elements to select · L or Escape to stop'
+        : '';
+    hint.textContent = text;
+    hint.hidden = !text;
+    document.getElementById('lassoMenuItem')?.setAttribute('aria-pressed', String(lasso));
   }
 
   /**
@@ -531,13 +549,15 @@ class UIManager {
     // brings its own layer back rather than failing quietly.
     if (!layer.visible) this.setOverlayVisible('notes', true);
     layer.armPlacement();
-    this.info('Click the canvas to place a text note — Escape to cancel');
   }
 
   /** The armed look on the note button. Driven from the layer, which owns every
    * route out of placement (the placing click, Escape, hiding the layer). */
   setNotePlacementActive(active) {
-    document.getElementById('noteToggleBtn')?.classList.toggle('active', active);
+    const btn = document.getElementById('noteToggleBtn');
+    btn?.classList.toggle('active', active);
+    btn?.setAttribute('aria-pressed', String(active));
+    this.syncModeHint();
   }
 
   // What a manual query freezes. Folding a group, switching Node/Edge, the
@@ -735,15 +755,9 @@ class UIManager {
     if (btn) this.#paintHoverToggle(btn, !this.cache.CFG.DISABLE_HOVER_EFFECT);
   }
 
-  /**
-   * The on/off look for the rail's Hover button. Plain `.active`, like the
-   * lasso and note buttons beside it — the old green/red pair painted OFF in
-   * the app's loudest colour, so "off" shouted louder than "on".
-   */
+  /** The Overlays tab's Hover highlight switch. */
   #paintHoverToggle(btn, on) {
-    btn.classList.remove('green', 'red', 'highlight');
-    btn.classList.toggle('active', on);
-    btn.title = on ? 'Disable hover highlight effect (H)' : 'Enable hover highlight effect (H)';
+    btn.setAttribute('aria-checked', String(on));
   }
 
   buildUI() {
