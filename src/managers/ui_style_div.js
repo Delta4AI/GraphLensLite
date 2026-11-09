@@ -3,6 +3,8 @@ import {attachCommunityMenu} from "./community_menu.js";
 import {BADGE_SLOTS, summarizeBadges} from "../graph/badges.js";
 import {safePaint} from "../graph/shape_textures.js";
 import {FONT_STYLES} from "../graph/label_renderers.js";
+import {MIXED, STYLE_PROPERTIES, styleOverride, readProperty, sharedBy, colorBuckets, labelSource}
+  from "./selection_style_values.js";
 
 // ----------------------------------------------------------- DOM primitives
 // The style div's generic control builders. They only ever needed their
@@ -146,6 +148,89 @@ function createInput(widthInPx = 80, placeholder = undefined, title = undefined,
   return input;
 }
 
+// ------------------------------------------------------- property rows
+// The appearance editor's row: a muted label column and a control column.
+// Builders appended into the control column name their controls after the row
+// label (nameControl), so a screen reader hears "Size, slider" rather than a
+// bare "slider", and clicking the label focuses the first input.
+
+let propRowSeq = 0;
+
+/** @returns {HTMLDivElement} the control column to build into */
+function propRow(parent, text, tooltip = undefined) {
+  const row = document.createElement("div");
+  row.className = "prop-row";
+  const label = document.createElement("label");
+  label.className = "prop-label";
+  label.id = `propLabel${++propRowSeq}`;
+  label.textContent = text;
+  if (tooltip) label.title = tooltip;
+  const ctl = document.createElement("div");
+  ctl.className = "prop-ctl";
+  ctl.dataset.labelId = label.id;
+  ctl.dataset.labelText = text;
+  ctl.rowLabel = label;
+  row.append(label, ctl);
+  parent.appendChild(row);
+  return ctl;
+}
+
+/** A sub-group heading inside a section ("Label", "Badges", "Arrows"). */
+function propSubhead(parent, text) {
+  const head = document.createElement("div");
+  head.className = "prop-subhead";
+  head.textContent = text;
+  parent.appendChild(head);
+}
+
+/**
+ * Give `control` an accessible name: the row label when built into a
+ * propRow (with `suffix` appended for secondary controls, e.g. "hex"),
+ * otherwise `fallback`.
+ */
+function nameControl(parent, control, fallback, suffix = "") {
+  const rowText = parent.dataset?.labelText;
+  if (rowText && !suffix) {
+    control.setAttribute("aria-labelledby", parent.dataset.labelId);
+    const label = parent.rowLabel;
+    if (label && !label.htmlFor && /^(INPUT|SELECT)$/.test(control.tagName) && control.type !== "range") {
+      control.id ||= `${label.id}Control`;
+      label.htmlFor = control.id;
+    }
+    return;
+  }
+  control.setAttribute("aria-label", [rowText ?? fallback, suffix].filter(Boolean).join(" "));
+}
+
+/** The "Mixed" note shown beside a control whose selection disagrees. */
+function createMixedTag() {
+  const tag = document.createElement("span");
+  tag.className = "prop-mixed";
+  tag.textContent = "Mixed";
+  tag.hidden = true;
+  return tag;
+}
+
+// Colours come from loaded files: only plain colour syntax reaches CSS.
+const TRANSPARENT = "#00000000";
+const isUnsetColor = (c) => c == null || c === "" || String(c).toLowerCase() === TRANSPARENT;
+
+/** "#RRGGBB" for <input type=color>, which takes nothing else; null if not hex. */
+function toHex6(color) {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})([0-9a-f]{2})?$/i.exec(String(color ?? ""));
+  if (!m) return null;
+  const hex = m[1].length === 3 ? [...m[1]].map((ch) => ch + ch).join("") : m[1];
+  return `#${hex.toLowerCase()}`;
+}
+
+/** A swatch background for a mixed selection: up to five of its colours as slices. */
+function mixedSwatchBackground(colors) {
+  const paints = colors.slice(0, 5).map((c) => safePaint(c, "transparent"));
+  if (paints.length < 2) return paints[0] ?? "transparent";
+  const step = 100 / paints.length;
+  return `conic-gradient(${paints.map((p, i) => `${p} ${i * step}% ${(i + 1) * step}%`).join(", ")})`;
+}
+
 // One badge per perimeter slot: Set fills (or replaces) the chosen slot on
 // every selected node, and the list below shows what the selection carries
 // so each slot can be edited or removed on its own.
@@ -157,20 +242,27 @@ function createInput(widthInPx = 80, placeholder = undefined, title = undefined,
  */
 function createNodeBadgeControls(cache, parent, listParent) {
   const sourceSelect = document.createElement("select");
-  sourceSelect.className = "style-inner-button";
+  sourceSelect.className = "prop-select";
   sourceSelect.title = "Badge text: typed here, or each node's value in a column.";
+  sourceSelect.setAttribute("aria-label", "Badge text source");
   parent.appendChild(sourceSelect);
 
   const badgeInput = createInput(90, "Badge text",
     "The text of the badge to set on the selected nodes.", undefined, undefined);
+  badgeInput.classList.add("prop-text");
+  badgeInput.style.width = "";
+  badgeInput.setAttribute("aria-label", "Badge text");
   parent.appendChild(badgeInput);
 
   const badgeColorPicker = createColorPicker(cache.DEFAULTS.NODE.BADGE.COLOR, "Set the color of the badge.");
+  badgeColorPicker.className = "prop-color-input";
+  badgeColorPicker.setAttribute("aria-label", "Badge color");
   parent.appendChild(badgeColorPicker);
 
   const placementSelect = document.createElement("select");
-  placementSelect.className = "style-inner-button";
+  placementSelect.className = "prop-select";
   placementSelect.title = "Where on the node's edge the badge sits. Each spot holds one badge.";
+  placementSelect.setAttribute("aria-label", "Badge position");
   for (const slot of BADGE_SLOTS) {
     const option = document.createElement("option");
     option.value = slot;
@@ -185,7 +277,11 @@ function createNodeBadgeControls(cache, parent, listParent) {
   };
   sourceSelect.addEventListener("change", syncSourceInput);
 
-  parent.appendChild(createButton("Set", "Set this badge on the selected nodes, replacing any badge already in that spot.",
+  const insp = (btn) => {
+    btn.className = btn.classList.contains("red") ? "insp-btn red" : "insp-btn";
+    return btn;
+  };
+  parent.appendChild(insp(createButton("Set", "Set this badge on the selected nodes, replacing any badge already in that spot.",
     async () => {
       const property = sourceSelect.value || undefined;
       const text = badgeInput.value.trim();
@@ -196,9 +292,9 @@ function createNodeBadgeControls(cache, parent, listParent) {
       await cache.gcm.updateNodes({}, ["badge_set"], {
         badge: {placement: placementSelect.value, color: badgeColorPicker.value, text, property},
       });
-    }, "badgeSetBtn"));
-  parent.appendChild(createButton("Clear", "Remove every badge from the selected nodes.",
-    async () => await cache.gcm.updateNodes({}, ["badge_clear"]), "badgeClearBtn"));
+    }, "badgeSetBtn")));
+  parent.appendChild(insp(createButton("Clear", "Remove every badge from the selected nodes.",
+    async () => await cache.gcm.updateNodes({}, ["badge_clear"]), "badgeClearBtn")));
 
   const list = document.createElement("div");
   list.className = "badge-list";
@@ -328,207 +424,189 @@ function createStyleDiv(cache) {
     return card;
   }
 
+  // ---------------------------------------------- selection ↔ control sync
+  // Every control bound to a node/edge style property registers here, so a
+  // selection change can show what the selection actually carries: one value
+  // when the selected elements agree, "Mixed" when they differ.
+  const bindings = [];
+
+  /**
+   * @param {string} property  key of STYLE_PROPERTIES, or a custom target via `read`
+   * @param {(value: any, entries: Array) => void} apply  MIXED, the shared value,
+   *   or undefined when nothing of that kind is selected
+   * @param {{target?: "node"|"edge", read?: (entry) => any, fallback?: any}} [opts]
+   */
+  function bind(property, apply, {target, read, fallback} = {}) {
+    const spec = STYLE_PROPERTIES[property];
+    if (!spec && !read) return; // Bubble Set rows etc. are not selection styles
+    bindings.push({
+      target: target ?? spec.target,
+      // An element missing the key everywhere (labelFontStyle is never
+      // resolved by style.js) reads as the builder's default, so "unset" and
+      // "explicitly default" don't show up as Mixed.
+      read: read ?? ((entry) => {
+        const resolved = readProperty(entry.resolved, spec.key);
+        return resolved !== undefined ? resolved : entry.raw.style?.[spec.key] ?? fallback;
+      }),
+      apply,
+    });
+  }
+
+  function selectedEntries(ids, ref, resolve) {
+    const entries = [];
+    for (const id of ids ?? []) {
+      const raw = ref?.get(id);
+      if (raw) entries.push({id, raw, resolved: resolve(raw)});
+    }
+    return entries;
+  }
+
+  /** Re-read the selection into every bound control. selection.js calls it on every change. */
+  function refreshStyleControls() {
+    const nodes = selectedEntries(cache.selectedNodes, cache.nodeRef,
+      (n) => cache.style.getNodeStyleOrDefaults(n));
+    const edges = selectedEntries(cache.selectedEdges, cache.edgeRef,
+      (e) => cache.style.getEdgeStyleOrDefaults(e));
+    for (const binding of bindings) {
+      const entries = binding.target === "node" ? nodes : edges;
+      binding.apply(sharedBy(entries, binding.read), entries);
+    }
+    const setCount = (id, n) => {
+      // The cards are re-parented into the inspector (ui.js CARD_MOUNTS), out of root.
+      const el = document.getElementById(id);
+      if (el) el.textContent = n ? String(n) : "";
+    };
+    setCount("styleNodeCount", nodes.length);
+    setCount("styleEdgeCount", edges.length);
+  }
+
   async function handleStyleChangeEvent(property, value) {
-    const commands = [];
-
-    if (value === "set_continuous_color_scale") {
-      commands.push("set_continuous_color_scale");
-      // Store property name in picker for display
-      cache.picker.currentProperty = property;
-    }
-
-    if (value === "set_numeric_scale") {
-      commands.push("set_numeric_scale");
-    }
-
     if (property.startsWith("Bubble Set")) {
       await cache.bs.updateBubbleSetStyle(property, value);
       return;
     }
 
-    switch (property) {
-      case "Node Size":
-        await cache.gcm.updateNodes({style: {size: value}}, commands);
-        break;
-      case "Node Border Size":
-        await cache.gcm.updateNodes({style: {lineWidth: value}}, commands);
-        break;
-      case "Node Label Font Size":
-        await cache.gcm.updateNodes({style: {labelFontSize: value}}, commands);
-        break;
-      case "Node Label Font Color":
-        await cache.gcm.updateNodes({style: {labelFill: value}}, commands);
-        break;
-      case "Node Label Background Color":
-        await cache.gcm.updateNodes({style: {labelBackground: true, labelBackgroundFill: value}}, commands);
-        break;
-      case "Node Fill Color":
-        await cache.gcm.updateNodes({style: {fill: value}}, commands);
-        break;
-      case "Node Border Color":
-        await cache.gcm.updateNodes({style: {stroke: value}}, commands);
-        break;
-      case "Node Opacity":
-        await cache.gcm.updateNodes({style: {opacity: value}}, commands);
-        break;
-      case "Node Label Color":
-        await cache.gcm.updateNodes({style: {labelFill: value}}, commands);
-        break;
-      case "Node Label Placement":
-        await cache.gcm.updateNodes({style: {labelPlacement: value}}, commands);
-        break;
-      case "Node Label Font Style":
-        await cache.gcm.updateNodes({style: {labelFontStyle: value}}, commands);
-        break;
-      case "Node Badge Font Size":
-        await cache.gcm.updateNodes({style: {badgeFontSize: value}}, commands);
-        break;
-      case "Node Badge Scale With Node":
-        await cache.gcm.updateNodes({style: {badgeScaleWithNode: value}}, commands);
-        break;
-      case "Edge Color":
-        await cache.gcm.updateEdges({style: {stroke: value}}, commands);
-        break;
-      case "Edge Width":
-        await cache.gcm.updateEdges({style: {lineWidth: value}}, commands);
-        break;
-      case "Edge Opacity":
-        await cache.gcm.updateEdges({style: {opacity: value}}, commands);
-        break;
-      case "Edge Dash":
-        await cache.gcm.updateEdges({style: {lineDash: value}}, commands);
-        break;
-      case "Edge Label Font Size":
-        await cache.gcm.updateEdges({style: {labelFontSize: value}}, commands);
-        break;
-      case "Edge Label Offset X":
-        await cache.gcm.updateEdges({style: {labelOffsetX: value}}, commands);
-        break;
-      case "Edge Label Offset Y":
-        await cache.gcm.updateEdges({style: {labelOffsetY: value}}, commands);
-        break;
-      case "Edge Label Placement":
-        await cache.gcm.updateEdges({style: {labelPlacement: value}}, commands);
-        break;
-      case "Edge Label Font Style":
-        await cache.gcm.updateEdges({style: {labelFontStyle: value}}, commands);
-        break;
-      case "Edge Label Font Color":
-        await cache.gcm.updateEdges({style: {labelFill: value}}, commands);
-        break;
-      case "Edge Label Background Color":
-        await cache.gcm.updateEdges({style: {labelBackground: true, labelBackgroundFill: value}}, commands);
-        break;
-      case "Edge Label Auto Rotate":
-        await cache.gcm.updateEdges({style: {labelAutoRotate: value}}, commands);
-        break;
-      case "Edge Start Arrow":
-        await cache.gcm.updateEdges({style: {startArrow: value}}, commands);
-        break;
-      case "Edge End Arrow":
-        await cache.gcm.updateEdges({style: {endArrow: value}}, commands);
-        break;
-      case "Edge Start Arrow Size":
-        await cache.gcm.updateEdges({style: {startArrowSize: value}}, commands);
-        break;
-      case "Edge End Arrow Size":
-        await cache.gcm.updateEdges({style: {endArrowSize: value}}, commands);
-        break;
-      case "Edge Start Arrow Type":
-        await cache.gcm.updateEdges({style: {startArrowType: value}}, commands);
-        break;
-      case "Edge End Arrow Type":
-        await cache.gcm.updateEdges({style: {endArrowType: value}}, commands);
-        break;
-      case "Edge Start Arrow Color":
-        await cache.gcm.updateEdges({style: {startArrowColor: value}}, commands);
-        break;
-      case "Edge Start Arrow Border Color":
-        await cache.gcm.updateEdges({style: {startArrowBorderColor: value}}, commands);
-        break;
-      case "Edge Start Arrow Border Size":
-        await cache.gcm.updateEdges({style: {startArrowBorderSize: value}}, commands);
-        break;
-      case "Edge End Arrow Color":
-        await cache.gcm.updateEdges({style: {endArrowColor: value}}, commands);
-        break;
-      case "Edge End Arrow Border Color":
-        await cache.gcm.updateEdges({style: {endArrowBorderColor: value}}, commands);
-        break;
-      case "Edge End Arrow Border Size":
-        await cache.gcm.updateEdges({style: {endArrowBorderSize: value}}, commands);
-        break;
-      case "Edge Halo":
-        await cache.gcm.updateEdges({style: {halo: value}}, commands);
-        break;
-      case "Edge Halo Width":
-        await cache.gcm.updateEdges({style: {haloLineWidth: value}}, commands);
-        break;
-      case "Edge Halo Color":
-        await cache.gcm.updateEdges({style: {haloStroke: value}}, commands);
-        break;
-      case "Edge Flow":
-        await cache.gcm.updateEdges({style: {flow: value}}, commands);
-        break;
-      case "Edge Flow Type":
-        await cache.gcm.updateEdges({style: {flowType: value}}, commands);
-        break;
-      case "Edge Flow Speed":
-        await cache.gcm.updateEdges({style: {flowSpeed: value}}, commands);
-        break;
-      case "Edge Flow Color":
-        await cache.gcm.updateEdges({style: {flowStroke: value}}, commands);
-        break;
-      case "Edge Flow Opacity":
-        await cache.gcm.updateEdges({style: {flowOpacity: value}}, commands);
-        break;
-      case "Edge Flow Density":
-        await cache.gcm.updateEdges({style: {flowDensity: value}}, commands);
-        break;
-      default:
-        break;
+    const commands = [];
+    if (value === "set_continuous_color_scale") {
+      commands.push("set_continuous_color_scale");
+      cache.picker.currentProperty = property;
     }
+    if (value === "set_numeric_scale") {
+      commands.push("set_numeric_scale");
+    }
+
+    // The scale sentinels ride in the override and are swapped for each
+    // element's mapped value by replaceColorScale/replaceNumericScale.
+    const overrides = styleOverride(property, value);
+    if (STYLE_PROPERTIES[property].target === "node") {
+      await cache.gcm.updateNodes(overrides, commands);
+    } else {
+      await cache.gcm.updateEdges(overrides, commands);
+    }
+    refreshStyleControls();
   }
 
-  function createBooleanControls(parent, property, tooltip = undefined) {
-    const onBtn = document.createElement("button");
-    onBtn.textContent = "On";
-    onBtn.classList.add("style-inner-button");
-    onBtn.onclick = async () => {
-      await handleStyleChangeEvent(property, true);
-    }
-    if (tooltip) onBtn.title = tooltip;
-    parent.appendChild(onBtn);
+  /** Map by data: the button that replaced the bare ∿ / gradient swatch. */
+  function createMapButton(parent, property, title, sentinel) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "insp-btn prop-map-btn";
+    btn.textContent = "Map…";
+    btn.title = title;
+    btn.dataset.property = property;
+    nameControl(parent, btn, property, "— map by data");
+    btn.onclick = () => {
+      if (sentinel === "set_numeric_scale") cache.numericPicker.currentProperty = property;
+      Promise.resolve(handleStyleChangeEvent(property, sentinel)).catch(reportButtonFailure);
+    };
+    parent.appendChild(btn);
+    return btn;
+  }
 
-    const offBtn = document.createElement("button");
-    offBtn.textContent = "Off";
-    offBtn.classList.add("style-inner-button");
-    offBtn.onclick = async () => {
-      await handleStyleChangeEvent(property, false);
-    }
-    if (tooltip) offBtn.title = tooltip;
-    parent.appendChild(offBtn);
+  function createBooleanControls(parent, property, tooltip = undefined, text = undefined) {
+    const wrap = document.createElement("label");
+    wrap.className = "prop-check";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    if (tooltip) wrap.title = tooltip;
+    nameControl(parent, box, property);
+    box.onchange = () => {
+      box.indeterminate = false;
+      Promise.resolve(handleStyleChangeEvent(property, box.checked)).catch(reportButtonFailure);
+    };
+    wrap.appendChild(box);
+    if (text) wrap.append(` ${text}`);
+    parent.appendChild(wrap);
+    bind(property, (value) => {
+      box.indeterminate = value === MIXED;
+      box.checked = value !== MIXED && !!value;
+    }, {fallback: false});
+    return box;
   }
 
   function createCategoricalControls(parent, property, defaultValue, listOfValues, tooltip = undefined) {
     const dropdown = document.createElement("select");
-    dropdown.className = "style-inner-button";
-    // The visible label is a sibling, not a <label for>; name the select itself.
-    dropdown.setAttribute("aria-label", property);
+    dropdown.className = "prop-select";
+    nameControl(parent, dropdown, property);
     if (tooltip) dropdown.title = tooltip;
 
-    listOfValues.forEach((value) => {
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = value;
-      dropdown.appendChild(option);
-      dropdown.onchange = async () => {
-        await handleStyleChangeEvent(property, dropdown.value);
-      };
-    });
+    // Shown only while the selection disagrees; never pickable.
+    const mixedOption = new Option("Mixed", "");
+    mixedOption.disabled = true;
+    mixedOption.hidden = true;
+    dropdown.appendChild(mixedOption);
+    for (const value of listOfValues) {
+      dropdown.appendChild(new Option(value, value));
+    }
+    dropdown.onchange = () => {
+      mixedOption.hidden = true;
+      Promise.resolve(handleStyleChangeEvent(property, dropdown.value)).catch(reportButtonFailure);
+    };
 
     dropdown.value = defaultValue;
     parent.appendChild(dropdown);
+    bind(property, (value) => {
+      mixedOption.hidden = value !== MIXED;
+      dropdown.value = value === MIXED ? "" : value ?? defaultValue;
+    }, {fallback: defaultValue});
+    return dropdown;
+  }
+
+  /**
+   * Segmented control: one pressed button per value. Used for short enums
+   * (shape, edge type, font style) where every option fits on the row.
+   * @param {Array<{value: string, text: string, label?: string}>} options
+   */
+  function createSegmentedControls(parent, property, defaultValue, options, {onPick, read, target} = {}) {
+    const group = document.createElement("div");
+    group.className = "prop-seg";
+    group.setAttribute("role", "group");
+    nameControl(parent, group, property);
+    const buttons = new Map();
+    for (const {value, text, label} of options) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = text;
+      btn.setAttribute("aria-pressed", "false");
+      if (label) {
+        btn.setAttribute("aria-label", label);
+        btn.title = label;
+      }
+      btn.onclick = () => {
+        const pick = onPick ?? ((v) => handleStyleChangeEvent(property, v));
+        Promise.resolve(pick(value)).catch(reportButtonFailure);
+      };
+      buttons.set(value, btn);
+      group.appendChild(btn);
+    }
+    const mixedTag = createMixedTag();
+    parent.append(group, mixedTag);
+    bind(property, (value) => {
+      mixedTag.hidden = value !== MIXED;
+      const shown = value === MIXED ? undefined : value ?? defaultValue;
+      for (const [v, btn] of buttons) btn.setAttribute("aria-pressed", String(v === shown));
+    }, {fallback: defaultValue, target, read});
+    return group;
   }
 
   function createNumericalSlider(parent, property, defaultValue, sliderParams = {
@@ -541,7 +619,6 @@ function createStyleDiv(cache) {
       !Number.isInteger(sliderParams.max) ||
       !Number.isInteger(sliderParams.step);
 
-    // A helper function to parse according to the useFloat flag
     function parseValue(val) {
       return useFloat ? parseFloat(val) : parseInt(val, 10);
     }
@@ -560,180 +637,303 @@ function createStyleDiv(cache) {
     slider.step = sliderParams.step;
     slider.value = typedDefaultValue;
     slider.classList.add("style-slider");
+    nameControl(parent, slider, property);
 
     const valueInput = document.createElement("input");
     valueInput.type = "number";
+    valueInput.step = sliderParams.step;
     valueInput.value = typedDefaultValue;
     valueInput.classList.add("style-input-sm");
+    nameControl(parent, valueInput, property, "value");
 
+    const showValue = (value) => {
+      const mixed = value === MIXED;
+      slider.classList.toggle("is-mixed", mixed);
+      if (mixed) {
+        slider.setAttribute("aria-valuetext", "Mixed");
+        valueInput.value = "";
+        valueInput.placeholder = "Mixed";
+      } else {
+        slider.removeAttribute("aria-valuetext");
+        slider.value = value;
+        valueInput.value = value;
+        valueInput.placeholder = "";
+      }
+    };
+
+    // One commit per gesture: dragging only previews the number, release
+    // applies — each style change re-renders and records one undo step.
+    const commit = (raw) => {
+      const value = parseValue(raw);
+      if (Number.isNaN(value)) return; // a cleared "Mixed" field applies nothing
+      showValue(value);
+      Promise.resolve(handleStyleChangeEvent(property, value)).catch(reportButtonFailure);
+    };
     slider.oninput = () => {
+      slider.classList.remove("is-mixed");
+      slider.removeAttribute("aria-valuetext");
       valueInput.value = slider.value;
+      valueInput.placeholder = "";
     };
+    slider.onchange = () => commit(slider.value);
+    valueInput.onchange = () => commit(valueInput.value);
 
-    slider.onchange = async () => {
-      await handleStyleChangeEvent(property, parseValue(slider.value));
-    };
-
-    valueInput.onchange = async () => {
-      slider.value = valueInput.value;
-      await handleStyleChangeEvent(property, parseValue(valueInput.value));
-    };
-
-    container.appendChild(slider);
-    container.appendChild(valueInput);
-
-    // Add numeric scale button only for specific properties
-    if (enableNumericScale) {
-      const scaleButton = document.createElement("button");
-      scaleButton.className = "style-inner-button style-numeric-scale-button";
-      scaleButton.textContent = "∿";
-      scaleButton.title = `Map by data: scale ${property} from a numeric property's values (e.g. larger nodes for higher degree)`;
-      scaleButton.style.marginLeft = "2px";
-      scaleButton.dataset.property = property;
-      scaleButton.onclick = async () => {
-        // Store property name in picker for retrieval in core.js
-        cache.numericPicker.currentProperty = property;
-        await handleStyleChangeEvent(property, "set_numeric_scale");
-      };
-      container.appendChild(scaleButton);
-    }
-
+    container.append(slider, valueInput);
     parent.appendChild(container);
+
+    if (enableNumericScale) {
+      createMapButton(parent, property,
+        `Map by data: scale ${property} from a numeric property's values (e.g. larger nodes for higher degree)`,
+        "set_numeric_scale");
+    }
+    bind(property, (value) => showValue(value === undefined || value === null ? typedDefaultValue : value),
+      {fallback: typedDefaultValue});
+    return container;
   }
 
+  // What an unset colour means for the rows where unset is not "none".
+  const UNSET_COLOR_TEXT = {
+    "Edge Start Arrow Color": "Edge color",
+    "Edge End Arrow Color": "Edge color",
+    "Edge Flow Color": "Auto",
+  };
+
   function createColorControls(parent, property, defaultColor, colors, continuousScaleBtn = true, customCSSClass = undefined) {
-    const colorButtonDiv = document.createElement("div");
-    colorButtonDiv.className = "style-color-button-container";
-    if (customCSSClass) colorButtonDiv.classList.add(customCSSClass);
+    const unsetText = UNSET_COLOR_TEXT[property] ?? "None";
 
-    for (const [label, value] of Object.entries(colors)) {
-      const colorButton = document.createElement("button");
-      colorButton.style.backgroundColor = value;
-      colorButton.style.color = StaticUtilities.getReadableForegroundColor(value);
-      colorButton.className = "style-inner-button style-color-button";
-      colorButton.title = `Set ${property} of the selected elements to ${label} (${value}).`;
-
-      if (label === "none") {
-        colorButton.textContent = "×";
-        colorButton.style.maxWidth = "12px";
-      }
-
-      colorButton.onclick = async () => {
-        colorInput.value = value;
-        await handleStyleChangeEvent(property, value);
-      };
-
-      if (customCSSClass) colorButton.classList.add(customCSSClass);
-      colorButtonDiv.appendChild(colorButton);
-    }
-
-    parent.appendChild(colorButtonDiv);
-
-    const colorPicker = createColorPicker(defaultColor,
-      `Set ${property} of the selected elements to a color of choice.`);
-
-    colorPicker.oninput = () => {
-      colorInput.value = colorPicker.value;
-    };
-
-    colorPicker.onchange = async () => {
-      await handleStyleChangeEvent(property, colorPicker.value);
-    }
+    // The well is the native picker under a painted swatch: <input type=color>
+    // can only show one #rrggbb, so mixed and unset are painted by the wrapper.
+    const well = document.createElement("span");
+    well.className = "color-well";
+    const colorPicker = createColorPicker(toHex6(defaultColor) ?? "#000000",
+      `Pick ${property} for the selected elements.`);
+    colorPicker.className = "color-well-input";
+    nameControl(parent, colorPicker, property, "— pick colour");
+    well.appendChild(colorPicker);
 
     const colorInput = document.createElement("input");
     colorInput.type = "text";
-    colorInput.value = defaultColor;
-    colorInput.classList.add("style-input");
+    colorInput.classList.add("style-input", "color-hex");
     colorInput.dataset.property = property;
-    colorInput.title = `Set ${property} of the selected elements to a color of choice (RGBA hex color code). Confirm with Enter`;
-    colorInput.placeholder = `Enter Color`;
+    colorInput.title = `Type a hex colour (e.g. #C33D35, or #C33D3580 with alpha) and press Enter.`;
+    nameControl(parent, colorInput, property, "hex");
 
-    colorInput.addEventListener("keypress", async function (event) {
+    if (customCSSClass) [well, colorInput].forEach((el) => el.classList.add(customCSSClass));
+
+    const paintWell = (value, entries) => {
+      well.classList.remove("is-mixed", "is-unset");
+      if (value === MIXED) {
+        const key = STYLE_PROPERTIES[property]?.key;
+        const shades = key ? colorBuckets(entries ?? [], key).map((b) => b.color) : [];
+        well.style.background = mixedSwatchBackground(shades);
+        well.classList.add("is-mixed");
+        colorInput.value = "";
+        colorInput.placeholder = "Mixed";
+      } else if (isUnsetColor(value)) {
+        well.style.background = "";
+        well.classList.add("is-unset");
+        colorInput.value = "";
+        colorInput.placeholder = unsetText;
+      } else {
+        well.style.background = safePaint(value, "transparent");
+        colorInput.value = value;
+        colorInput.placeholder = "";
+        const hex = toHex6(value);
+        if (hex) colorPicker.value = hex;
+      }
+    };
+
+    let lastCommitted = null;
+    const commit = (value) => {
+      const trimmed = String(value).trim();
+      if (!trimmed || trimmed === lastCommitted) return;
+      lastCommitted = trimmed;
+      paintWell(trimmed);
+      Promise.resolve(handleStyleChangeEvent(property, trimmed)).catch(reportButtonFailure);
+    };
+
+    colorPicker.oninput = () => {
+      well.classList.remove("is-mixed", "is-unset");
+      well.style.background = colorPicker.value;
+      colorInput.value = colorPicker.value;
+    };
+    colorPicker.onchange = () => commit(colorPicker.value);
+    colorInput.addEventListener("focus", () => { lastCommitted = colorInput.value.trim(); });
+    colorInput.addEventListener("change", () => commit(colorInput.value));
+    colorInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        await handleStyleChangeEvent(property, colorInput.value);
+        commit(colorInput.value);
       }
     });
 
-    if (customCSSClass) {
-      colorPicker.classList.add(customCSSClass);
-      colorInput.classList.add(customCSSClass);
-    }
+    parent.append(well, colorInput);
 
-    parent.appendChild(colorPicker);
-    parent.appendChild(colorInput);
+    const palette = Object.entries(colors);
+    if (palette.length) {
+      const swatches = document.createElement("div");
+      swatches.className = "style-color-button-container";
+      for (const [name, value] of palette) {
+        const swatch = document.createElement("button");
+        swatch.type = "button";
+        swatch.className = "style-color-button prop-swatch";
+        if (isUnsetColor(value)) swatch.classList.add("is-unset");
+        else swatch.style.backgroundColor = value;
+        swatch.title = `${name} (${value})`;
+        nameControl(parent, swatch, property, name);
+        swatch.onclick = () => {
+          lastCommitted = null;
+          commit(value);
+        };
+        if (customCSSClass) swatch.classList.add(customCSSClass);
+        swatches.appendChild(swatch);
+      }
+      parent.appendChild(swatches);
+    }
 
     if (continuousScaleBtn) {
-      const contScaleBtn = document.createElement("button");
-      contScaleBtn.className = "style-inner-button style-color-button style-color-gradient-button";
-      contScaleBtn.title = `Map by data: colour ${property} on a continuous gradient from a property's values`;
-      contScaleBtn.onclick = async () => {
-        colorInput.value = "";
-        await handleStyleChangeEvent(property, "set_continuous_color_scale");
-      };
-
-      if (customCSSClass) contScaleBtn.classList.add(customCSSClass)
-      parent.appendChild(contScaleBtn);
+      createMapButton(parent, property,
+        `Map by data: colour ${property} on a gradient or by category from a property's values`,
+        "set_continuous_color_scale");
     }
+
+    paintWell(defaultColor);
+    bind(property, (value, entries) => {
+      lastCommitted = null;
+      paintWell(value === undefined ? defaultColor : value, entries);
+    }, {fallback: null});
   }
 
-  function createLabelControls(parent, property, isNode = null) {
-    const labelInput = createInput(120, `Enter Custom ${property}`,
-      `Set the label of the selected ${isNode ? "nodes" : "edges"} to a custom label.`, undefined,
-      async () => {
-        isNode ? await cache.gcm.updateNodes({
-          style: {
-            label: true,
-            labelText: labelInput.value.trim()
-          }
-        }) : await cache.gcm.updateEdges({style: {label: true, labelText: labelInput.value.trim()}});
-      });
+  /**
+   * The "In selection" row (after Figma's Selection colors): while a colour is
+   * mixed, list each distinct colour with how many elements carry it; picking
+   * a new colour for one recolours just those elements.
+   */
+  function createSelectionColorsRow(parentCard, property, noun) {
+    const MAX_CHIPS = 8;
+    const {target, key} = STYLE_PROPERTIES[property];
+    const ctl = propRow(parentCard, "In selection",
+      `Each ${noun.slice(0, -1)} colour in the selection. Click one to recolour only those ${noun}.`);
+    const row = ctl.parentElement;
+    row.classList.add("prop-row-selection-colors");
+    row.hidden = true;
 
-    const clearLabelButton = createButton("Clear",
-      `Clear the label of the selected ${isNode ? "nodes" : "edges"}.`, async () => {
-        labelInput.value = "";
-        const sharedOverride = {
-          style: {
-            label: true,
-            labelText: cache.CFG.INVISIBLE_CHAR
-          }
+    const chips = document.createElement("div");
+    chips.className = "prop-chips";
+    const more = document.createElement("span");
+    more.className = "prop-more";
+    // One shared picker; it opens for whichever chip was clicked.
+    const picker = document.createElement("input");
+    picker.type = "color";
+    picker.className = "prop-chip-picker";
+    picker.tabIndex = -1;
+    picker.setAttribute("aria-hidden", "true");
+    let pending = null;
+    picker.onchange = () => {
+      if (!pending) return;
+      const ids = pending;
+      pending = null;
+      const update = target === "node"
+        ? cache.gcm.updateNodes(styleOverride(property, picker.value), [], {ids})
+        : cache.gcm.updateEdges(styleOverride(property, picker.value), [], {ids});
+      Promise.resolve(update).then(refreshStyleControls).catch(reportButtonFailure);
+    };
+    ctl.append(chips, more, picker);
+
+    bind(property, (value, entries) => {
+      const buckets = value === MIXED ? colorBuckets(entries, key) : [];
+      row.hidden = buckets.length < 2;
+      chips.replaceChildren();
+      for (const bucket of buckets.slice(0, MAX_CHIPS)) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "prop-chip";
+        const dot = document.createElement("i");
+        dot.style.background = safePaint(bucket.color, "transparent");
+        const count = document.createElement("span");
+        count.textContent = String(bucket.ids.length);
+        chip.append(dot, count);
+        chip.title = `${bucket.color} — ${bucket.ids.length} ${noun}. Click to recolour them.`;
+        chip.setAttribute("aria-label", `Recolour the ${bucket.ids.length} ${noun} coloured ${bucket.color}`);
+        chip.onclick = () => {
+          pending = bucket.ids;
+          picker.value = toHex6(bucket.color) ?? "#000000";
+          if (typeof picker.showPicker === "function") picker.showPicker();
+          else picker.click();
         };
-        isNode ? await cache.gcm.updateNodes(sharedOverride) : await cache.gcm.updateEdges(sharedOverride);
-        labelInput.value = "";
-      });
-
-    const setToIDButton = createButton("Set to ID",
-      `Set the label of the selected ${isNode ? "nodes" : "edges"} to their predefined IDs.`, async () => {
-        labelInput.value = "";
-        const sharedCommands = ["label_set_to_id"];
-        isNode ? await cache.gcm.updateNodes(undefined, sharedCommands) : await cache.gcm.updateEdges(undefined, sharedCommands);
-      });
-    const setToLabelButton = createButton("Set to Label",
-      `Set the label of the selected ${isNode ? "nodes" : "edges"} to their predefined labels.`, async () => {
-        labelInput.value = "";
-        const sharedCommands = ["label_set_to_label"];
-        isNode ? await cache.gcm.updateNodes(undefined, sharedCommands) : await cache.gcm.updateEdges(undefined, sharedCommands);
-      });
-
-    parent.appendChild(labelInput);
-    parent.appendChild(setToIDButton);
-    parent.appendChild(setToLabelButton);
-    parent.appendChild(clearLabelButton);
+        chips.appendChild(chip);
+      }
+      const hidden = buckets.length - MAX_CHIPS;
+      more.textContent = hidden > 0 ? `+${hidden} more` : "";
+    });
   }
+
+  /**
+   * Label text: a custom-text field plus ID / Label / None, pressed by where
+   * the selection's labels come from now.
+   */
+  function createLabelControls(parent, property, isNode = null) {
+    const noun = isNode ? "nodes" : "edges";
+    const target = isNode ? "node" : "edge";
+    const update = (overrides, commands) => (isNode
+      ? cache.gcm.updateNodes(overrides, commands)
+      : cache.gcm.updateEdges(overrides, commands));
+    const run = async (overrides, commands) => {
+      await update(overrides, commands);
+      refreshStyleControls();
+    };
+
+    const labelInput = createInput(120, "Custom text",
+      `Type a label for the selected ${noun} and press Enter.`, undefined,
+      (text) => run({style: {label: true, labelText: text}}));
+    labelInput.classList.add("prop-text");
+    labelInput.style.width = "";
+    nameControl(parent, labelInput, property);
+    parent.appendChild(labelInput);
+
+    const sources = [
+      {value: "id", text: "ID", label: `Label the selected ${noun} with their IDs`},
+      {value: "label", text: "Label", label: `Label the selected ${noun} with their predefined labels`},
+      {value: "none", text: "None", label: `Hide the labels of the selected ${noun}`},
+    ];
+    const pick = async (source) => {
+      labelInput.value = "";
+      if (source === "id") return run(undefined, ["label_set_to_id"]);
+      if (source === "label") return run(undefined, ["label_set_to_label"]);
+      return run({style: {label: true, labelText: cache.CFG.INVISIBLE_CHAR}});
+    };
+    const sourceProperty = `${isNode ? "Node" : "Edge"} Label Source`;
+    createSegmentedControls(parent, sourceProperty, undefined, sources, {
+      onPick: pick,
+      target,
+      read: (entry) => labelSource(entry.raw, cache.CFG.INVISIBLE_CHAR),
+    });
+
+    bind(sourceProperty, (value, entries) => {
+      const custom = value === "custom" ? sharedBy(entries, (e) => e.raw.style?.labelText) : undefined;
+      labelInput.value = typeof custom === "string" ? custom : "";
+      labelInput.placeholder = value === MIXED || custom === MIXED ? "Mixed" : "Custom text";
+    }, {target, read: (entry) => labelSource(entry.raw, cache.CFG.INVISIBLE_CHAR)});
+  }
+
+  const SHAPE_NAMES = {circle: "Circle", diamond: "Diamond", hexagon: "Hexagon", rect: "Square", triangle: "Triangle", star: "Star"};
 
   function createNodeShapeControls(parent) {
-    for (const [label, value] of Object.entries(cache.DEFAULTS.STYLES.NODE_FORM)) {
-      appendButton(parent, label, value,
-        async () => await cache.gcm.updateNodes({type: value})
-      );
-    }
+    const options = Object.entries(cache.DEFAULTS.STYLES.NODE_FORM)
+      .map(([glyph, value]) => ({value, text: glyph, label: SHAPE_NAMES[value] ?? value}));
+    createSegmentedControls(parent, "Node Shape", cache.DEFAULTS.NODE.TYPE, options);
   }
 
   function createEdgeTypeControls(parent) {
-    for (const label of cache.DEFAULTS.STYLES.EDGE_TYPES) {
-      appendButton(parent, label, label, async () => await cache.gcm.updateEdges({type: label}));
-    }
+    const options = cache.DEFAULTS.STYLES.EDGE_TYPES.map((value) => ({value, text: value}));
+    createSegmentedControls(parent, "Edge Type", cache.DEFAULTS.EDGE.TYPE, options);
   }
+
+  const FONT_STYLE_OPTIONS = FONT_STYLES.map((value) => ({
+    value,
+    text: {normal: "Normal", bold: "B", italic: "I", "bold italic": "BI"}[value] ?? value,
+    label: value[0].toUpperCase() + value.slice(1),
+  }));
 
   // Two cards, split by what they need to already have: "Select Elements"
   // *creates* a selection out of the visible graph (rail ◈ menu), while
@@ -867,308 +1067,142 @@ function createStyleDiv(cache) {
       async () => await cache.lm.layoutSelectedNodes("random"));
   }
 
-  function createNodeConfigCard() {
-    const nodeDiv = createCard("Node Configuration");
+  /** An inspector-style button built through createButton (keeps its failure reporting). */
+  function propButton(parent, label, tooltip, callback, id = undefined) {
+    const btn = createButton(label, tooltip, callback, id);
+    btn.className = "insp-btn";
+    parent.appendChild(btn);
+    return btn;
+  }
 
-    const rowOne = createNewRow(nodeDiv);
-    appendLabel(rowOne, "Shape");
-    createNodeShapeControls(rowOne);
-    appendVerticalRule(rowOne);
-    appendButton(rowOne, "Pie…",
+  function createNodeConfigCard() {
+    const nodeDiv = createCard("Node Configuration", undefined, "appearance-card");
+    const D = cache.DEFAULTS;
+
+    createNodeShapeControls(propRow(nodeDiv, "Shape"));
+    const pie = propRow(nodeDiv, "Pie chart",
+      "Draw the selected nodes as pie charts of their categorical or numeric properties.");
+    propButton(pie, "Pie…",
       "Render the selected nodes as pie charts: map categorical values (equal slices) or numeric properties (sized slices) to wedges.",
-      async () => await cache.gcm.updateNodes({}, ["set_pie_chart"]));
-    appendButton(rowOne, "Clear pie", "Remove pie-chart rendering and restore the nodes' shape.",
+      async () => {
+        await cache.gcm.updateNodes({}, ["set_pie_chart"]);
+        refreshStyleControls();
+      });
+    propButton(pie, "Clear pie", "Remove pie-chart rendering and restore the nodes' shape.",
       async () => await cache.gcm.updateNodes({}, ["clear_pie_chart"]));
 
-    const rowTwo = createNewRow(nodeDiv);
-    appendLabel(rowTwo, "Size");
-    createNumericalSlider(rowTwo, "Node Size", cache.DEFAULTS.NODE.SIZE, {min: 10, max: 50, step: 1});
+    createNumericalSlider(propRow(nodeDiv, "Size"), "Node Size", D.NODE.SIZE, {min: 10, max: 50, step: 1});
+    createColorControls(propRow(nodeDiv, "Fill color"), "Node Fill Color", D.NODE.FILL_COLOR, D.STYLES.NODE_COLORS);
+    createSelectionColorsRow(nodeDiv, "Node Fill Color", "nodes");
+    createNumericalSlider(propRow(nodeDiv, "Border width", "Width of the selected nodes' border."),
+      "Node Border Size", D.NODE.LINE_WIDTH, {min: 1, max: 10, step: 1});
+    createColorControls(propRow(nodeDiv, "Border color"), "Node Border Color", D.NODE.STROKE_COLOR,
+      D.STYLES.NODE_BORDER_COLORS);
+    const opacityHint =
+      "Transparency of the selected nodes (1 = opaque, 0 = invisible). Composes with the fill/border color's own alpha.";
+    createNumericalSlider(propRow(nodeDiv, "Opacity", opacityHint), "Node Opacity", D.NODE.OPACITY,
+      {min: 0, max: 1, step: 0.05});
 
-    const rowThree = createNewRow(nodeDiv);
-    appendLabel(rowThree, "Fill Color");
-    createColorControls(rowThree, "Node Fill Color", cache.DEFAULTS.NODE.FILL_COLOR, cache.DEFAULTS.STYLES.NODE_COLORS);
+    propSubhead(nodeDiv, "Label");
+    createLabelControls(propRow(nodeDiv, "Text"), "Node Label", true);
+    createNumericalSlider(propRow(nodeDiv, "Size", "Font size of the selected nodes' labels."),
+      "Node Label Font Size", D.NODE.LABEL.FONT_SIZE, {min: 10, max: 30, step: 1});
+    createCategoricalControls(propRow(nodeDiv, "Position", "Where the label sits relative to the node."),
+      "Node Label Placement", D.NODE.LABEL.PLACEMENT, D.STYLES.NODE_LABEL_PLACEMENTS);
+    createSegmentedControls(propRow(nodeDiv, "Style"), "Node Label Font Style", "normal", FONT_STYLE_OPTIONS);
+    createColorControls(propRow(nodeDiv, "Color", "Text color of the selected nodes' labels."),
+      "Node Label Font Color", D.NODE.LABEL.FOREGROUND_COLOR, D.STYLES.NODE_LABEL_COLORS);
+    createColorControls(propRow(nodeDiv, "Background", "Background color behind the selected nodes' labels."),
+      "Node Label Background Color", D.NODE.LABEL.BACKGROUND_COLOR, D.STYLES.NODE_LABEL_BACKGROUND_COLORS);
 
-    const rowFour = createNewRow(nodeDiv);
-    appendLabel(rowFour, "Border Size", "Defines the width of the border of the selected nodes.");
-    createNumericalSlider(rowFour, "Node Border Size", cache.DEFAULTS.NODE.LINE_WIDTH,
-      {min: 1, max: 10, step: 1}, "Defines the width of the border of the selected nodes.");
-
-    const rowFive = createNewRow(nodeDiv);
-    appendLabel(rowFive, "Border Color", "Defines the fill color of the selected nodes.");
-    createColorControls(rowFive, "Node Border Color", cache.DEFAULTS.NODE.STROKE_COLOR,
-      cache.DEFAULTS.STYLES.NODE_BORDER_COLORS);
-
-    const rowFiveOpacity = createNewRow(nodeDiv);
-    appendLabel(rowFiveOpacity, "Opacity",
-      "Transparency of the selected nodes (1 = opaque, 0 = invisible). Composes with the fill/border color's own alpha.");
-    createNumericalSlider(rowFiveOpacity, "Node Opacity", cache.DEFAULTS.NODE.OPACITY,
-      {min: 0, max: 1, step: 0.05},
-      "Transparency of the selected nodes (1 = opaque, 0 = invisible). Composes with the fill/border color's own alpha.",
-      true);
-
-    appendHorizontalRule(nodeDiv);
-
-    const rowSix = createNewRow(nodeDiv);
-    appendLabel(rowSix, "Label", "Customize the selected nodes labels.");
-    createLabelControls(rowSix, "Node Label", true);
-
-    const rowSeven = createNewRow(nodeDiv);
-    appendLabel(rowSeven, "Label Font Size", "Defines the font size of the selected nodes labels.");
-    createNumericalSlider(rowSeven, "Node Label Font Size", cache.DEFAULTS.NODE.LABEL.FONT_SIZE,
-      {min: 10, max: 30, step: 1}, "Defines the font size of the selected nodes labels.");
-
-    const rowEight = createNewRow(nodeDiv);
-    appendLabel(rowEight, "Label Placement", "Defines the placement of the selected nodes labels.");
-    createCategoricalControls(rowEight, "Node Label Placement", cache.DEFAULTS.NODE.LABEL.PLACEMENT,
-      cache.DEFAULTS.STYLES.NODE_LABEL_PLACEMENTS, "Defines the placement of the selected nodes labels.");
-
-    const rowEightB = createNewRow(nodeDiv);
-    appendLabel(rowEightB, "Label Font Style", "Bold and/or italic labels for the selected nodes.");
-    createCategoricalControls(rowEightB, "Node Label Font Style", "normal", FONT_STYLES,
-      "Bold and/or italic labels for the selected nodes.");
-
-    const rowNine = createNewRow(nodeDiv);
-    appendLabel(rowNine, "Label Color",
-      "Defines the foreground (text) color of the selected nodes labels.");
-    createColorControls(rowNine, "Node Label Font Color", cache.DEFAULTS.NODE.LABEL.FOREGROUND_COLOR,
-      cache.DEFAULTS.STYLES.NODE_LABEL_COLORS);
-
-    const rowTen = createNewRow(nodeDiv);
-    appendLabel(rowTen, "Label Background Color",
-      "Defines the background color of the selected nodes labels.");
-    createColorControls(rowTen, "Node Label Background Color", cache.DEFAULTS.NODE.LABEL.BACKGROUND_COLOR,
-      cache.DEFAULTS.STYLES.NODE_LABEL_BACKGROUND_COLORS);
-
-    appendHorizontalRule(nodeDiv);
-
-    const rowEleven = createNewRow(nodeDiv);
-    appendLabel(rowEleven, "Badges", "Set badges on the selected nodes, one per spot on the node's edge.");
+    propSubhead(nodeDiv, "Badges");
     // selection.js refreshes it on every selection change.
-    cache.ui.refreshBadgeControls = createNodeBadgeControls(cache, rowEleven, nodeDiv).refresh;
-
-    const rowTwelve = createNewRow(nodeDiv);
-    appendLabel(rowTwelve, "Badge Size", "Defines the font size (and pill size) of the selected nodes badges.");
-    createNumericalSlider(rowTwelve, "Node Badge Font Size", cache.DEFAULTS.NODE.BADGE.FONT_SIZE,
-      {min: 4, max: 32, step: 1}, "Defines the font size (and pill size) of the selected nodes badges.");
-
-    const rowThirteen = createNewRow(nodeDiv);
-    appendLabel(rowThirteen, "Badge Scale With Node",
-      "Scale badges proportionally with each node's size (relative to the default node size).");
-    createBooleanControls(rowThirteen, "Node Badge Scale With Node",
-      "Scale badges proportionally with each node's size (relative to the default node size).");
+    cache.ui.refreshBadgeControls = createNodeBadgeControls(cache,
+      propRow(nodeDiv, "Add", "Set a badge on the selected nodes, one per spot on the node's edge."), nodeDiv).refresh;
+    const badgeSize = propRow(nodeDiv, "Size", "Font size (and pill size) of the selected nodes' badges.");
+    createNumericalSlider(badgeSize, "Node Badge Font Size", D.NODE.BADGE.FONT_SIZE, {min: 4, max: 32, step: 1});
+    createBooleanControls(propRow(nodeDiv, "Scale",
+      "Scale badges proportionally with each node's size (relative to the default node size)."),
+    "Node Badge Scale With Node", undefined, "With node size");
   }
 
   function createEdgeConfigCard() {
-    const edgeDiv = createCard("Edge Configuration");
+    const edgeDiv = createCard("Edge Configuration", undefined, "appearance-card");
+    const D = cache.DEFAULTS;
+    const E = D.EDGE;
 
-    const rowOne = createNewRow(edgeDiv);
-    appendLabel(rowOne, "Type", "Change the geometric edge type of the selected edges.");
-    createEdgeTypeControls(rowOne);
+    createEdgeTypeControls(propRow(edgeDiv, "Type", "Geometric type of the selected edges."));
+    createNumericalSlider(propRow(edgeDiv, "Width"), "Edge Width", E.LINE_WIDTH, {min: 0.1, max: 10.0, step: 0.1});
+    createNumericalSlider(propRow(edgeDiv, "Dash", "Dash length of the selected edges; 0 is a solid line."),
+      "Edge Dash", E.LINE_DASH, {min: 0, max: 40, step: 1});
+    createColorControls(propRow(edgeDiv, "Color"), "Edge Color", E.COLOR, D.STYLES.EDGE_COLORS);
+    createSelectionColorsRow(edgeDiv, "Edge Color", "edges");
+    createNumericalSlider(propRow(edgeDiv, "Opacity",
+      "Transparency of the selected edges (1 = opaque, 0 = invisible). Composes with the edge color's own alpha."),
+    "Edge Opacity", E.OPACITY, {min: 0, max: 1, step: 0.05});
 
-    const rowTwo = createNewRow(edgeDiv);
-    appendLabel(rowTwo, "Line Width", "Change the width of the selected edges.");
-    createNumericalSlider(rowTwo, "Edge Width", cache.DEFAULTS.EDGE.LINE_WIDTH,
-      {min: 0.1, max: 10.0, step: 0.1}, "Change the width of the selected edges.");
+    propSubhead(edgeDiv, "Label");
+    createLabelControls(propRow(edgeDiv, "Text"), "Edge Label");
+    createNumericalSlider(propRow(edgeDiv, "Size", "Font size of the selected edges' labels."),
+      "Edge Label Font Size", E.LABEL.FONT_SIZE, {min: 10, max: 30, step: 1});
+    createCategoricalControls(propRow(edgeDiv, "Position", "Where along the edge the label sits."),
+      "Edge Label Placement", E.LABEL.PLACEMENT, D.STYLES.EDGE_LABEL_PLACEMENTS);
+    createSegmentedControls(propRow(edgeDiv, "Style"), "Edge Label Font Style", "normal", FONT_STYLE_OPTIONS);
+    createBooleanControls(propRow(edgeDiv, "Rotate", "Turn the label to follow the edge's direction."),
+      "Edge Label Auto Rotate", undefined, "Follow edge");
+    createNumericalSlider(propRow(edgeDiv, "Offset X", "Label offset along the X-axis."),
+      "Edge Label Offset X", E.LABEL.OFFSET_X, {min: -100, max: 100, step: 1}, undefined, false);
+    createNumericalSlider(propRow(edgeDiv, "Offset Y", "Label offset along the Y-axis."),
+      "Edge Label Offset Y", E.LABEL.OFFSET_Y, {min: -100, max: 100, step: 1}, undefined, false);
+    createColorControls(propRow(edgeDiv, "Color", "Text color of the selected edges' labels."),
+      "Edge Label Font Color", E.LABEL.FOREGROUND_COLOR, D.STYLES.EDGE_LABEL_COLORS);
+    createColorControls(propRow(edgeDiv, "Background", "Background color behind the selected edges' labels."),
+      "Edge Label Background Color", E.LABEL.BACKGROUND_COLOR, D.STYLES.EDGE_LABEL_BACKGROUND_COLORS);
 
-    const rowThree = createNewRow(edgeDiv);
-    appendLabel(rowThree, "Line Dash", "Define the dash pattern of the selected edges.");
-    createNumericalSlider(rowThree, "Edge Dash", cache.DEFAULTS.EDGE.LINE_DASH,
-      {min: 0, max: 40, step: 1}, "Define the dash pattern of the selected edges.");
+    const typeHint =
+      "Marker shape: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.";
+    for (const [end, Key, size, type, borderSize] of [
+      ["start", "Start", E.ARROWS.START_SIZE, E.ARROWS.START_TYPE, E.ARROWS.START_BORDER_SIZE],
+      ["end", "End", E.ARROWS.END_SIZE, E.ARROWS.END_TYPE, E.ARROWS.END_BORDER_SIZE],
+    ]) {
+      propSubhead(edgeDiv, `${Key} arrow`);
+      createBooleanControls(propRow(edgeDiv, "Show", `Draw a marker at the ${end} of the selected edges.`),
+        `Edge ${Key} Arrow`, undefined, `${Key} arrow`);
+      createCategoricalControls(propRow(edgeDiv, "Shape", typeHint), `Edge ${Key} Arrow Type`, type,
+        D.STYLES.EDGE_ARROW_TYPES);
+      createNumericalSlider(propRow(edgeDiv, "Size", `Size of the ${end} marker.`), `Edge ${Key} Arrow Size`, size,
+        {min: 4, max: 40, step: 1});
+      createColorControls(propRow(edgeDiv, "Color", `Fill color of the ${end} marker. Unset inherits the edge color.`),
+        `Edge ${Key} Arrow Color`, E.COLOR, D.STYLES.EDGE_ARROW_COLORS);
+      createColorControls(propRow(edgeDiv, "Border", `Outline color of the ${end} marker. None for no border.`),
+        `Edge ${Key} Arrow Border Color`, E.HALO.COLOR, D.STYLES.EDGE_ARROW_BORDER_COLORS);
+      createNumericalSlider(propRow(edgeDiv, "Border width",
+        `Thickness of the ${end} marker border in px. 0 = auto (scales with the arrow).`),
+      `Edge ${Key} Arrow Border Size`, borderSize, {min: 0, max: 20, step: 1});
+    }
 
-    const rowFour = createNewRow(edgeDiv);
-    appendLabel(rowFour, "Color", "Define the selected edges color.");
-    createColorControls(rowFour, "Edge Color", cache.DEFAULTS.EDGE.COLOR, cache.DEFAULTS.STYLES.EDGE_COLORS);
+    propSubhead(edgeDiv, "Halo");
+    createBooleanControls(propRow(edgeDiv, "Show", "Draw a halo around the selected edges."),
+      "Edge Halo", undefined, "Halo");
+    createColorControls(propRow(edgeDiv, "Color"), "Edge Halo Color", E.HALO.COLOR, D.STYLES.EDGE_COLORS);
+    createNumericalSlider(propRow(edgeDiv, "Width"), "Edge Halo Width", E.HALO.WIDTH, {min: 1, max: 30, step: 1});
 
-    const rowFourOpacity = createNewRow(edgeDiv);
-    appendLabel(rowFourOpacity, "Opacity",
-      "Transparency of the selected edges (1 = opaque, 0 = invisible). Composes with the edge color's own alpha.");
-    createNumericalSlider(rowFourOpacity, "Edge Opacity", cache.DEFAULTS.EDGE.OPACITY,
-      {min: 0, max: 1, step: 0.05},
-      "Transparency of the selected edges (1 = opaque, 0 = invisible). Composes with the edge color's own alpha.",
-      true);
-
-    appendHorizontalRule(edgeDiv);
-
-    const rowFive = createNewRow(edgeDiv);
-    appendLabel(rowFive, "Label", "Customize the selected edges labels.");
-    createLabelControls(rowFive, "Edge Label");
-
-    const rowSix = createNewRow(edgeDiv);
-    appendLabel(rowSix, "Label Font Size", "Defines the font size of the selected edges labels.");
-    createNumericalSlider(rowSix, "Edge Label Font Size", cache.DEFAULTS.EDGE.LABEL.FONT_SIZE,
-      {min: 10, max: 30, step: 1}, "Defines the font size of the selected edges labels.");
-
-    const rowSeven = createNewRow(edgeDiv);
-    appendLabel(rowSeven, "Label Placement", "Defines the placement of the selected edges labels.");
-    createCategoricalControls(rowSeven, "Edge Label Placement", cache.DEFAULTS.EDGE.LABEL.PLACEMENT,
-      cache.DEFAULTS.STYLES.EDGE_LABEL_PLACEMENTS, "Defines the placement of the selected edges labels.");
-
-    const rowSevenB = createNewRow(edgeDiv);
-    appendLabel(rowSevenB, "Label Font Style", "Bold and/or italic labels for the selected edges.");
-    createCategoricalControls(rowSevenB, "Edge Label Font Style", "normal", FONT_STYLES,
-      "Bold and/or italic labels for the selected edges.");
-
-    const rowEight = createNewRow(edgeDiv);
-    appendLabel(rowEight, "Label Auto Rotate", "Enable/Disable label rotation.");
-    createBooleanControls(rowEight, "Edge Label Auto Rotate", "Enable/Disable label rotation.");
-
-    const rowNine = createNewRow(edgeDiv);
-    appendLabel(rowNine, "Label Offset X",
-      "Define the offset of the selected edges labels along the X-axis.");
-    createNumericalSlider(rowNine, "Edge Label Offset X", cache.DEFAULTS.EDGE.LABEL.OFFSET_X,
-      {min: -100, max: 100, step: 1},
-      "Define the offset of the selected edges labels along the X-axis.", false);
-
-    const rowTen = createNewRow(edgeDiv);
-    appendLabel(rowTen, "Label Offset Y",
-      "Define the offset of the selected edges labels along the Y-axis.");
-    createNumericalSlider(rowTen, "Edge Label Offset Y", cache.DEFAULTS.EDGE.LABEL.OFFSET_Y,
-      {min: -100, max: 100, step: 1},
-      "Define the offset of the selected edges labels along the Y-axis.", false);
-
-    const rowEleven = createNewRow(edgeDiv);
-    appendLabel(rowEleven, "Label Color",
-      "Defines the foreground (text) color of the selected edges labels.");
-    createColorControls(rowEleven, "Edge Label Font Color", cache.DEFAULTS.EDGE.LABEL.FOREGROUND_COLOR,
-      cache.DEFAULTS.STYLES.EDGE_LABEL_COLORS, "Defines the foreground (text) color of the selected edges labels.");
-
-    const rowTwelve = createNewRow(edgeDiv);
-    appendLabel(rowTwelve, "Label Background Color",
-      "Defines the background color of the selected edges labels.");
-    createColorControls(rowTwelve, "Edge Label Background Color", cache.DEFAULTS.EDGE.LABEL.BACKGROUND_COLOR,
-      cache.DEFAULTS.STYLES.EDGE_LABEL_BACKGROUND_COLORS, "Defines the background color of the selected edges labels.");
-
-    appendHorizontalRule(edgeDiv);
-
-    const rowThirteen = createNewRow(edgeDiv);
-    appendLabel(rowThirteen, "Start Arrow", "Enable/Disable the start arrow of the selected edges.");
-    createBooleanControls(rowThirteen, "Edge Start Arrow", "Enable/Disable the start arrow of the selected edges.");
-
-    const rowFourteen = createNewRow(edgeDiv);
-    appendLabel(rowFourteen, "Start Arrow Size", "Define the size of the start marker of the selected edges.");
-    createNumericalSlider(rowFourteen, "Edge Start Arrow Size", cache.DEFAULTS.EDGE.ARROWS.START_SIZE,
-      {min: 4, max: 40, step: 1}, "Define the size of the start marker of the selected edges.", true);
-
-    const rowFifteen = createNewRow(edgeDiv);
-    appendLabel(rowFifteen, "Start Arrow Type",
-      "Marker shape at the source end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
-    createCategoricalControls(rowFifteen, "Edge Start Arrow Type", cache.DEFAULTS.EDGE.ARROWS.START_TYPE,
-      cache.DEFAULTS.STYLES.EDGE_ARROW_TYPES,
-      "Marker shape at the source end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
-
-    const rowFifteenColor = createNewRow(edgeDiv);
-    appendLabel(rowFifteenColor, "Start Arrow Color",
-      "Fill color of the start marker. Leave unset to inherit the edge color.");
-    createColorControls(rowFifteenColor, "Edge Start Arrow Color", cache.DEFAULTS.EDGE.COLOR,
-      cache.DEFAULTS.STYLES.EDGE_ARROW_COLORS,
-      "Fill color of the start marker. Leave unset to inherit the edge color.");
-
-    const rowFifteenBorder = createNewRow(edgeDiv);
-    appendLabel(rowFifteenBorder, "Start Arrow Border Color",
-      "Outline color of the start marker. Set to none for no border.");
-    createColorControls(rowFifteenBorder, "Edge Start Arrow Border Color", cache.DEFAULTS.EDGE.HALO.COLOR,
-      cache.DEFAULTS.STYLES.EDGE_ARROW_BORDER_COLORS,
-      "Outline color of the start marker. Set to none for no border.");
-
-    const rowFifteenBorderSize = createNewRow(edgeDiv);
-    appendLabel(rowFifteenBorderSize, "Start Arrow Border Size",
-      "Thickness of the start marker border in px. 0 = auto (scales with the arrow).");
-    createNumericalSlider(rowFifteenBorderSize, "Edge Start Arrow Border Size",
-      cache.DEFAULTS.EDGE.ARROWS.START_BORDER_SIZE, {min: 0, max: 20, step: 1},
-      "Thickness of the start marker border in px. 0 = auto (scales with the arrow).", true);
-
-    const rowSixteen = createNewRow(edgeDiv);
-    appendLabel(rowSixteen, "End Arrow", "Enable/Disable the end arrow of the selected edges.");
-    createBooleanControls(rowSixteen, "Edge End Arrow", "Enable/Disable the end arrow of the selected edges.");
-
-    const rowEighteen = createNewRow(edgeDiv);
-    appendLabel(rowEighteen, "End Arrow Size", "Define the size of the end marker of the selected edges.");
-    createNumericalSlider(rowEighteen, "Edge End Arrow Size", cache.DEFAULTS.EDGE.ARROWS.END_SIZE,
-      {min: 4, max: 40, step: 1}, "Define the size of the end marker of the selected edges.", true);
-
-    const rowNineteen = createNewRow(edgeDiv);
-    appendLabel(rowNineteen, "End Arrow Type",
-      "Marker shape at the target end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
-    createCategoricalControls(rowNineteen, "Edge End Arrow Type", cache.DEFAULTS.EDGE.ARROWS.END_TYPE,
-      cache.DEFAULTS.STYLES.EDGE_ARROW_TYPES,
-      "Marker shape at the target end: arrow/rect/diamond/circle encode direction, tee (⊣) encodes inhibition.");
-
-    const rowNineteenColor = createNewRow(edgeDiv);
-    appendLabel(rowNineteenColor, "End Arrow Color",
-      "Fill color of the end marker. Leave unset to inherit the edge color.");
-    createColorControls(rowNineteenColor, "Edge End Arrow Color", cache.DEFAULTS.EDGE.COLOR,
-      cache.DEFAULTS.STYLES.EDGE_ARROW_COLORS,
-      "Fill color of the end marker. Leave unset to inherit the edge color.");
-
-    const rowNineteenBorder = createNewRow(edgeDiv);
-    appendLabel(rowNineteenBorder, "End Arrow Border Color",
-      "Outline color of the end marker. Set to none for no border.");
-    createColorControls(rowNineteenBorder, "Edge End Arrow Border Color", cache.DEFAULTS.EDGE.HALO.COLOR,
-      cache.DEFAULTS.STYLES.EDGE_ARROW_BORDER_COLORS,
-      "Outline color of the end marker. Set to none for no border.");
-
-    const rowNineteenBorderSize = createNewRow(edgeDiv);
-    appendLabel(rowNineteenBorderSize, "End Arrow Border Size",
-      "Thickness of the end marker border in px. 0 = auto (scales with the arrow).");
-    createNumericalSlider(rowNineteenBorderSize, "Edge End Arrow Border Size",
-      cache.DEFAULTS.EDGE.ARROWS.END_BORDER_SIZE, {min: 0, max: 20, step: 1},
-      "Thickness of the end marker border in px. 0 = auto (scales with the arrow).", true);
-
-    appendHorizontalRule(edgeDiv);
-
-    const rowTwenty = createNewRow(edgeDiv);
-    appendLabel(rowTwenty, "Halo", "Enable/Disable a halo around the selected edges.");
-    createBooleanControls(rowTwenty, "Edge Halo", "Enable/Disable a halo around the selected edges.");
-
-    const rowTwentyOne = createNewRow(edgeDiv);
-    appendLabel(rowTwentyOne, "Halo Color", "Define the color of the halo for the selected edges.");
-    createColorControls(rowTwentyOne, "Edge Halo Color", cache.DEFAULTS.EDGE.HALO.COLOR,
-      cache.DEFAULTS.STYLES.EDGE_COLORS);
-
-    const rowTwentyTwo = createNewRow(edgeDiv);
-    appendLabel(rowTwentyTwo, "Halo Width", "Define the halo width for the selected edges.");
-    createNumericalSlider(rowTwentyTwo, "Edge Halo Width", cache.DEFAULTS.EDGE.HALO.WIDTH,
-      {min: 1, max: 30, step: 1}, "Define the halo width for the selected edges.");
-
-    appendHorizontalRule(edgeDiv);
-
-    const rowTwentyThree = createNewRow(edgeDiv);
-    appendLabel(rowTwentyThree, "Flow",
-      "Animate a directional flow along the selected edges (source → target).");
-    createBooleanControls(rowTwentyThree, "Edge Flow",
-      "Animate a directional flow along the selected edges (source → target).");
-
-    const flowTypeTooltip =
-      "dash = marching dashes, pulse = travelling dots, comet = fading tails, chevron = travelling arrows.";
-    const rowTwentyFour = createNewRow(edgeDiv);
-    appendLabel(rowTwentyFour, "Flow Type", flowTypeTooltip);
-    createCategoricalControls(rowTwentyFour, "Edge Flow Type", cache.DEFAULTS.EDGE.FLOW.TYPE,
-      cache.DEFAULTS.STYLES.EDGE_FLOW_TYPES, flowTypeTooltip);
-
-    const rowTwentyFive = createNewRow(edgeDiv);
-    appendLabel(rowTwentyFive, "Flow Speed", "Speed multiplier for the flow animation.");
-    createNumericalSlider(rowTwentyFive, "Edge Flow Speed", cache.DEFAULTS.EDGE.FLOW.SPEED,
-      {min: 0.2, max: 5, step: 0.2}, "Speed multiplier for the flow animation.", true);
-
-    const rowTwentySix = createNewRow(edgeDiv);
-    appendLabel(rowTwentySix, "Flow Color",
-      "Color of the flow overlay. Leave unset to derive a lighter shade of the edge color.");
-    // Swatch stand-in only (FLOW.COLOR is null = "derive from the stroke") —
-    // same convention as the arrow-color rows defaulting to EDGE.COLOR.
-    createColorControls(rowTwentySix, "Edge Flow Color", cache.DEFAULTS.EDGE.COLOR,
-      cache.DEFAULTS.STYLES.EDGE_COLORS);
-
-    const rowTwentySeven = createNewRow(edgeDiv);
-    appendLabel(rowTwentySeven, "Flow Opacity",
-      "Opacity of the flow overlay — lower to make it less prominent.");
-    createNumericalSlider(rowTwentySeven, "Edge Flow Opacity", cache.DEFAULTS.EDGE.FLOW.OPACITY,
-      {min: 0.1, max: 1, step: 0.05}, "Opacity of the flow overlay — lower to make it less prominent.", true);
-
-    const rowTwentyEight = createNewRow(edgeDiv);
-    appendLabel(rowTwentyEight, "Flow Density",
-      "Pattern spacing multiplier — higher spreads the dashes/dots further apart.");
-    createNumericalSlider(rowTwentyEight, "Edge Flow Density", cache.DEFAULTS.EDGE.FLOW.DENSITY,
-      {min: 0.5, max: 3, step: 0.25}, "Pattern spacing multiplier — higher spreads the dashes/dots further apart.", true);
+    propSubhead(edgeDiv, "Flow");
+    createBooleanControls(propRow(edgeDiv, "Show",
+      "Animate a directional flow along the selected edges (source → target)."), "Edge Flow", undefined, "Flow");
+    createCategoricalControls(propRow(edgeDiv, "Type",
+      "dash = marching dashes, pulse = travelling dots, comet = fading tails, chevron = travelling arrows."),
+    "Edge Flow Type", E.FLOW.TYPE, D.STYLES.EDGE_FLOW_TYPES);
+    createNumericalSlider(propRow(edgeDiv, "Speed", "Speed multiplier for the flow animation."),
+      "Edge Flow Speed", E.FLOW.SPEED, {min: 0.2, max: 5, step: 0.2});
+    // Unset (FLOW.COLOR null) derives a lighter shade of the edge color.
+    createColorControls(propRow(edgeDiv, "Color", "Color of the flow overlay. Unset derives it from the edge color."),
+      "Edge Flow Color", E.FLOW.COLOR, D.STYLES.EDGE_COLORS);
+    createNumericalSlider(propRow(edgeDiv, "Opacity", "Opacity of the flow overlay."),
+      "Edge Flow Opacity", E.FLOW.OPACITY, {min: 0.1, max: 1, step: 0.05});
+    createNumericalSlider(propRow(edgeDiv, "Density",
+      "Pattern spacing multiplier — higher spreads the dashes/dots further apart."),
+    "Edge Flow Density", E.FLOW.DENSITY, {min: 0.5, max: 3, step: 0.25});
   }
 
   // The Groups overlay card. The four fixed style tabs are gone: a workspace
@@ -1667,8 +1701,8 @@ function createStyleDiv(cache) {
   // folded. The two overlay cards are the layer stack's settings-bearing rows:
   // both fold, and both carry their own switch (see makeCollapsible's
   // `overlay`), which is what keeps on/off and parameters in one place.
-  makeCollapsible("Node Configuration");
-  makeCollapsible("Edge Configuration", true);
+  makeCollapsible("Node Configuration", false, {title: "Nodes", countId: "styleNodeCount"});
+  makeCollapsible("Edge Configuration", true, {title: "Edges", countId: "styleEdgeCount"});
   makeCollapsible("Bubble Sets", true, {
     title: "Groups",
     overlay: "groups",
@@ -1683,6 +1717,7 @@ function createStyleDiv(cache) {
   // after this builder has returned, so hand the closure to the UI manager
   // rather than making bubble_sets reach back into this module.
   cache.ui.buildGroupStylePanel = buildGroupStylePanel;
+  cache.ui.refreshStyleControls = refreshStyleControls;
 
   return root;
 }

@@ -2051,6 +2051,378 @@ h5 {
     opacity: 0.5;
 }
 
+/* --------------------------------------------------------------------------
+   Appearance editor (Selection › Nodes / Edges). An inspector, not a card
+   stack: a flat section header with a hairline, then label | control rows.
+   Controls show the selection's shared value or "Mixed" (ui_style_div.js
+   refreshStyleControls).
+   -------------------------------------------------------------------------- */
+.card-labeled.appearance-card {
+    border: none;
+    box-shadow: none;
+    background: none;
+    padding: 0 0 6px;
+    margin-top: 10px;
+}
+
+.appearance-card > .card-collapse-bar {
+    background: none;
+    color: var(--text-muted);
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+}
+
+.appearance-card > .card-collapse-bar:has(.card-collapse-header:hover) {
+    background: none;
+    color: var(--accent-text);
+}
+
+.appearance-card .card-collapse-header {
+    padding: 4px 0;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.appearance-card .card-collapse-title {
+    flex: 0 1 auto;
+}
+
+.appearance-card .layer-count {
+    flex: 1 1 auto;
+    text-align: left;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    opacity: 1;
+}
+
+.prop-row {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    column-gap: 8px;
+    /* Top-aligned so a row whose controls wrap keeps its label on line one. */
+    align-items: start;
+    min-height: 28px;
+    padding: 2px 0;
+}
+
+.prop-row[hidden] {
+    display: none;
+}
+
+.prop-label {
+    line-height: 24px;
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.prop-ctl {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.prop-subhead {
+    margin: 8px 0 2px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-soft);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.prop-mixed {
+    font-size: 11px;
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+.prop-mixed[hidden] {
+    display: none;
+}
+
+/* One control height (24px, WCAG 2.5.8) and one radius for everything in a row. */
+.prop-ctl .insp-btn,
+.prop-select,
+.prop-text,
+.appearance-card .color-hex,
+.appearance-card .style-input-sm {
+    height: 24px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+}
+
+.prop-ctl .insp-btn {
+    padding: 0 8px;
+}
+
+.prop-select {
+    flex: 1 1 96px;
+    min-width: 0;
+    padding: 0 4px;
+}
+
+.prop-text {
+    flex: 1 1 96px;
+    min-width: 72px;
+    padding: 0 6px;
+}
+
+.appearance-card .style-input-sm {
+    flex: none;
+    width: 52px;
+    padding: 0 4px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-variant-numeric: tabular-nums;
+    /* The spinner arrows ate the field; arrow keys still step the value. */
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.appearance-card .style-input-sm::-webkit-inner-spin-button,
+.appearance-card .style-input-sm::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.appearance-card .color-hex {
+    width: 80px;
+    padding: 0 6px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.prop-ctl ::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+    font-family: inherit;
+}
+
+.appearance-card .style-slider-container {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 24px;
+    gap: 4px;
+    justify-content: flex-start;
+}
+
+.appearance-card .style-slider {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 0;
+    height: 6px;
+}
+
+/* Mixed: no single position is true, so the thumb steps back to an outline. */
+.style-slider.is-mixed::-webkit-slider-thumb {
+    background: transparent;
+    box-shadow: inset 0 0 0 2px var(--text-muted);
+}
+
+.style-slider.is-mixed::-moz-range-thumb {
+    background: transparent;
+    box-shadow: inset 0 0 0 2px var(--text-muted);
+}
+
+.style-slider:focus-visible {
+    outline: 2px solid var(--accent-ring);
+    outline-offset: 3px;
+}
+
+/* Segmented control: pressed state is the value. */
+.prop-seg {
+    display: inline-flex;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--input-bg);
+}
+
+.prop-seg > button {
+    min-width: 26px;
+    height: 22px;
+    padding: 0 7px;
+    border: none;
+    border-right: 1px solid var(--border-soft);
+    background: transparent;
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.prop-seg > button:last-child {
+    border-right: none;
+}
+
+.prop-seg > button:hover {
+    color: var(--accent-text);
+}
+
+.prop-seg > button[aria-pressed="true"] {
+    background: var(--brand-border);
+    color: #fff;
+}
+
+.prop-seg > button:focus-visible {
+    outline: 2px solid var(--accent-ring);
+    outline-offset: -2px;
+}
+
+/* Colour: a painted well over the native picker, a hex field, the palette. */
+.color-well {
+    position: relative;
+    flex: none;
+    width: 28px;
+    height: 24px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.color-well.is-unset {
+    background: repeating-linear-gradient(135deg, var(--input-bg) 0 5px, var(--border) 5px 6px);
+}
+
+.color-well-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+}
+
+.color-well:has(.color-well-input:focus-visible) {
+    outline: 2px solid var(--accent-ring);
+    outline-offset: 1px;
+}
+
+.appearance-card .style-color-button-container {
+    gap: 4px;
+}
+
+/* 20px with a 4px gap: the 24px spacing exception of WCAG 2.5.8. */
+.prop-swatch {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.prop-swatch.is-unset {
+    background: repeating-linear-gradient(135deg, var(--input-bg) 0 4px, var(--border) 4px 5px);
+}
+
+.prop-swatch:hover {
+    border-color: var(--accent-text);
+}
+
+.prop-color-input {
+    width: 28px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--input-bg);
+    cursor: pointer;
+}
+
+.prop-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+    font-size: 12px;
+    color: var(--text-strong);
+    cursor: pointer;
+}
+
+.prop-check input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--brand-border);
+}
+
+/* "In selection": one chip per distinct colour, with its count. */
+.prop-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.prop-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 24px;
+    padding: 0 6px 0 4px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 11px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+
+.prop-chip:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+.prop-chip > i {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid var(--border-soft);
+    box-sizing: border-box;
+}
+
+.prop-more {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* The shared picker behind the chips: present for showPicker(), never seen. */
+.prop-row-selection-colors .prop-ctl {
+    position: relative;
+}
+
+.prop-chip-picker {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.appearance-card .badge-list {
+    margin: 2px 0 4px 92px;
+}
+
 .bubble-set-config-card-header::before {
     font-size: 12px;
 }

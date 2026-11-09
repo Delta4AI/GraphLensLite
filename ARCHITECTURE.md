@@ -129,7 +129,13 @@ Business logic and UI:
   re-parents each card to its single home in the rail or the inspector. The Groups
   card is a list (painted by `bubble_sets.renderGroupList`) over ONE settings pane
   rebuilt for the selected row by `buildGroupStylePanel` — a pane per group would
-  be N × ~20 rows of DOM for a surface showing one group at a time
+  be N × ~20 rows of DOM for a surface showing one group at a time. The Nodes /
+  Edges sections bind each control to a style property; `selection.js` calls
+  `refreshStyleControls` on every selection change so they show the selection's
+  shared value or "Mixed"
+- `selection_style_values.js` — pure side of that sync: the editor property →
+  style key table (also what `handleStyleChangeEvent` writes), the shared-or-MIXED
+  reduction, the per-colour buckets behind the "In selection" row, label source
 - `metrics.js` — `NetworkMetrics`: degree/betweenness/closeness/eigenvector centrality, PageRank.
   Computed lazily — only while its workbench tab is visible (`setWorkbenchVisible`)
 - `api_client.js` — client for the standalone ingest service
