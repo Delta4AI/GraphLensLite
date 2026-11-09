@@ -128,6 +128,16 @@ Standalone `article` document (`supplement/dsl_grammar.tex`) with the EBNF
 grammar of the query DSL, derived from `src/managers/query.js`. Re-check its
 examples whenever the query parser changes.
 
+### Supplementary Tables S1 and S2: benchmarks
+
+```bash
+cd supplement && latexmk -pdf benchmarks
+```
+
+Render sweep (S1) and assistant benchmark (S2). Every number comes from the
+result files in `bench/render/results/` and `bench/assistant/results/` named in
+the table notes; replace rows from those files when a run is redone.
+
 ### Clean auxiliary files
 
 ```bash

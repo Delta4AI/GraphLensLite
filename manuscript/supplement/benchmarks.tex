@@ -1,0 +1,207 @@
+%% Supplementary Tables S1 and S2: render and assistant benchmarks.
+%% Standalone document; build with:  latexmk -pdf benchmarks  (in this folder)
+%%
+%% AI-DRAFTED -- REVIEW
+%% Every number is taken from the committed result files named in each table
+%% note (bench/render/results/, bench/assistant/results/). Re-generate the rows
+%% from those JSON files if a run is replaced; do not edit numbers by hand.
+
+\documentclass[10pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{booktabs}
+\usepackage[hyphens]{url}
+\setlength{\tabcolsep}{4pt}
+
+\renewcommand{\thetable}{S\arabic{table}}
+\title{Supplementary Tables S1 and S2: Render and assistant benchmarks}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{S1. Render scalability}
+
+The harness (\path{scripts/perf_benchmark.js --sweep}, documented in
+\path{bench/render/README.md}) loads synthetic networks of 1,000 to 100,000
+nodes with 1.5 or 5 edges per node into GLL in a fresh headless Chromium for
+each run (viewport $1600\times900$, device pixel ratio 1) and measures load
+time and frame rates during real wheel-zoom and mouse-drag input. Nodes are
+placed in eight Gaussian clusters with 85\,\% of edges inside a cluster, and
+the layout is precomputed, so no force layout is timed. Three styling
+variants are tested: \emph{plain} (application defaults; labels are hidden
+automatically above 1,000 nodes), \emph{heavy} (fill colour mapped from a
+categorical property, size from a numeric property, labels forced on for
+every node, curved edges with arrows, edge colour and width mapped from data)
+and \emph{overlays} (\emph{heavy} plus animated flow on every edge, four
+bubble groups of up to 500 members and the density heatmap). Headless
+Chromium limits \texttt{requestAnimationFrame} to 60\,Hz, so 60 frames per
+second (FPS) is the ceiling.
+
+Table~\ref{tab:render} reports the medians of three runs on a workstation
+(Intel Xeon w5-2465X, NVIDIA RTX A4000 16\,GB, Debian 13, Chromium 148, GLL
+1.18.0 at commit \texttt{91eb61f}). The largest networks for which the
+median zoom and pan rate both stayed at or above 30\,FPS were 50,000 nodes
+(plain, both edge densities), 25,000 and 10,000 nodes (heavy, 1.5 and 5 edges
+per node; in both series one smaller size fell below 30\,FPS while panning,
+see the table note) and 5,000 and 1,000 nodes (overlays). On a laptop with an
+integrated GPU (AMD Ryzen AI 9 HX 370 with Radeon 890M, Fedora 44, commit
+\texttt{c931484}) the corresponding sizes were 50,000 and 25,000 (plain),
+5,000 and 1,000 (heavy), and 1,000 and none (overlays).
+
+\begin{table}[h]
+\centering
+\small
+\caption[Render scalability]{Load time and interaction frame rates against network size and
+styling (workstation, NVIDIA RTX A4000). Load: \texttt{renderGraphData()}
+called until the first frame after it resolved (graph build, render, fit);
+JSON parsing is excluded. Idle: frame rate without input after the view
+settled; for \emph{overlays} this is the sustained flow-animation rate.
+Zoom, Pan: frame rate during 3\,s of wheel input and 3\,s of mouse drag.
+Select: selecting 500 nodes until the next frame. Heap: used JavaScript heap
+after load. Medians of three runs; quartiles for every cell are in
+\path{bench/render/results/sweep_2026-11-06T18-13-05-679Z.md}. For
+\emph{heavy}, the pan rate is lower at 10,000/15,000 (29.8\,FPS) and
+5,000/25,000 (22.1\,FPS) than at the next larger size. Both cells lie at or
+below 25,000 edges, where GLL keeps edge hover and click events on; above it
+they are switched off. The slowdown coincides with that cut-off, but we did
+not profile it.}
+\label{tab:render}
+\begin{tabular}{rrlrrrrrr}
+\toprule
+Nodes & Edges & Variant & Load (s) & Idle FPS & Zoom FPS & Pan FPS & Select (ms) & Heap (MB) \\
+\midrule
+1,000 & 1,500 & plain & 0.7 & 59.9 & 60.0 & 60.0 & 22 & 27 \\
+5,000 & 7,500 & plain & 1.1 & 59.9 & 59.7 & 60.0 & 39 & 87 \\
+10,000 & 15,000 & plain & 1.6 & 59.9 & 59.7 & 60.0 & 70 & 142 \\
+25,000 & 37,500 & plain & 3.4 & 59.9 & 59.7 & 60.0 & 150 & 347 \\
+50,000 & 75,000 & plain & 6.5 & 59.9 & 53.9 & 59.3 & 406 & 823 \\
+100,000 & 150,000 & plain & 13.6 & 59.9 & 28.2 & 6.9 & 849 & 1588 \\
+1,000 & 1,500 & heavy & 0.8 & 59.9 & 59.7 & 60.0 & 78 & 40 \\
+5,000 & 7,500 & heavy & 1.2 & 59.9 & 59.7 & 60.0 & 98 & 89 \\
+10,000 & 15,000 & heavy & 1.9 & 59.9 & 59.4 & 29.8 & 127 & 160 \\
+25,000 & 37,500 & heavy & 3.9 & 59.9 & 50.9 & 60.1 & 238 & 433 \\
+50,000 & 75,000 & heavy & 7.6 & 59.9 & 24.7 & 52.3 & 509 & 924 \\
+100,000 & 150,000 & heavy & 15.6 & 59.9 & 11.2 & 46.6 & 975 & 1896 \\
+1,000 & 1,500 & overlays & 1.0 & 59.9 & 59.9 & 59.3 & 72 & 41 \\
+5,000 & 7,500 & overlays & 1.9 & 41.5 & 36.1 & 40.0 & 117 & 127 \\
+10,000 & 15,000 & overlays & 3.0 & 19.2 & 16.5 & 19.1 & 187 & 249 \\
+25,000 & 37,500 & overlays & 6.8 & 7.4 & 6.5 & 6.3 & 371 & 773 \\
+50,000 & 75,000 & overlays & 14.3 & 3.1 & 2.9 & 2.8 & 804 & 1280 \\
+100,000 & 150,000 & overlays & 31.1 & 1.4 & 1.2 & 1.1 & 1718 & 1865 \\
+\midrule
+1,000 & 5,000 & plain & 0.9 & 59.9 & 60.0 & 60.0 & 29 & 47 \\
+5,000 & 25,000 & plain & 1.8 & 59.9 & 59.7 & 60.0 & 67 & 162 \\
+10,000 & 50,000 & plain & 3.2 & 59.9 & 59.7 & 60.0 & 140 & 351 \\
+25,000 & 125,000 & plain & 7.8 & 59.9 & 59.7 & 60.2 & 450 & 942 \\
+50,000 & 250,000 & plain & 15.8 & 59.9 & 50.7 & 59.0 & 1119 & 1847 \\
+100,000 & 500,000 & plain & 35.3 & 59.9 & 27.1 & 51.5 & 2560 & 2299 \\
+1,000 & 5,000 & heavy & 1.0 & 59.9 & 59.7 & 60.0 & 83 & 69 \\
+5,000 & 25,000 & heavy & 2.1 & 59.9 & 55.3 & 22.1 & 161 & 162 \\
+10,000 & 50,000 & heavy & 3.6 & 59.9 & 39.9 & 58.1 & 245 & 409 \\
+25,000 & 125,000 & heavy & 8.7 & 59.9 & 17.2 & 34.0 & 574 & 770 \\
+50,000 & 250,000 & heavy & 17.6 & 59.9 & 9.3 & 17.9 & 1220 & 2109 \\
+100,000 & 500,000 & heavy & 39.7 & 59.9 & 5.5 & 34.8 & 2810 & 3055 \\
+1,000 & 5,000 & overlays & 1.2 & 56.4 & 58.4 & 58.4 & 91 & 84 \\
+5,000 & 25,000 & overlays & 3.5 & 15.2 & 12.5 & 14.1 & 215 & 296 \\
+10,000 & 50,000 & overlays & 6.4 & 6.6 & 6.3 & 6.3 & 375 & 730 \\
+25,000 & 125,000 & overlays & 16.7 & 2.2 & 2.3 & 2.1 & 956 & 1588 \\
+50,000 & 250,000 & overlays & 36.7 & 1.0 & 0.9 & 0.9 & 2532 & 2427 \\
+100,000 & 500,000 & overlays & \multicolumn{6}{c}{timeout (run exceeded 240\,s)} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\section*{S2. Assistant query generation}
+
+Schema-constrained decoding guarantees that a generated query is well formed,
+not that it is correct. The benchmark (\path{bench/assistant/}) therefore
+compares the selection of each generated query with the selection of a
+hand-written gold query. The gold set holds 52 questions on two networks, the
+ADPKD model of this study (Supplementary datafile S1; 33 questions) and the
+airport network template shipped with GLL (19 questions), in six tiers:
+\emph{numeric} (a single numeric range; 9 questions), \emph{categorical} (a
+single \texttt{IN} or \texttt{IS TRUE} condition; 9), \emph{two-clause} (two
+conditions joined by \texttt{AND} or \texttt{OR}; 10), \emph{nested} (three or
+more conditions, nesting or binary \texttt{NOT}; 8), \emph{paraphrase} (the
+wording does not match the property name; 11) and \emph{impossible} (no
+property can answer the question, so the correct answer is no query; 5).
+
+For each question the harness imports the network with GLL's own Excel
+import, builds the graph snapshot that the assistant panel sends, and calls
+the application's query generator with its Ollama client (structured output
+constrained to the network's properties, temperature 0, context window
+16,384 tokens, including the generator's single repair pass). The first valid
+suggested query is evaluated with GLL's query parser, as the panel's
+\emph{Select} button does, and its node and edge IDs are compared with the
+gold selection. A question counts as \emph{exact} when both ID sets are
+identical; an impossible question counts as exact only when no query is
+returned. Each question was run three times per model on a workstation with
+an NVIDIA RTX A4000 (16\,GB) running Ollama
+% CONFIRM(authors): the run metadata says Ollama 0.40.11, but mimo-v2.6
+% requires >= 0.40.15. Check `ollama --version` on the workstation.
+0.40.11; all models were 4-bit quantized (Q4\_K\_M). Latency is the
+wall-clock time of the whole generation call, repair pass included; no
+warm-up was run, so the slowest calls include loading the model.
+
+\begin{table}[h]
+\centering
+\small
+\caption[Assistant accuracy]{Accuracy of generated queries against the gold set (52 questions
+$\times$ 3 runs per model). Exact: the selection equals the gold selection.
+Jaccard: mean overlap of selected and gold node and edge IDs (0 when no query
+was returned). Repair: the first reply failed validation and the repair pass
+ran. Schema-valid: the first raw reply conformed to the JSON schema. No query:
+no valid query was returned (correct only for impossible questions).
+Latency: median and interquartile range in seconds. Parameter counts as
+reported by Ollama. Result files: \path{bench/assistant/results/2026-11-07T17-37-48-576Z.json}
+(\texttt{qwen3.5:9b}) and \path{2026-11-09T09-40-38-007Z.json} (the others).}
+\label{tab:assistant}
+\begin{tabular}{lrrrrrrrl}
+\toprule
+Model & Params & $n$ & Exact (\%) & Jaccard & Repair (\%) & Schema-valid (\%) & No query (\%) & Latency (s) \\
+\midrule
+\texttt{qwen3.5:9b} & 9.7B & 156 & 88.5 & 0.907 & 0.0 & 100.0 & 11.5 & 25.0 (17.6--39.5) \\
+\texttt{qwen3.5:4b} & 4.7B & 156 & 75.6 & 0.806 & 1.9 & 98.1 & 13.5 & 17.9 (10.5--21.1) \\
+\texttt{mimo-v2.6} & 9.0B & 156 & 75.0 & 0.781 & 5.8 & 96.2 & 17.3 & 11.7 (8.3--29.1) \\
+% TODO(bench): add gemma4:12b and llama3.1:8b after the rerun with the
+% repeat-limit fix (harness scores Ollama's "token repeat limit reached" as no query).
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\small
+\caption[Exact matches per tier]{Exact matches (\%) per question tier. Number of questions per tier
+(each run three times): numeric 9, categorical 9, two-clause 10, nested 8,
+paraphrase 11, impossible 5.}
+\label{tab:assistant-tiers}
+\begin{tabular}{lrrrrrr}
+\toprule
+Model & Numeric & Categorical & Two-clause & Nested & Paraphrase & Impossible \\
+\midrule
+\texttt{qwen3.5:9b} & 100.0 & 100.0 & 90.0 & 62.5 & 81.8 & 100.0 \\
+\texttt{qwen3.5:4b} & 88.9 & 88.9 & 73.3 & 50.0 & 72.7 & 80.0 \\
+\texttt{mimo-v2.6} & 88.9 & 100.0 & 80.0 & 12.5 & 81.8 & 80.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Notes.}\sloppy
+\texttt{mimo-v2.6} is the Ollama tag \texttt{mimo-v2.6:latest}
+of MiMo-V2.6-Distill-Qwen-9B
+(\url{https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Distill-Qwen-9B}).
+Within each run, \texttt{qwen3.5:9b} and \texttt{mimo-v2.6} returned identical
+results in all three repeats; for \texttt{qwen3.5:4b} the outcome of one question varied.
+An earlier \texttt{qwen3.5:9b} run on the same machine, while other jobs were
+loading the GPU, scored 84.6\,\% exact because two questions changed outcome
+(\path{2026-11-06T14-10-07-527Z.json}); temperature is 0 but no seed is set,
+so the remaining variation comes from the server. Replies that Ollama
+returned empty (\texttt{qwen3.5:4b}: 3, \texttt{mimo-v2.6}: 6 of 156) count as
+no query. Most failures of \texttt{mimo-v2.6} on nested questions were no
+query at all (12 of 21), whereas the Qwen models mostly returned a valid but
+different selection.
+
+\end{document}
