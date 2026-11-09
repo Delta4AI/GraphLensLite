@@ -84,6 +84,19 @@ class RailMenu {
     };
     document.addEventListener('pointerdown', this._outsideHandler, true);
     this._escapeHandler = (e) => {
+      // The menu is body-appended, so Tabbing off its last field (or Shift+Tab
+      // off its first) would leave the document with the menu still open.
+      // Close and land back on the anchor instead, as Escape does.
+      if (e.key === 'Tab' && this.el.contains(document.activeElement)) {
+        const fields = [...this.el.querySelectorAll('button, input, select, textarea, [tabindex="0"]')]
+          .filter((f) => f.tabIndex >= 0 && !f.disabled && !f.closest('[hidden]'));
+        const edge = e.shiftKey ? fields[0] : fields[fields.length - 1];
+        if (!fields.length || document.activeElement === edge) {
+          e.preventDefault();
+          this.close();
+        }
+        return;
+      }
       if (e.key === 'Escape') {
         // The menu is the innermost layer while it is open, so Escape belongs to
         // it alone — Popup's own Escape would otherwise close the dialog under
@@ -138,7 +151,7 @@ class RailMenu {
   }
 }
 
-function menuItem({ icon = '', label, onClick, title = '', disabled = false, checked = false }) {
+function menuItem({ icon = '', label, onClick, title = '', disabled = false, checked }) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'rail-menu-item';
@@ -147,6 +160,8 @@ function menuItem({ icon = '', label, onClick, title = '', disabled = false, che
     btn.setAttribute('aria-disabled', 'true');
   }
   if (checked) btn.classList.add('checked');
+  // A row that carries an on/off state says so; the ✓ glyph is decoration.
+  if (typeof checked === 'boolean') btn.setAttribute('aria-pressed', String(checked));
   if (title) btn.title = title;
 
   const iconSpan = document.createElement('span');
@@ -160,6 +175,7 @@ function menuItem({ icon = '', label, onClick, title = '', disabled = false, che
   if (checked) {
     const check = document.createElement('span');
     check.className = 'rail-menu-check';
+    check.setAttribute('aria-hidden', 'true');
     check.textContent = '✓';
     btn.appendChild(check);
   }

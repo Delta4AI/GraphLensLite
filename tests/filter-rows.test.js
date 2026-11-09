@@ -74,15 +74,56 @@ describe('category list', () => {
     expect(trigger.textContent).toContain('2 of 3');
     expect(all.indeterminate).toBe(true);
 
-    b.dispatchEvent(new MouseEvent('click', { bubbles: true, altKey: true }));
+    key(b, 'Enter'); // Enter on a value keeps only that value
     await vi.waitFor(() => expect(cache.fm.handleFilterEvent).toHaveBeenCalledTimes(2));
     await new Promise((r) => setTimeout(r, 0));
     expect(cache.fm.handleFilterEvent).toHaveBeenCalledTimes(2); // Alt-click is one filter pass
     expect([...list.selectedCategories]).toEqual(['b']);
+    expect(trigger.textContent).toContain('b'); // one kept value is named, not "1 of 3"
+
+    // Tab inside the list stays there; Tab off the last field closes it and
+    // lands back on the field.
+    key(menuBoxes()[1], 'Tab');
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    const last = menuBoxes().at(-1);
+    last.focus();
+    key(last, 'Tab');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
+    trigger.click();
+    await Promise.resolve();
 
     key(document.activeElement, 'Escape');
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(trigger);
+  });
+});
+
+describe('category list search', () => {
+  it('scopes All to the values the search shows, and says when nothing matches', async () => {
+    const cache = makeCache();
+    const values = Array.from({ length: 12 }, (_, i) => (i < 3 ? `protein ${i}` : `gene ${i}`));
+    cache.data.filterDefaults.get(PROP).categories = new Set(values);
+    cache.data.layouts.L.filters.get(PROP).categories = new Set(values);
+    const list = mountList(cache);
+    list.anchor.click();
+    await Promise.resolve();
+
+    const search = document.querySelector('.filter-cat-search');
+    search.value = 'prot';
+    search.dispatchEvent(new Event('input'));
+    const all = menuBoxes()[0];
+    expect(all.closest('label').textContent).toContain('All matching');
+
+    all.click(); // every shown value is ticked, so All unticks just those
+    await vi.waitFor(() => expect(cache.fm.handleFilterEvent).toHaveBeenCalledTimes(1));
+    expect(list.selectedCategories.size).toBe(9);
+    expect([...list.selectedCategories].some((v) => v.startsWith('protein'))).toBe(false);
+
+    search.value = 'zzz';
+    search.dispatchEvent(new Event('input'));
+    expect(document.querySelector('.filter-cat-empty').hidden).toBe(false);
+    expect(document.querySelector('.filter-cat-empty').textContent).toContain('zzz');
   });
 });
 

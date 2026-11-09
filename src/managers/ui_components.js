@@ -53,6 +53,8 @@ class DropdownChecklist {
     const total = this.categories.size;
     if (n === total) return 'All';
     if (n === 0) return 'None';
+    // The most common narrowing keeps one value: name it.
+    if (n === 1) return String([...this.selectedCategories][0]);
     return `${n} of ${total}`;
   }
 
@@ -71,7 +73,6 @@ class DropdownChecklist {
     this.anchor.type = 'button';
     this.anchor.className = 'filter-cat-trigger';
     this.anchor.id = this.propID + '-dropdown-anchor';
-    this.anchor.setAttribute('aria-haspopup', 'true');
     this.summaryText = document.createElement('span');
     this.summaryText.className = 'filter-cat-summary';
     this.totalText = document.createElement('span');
@@ -103,7 +104,9 @@ class DropdownChecklist {
     this.summaryText.textContent = summary;
     // The total only adds information next to "All"; "4 of 6" already says it.
     this.totalText.textContent = summary === 'All' ? String(this.categories.size) : '';
-    this.anchor.setAttribute('aria-label', `${prop}: ${summary === 'All' ? 'all' : summary} values shown`);
+    const n = this.selectedCategories.size;
+    const shown = n === this.categories.size ? 'all' : `${n} of ${this.categories.size}`;
+    this.anchor.setAttribute('aria-label', `${prop}: ${shown} values shown${n === 1 ? ` (${summary})` : ''}`);
     this.anchor.title = `Choose which ${prop} values to show`;
     this.anchor.classList.toggle('narrowed', summary !== 'All');
   }
@@ -138,9 +141,15 @@ class DropdownChecklist {
       search.setAttribute('aria-label', `Search ${prop} values`);
       search.addEventListener('input', () => {
         const q = search.value.trim().toLowerCase();
+        let shown = 0;
         for (const item of el.querySelectorAll('.filter-cat-item[data-value]')) {
           item.hidden = q !== '' && !item.dataset.value.toLowerCase().includes(q);
+          if (!item.hidden) shown += 1;
         }
+        empty.hidden = shown > 0;
+        empty.textContent = `No values match "${search.value.trim()}"`;
+        all.querySelector('.filter-cat-name').textContent = q ? 'All matching' : 'All';
+        this.#syncBoxes();
       });
       el.appendChild(search);
     }
@@ -148,13 +157,28 @@ class DropdownChecklist {
     const all = this.#item('All', null, carriers);
     all.classList.add('filter-cat-all');
     this.allBox = all.querySelector('input');
+    // With a search typed, All acts on the values it shows.
     this.allBox.addEventListener('change', async () => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return this.#syncBoxes();
-      this.selectedCategories.size === this.categories.size
-        ? await this.deselectAllCategories()
-        : await this.selectAllCategories();
+      const scope = this.#visibleValues();
+      if (scope.length === this.categories.size) {
+        return this.selectedCategories.size === this.categories.size
+          ? await this.deselectAllCategories()
+          : await this.selectAllCategories();
+      }
+      const add = !scope.every((v) => this.selectedCategories.has(v));
+      for (const v of scope) add ? this.selectedCategories.add(v) : this.selectedCategories.delete(v);
+      this.#syncBoxes();
+      await this.cache.fm.handleFilterEvent(
+        `${add ? 'Showing' : 'Hiding'} Elements`,
+        `${scope.length} values of ${this.propID}`,
+        this.propID
+      );
     });
     el.appendChild(all);
+    const empty = document.createElement('div');
+    empty.className = 'filter-cat-empty';
+    empty.hidden = true;
 
     const group = document.createElement('div');
     group.setAttribute('role', 'group');
@@ -163,15 +187,35 @@ class DropdownChecklist {
       const item = this.#item(value, value, counts.get(String(value)) ?? 0);
       const box = item.querySelector('input');
       box.addEventListener('change', async (ev) => await this.handleSelection(ev));
-      // Alt-click keeps only this value (Linear's "replace selection").
+      // Keep only this value: the Only button, Enter on the box, or Alt-click
+      // (Linear's "replace selection").
+      const only = document.createElement('button');
+      only.type = 'button';
+      only.className = 'filter-cat-only';
+      only.textContent = 'Only';
+      only.tabIndex = -1; // Enter on the box does the same; keeps ↑/↓ a single column
+      only.title = 'Keep only this value (Enter, or Alt-click the value)';
+      only.setAttribute('aria-label', `Only ${value}`);
+      only.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        await this.selectOnly(value);
+      });
+      item.appendChild(only);
+      box.addEventListener('keydown', async (ev) => {
+        if (ev.key !== 'Enter') return;
+        ev.preventDefault();
+        await this.selectOnly(value);
+      });
+      box.setAttribute('aria-description', 'Enter keeps only this value');
       item.addEventListener('click', async (ev) => {
-        if (!ev.altKey) return;
+        if (!ev.altKey || ev.target === only) return;
         ev.preventDefault();
         await this.selectOnly(value);
       });
       group.appendChild(item);
     }
     el.appendChild(group);
+    el.appendChild(empty);
     el.addEventListener('keydown', (ev) => this.#onListKey(ev, el));
     this.listEl = el;
     this.#syncBoxes();
@@ -197,13 +241,16 @@ class DropdownChecklist {
     return label;
   }
 
-  /** ↑/↓ walk the visible fields; Tab leaves the list back to its field. */
+  /** Values not hidden by the search. */
+  #visibleValues() {
+    if (!this.listEl) return [...this.categories];
+    return [...this.listEl.querySelectorAll('.filter-cat-item[data-value]')]
+      .filter((item) => !item.hidden)
+      .map((item) => item.querySelector('input').value);
+  }
+
+  /** ↑/↓ walk the visible fields (RailMenu closes the list on Tab out). */
   #onListKey(ev, el) {
-    if (ev.key === 'Tab') {
-      ev.preventDefault();
-      this.menu.close();
-      return;
-    }
     if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
     const fields = [...el.querySelectorAll('input')].filter((f) => !f.closest('[hidden]') && !f.hidden);
     const i = fields.indexOf(document.activeElement);
@@ -223,9 +270,10 @@ class DropdownChecklist {
       box.checked = this.selectedCategories.has(box.value);
     }
     if (this.allBox) {
-      const n = this.selectedCategories.size;
-      this.allBox.checked = n === this.categories.size;
-      this.allBox.indeterminate = n > 0 && n < this.categories.size;
+      const scope = this.#visibleValues();
+      const n = scope.filter((v) => this.selectedCategories.has(v)).length;
+      this.allBox.checked = scope.length > 0 && n === scope.length;
+      this.allBox.indeterminate = n > 0 && n < scope.length;
     }
   }
 
@@ -799,6 +847,25 @@ class InvertibleRangeSlider {
     if (box && document.activeElement !== box) {
       box.value = this.formatThreshold(primaryValue);
     }
+    this.#describeThresholds();
+  }
+
+  /**
+   * Inverted, the "lower threshold" handle holds the higher value and the
+   * filter keeps what lies outside — shown only by colour and swapped boxes,
+   * so the handles say it in words.
+   */
+  #describeThresholds() {
+    if (!this.isInverted) {
+      this.sliderStart.removeAttribute('aria-valuetext');
+      this.sliderEnd.removeAttribute('aria-valuetext');
+      return;
+    }
+    const lo = this.formatThreshold(Math.min(this.currentMin, this.currentMax));
+    const hi = this.formatThreshold(Math.max(this.currentMin, this.currentMax));
+    const outside = `keeping values outside ${lo} to ${hi}`;
+    this.sliderStart.setAttribute('aria-valuetext', `at least ${hi}, ${outside}`);
+    this.sliderEnd.setAttribute('aria-valuetext', `at most ${lo}, ${outside}`);
   }
 
   setTo(min, max, inverted) {
@@ -1308,7 +1375,7 @@ class UIComponentManager {
         el.append(menuItem({ icon: '◌', label: 'Add to group…', onClick: () => { menu.close(); chip.groupMenu.open(); } }));
       }
       el.append(
-        menuItem({ icon: '📝', label: 'Add to query', onClick: run(() => this.addToQuery(propID)) }),
+        menuItem({ icon: '✎\uFE0E', label: 'Add to query', onClick: run(() => this.addToQuery(propID)) }),
         menuSeparator(),
         menuItem({
           icon: '⟳',
@@ -1343,7 +1410,7 @@ class UIComponentManager {
           ? `${propID} LOWER THAN ${slider.currentMax} OR GREATER THAN ${slider.currentMin}`
           : `${propID} BETWEEN ${slider.currentMin} AND ${slider.currentMax}`;
       } else {
-        queryFragment = `(${propID} BETWEEN ${slider.sliderMin} AND ${slider.sliderMax}`;
+        queryFragment = `${propID} BETWEEN ${slider.sliderMin} AND ${slider.sliderMax}`;
       }
     } else if (dropdown) {
       const values = this.cache.CFG.QUERY_BTN_USE_CURRENT_FILTER
@@ -1394,7 +1461,14 @@ class UIComponentManager {
     if (edgeIDs?.size > 0) {
       await this.cache.sm.updateSelectedState(this.cache.graph.getEdgeData([...edgeIDs]), shouldAdd);
     }
-    if (!nodeIDs?.size && !edgeIDs?.size) this.cache.ui.info('Nothing shown matches this filter.');
+    const n = nodeIDs?.size ?? 0;
+    const e = edgeIDs?.size ?? 0;
+    if (!n && !e) {
+      this.cache.ui.info('Nothing shown matches this filter.');
+      return;
+    }
+    const parts = [n && `${n} node${n === 1 ? '' : 's'}`, e && `${e} edge${e === 1 ? '' : 's'}`].filter(Boolean);
+    this.cache.ui.info(`${shouldAdd ? 'Selected' : 'Removed from selection:'} ${parts.join(', ')}`);
   }
 }
 
