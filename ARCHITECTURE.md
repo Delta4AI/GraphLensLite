@@ -113,8 +113,9 @@ Business logic and UI:
   feature that stores something new on the layout is undoable for free
 - `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, IS FOREIGN,
   comparisons)
-- `ui_components.js` — filter UI (dropdown checklists, invertible range sliders),
-  the per-row group chip, tooltips
+- `ui_components.js` — filter UI (category checklists on `RailMenu`, invertible
+  range sliders, boolean segments), the per-row group dot and ⋯ actions menu,
+  the section tri-state checkboxes, tooltips
 - `group_menu.js` — the one group checklist, opened by both assign sites (a filter
   row assigns a property, the Selection panel assigns nodes); built on `RailMenu`
 - `community_menu.js` — the 🧩 Auto-detect configurator (Louvain weighting,

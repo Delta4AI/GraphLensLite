@@ -38,12 +38,32 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - Pick the control by property type:
   - 2–6 options that fit on the row: segmented control (`.prop-seg`, pressed
     state = value). Longer enums: `<select>`.
-  - On/off: checkbox (`.prop-check`).
+  - On/off: native checkbox (`.prop-check`). Every checkbox takes the
+    interactive accent from one global rule; never a hidden input under a drawn
+    box.
+  - Pick several values from a list: a field button that opens a checkbox
+    group (`DropdownChecklist`, built on `RailMenu`), never a native
+    multi-select. It shows "All", "None" or "4 of 6"; the list has an All box
+    that goes mixed, a count per value, search from 10 values, and Alt-click
+    keeps only one value.
   - Number with a range: slider plus number field; arrow keys step.
   - Colour: painted well over the native picker, hex field, palette, then
     **Map…** when the property can be driven by data.
 - "Map by data" is always a labelled **Map…** button at the row's end, never a
   bare glyph.
+- A "select all in this group" control is one tri-state checkbox (ticked,
+  mixed, empty), not separate enable/disable buttons.
+
+## Row actions
+
+- A row with more than two actions puts them behind one visible **⋯** button
+  at its end (`.filter-row-more`, `.group-row-more`), opening a `RailMenu` of
+  labelled items. The button is always visible, not revealed on hover.
+- Inline next to it only what also shows state (the group dot on a filter
+  row). An inline control that is empty by default may hide until the row is
+  hovered or the control is focused, as long as it stays in the tab order.
+- Popups (`RailMenu`) open from Enter, Space or ↓ on their trigger, move focus
+  inside, and return it to the trigger on Escape.
 
 ## Editing the selection
 
@@ -63,5 +83,7 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - Light-mode neutrals are pure greys and the accent is the brand red, which also
   marks destructive actions. Moving to cool slate neutrals with an indigo accent
   is an open token-level change.
-- The workbench (Data, Query, Metrics, Assistant) and the filter rows have not
-  been moved onto these patterns yet.
+- The workbench (Data, Query, Metrics, Assistant) has not been moved onto
+  these patterns yet.
+- Filter rows add matches to the selection in two clicks (⋯ › Add matches);
+  the old inline ± did it in one.
