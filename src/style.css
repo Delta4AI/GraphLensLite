@@ -91,7 +91,7 @@
     --added-wash: #1f3324;
     --added-line: #58c06a;
     --deleted-wash: #3a2224;
-    --deleted-line: #e0635b;
+    --deleted-line: #ef8a83;
     color-scheme: dark;
 }
 
@@ -5146,20 +5146,21 @@ div[slider] > input[type=range]::-ms-tooltip {
 
 .data-toolbar .insp-btn,
 .data-changes .insp-btn,
-.data-add-form .insp-btn {
+.data-add-form .insp-btn,
+.data-empty .insp-btn,
+.data-review .insp-btn {
     height: 24px;
     box-sizing: border-box;
 }
 
 .data-seg-count {
     margin-left: 1px;
-    color: var(--text-faint);
+    color: var(--text-muted);
     font-variant-numeric: tabular-nums;
 }
 
 .prop-seg > button[aria-pressed="true"] .data-seg-count {
     color: inherit;
-    opacity: 0.8;
 }
 
 .data-filter {
@@ -5206,6 +5207,9 @@ div[slider] > input[type=range]::-ms-tooltip {
     flex: 1;
     min-height: 0;
     overflow: auto;
+    /* The sticky group + header rows (20px + 26px): a focused cell scrolled
+       into view lands below them, not under them. */
+    scroll-padding-top: 46px;
 }
 
 .data-table {
@@ -5298,6 +5302,9 @@ div[slider] > input[type=range]::-ms-tooltip {
 .data-table .data-id {
     position: sticky;
     left: 32px;
+    /* Room for an ID plus its New / Deleted pill, so staging a row does not
+       push every column sideways. */
+    min-width: 140px;
     z-index: 1;
     box-shadow: inset -1px 0 0 var(--border);
 }
@@ -5332,7 +5339,8 @@ div[slider] > input[type=range]::-ms-tooltip {
     color: var(--text-muted);
 }
 
-.data-table tbody tr:hover td {
+/* Staged rows and cells keep their wash under the pointer. */
+.data-table tbody tr:not(.data-row-added, .data-row-deleted):hover td:not(.data-cell-edited) {
     background: var(--row-hover);
 }
 
@@ -5383,7 +5391,7 @@ div[slider] > input[type=range]::-ms-tooltip {
 /* Colour is never the only signal: the ID cell says New / Deleted in words. */
 .data-pill {
     display: inline-block;
-    margin-left: 6px;
+    margin-left: 2px;
     padding: 0 5px;
     border: 1px solid currentColor;
     border-radius: 6px;
@@ -5498,6 +5506,13 @@ div[slider] > input[type=range]::-ms-tooltip {
     width: 320px;
     max-height: 300px;
     overflow: auto;
+}
+
+.data-review h4 {
+    margin: 2px 4px 4px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
 }
 
 .data-review-item {

@@ -69,11 +69,9 @@ class RailMenu {
     }
     // Before any measuring: offsetHeight/offsetWidth are 0 while detached.
     if (!this.el.isConnected) document.body.appendChild(this.el);
-    const rect = this.anchor.getBoundingClientRect();
     this.el.classList.add('open');
     this.anchor.setAttribute('aria-expanded', 'true');
-    this.el.style.top = `${clampPopoverTop(rect.bottom + MENU_OFFSET_PX, this.el.offsetHeight, window.innerHeight)}px`;
-    this.el.style.left = `${clampPopoverLeft(rect.left, this.el.offsetWidth, window.innerWidth)}px`;
+    this.place();
     // The menu is body-appended, so it sits at the end of the tab order rather
     // than after its anchor. Moving focus in is what makes it reachable at all;
     // Escape below puts focus back on the anchor.
@@ -113,6 +111,22 @@ class RailMenu {
       if (!this.el.contains(e.target)) this.close();
     };
     document.addEventListener('scroll', this._scrollHandler, { capture: true, passive: true });
+  }
+
+  /**
+   * Position under the anchor, or above it when there is no room below: an
+   * anchor at the bottom edge (a status bar's button) would otherwise be
+   * covered by its own menu once the clamp pushes it back up. Public so a menu
+   * whose content changes height while open can re-place itself.
+   */
+  place() {
+    const rect = this.anchor.getBoundingClientRect();
+    const height = this.el.offsetHeight;
+    const below = rect.bottom + MENU_OFFSET_PX;
+    const above = rect.top - MENU_OFFSET_PX - height;
+    const top = below + height > window.innerHeight && above >= 0 ? above : below;
+    this.el.style.top = `${clampPopoverTop(top, height, window.innerHeight)}px`;
+    this.el.style.left = `${clampPopoverLeft(rect.left, this.el.offsetWidth, window.innerWidth)}px`;
   }
 
   close() {

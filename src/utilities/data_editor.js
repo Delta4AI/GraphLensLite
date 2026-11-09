@@ -51,14 +51,16 @@ const PANE_HTML = `
             title="Export the rows shown here, with their styling, as Excel">⤓ Export</button>
   </div>
   <div class="data-table-wrapper">
-    <table id="dataTable" class="data-table" role="grid" aria-label="Graph data">
+    <table id="dataTable" class="data-table" role="grid" aria-label="Graph data" aria-describedby="dataGridHint">
       <thead id="dataTableHead"></thead>
       <tbody id="dataTableBody"></tbody>
     </table>
     <div class="data-empty" hidden></div>
   </div>
+  <span id="dataGridHint" class="visually-hidden">Arrow keys move between cells. Enter, F2 or typing edits a cell; Escape cancels.</span>
+  <span class="data-status visually-hidden" role="status"></span>
   <div class="data-changes" hidden>
-    <strong class="data-changes-count" aria-live="polite"></strong>
+    <strong class="data-changes-count"></strong>
     <span class="data-changes-meta"></span>
     <span class="data-gap"></span>
     <button type="button" id="dataReviewBtn" class="insp-btn">Review</button>
@@ -81,6 +83,8 @@ class DataTable {
     // rowKey → { type, id, action: 'edit', values: { header: text } }
     //        | { type, id, action: 'delete' }
     this.pendingChanges = new Map();
+    // Property columns added here and not yet applied: { isNode, group, name, header }.
+    this.addedColumns = [];
     this.onPendingChangesCallback = null;
     this.filterText = '';
     // The roving focus position: row key + column (or 'act' / 'head').
@@ -115,6 +119,7 @@ class DataTable {
     this.changesBar = $('.data-changes');
     this.filterInput = $('.data-filter');
     this.countEl = $('.data-count');
+    this.statusEl = $('.data-status');
 
     this.toolbar.addEventListener('click', async (e) => {
       const btn = e.target.closest('[data-scope], [data-kind]');
@@ -241,10 +246,14 @@ class DataTable {
     const rowIndexByKey = new Map(this.tableData.map((row, i) => [rowKey(row[TYPE_COL], row[ID_COL]), i]));
 
     for (const [key, change] of this.pendingChanges) {
-      if (!types.includes(change.type) || change.action === 'delete') continue;
-      // Edited or added rows stay listed even once deselected, so an unapplied
-      // edit is never out of sight.
+      if (!types.includes(change.type)) continue;
+      // Edited, added and deleted rows stay listed even once deselected, so an
+      // unapplied change is never out of sight.
       let row = this.tableData[rowIndexByKey.get(key)];
+      if (change.action === 'delete') {
+        if (!row) this.tableData.push(this.#buildRow(change.type, change.id, this.#elementFor(change.type, change.id)));
+        continue;
+      }
       if (!row) {
         row = this.#buildRow(change.type, change.id, this.#elementFor(change.type, change.id));
         this.tableData.push(row);
@@ -364,6 +373,11 @@ class DataTable {
     }
 
     this.fileData = structuredClone(fileData);
+    // Staged edits belong to the graph they were made on: a newly loaded graph
+    // (or the rebuild after Apply) starts clean, never with another file's edits.
+    this.pendingChanges.clear();
+    this.addedColumns = [];
+    this.notifyPendingChanges();
     this.loadTabData();
   }
 
@@ -376,6 +390,8 @@ class DataTable {
   reset() {
     this.sortState = {};
     this.pendingChanges.clear();
+    for (const column of this.addedColumns) this.#removeColumnHeader(column);
+    this.addedColumns = [];
     this.notifyPendingChanges();
     this.loadTabData();
   }
@@ -433,9 +449,16 @@ class DataTable {
   /** What a row is in the pending changes: 'deleted', 'added', 'edited' or ''. */
   #rowState(type, id) {
     const change = this.pendingChanges.get(rowKey(type, id));
-    if (!change) return '';
+    if (!change) return type === 'Edge' && this.#deletedEnd(id) ? 'cascade' : '';
     if (change.action === 'delete') return 'deleted';
     return this.#elementFor(type, id) ? 'edited' : 'added';
+  }
+
+  /** The staged-for-deletion node an edge hangs off, which takes the edge with it on Apply. */
+  #deletedEnd(edgeId) {
+    const edge = this.#elementFor('Edge', edgeId);
+    if (!edge) return null;
+    return [edge.source, edge.target].find((n) => this.pendingChanges.get(rowKey('Node', n))?.action === 'delete') ?? null;
   }
 
   /** @returns {Node[]|null} The empty-state content for this view, or null when there are rows. */
@@ -446,7 +469,8 @@ class DataTable {
       if (!action) return [p];
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'insp-btn primary';
+      // One filled button per surface: Apply owns it while changes are staged.
+      btn.className = this.#changeCounts().total ? 'insp-btn' : 'insp-btn primary';
       btn.textContent = action;
       btn.addEventListener('click', onClick);
       return [p, btn];
@@ -480,6 +504,9 @@ class DataTable {
       scope === 'selection'
         ? { Node: this.cache.selectedNodes?.length ?? 0, Edge: this.cache.selectedEdges?.length ?? 0 }
         : { Node: this.fileData?.nodes?.length ?? 0, Edge: this.fileData?.edges?.length ?? 0 };
+    for (const change of this.pendingChanges.values()) {
+      if (change.action !== 'delete' && !this.#elementFor(change.type, change.id)) counts[change.type] += 1;
+    }
     counts.Both = counts.Node + counts.Edge;
     return counts;
   }
@@ -524,23 +551,31 @@ class DataTable {
       else if (!this.#elementFor(change.type, change.id)) added++;
       else edited += Object.keys(change.values).length;
     }
-    return { edited, added, deleted, total: edited + added + deleted };
+    const columns = this.addedColumns.length;
+    return { edited, added, deleted, columns, total: edited + added + deleted + columns };
   }
 
   #syncChangesBar() {
     if (!this.changesBar) return;
-    const { edited, added, deleted, total } = this.#changeCounts();
-    this.changesBar.hidden = total === 0;
+    const { edited, added, deleted, columns, total } = this.#changeCounts();
     if (!total) {
+      // Hiding the bar (or the review list) under focus would drop it to <body>.
+      const held = this.changesBar.contains(document.activeElement) || this.reviewMenu?.el.contains(document.activeElement);
       if (this.reviewMenu?.isOpen) this.reviewMenu.close();
+      this.changesBar.hidden = true;
+      this.#announce(this.lastAnnounced ? 'No unsaved changes.' : '');
+      // After the current redraw: this runs at the top of render(), before the rows are rebuilt.
+      if (held) queueMicrotask(() => (this.table && !this.table.hidden ? this.focusActiveCell() : this.filterInput?.focus()));
       return;
     }
+    this.changesBar.hidden = false;
     const noun = total === 1 ? 'change' : 'changes';
     this.changesBar.querySelector('.data-changes-count').textContent = `${total} unsaved ${noun}`;
     const parts = [
       edited && `${edited} edited`,
       added && `${added} added`,
       deleted && `${deleted} deleted`,
+      columns && `${columns} new column${columns === 1 ? '' : 's'}`,
     ].filter(Boolean);
     const meta = this.changesBar.querySelector('.data-changes-meta');
     const problems = this.validateNewElements();
@@ -548,7 +583,18 @@ class DataTable {
     meta.textContent = problems.length
       ? problems[0].replace(/^• /, '') + ' before Apply'
       : `${parts.join(' · ')} · applies to every workspace`;
-    this.changesBar.querySelector('#updateDataTableBtn').textContent = `Apply ${total} ${noun}`;
+    this.#announce(`${total} unsaved ${noun}.${problems.length ? ` ${meta.textContent}.` : ''}`);
+    const apply = this.changesBar.querySelector('#updateDataTableBtn');
+    apply.textContent = `Apply ${total} ${noun}`;
+    // Blocked while a new row still owes a value; the line beside it says which.
+    apply.disabled = problems.length > 0;
+  }
+
+  /** One always-present live region; only a changed message is written, so redraws stay quiet. */
+  #announce(text) {
+    if (!this.statusEl || text === (this.lastAnnounced ?? '')) return;
+    this.lastAnnounced = text;
+    this.statusEl.textContent = text;
   }
 
   render() {
@@ -578,6 +624,11 @@ class DataTable {
     for (const r of rows) fragment.appendChild(this.#bodyRow(r, cols));
     this.tableBody.appendChild(fragment);
     this.table?.setAttribute('aria-rowcount', String(rows.length + 2));
+    // scrollIntoView honours scroll-padding: keep the active cell clear of the
+    // frozen ⋯ + ID columns (the sticky header's height is fixed in CSS).
+    const idHead = this.tableHead.querySelector('.data-head-row .data-id');
+    const wrapper = this.table?.parentElement;
+    if (idHead && wrapper) wrapper.style.scrollPaddingLeft = `${idHead.offsetLeft + idHead.offsetWidth}px`;
     this.#placeRovingFocus();
   }
 
@@ -647,7 +698,10 @@ class DataTable {
     const tr = document.createElement('tr');
     tr.dataset.row = r;
     tr.dataset.key = rowKey(type, id);
-    if (state === 'deleted' || state === 'added') tr.classList.add(`data-row-${state}`);
+    const gone = state === 'deleted' || state === 'cascade';
+    if (gone) tr.classList.add('data-row-deleted');
+    if (state === 'added') tr.classList.add('data-row-added');
+    const endNode = state === 'cascade' ? this.#deletedEnd(id) : null;
 
     const act = document.createElement('td');
     act.className = 'data-act';
@@ -657,7 +711,11 @@ class DataTable {
     btn.className = 'data-row-btn';
     btn.tabIndex = -1;
     const noun = type.toLowerCase();
-    if (state === 'deleted') {
+    if (state === 'cascade') {
+      // Nothing to do on the edge itself: restoring its node brings it back.
+      btn.remove();
+      act.tabIndex = -1;
+    } else if (state === 'deleted') {
       btn.textContent = '↺';
       btn.dataset.action = 'restore';
       btn.setAttribute('aria-label', `Restore ${noun} ${id}`);
@@ -665,9 +723,10 @@ class DataTable {
     } else {
       btn.textContent = '⋯';
       btn.dataset.action = 'menu';
+      btn.setAttribute('aria-expanded', 'false');
       btn.setAttribute('aria-label', `${type} ${id} actions`);
     }
-    act.appendChild(btn);
+    if (state !== 'cascade') act.appendChild(btn);
     tr.appendChild(act);
 
     for (const col of cols) {
@@ -679,16 +738,19 @@ class DataTable {
       td.textContent = value !== null && value !== undefined ? value : '';
       if (col === ID_COL) {
         td.classList.add('data-id');
-        if (state === 'added' || state === 'deleted') {
+        if (state === 'added' || gone) {
+          td.append(' '); // a word break for the accessible name: "n1001 New"
           const pill = document.createElement('span');
-          pill.className = `data-pill ${state}`;
-          pill.textContent = state === 'added' ? 'New' : 'Deleted';
+          pill.className = `data-pill ${state === 'added' ? 'added' : 'deleted'}`;
+          pill.textContent = state === 'added' ? 'New' : endNode ? `Deleted with ${endNode}` : 'Deleted';
           td.appendChild(pill);
         }
       }
-      if (state === 'deleted' || !this.#isEditable(type, col)) {
+      if (gone || !this.#isEditable(type, col)) {
         td.setAttribute('aria-readonly', 'true');
         td.classList.add('readonly');
+        const why = this.#readonlyReason(type, col, state, endNode);
+        if (why) td.title = why;
       }
       if (loaded && Object.hasOwn(change.values, this.headers[col])) {
         td.classList.add('data-cell-edited');
@@ -697,6 +759,15 @@ class DataTable {
       tr.appendChild(td);
     }
     return tr;
+  }
+
+  /** Why a cell cannot be edited, for its tooltip; null when the column says it. */
+  #readonlyReason(type, col, state, endNode) {
+    if (state === 'cascade') return `Removed with node ${endNode} on Apply. Restore the node to keep it.`;
+    if (state === 'deleted') return 'Restore the row to edit it.';
+    if (col === ID_COL) return `IDs cannot be edited. Add a new ${type.toLowerCase()} and delete this one.`;
+    if (col === TYPE_COL) return null;
+    return `${type === 'Node' ? 'Edge' : 'Node'} property, not used by ${type.toLowerCase()}s.`;
   }
 
   updateExportButtonState() {
@@ -1001,10 +1072,12 @@ class DataTable {
       }
       const element = this.#elementFor(type, id);
       if (!element) {
-        const n = Object.values(change.values).filter((v) => String(v).trim() !== '').length;
+        const n = Object.entries(change.values).filter(
+          ([header, v]) => !BASIC_HEADERS.has(header) && String(v).trim() !== ''
+        ).length;
         items.push({
           what: `${id} · new ${noun}`,
-          detail: n ? `${n} value${n === 1 ? '' : 's'}` : 'no values yet',
+          detail: n ? `${n} property value${n === 1 ? '' : 's'}` : 'needs a property value',
           undo: () => {
             this.pendingChanges.delete(key);
             reload();
@@ -1014,6 +1087,7 @@ class DataTable {
       }
       const loaded = this.#buildRow(type, id, element);
       for (const [header, after] of Object.entries(change.values)) {
+        if (this.addedColumns.some((c) => c.header === header)) continue; // listed under its column
         const col = this.headerIndexMap.get(header);
         const name = header.split('::').at(-1);
         items.push({
@@ -1028,6 +1102,19 @@ class DataTable {
         });
       }
     }
+    for (const column of this.addedColumns) {
+      const filled = [...this.pendingChanges.values()].filter(
+        (c) => c.action !== 'delete' && String(c.values[column.header] ?? '').trim() !== ''
+      ).length;
+      items.push({
+        what: `${column.name} · new column`,
+        detail: `${column.group}, ${column.isNode ? 'nodes' : 'edges'}${filled ? ` · ${filled} value${filled === 1 ? '' : 's'}` : ''}`,
+        undo: () => {
+          this.#undoColumn(column);
+          reload();
+        },
+      });
+    }
     return items;
   }
 
@@ -1039,6 +1126,17 @@ class DataTable {
       `Discard ${noun}`
     );
     if (ok) this.reset();
+  }
+
+  /** Node IDs an edge can use now: loaded ones not staged for deletion, plus new ones. */
+  nodeChoices() {
+    const out = (this.fileData?.nodes ?? []).filter((n) => this.hasElement('Node', n.id)).map((n) => [n.id, n.label]);
+    for (const change of this.pendingChanges.values()) {
+      if (change.type === 'Node' && change.action !== 'delete' && !this.#elementFor('Node', change.id)) {
+        out.push([change.id, change.values.Label]);
+      }
+    }
+    return out;
   }
 
   /** Existing property groups, for the new-column form's suggestions. */
@@ -1053,6 +1151,7 @@ class DataTable {
   async addNode(rawId, label = '') {
     const id = String(rawId ?? '').trim();
     if (!id) return { field: 'id', message: 'Enter an ID for the node.' };
+    if (id.includes('::')) return { field: 'id', message: 'A node ID cannot contain "::" (it joins edge ends).' };
     if (this.hasElement('Node', id)) return { field: 'id', message: `Node "${id}" already exists.` };
     await this.addRow('Node', id, label.trim() ? { Label: label.trim() } : {});
     return null;
@@ -1066,6 +1165,9 @@ class DataTable {
     if (!target) return { field: 'target', message: 'Pick the node the edge ends at.' };
     for (const [field, nodeId] of [['source', source], ['target', target]]) {
       if (nodeId.includes('::')) return { field, message: 'A node ID cannot contain "::".' };
+      if (this.pendingChanges.get(rowKey('Node', nodeId))?.action === 'delete') {
+        return { field, message: `Node "${nodeId}" is staged for deletion. Restore it first.` };
+      }
       if (!this.hasElement('Node', nodeId)) return { field, message: `There is no node "${nodeId}". Add it first.` };
     }
     const id = `${source}::${target}`;
@@ -1095,12 +1197,31 @@ class DataTable {
 
     const type = isNode ? 'Node' : 'Edge';
     const header = `${isNode ? this.cache.CFG.EXCEL_NODE_HEADER : this.cache.CFG.EXCEL_EDGE_HEADER}::${group}::${name}`;
+    // Staged like any other change, so Review and Discard can take it back.
+    this.addedColumns.push({ isNode, group, name, header });
+    this.notifyPendingChanges();
     if (!this.#tabTypes().includes(type)) await this.switchTab(SCOPE_TABS[this.scope][type]);
     else this.loadTabData();
     const first = this.tableData[this.#visibleRows()[0]];
     if (first) this.activeCell = { key: rowKey(first[TYPE_COL], first[ID_COL]), col: String(this.headerIndexMap.get(header)) };
-    this.cache.ui.info?.(`Column "${name}" added. Fill in values, then Apply.`);
     return null;
+  }
+
+  #removeColumnHeader({ isNode, group, name }) {
+    const headers = isNode ? this.fileData.nodeDataHeaders : this.fileData.edgeDataHeaders;
+    const at = headers.findIndex((h) => h.subGroup === group && h.key === name);
+    if (at !== -1) headers.splice(at, 1);
+  }
+
+  /** Take back an added column and every staged value typed into it. */
+  #undoColumn(column) {
+    this.#removeColumnHeader(column);
+    this.addedColumns = this.addedColumns.filter((c) => c !== column);
+    for (const [key, change] of this.pendingChanges) {
+      if (change.action === 'delete' || !Object.hasOwn(change.values, column.header)) continue;
+      delete change.values[column.header];
+      if (this.#elementFor(change.type, change.id) && !Object.keys(change.values).length) this.pendingChanges.delete(key);
+    }
   }
 
   async addRow(type = 'Node', id = '', values = {}) {
@@ -1159,34 +1280,43 @@ class DataTable {
   }
 
   async update() {
+    // Checked before anything runs: a blocked Apply must not raise the loading
+    // overlay or the "edges removed" notice for changes it then refuses.
+    const problems = this.validateNewElements();
+    if (problems.length > 0) {
+      this.#focusFirstProblem();
+      this.cache.ui.error(problems[0].replace(/^• /, '') + ' before Apply.');
+      return;
+    }
     await this.cache.ui.showLoading('Updating Data', 'Updating Data from Data Table ..');
     try {
       const updatedFileData = this.getUpdatedFileData();
-
       if (!updatedFileData || (!updatedFileData.nodes && !updatedFileData.edges)) {
         this.cache.ui.error('No data to update with.');
         return;
       }
-
-      const validationErrors = this.validateNewElements();
-      if (validationErrors.length > 0) {
-        await this.cache.ui.hideLoading();
-        this.cache.ui.error(
-          'Cannot apply changes:\n' +
-            validationErrors.join('\n') +
-            '\nPlease add at least one property to each new element.'
-        );
-        return;
-      }
-
-      this.pendingChanges.clear();
-
+      // The rebuild repopulates the table, which clears the staged changes;
+      // if it throws first, they are still here to retry.
       await this.rebuildGraph(updatedFileData);
-
     } catch (err) {
       this.cache.ui.error(`Error updating graph: ${err}`);
     } finally {
       await this.cache.ui.hideLoading();
+    }
+  }
+
+  /** Move to the first new row still owing a property value. */
+  #focusFirstProblem() {
+    for (const change of this.pendingChanges.values()) {
+      if (change.action === 'delete' || this.#elementFor(change.type, change.id)) continue;
+      const owes = !Object.entries(change.values).some(
+        ([header, value]) => !BASIC_HEADERS.has(header) && String(value).trim() !== ''
+      );
+      if (!owes) continue;
+      const col = this.headers.findIndex((h, c) => c > FIRST_EDITABLE_COL + 1 && this.#isEditable(change.type, c));
+      if (col > 0) this.activeCell = { key: rowKey(change.type, change.id), col: String(col) };
+      this.focusActiveCell();
+      return;
     }
   }
 
@@ -1463,6 +1593,14 @@ class DataTable {
   }
 
   async exportToExcel() {
+    const { total } = this.#changeCounts();
+    if (total > 0) {
+      const ok = await Popup.confirm(
+        `Export the applied data? Your ${total} unsaved change${total === 1 ? ' is' : 's are'} not included until you apply ${total === 1 ? 'it' : 'them'}.`,
+        'Export applied data'
+      );
+      if (!ok) return;
+    }
     await this.cache.ui.showLoading('Data Editor', 'Exporting Table to Excel ..');
 
     try {
@@ -1602,7 +1740,7 @@ class DataTable {
   getNodesFromTableData() {
     const nodes = [];
     for (const row of this.tableData) {
-      if (row[2] === 'Node' && this.#rowState('Node', row[3]) !== 'deleted') {
+      if (row[2] === 'Node') {
         const nodeId = row[3];
         const node = this.cache.nodeRef.get(nodeId);
         if (node) {
@@ -1616,7 +1754,7 @@ class DataTable {
   getEdgesFromTableData() {
     const edges = [];
     for (const row of this.tableData) {
-      if (row[2] === 'Edge' && this.#rowState('Edge', row[3]) !== 'deleted') {
+      if (row[2] === 'Edge') {
         const edgeId = row[3];
         const edge = this.cache.edgeRef.get(edgeId);
         if (edge) {
