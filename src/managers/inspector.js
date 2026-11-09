@@ -1,6 +1,7 @@
 /**
  * The inspector: the single context-driven 356 px column on the right, always
- * present and never displaced. Three contexts — Filters, Overlays (groups,
+ * present and never displaced — except at phone width, where it is a bottom
+ * sheet opened from the rail's ▤ Panel button (openSheet / closeSheet). Three contexts — Filters, Overlays (groups,
  * density heatmap, notes, minimap) and Selection (act, arrange, appearance) —
  * share it, and each pill names exactly one job.
  *
@@ -19,13 +20,18 @@ const CONTEXTS = ['filters', 'overlays', 'selection'];
 /** Matches the .insp-pill.flash animation; the class is what drives it. */
 const FLASH_MS = 1200;
 
+/** Below this width the inspector is a bottom sheet (style.css has the twin query). */
+const PHONE_QUERY = '(max-width: 760px)';
+const isPhone = () => !!globalThis.matchMedia?.(PHONE_QUERY).matches;
+
 /** 'filters' → 'Filters', for the id convention both panels and pills follow. */
 const elementId = (prefix, name) => `${prefix}${name[0].toUpperCase()}${name.slice(1)}`;
 
 class Inspector {
   #flashTimer = null;
 
-  constructor() {
+  constructor(cache = null) {
+    this.cache = cache;
     this.context = 'filters';
     this.selectionSize = '0/0';
     this.panels = {};
@@ -41,6 +47,48 @@ class Inspector {
       this.pills[name]?.addEventListener('keydown', (e) => this.#onPillKey(e));
     }
     this.setContext(this.context);
+    // Escape closes the sheet from anywhere inside it; a field's own Escape
+    // (a menu, an edit) stops propagation first.
+    document.getElementById('inspector')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.sheet && isPhone()) this.closeSheet();
+    });
+  }
+
+  // ------------------------------------------------- phone: the bottom sheet
+
+  /** null (closed), 'half' or 'full'. Ignored above the phone breakpoint. */
+  get sheet() {
+    return document.body.dataset.sheet || null;
+  }
+
+  /** @param {'half'|'full'} [detent] */
+  openSheet(detent = 'half') {
+    document.body.dataset.sheet = detent;
+    document.getElementById('panelToggleBtn')?.setAttribute('aria-expanded', 'true');
+    // One sheet at a time on a phone: the workbench rises from the same edge.
+    if (isPhone()) this.cache?.workbench?.close();
+    this.pills[this.context]?.focus();
+  }
+
+  closeSheet() {
+    if (!this.sheet) return;
+    const hadFocus = document.getElementById('inspector')?.contains(document.activeElement);
+    delete document.body.dataset.sheet;
+    const toggle = document.getElementById('panelToggleBtn');
+    toggle?.setAttribute('aria-expanded', 'false');
+    if (hadFocus) toggle?.focus();
+  }
+
+  toggleSheet() {
+    if (this.sheet) this.closeSheet();
+    else this.openSheet();
+  }
+
+  /** The grabber: half ↔ full. */
+  cycleSheet() {
+    const next = this.sheet === 'full' ? 'half' : 'full';
+    document.body.dataset.sheet = next;
+    document.querySelector('.sheet-grab')?.setAttribute('aria-label', next === 'full' ? 'Shorter panel' : 'Taller panel');
   }
 
   #onPillKey(event) {
@@ -98,6 +146,9 @@ class Inspector {
     const changed = size !== this.selectionSize;
     this.selectionSize = size;
     this.panels.selection?.classList.toggle('has-selection', nodeCount + edgeCount > 0);
+    // With the sheet closed, the Panel button is the one place that shows a selection.
+    const count = document.querySelector('#panelToggleBtn .rail-panel-count');
+    if (count) count.textContent = nodeCount + edgeCount > 0 ? String(nodeCount + edgeCount) : '';
     if (changed && nodeCount + edgeCount > 0) this.flashPill('selection');
   }
 
@@ -111,7 +162,7 @@ class Inspector {
 }
 
 /** Safe in DOMs without the inspector markup (unit tests): returns null. */
-export function initInspector() {
-  return document.getElementById('inspectorBody') ? new Inspector() : null;
+export function initInspector(cache) {
+  return document.getElementById('inspectorBody') ? new Inspector(cache) : null;
 }
 

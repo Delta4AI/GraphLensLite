@@ -109,8 +109,18 @@
     <button id="historyRedoBtn" class="rail-mini disabled" aria-label="Redo"
             title="Nothing to redo" onclick="cache.history.redo()">↷</button>
   </div>
+  <!-- Phone layout only (≤760px): the inspector as a bottom sheet, and the
+       controls the narrow bar hides. -->
+  <button id="panelToggleBtn" class="rail-vb rail-phone-only" aria-expanded="false" aria-controls="inspector"
+          title="Panel — filters, overlays and the selection" onclick="cache.inspector.toggleSheet()">
+    <span class="rail-vb-g">▤</span><span class="rail-panel-count"></span>
+  </button>
+  <button id="railMoreBtn" class="rail-vb rail-phone-only" aria-label="More"
+          title="More — fit, layout, search, selection, workbench, export, theme">
+    <span class="rail-vb-g">⋯</span>
+  </button>
   <div class="rail-div"></div>
-  <button class="rail-vb" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">
+  <button id="fitBtn" class="rail-vb" title="Fit graph to screen (F)" onclick="cache.gcm.fitViewToVisibleNodes()">
     <span class="rail-vb-g">⊡</span><span class="rail-vb-t">Fit</span>
   </button>
   <button id="relayoutBtn" class="rail-vb"
@@ -256,6 +266,8 @@
   <aside id="inspector">
     <div class="inspector-resize-handle"></div>
     <div class="insp-pills-row">
+      <button type="button" class="sheet-grab rail-phone-only" aria-label="Taller panel"
+              onclick="cache.inspector.cycleSheet()"></button>
       <div class="insp-pills" role="tablist" aria-label="Inspector context">
       <button id="inspectorPillFilters" class="insp-pill active" role="tab" aria-selected="true"
               aria-controls="inspectorFilters" tabindex="0"
@@ -267,6 +279,8 @@
               aria-controls="inspectorSelection" tabindex="-1"
               title="Everything that acts on the current selection: actions, arrange, appearance">Selection</button>
       </div>
+      <button type="button" class="sheet-close rail-phone-only" aria-label="Close panel"
+              onclick="cache.inspector.closeSheet()">×</button>
     </div>
     <div id="inspectorBody">
       <section id="inspectorFilters" class="insp-panel" role="tabpanel" tabindex="0"

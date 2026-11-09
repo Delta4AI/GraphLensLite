@@ -7639,3 +7639,132 @@ div[slider] > input[type=range]::-ms-tooltip {
     border-radius: 4px;
     white-space: nowrap;
 }
+
+/* ==========================================================================
+   Narrow windows. 761–860px: the full rail fits once its spacing tightens.
+   ≤760px (phones): the graph takes the whole width under a five-control bar
+   (File, workspace, undo/redo, ▤ Panel, ⋯ More); the inspector becomes a
+   bottom sheet (body[data-sheet] = half | full) that the workbench shares —
+   inspector.js and workbench.js open one at a time. The 760px figure is
+   repeated in inspector.js and workbench.js (matchMedia).
+   ========================================================================== */
+.rail-phone-only {
+    display: none !important;
+}
+
+@media (max-width: 860px) {
+    #rail {
+        gap: 3px;
+        padding: 0 6px;
+    }
+
+    #rail > .rail-div {
+        display: none;
+    }
+}
+
+@media (max-width: 760px) {
+    .rail-phone-only {
+        display: flex !important;
+    }
+
+    #rail > :not(#appMenuBtn, #workspaceChip, .rail-hist, .rail-phone-only) {
+        display: none !important;
+    }
+
+    #rail .rail-wschip {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .rail-panel-count {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--accent-text);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Every rail menu drops down full width under the bar, whichever control
+       opened it (⋯ More reaches menus whose own anchor is hidden). */
+    .rail-menu {
+        left: 8px !important;
+        right: 8px;
+        top: 56px !important;
+        max-height: calc(100dvh - 64px);
+    }
+
+    #inspector {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: auto;
+        min-width: 0;
+        height: 55dvh;
+        z-index: calc(var(--z-workbench) + 1);
+        border-left: none;
+        border-top: 1px solid var(--border);
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.18);
+    }
+
+    body:not([data-sheet]) #inspector {
+        display: none;
+    }
+
+    body[data-sheet="full"] #inspector {
+        height: calc(100dvh - 52px);
+    }
+
+    .inspector-resize-handle {
+        display: none;
+    }
+
+    .insp-pills-row {
+        position: relative;
+        padding-top: 18px;
+    }
+
+    .sheet-grab {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 64px;
+        height: 16px;
+        padding: 0;
+        border: none;
+        background: none;
+        cursor: pointer;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .sheet-grab::before {
+        content: "";
+        width: 36px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--text-faint);
+    }
+
+    .sheet-close {
+        margin-left: auto;
+        width: 28px;
+        height: 28px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        background: none;
+        color: var(--text-strong);
+        font-size: 18px;
+        cursor: pointer;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .sheet-close:hover {
+        background: var(--surface-3);
+        border-color: var(--border);
+    }
+}
