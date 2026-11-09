@@ -90,6 +90,9 @@ class DataTable {
     // The roving focus position: row key + column (or 'act' / 'head').
     this.activeCell = null;
     this.editing = null;
+    // Set by carryOver when the replaced editor held focus; spent on the first
+    // render with data, so it can never pull focus in later.
+    this.restoreFocus = false;
 
     this.cache = cache;
   }
@@ -103,8 +106,9 @@ class DataTable {
     this.currentTab = previous.currentTab;
     this.filterText = previous.filterText;
     this.activeCell = previous.activeCell;
-    const active = document.activeElement;
-    this.restoreFocus = !!(previous.table?.contains(active) || previous.changesBar?.contains(active));
+    // Anywhere in the old pane (grid, toolbar, empty state, changes bar): its DOM
+    // is still in place here, and init() is about to replace it.
+    this.restoreFocus = !!document.getElementById(previous.containerId)?.contains(document.activeElement);
     const { total } = previous.#changeCounts();
     if (total) {
       this.cache.ui.warning?.(
@@ -393,15 +397,8 @@ class DataTable {
     }
 
     this.fileData = structuredClone(fileData);
-    // Staged edits belong to the graph they were made on: a newly loaded graph
-    // starts clean, never with another file's edits. Apply clears them itself
-    // before its rebuild, so anything left here is work the user loses.
-    const { total } = this.#changeCounts();
-    if (total) {
-      this.cache.ui.warning?.(
-        `${total} unsaved data editor change${total === 1 ? ' was' : 's were'} discarded because the graph was replaced.`
-      );
-    }
+    // Staged edits belong to the graph they were made on. A load builds a new
+    // editor (carryOver says what was lost); this guards any path that does not.
     this.pendingChanges.clear();
     this.addedColumns = [];
     this.notifyPendingChanges();
@@ -649,7 +646,12 @@ class DataTable {
     this.tableHead.replaceChildren();
     this.tableBody.replaceChildren();
     if (empty) {
-      if (hadFocus) this.filterInput?.focus();
+      // init() renders before any data arrives: keep a carried-over focus for
+      // the render that has data, and spend it there either way.
+      if (hadFocus || (this.restoreFocus && this.fileData)) {
+        this.restoreFocus = false;
+        (this.emptyEl?.querySelector('button') ?? this.filterInput)?.focus();
+      }
       return;
     }
 
@@ -1345,7 +1347,9 @@ class DataTable {
         await this.rebuildGraph(updatedFileData);
       } catch (err) {
         // The rebuild may already have swapped in a new editor (cache.reset()).
-        const current = this.cache.dataTable ?? this;
+        // ...but only if that one already has its pane; a throw before init()
+        // leaves the old editor as the visible one.
+        const current = this.cache.dataTable?.table?.isConnected ? this.cache.dataTable : this;
         current.pendingChanges = staged.changes;
         current.addedColumns = staged.columns;
         current.notifyPendingChanges();
