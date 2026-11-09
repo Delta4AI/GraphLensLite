@@ -198,6 +198,14 @@ class Workbench {
   #setHeight(height) {
     this.el.style.height = `${height}px`;
     this.el.parentElement?.style.setProperty('--workbench-height', `${height}px`);
+    // A focusable separator must report its value: the share of the stage the panel takes.
+    const handle = this.el.querySelector('.resize-handle');
+    const stage = this.#stageHeight();
+    if (handle && stage > 0) {
+      const percent = Math.round((height / stage) * 100);
+      handle.setAttribute('aria-valuenow', String(percent));
+      handle.setAttribute('aria-valuetext', `${percent}% of the graph area`);
+    }
   }
 
   #clamp(height) {
@@ -233,6 +241,8 @@ class Workbench {
     handle.setAttribute('role', 'separator');
     handle.setAttribute('aria-orientation', 'horizontal');
     handle.setAttribute('aria-label', 'Resize the workbench');
+    handle.setAttribute('aria-valuemin', '0');
+    handle.setAttribute('aria-valuemax', '100');
     handle.tabIndex = 0;
     handle.addEventListener('keydown', (e) => {
       const step = KEYBOARD_RESIZE_STEP_PX * (e.shiftKey ? KEYBOARD_RESIZE_COARSE : 1);

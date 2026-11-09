@@ -99,8 +99,10 @@ describe('workbench tabs', () => {
 
     const el = document.getElementById('workbench');
     const before = parseFloat(el.style.height);
+    const valueBefore = Number(handle.getAttribute('aria-valuenow'));
     handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
     expect(parseFloat(el.style.height)).toBeGreaterThan(before);
+    expect(Number(handle.getAttribute('aria-valuenow'))).toBeGreaterThan(valueBefore);
 
     handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     expect(parseFloat(el.style.height)).toBe(before);
