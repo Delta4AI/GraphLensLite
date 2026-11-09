@@ -306,6 +306,20 @@ describe('the index is derived from the DOM', () => {
     expect(named(cmds, 'Fill Color')).toMatchObject({ kind: 'reveal' });
   });
 
+  it('indexes appearance-editor rows by their sub-group name, so repeated labels stay apart', () => {
+    const card = document.createElement('div');
+    card.dataset.label = 'Node Configuration';
+    card.innerHTML = `
+      <div class="prop-row" data-name="Size"><label class="prop-label">Size</label>
+        <div class="prop-ctl"><input type="number"></div></div>
+      <div class="prop-row" data-name="Label size"><label class="prop-label">Size</label>
+        <div class="prop-ctl"><input type="number"></div></div>`;
+    document.getElementById('inspectorLayerCards').appendChild(card);
+    const cmds = collectCommands(cache);
+    expect(named(cmds, 'Size')).toMatchObject({ kind: 'reveal' });
+    expect(named(cmds, 'Label size')).toMatchObject({ kind: 'reveal' });
+  });
+
   it('does not index the palette button itself', () => {
     const btn = document.createElement('button');
     btn.id = 'cmdkBtn';
