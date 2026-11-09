@@ -200,6 +200,10 @@ class GraphCoreManager {
   async initialAfterRenderEvent() {
     if (this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_RUNNING) return;
 
+    // The overlay is the "ready" signal: the render() below would clear it
+    // before persisting, hide-disconnected and the undo baseline, and an edit
+    // in that gap became part of the baseline (not undoable).
+    this.cache.ui.holdLoading();
     try {
       this.cache.ui.debug('ONCE AFTER RENDER');
       await this.cache.ui.showLoading('Post-processing', 'Post-processing ..');
@@ -253,9 +257,10 @@ class GraphCoreManager {
     } catch (errorMsg) {
       this.cache.ui.error(`Error in initial AFTER_RENDER: ${errorMsg}`);
       this.cache.ui.error('Graph setup failed. Please check your input data.');
-      await this.cache.ui.hideLoading();
     } finally {
       this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_RUNNING = false;
+      this.cache.ui.releaseLoading();
+      await this.cache.ui.hideLoading();
     }
   }
 
