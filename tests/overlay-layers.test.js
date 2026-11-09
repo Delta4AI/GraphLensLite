@@ -223,7 +223,8 @@ describe('UIManager overlay layer stack', () => {
   it('toggles lasso mode from the graph\'s own state and says so on the stage', () => {
     // No rail button holds the state any more: the graph does, and the stage
     // hint is the one visible sign that a drag now lassoes.
-    document.body.insertAdjacentHTML('beforeend', '<div id="modeHint" hidden></div>');
+    document.body.insertAdjacentHTML('beforeend',
+      '<span id="modeStatus"></span><div id="modeHint" hidden><span class="mode-hint-text"></span><button class="mode-hint-done"></button></div>');
     const [ui, cache] = makeUI();
     let lasso = false;
     cache.graph.isInteractionEnabled = (name) => name === 'lasso' && lasso;
@@ -237,7 +238,8 @@ describe('UIManager overlay layer stack', () => {
       ['tooltip', false],
     ]);
     expect(hint.hidden).toBe(false);
-    expect(hint.textContent).toContain('Escape');
+    expect(document.getElementById('modeStatus').textContent).toContain('Escape'); // announced
+    expect(hint.querySelector('.mode-hint-done').textContent).toBe('Done'); // the touch way out
 
     ui.toggleLassoSelection();
     expect(cache.graph.setInteractionEnabled).toHaveBeenLastCalledWith('tooltip', true);

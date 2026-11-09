@@ -272,7 +272,9 @@ body {
 /* On-state (lasso active, hover highlight enabled). `.highlight` is kept for
    the workbench tabs that still use it; rail buttons all speak `.active`. */
 .rail-vb.highlight,
-.rail-vb.active {
+.rail-vb.active,
+.rail-vb[aria-expanded="true"],
+.rail-selchip-btn[aria-expanded="true"] {
     background: var(--surface-3);
     border-color: var(--accent-text);
 }
@@ -367,6 +369,38 @@ body {
 
 .rail-selchip:not(.live) #clearSelectionBtn {
     display: none;
+}
+
+#selectMenuMount {
+    padding: 0 8px;
+}
+
+.rail-menu [aria-pressed="true"] .rail-menu-label {
+    color: var(--accent-text);
+    font-weight: 600;
+}
+
+/* Presentation mode's way out where there is no Escape key (touch, phones). */
+#presentationExitBtn {
+    display: none;
+}
+
+@media (max-width: 760px), (hover: none) {
+    body.presentation #presentationExitBtn {
+        display: block;
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: var(--z-modal);
+        height: 32px;
+        padding: 0 12px;
+        border: 1px solid var(--brand-border);
+        border-radius: 6px;
+        background: var(--brand-border);
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+    }
 }
 
 .rail-selchip-counts,
@@ -798,15 +832,18 @@ body {
     flex-shrink: 0;
 }
 
-/* A tab without help hides ⓘ; display:flex above would otherwise keep it. */
-/* The stage's line for an active pointer mode (lasso, placing a note). */
+/* The stage's line for an active pointer mode (lasso, placing a note), with
+   its own Done/Cancel: phones have no L or Escape key. */
 .mode-hint {
     position: absolute;
     top: 10px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: var(--z-minimap);
-    padding: 4px 12px;
+    z-index: var(--z-armed-overlay);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 4px 4px 12px;
     border: 1px solid var(--brand-border);
     border-radius: 6px;
     background: var(--brand-border);
@@ -817,22 +854,39 @@ body {
     pointer-events: none;
 }
 
+.mode-hint-done {
+    pointer-events: auto;
+    height: 24px;
+    padding: 0 10px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+    background: none;
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.mode-hint-done:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
 .mode-hint[hidden] {
     display: none;
 }
 
-.layer-row-action {
+.layer-row .layer-row-action {
     margin-left: auto;
     height: 20px;
     padding: 0 8px;
     font-size: 11px;
 }
 
-.layer-row-action.active {
+.layer-row .layer-row-action.active {
     border-color: var(--accent-text);
     color: var(--accent-text);
 }
 
+/* A tab without help hides ⓘ; display:flex above would otherwise keep it. */
 .panel-header-btn[hidden] {
     display: none;
 }
@@ -7694,6 +7748,16 @@ div[slider] > input[type=range]::-ms-tooltip {
         max-height: calc(100dvh - 64px);
     }
 
+    /* Half height shares the screen with the stage (the graph resizes into
+       the top half); full height covers it. */
+    body[data-sheet="half"] #mainContent {
+        flex-direction: column;
+    }
+
+    body[data-sheet="half"] #outerGraphContainer {
+        min-height: 0;
+    }
+
     #inspector {
         position: fixed;
         left: 0;
@@ -7713,6 +7777,23 @@ div[slider] > input[type=range]::-ms-tooltip {
         display: none;
     }
 
+    body[data-sheet="half"] #inspector {
+        position: static;
+        flex: 0 0 55dvh;
+    }
+
+    .mode-hint {
+        white-space: normal;
+        max-width: calc(100% - 24px);
+        width: max-content;
+        text-align: center;
+    }
+
+    #innerGraphContainer .gll-minimap {
+        transform: scale(0.6);
+        transform-origin: bottom right;
+    }
+
     body[data-sheet="full"] #inspector {
         height: calc(100dvh - 52px);
     }
@@ -7723,7 +7804,7 @@ div[slider] > input[type=range]::-ms-tooltip {
 
     .insp-pills-row {
         position: relative;
-        padding-top: 18px;
+        padding-top: 28px;
     }
 
     .sheet-grab {
@@ -7731,8 +7812,8 @@ div[slider] > input[type=range]::-ms-tooltip {
         top: 0;
         left: 50%;
         transform: translateX(-50%);
-        width: 64px;
-        height: 16px;
+        width: 88px;
+        height: 28px;
         padding: 0;
         border: none;
         background: none;
@@ -7751,8 +7832,8 @@ div[slider] > input[type=range]::-ms-tooltip {
 
     .sheet-close {
         margin-left: auto;
-        width: 28px;
-        height: 28px;
+        width: 40px;
+        height: 40px;
         border: 1px solid transparent;
         border-radius: 6px;
         background: none;

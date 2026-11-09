@@ -64,10 +64,12 @@ class Inspector {
   /** @param {'half'|'full'} [detent] */
   openSheet(detent = 'half') {
     document.body.dataset.sheet = detent;
+    document.querySelector('.sheet-grab')?.setAttribute('aria-label', detent === 'full' ? 'Shorter panel' : 'Taller panel');
     document.getElementById('panelToggleBtn')?.setAttribute('aria-expanded', 'true');
     // One sheet at a time on a phone: the workbench rises from the same edge.
     if (isPhone()) this.cache?.workbench?.close();
     this.pills[this.context]?.focus();
+    this.cache?.graph?.resize?.(); // half height shrinks the stage
   }
 
   closeSheet() {
@@ -77,6 +79,7 @@ class Inspector {
     const toggle = document.getElementById('panelToggleBtn');
     toggle?.setAttribute('aria-expanded', 'false');
     if (hadFocus) toggle?.focus();
+    this.cache?.graph?.resize?.();
   }
 
   toggleSheet() {
@@ -89,6 +92,7 @@ class Inspector {
     const next = this.sheet === 'full' ? 'half' : 'full';
     document.body.dataset.sheet = next;
     document.querySelector('.sheet-grab')?.setAttribute('aria-label', next === 'full' ? 'Shorter panel' : 'Taller panel');
+    this.cache?.graph?.resize?.();
   }
 
   #onPillKey(event) {
@@ -147,8 +151,9 @@ class Inspector {
     this.selectionSize = size;
     this.panels.selection?.classList.toggle('has-selection', nodeCount + edgeCount > 0);
     // With the sheet closed, the Panel button is the one place that shows a selection.
+    const total = nodeCount + edgeCount;
     const count = document.querySelector('#panelToggleBtn .rail-panel-count');
-    if (count) count.textContent = nodeCount + edgeCount > 0 ? String(nodeCount + edgeCount) : '';
+    if (count) count.textContent = total > 0 ? String(total) : '';
     if (changed && nodeCount + edgeCount > 0) this.flashPill('selection');
   }
 

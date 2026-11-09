@@ -259,6 +259,11 @@ class Rail {
     if (moreBtn) this.menus.push(new RailMenu(moreBtn, (el) => this.#buildMoreMenu(el)));
   }
 
+  /** The selection menu, opened under `anchor` (the Selection tab's "By name or ID"). */
+  openSelectionMenu(anchor) {
+    this.#menuOf('selectMenuBtn')?.openFrom(anchor);
+  }
+
   /** The menu anchored to `id`, to open it from ⋯ More. */
   #menuOf(id) {
     return this.menus.find((m) => (m._home ?? m.anchor).id === id);
@@ -283,6 +288,11 @@ class Rail {
     };
     const tab = (id, icon, label) => menuItem({ icon, label, onClick: click(id) });
     el.append(
+      menuItem({
+        icon: '▤',
+        label: 'Panel: filters, overlays, selection',
+        onClick: this.#closeAnd(() => this.cache.inspector?.openSheet()),
+      }),
       header('View'),
       menuItem({ icon: '⊡', label: 'Fit graph', onClick: click('fitBtn') }),
       menuItem({ icon: '↻', label: 'Layout…', onClick: submenu('relayoutBtn') }),
@@ -549,6 +559,7 @@ class Rail {
       const btn = menuItem({ icon, label, title, onClick: close ? this.#closeAnd(run) : run });
       btn.id = id;
       btn.classList.add('disabled');
+      btn.setAttribute('aria-disabled', 'true');
       return btn;
     };
     const lasso = menuItem({
@@ -561,6 +572,9 @@ class Rail {
     el.append(
       row('focusSelectionBtn', '🔍', 'Zoom to selection', 'Center and zoom to the selection',
         () => this.cache.gcm.focusSelection()),
+      // The chip's × is hidden on a phone; the menu is reachable there.
+      row('clearSelectionMenuItem', '×', 'Clear selection', 'Deselect everything',
+        () => this.cache.sm.clearSelection()),
       // Undo/redo stay open: stepping back through several selections is one gesture.
       row('undoSelectionBtn', '↶', 'Undo selection change', 'Go back to the previous selection',
         () => this.cache.sm.undoSelection(), { close: false }),

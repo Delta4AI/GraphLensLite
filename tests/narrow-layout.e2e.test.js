@@ -55,9 +55,17 @@ describe.skipIf(!E2E)('narrow layout, end to end', () => {
     expect(await page.locator('#inspector').isVisible()).toBe(false);
     expect(await page.evaluate(() => document.getElementById('outerGraphContainer').getBoundingClientRect().width)).toBe(390);
 
+    // Lasso and its touch way out: the stage line's Done, no key needed.
+    await page.evaluate(() => window.cache.ui.toggleLassoSelection());
+    await page.locator('#modeHint').getByRole('button', { name: 'Done' }).click();
+    expect(await page.evaluate(() => window.cache.graph.isInteractionEnabled('lasso'))).toBe(false);
+
     const panel = page.locator('#panelToggleBtn');
     await panel.click();
     await expect.poll(() => page.locator('#inspector').isVisible()).toBe(true);
+    // Half height shares the screen: the graph shrinks into the top part.
+    expect(await page.evaluate(() => document.getElementById('outerGraphContainer').getBoundingClientRect().height))
+      .toBeLessThan(500);
     await page.keyboard.press('Escape');
     await expect.poll(() => page.locator('#inspector').isVisible()).toBe(false);
     expect(await panel.evaluate((el) => el === document.activeElement)).toBe(true);
