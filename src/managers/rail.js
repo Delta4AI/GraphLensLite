@@ -277,8 +277,10 @@ class Rail {
    */
   async #replacingGraph(lead, action) {
     if (!this.cache.initialized) return action();
+    const staged = this.cache.dataTable?.stagedCount ?? 0;
+    const edits = staged ? ` and ${staged} unsaved data editor change${staged === 1 ? '' : 's'}` : '';
     const confirmed = await Popup.confirm(
-      `${lead} replaces the loaded graph, discarding every workspace, style and group in it. Continue?`,
+      `${lead} replaces the loaded graph, discarding every workspace, style and group in it${edits}. Continue?`,
       'Discard and continue'
     );
     if (confirmed) action();

@@ -1161,6 +1161,28 @@ class DataTable {
     return items;
   }
 
+  /** How many changes are staged and not applied yet. */
+  get stagedCount() {
+    return this.#changeCounts().total;
+  }
+
+  /**
+   * Before something replaces the graph: asks while changes are staged, and
+   * agreeing drops them (so the replaced editor has nothing left to warn
+   * about). True means go ahead.
+   */
+  async confirmDiscard() {
+    const total = this.stagedCount;
+    if (!total) return true;
+    const noun = total === 1 ? 'change' : 'changes';
+    const ok = await Popup.confirm(
+      `Loading this graph replaces the current one and discards ${total} unsaved data editor ${noun}. Apply ${total === 1 ? 'it' : 'them'} first to keep ${total === 1 ? 'it' : 'them'}.`,
+      `Discard ${noun} and load`
+    );
+    if (ok) this.reset();
+    return ok;
+  }
+
   async discard() {
     const { total } = this.#changeCounts();
     const noun = total === 1 ? 'change' : 'changes';

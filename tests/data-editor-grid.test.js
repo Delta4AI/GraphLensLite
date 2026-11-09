@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DataTable } from '../src/utilities/data_editor.js';
+import { Popup } from '../src/utilities/popup.js';
 
 // ==========================================================================
 // The data editor's redesigned contract: one Tab stop with arrow keys (APG
@@ -194,6 +195,25 @@ describe('data editor grid', () => {
     cache.selectedNodes = ['n2'];
     await dt.refreshCurrentTab();
     expect(dt.tableBody.querySelector('tr[data-key="Node::n1"]').classList.contains('data-row-deleted')).toBe(true);
+  });
+
+  it('asks before a new graph replaces staged changes, and only then', async () => {
+    const { dt } = mount();
+    const confirm = vi.spyOn(Popup, 'confirm');
+    expect(await dt.confirmDiscard()).toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
+
+    await dt.switchTab('allNodes');
+    dt.deleteRow('Node', 'n2');
+    confirm.mockResolvedValueOnce(false);
+    expect(await dt.confirmDiscard()).toBe(false);
+    expect(confirm.mock.calls[0][0]).toContain('discards 1 unsaved data editor change');
+    expect(dt.stagedCount).toBe(1);
+
+    confirm.mockResolvedValueOnce(true);
+    expect(await dt.confirmDiscard()).toBe(true);
+    expect(dt.stagedCount).toBe(0); // the editor that replaces this one has nothing left to warn about
+    confirm.mockRestore();
   });
 
   it('keeps focus in the table when the last change is undone from Review', async () => {
