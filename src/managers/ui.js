@@ -1557,9 +1557,18 @@ class UIManager {
   // Prepends a chevron and wires a click on the group header to fold the group
   // body. Clicks on the header's action badges are ignored so they still fire.
   makeFilterGroupCollapsible(wrapper, headerDiv) {
-    const chevron = document.createElement('span');
+    // A real button, so the keyboard can fold a group too; the header's own
+    // click stays as the larger mouse target.
+    const chevron = document.createElement('button');
+    chevron.type = 'button';
     chevron.className = 'filter-group-chevron';
     chevron.textContent = '▾';
+    chevron.setAttribute('aria-expanded', 'true');
+    const name = headerDiv.querySelector('h4, h5')?.textContent;
+    chevron.setAttribute('aria-label', name ? `Show ${name} filters` : 'Show filters');
+    chevron.addEventListener('click', () =>
+      this.setFilterGroupCollapsed(wrapper, !wrapper.classList.contains('collapsed'))
+    );
     headerDiv.insertBefore(chevron, headerDiv.firstChild);
     headerDiv.classList.add('collapsible-filter-header');
     headerDiv.addEventListener('click', (e) => {
@@ -1583,7 +1592,10 @@ class UIManager {
     // The group's OWN chevron: it sits in the group header, a direct child of the
     // wrapper, and a plain descendant query would find a nested group's instead.
     const chevron = wrapper.querySelector(':scope > * > .filter-group-chevron');
-    if (chevron) chevron.textContent = collapsed ? '▸' : '▾';
+    if (chevron) {
+      chevron.textContent = collapsed ? '▸' : '▾';
+      chevron.setAttribute('aria-expanded', String(!collapsed));
+    }
   }
 
   // Pre-load, the landing page (a full-viewport overlay) covers the shell;

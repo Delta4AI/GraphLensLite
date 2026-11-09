@@ -38,14 +38,16 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - Pick the control by property type:
   - 2–6 options that fit on the row: segmented control (`.prop-seg`, pressed
     state = value). Longer enums: `<select>`.
-  - On/off: native checkbox (`.prop-check`). Every checkbox takes the
-    interactive accent from one global rule; never a hidden input under a drawn
-    box.
+  - On/off: native checkbox (`.prop-check`). Every checkbox takes the brand
+    slate from one global rule, so a column of ticked defaults stays quiet and
+    the red accent is left for what changed (a narrowed filter). Never a hidden
+    input under a drawn box.
   - Pick several values from a list: a field button that opens a checkbox
     group (`DropdownChecklist`, built on `RailMenu`), never a native
-    multi-select. It shows "All", "None" or "4 of 6"; the list has an All box
-    that goes mixed, a count per value, search from 10 values, and Alt-click
-    keeps only one value.
+    multi-select. It shows "All", "None", the one kept value, or "4 of 6"; the
+    list has an All box that goes mixed (and acts on the search results while
+    a search is typed), a count per value, search from 10 values, and "Only"
+    on each value (Enter on a focused value, or Alt-click, does the same).
   - Number with a range: slider plus number field; arrow keys step.
   - Colour: painted well over the native picker, hex field, palette, then
     **Map…** when the property can be driven by data.
