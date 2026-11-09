@@ -1,9 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
+import { propRow, propSubhead } from '../src/managers/appearance_controls.js';
 import {
-  createNewRow,
-  createLabel,
-  appendLabel,
   createSwitch,
   createButton,
   createInput,
@@ -11,9 +9,8 @@ import {
 } from '../src/managers/ui_style_div.js';
 
 // ==========================================================================
-// The style div's generic control builders. Until they were lifted to module
-// scope they were closures inside a 1556-line function with a single export,
-// so none of this was reachable from a test.
+// The inspector's generic control builders: each takes only its arguments,
+// so they are tested here without building a whole card.
 // ==========================================================================
 
 describe('createSwitch', () => {
@@ -79,19 +76,19 @@ describe('createButton and createColorPicker', () => {
   });
 });
 
-describe('rows and labels', () => {
-  it('appends a row to its parent and a titled label to a row', () => {
-    const parent = document.createElement('div');
-    const row = createNewRow(parent);
-    expect(parent.firstChild).toBe(row);
-    expect(row.className).toContain('card-row');
+describe('propRow', () => {
+  it('appends a label | control row and names controls after it, with its section and sub-group', () => {
+    const card = document.createElement('div');
+    card.dataset.propSection = 'Edge';
+    const plain = propRow(card, 'Color', 'What it does');
+    expect(card.firstChild.className).toBe('prop-row');
+    expect(card.querySelector('.prop-label').textContent).toBe('Color');
+    expect(card.querySelector('.prop-label').title).toBe('What it does');
+    expect(plain.dataset.labelText).toBe('Edge color');
 
-    appendLabel(row, 'Fill Color', 'What it does');
-    expect(row.querySelector('label').textContent).toBe('Fill Color');
-    expect(row.querySelector('label').title).toBe('What it does');
-  });
-
-  it('returns nothing for an empty label', () => {
-    expect(createLabel('')).toBeNull();
+    propSubhead(card, 'Start arrow');
+    const sub = propRow(card, 'Color');
+    expect(sub.dataset.labelText).toBe('Edge start arrow color');
+    expect(sub.parentElement.dataset.name).toBe('Start arrow color');
   });
 });

@@ -223,6 +223,14 @@ class StaticUtilities {
     return propId.split("::");
   }
 
+  /**
+   * The id prefix of every property under a section or sub-group. The trailing
+   * separator matters: "Topology" must not also match "Topology 2".
+   */
+  static propIDPrefix(section, subSection = null) {
+    return subSection ? `${section}::${subSection}::` : `${section}::`;
+  }
+
   // The query DSL uses [ ] , ( ) and \ as grammar. Categorical values can
   // contain any of these (e.g. free-text "Evidence sample" cells), so they are
   // backslash-escaped when written into a query string and unescaped when the

@@ -18,7 +18,7 @@ function workbenchDom() {
         <div class="panel-header">
           <span id="workbenchTitle"></span>
           <div class="query-buttons"></div>
-          <div class="data-buttons" style="display: none;"></div>
+          <div class="data-toolbar" style="display: none;"></div>
           <div class="assistant-buttons" style="display: none;"></div>
           <button id="workbenchHelpBtn"></button>
           <button id="workbenchExpandBtn" aria-pressed="false">⤢</button>
@@ -36,7 +36,6 @@ function workbenchDom() {
     <button id="queryToggleBtn"></button>
     <button id="metricsToggleBtn"></button>
     <button id="assistantToggleBtn"></button>
-    <button class="add-to-query-button"></button>
   `;
 }
 
@@ -143,10 +142,10 @@ describe('workbench tabs', () => {
   it('swaps the tab-scoped toolbar with the tab', () => {
     wb.show('query');
     expect(document.querySelector('.query-buttons').style.display).toBe('flex');
-    expect(document.querySelector('.data-buttons').style.display).toBe('none');
+    expect(document.querySelector('.data-toolbar').style.display).toBe('none');
     wb.show('data');
     expect(document.querySelector('.query-buttons').style.display).toBe('none');
-    expect(document.querySelector('.data-buttons').style.display).toBe('flex');
+    expect(document.querySelector('.data-toolbar').style.display).toBe('flex');
   });
 
   it('routes the help button to the open tab, and hides it where there is no help', () => {
@@ -159,17 +158,6 @@ describe('workbench tabs', () => {
     expect(cache.dataTable.help).toHaveBeenCalled();
     wb.show('metrics');
     expect(help.hidden).toBe(true);
-  });
-
-  it('reveals the add-to-query affordances only for the query tab', () => {
-    const btn = document.querySelector('.add-to-query-button');
-    wb.show('query');
-    expect(btn.classList.contains('show')).toBe(true);
-    wb.show('data');
-    expect(btn.classList.contains('show')).toBe(false);
-    wb.show('query');
-    wb.close();
-    expect(btn.classList.contains('show')).toBe(false);
   });
 });
 

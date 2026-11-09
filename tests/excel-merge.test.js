@@ -798,7 +798,7 @@ describe("DataTable import guards and position seeding", () => {
     table.pendingChanges.set("A", { type: "Node" });
     table.importExcel();
     expect(cache.ui.error).toHaveBeenCalledWith(
-      "Apply or reset the pending data editor changes before importing."
+      "Apply or discard the unsaved data editor changes before importing."
     );
   });
 

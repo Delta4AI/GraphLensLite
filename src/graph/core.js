@@ -465,7 +465,12 @@ class GraphCoreManager {
     this.cache.graph.fitViewToBounds({ minX, minY, maxX, maxY });
   }
 
-  async updateEdges(overrides = {}, commands = []) {
+  /**
+   * @param {string[]} [options.ids]  edges to update instead of the selection
+   *   (the appearance editor's per-colour recolour); defaults to the selection
+   */
+  async updateEdges(overrides = {}, commands = [], { ids } = {}) {
+    const targets = ids ?? this.cache.selectedEdges;
     let colorMap = null;
     if (commands.includes('set_continuous_color_scale')) {
       colorMap = await this.cache.picker.pickColors('edges');
@@ -485,7 +490,7 @@ class GraphCoreManager {
       }
     }
 
-    for (const edgeID of this.cache.selectedEdges) {
+    for (const edgeID of targets) {
       const edge = this.cache.edgeRef.get(edgeID);
 
       for (const command of commands) {
@@ -519,7 +524,7 @@ class GraphCoreManager {
     }
 
     await this.cache.style.handleStyleChangeLoadingEvent('Style', 'Updating Edge Styles');
-    if (this.cache.selectedEdges.length) this.cache.history?.commit('Edge style change');
+    if (targets.length) this.cache.history?.commit('Edge style change');
   }
 
   /**
@@ -529,8 +534,10 @@ class GraphCoreManager {
    * @param {object} [options.badge]  for 'badge_set': {placement, color, text}
    *   or {placement, color, property} to take each node's text from a column;
    *   for 'badge_remove': {placement}
+   * @param {string[]} [options.ids]  nodes to update instead of the selection
    */
-  async updateNodes(overrides = {}, commands = [], { badge } = {}) {
+  async updateNodes(overrides = {}, commands = [], { badge, ids } = {}) {
+    const targets = ids ?? this.cache.selectedNodes;
     let colorMap = null;
     if (commands.includes('set_continuous_color_scale')) {
       colorMap = await this.cache.picker.pickColors('nodes');
@@ -561,7 +568,7 @@ class GraphCoreManager {
 
     let nodesWithoutBadgeValue = 0;
 
-    for (const nodeID of this.cache.selectedNodes) {
+    for (const nodeID of targets) {
       const node = this.cache.nodeRef.get(nodeID);
 
       for (const command of commands) {
@@ -625,10 +632,10 @@ class GraphCoreManager {
     }
 
     await this.cache.style.handleStyleChangeLoadingEvent('Style', `Updating Node Styles`);
-    if (this.cache.selectedNodes.length) this.cache.history?.commit('Node style change');
+    if (targets.length) this.cache.history?.commit('Node style change');
     if (nodesWithoutBadgeValue > 0) {
       this.cache.ui.info(
-        `${nodesWithoutBadgeValue} of ${this.cache.selectedNodes.length} selected nodes have no ` +
+        `${nodesWithoutBadgeValue} of ${targets.length} selected nodes have no ` +
           `value for that column, so they got no badge there.`
       );
     }

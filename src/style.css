@@ -32,6 +32,13 @@
     --accent-ring: rgba(195, 61, 53, 0.35);
     --success-text: #015C0C;
     --danger-text: #8a2d2d;
+    /* Data editor: a cell, row or deletion staged but not yet applied. */
+    --edited-wash: #fff3d6;
+    --edited-line: #b07a0a;
+    --added-wash: #e7f5e9;
+    --added-line: #2f7d3b;
+    --deleted-wash: #fbe9e8;
+    --deleted-line: #b4443c;
     color-scheme: light;
 
     /* Stacking order, bottom to top. Theme-independent, so they live here once
@@ -79,6 +86,12 @@
     --accent-ring: rgba(224, 99, 91, 0.45);
     --success-text: #58c06a;
     --danger-text: #d98a84;
+    --edited-wash: #3a3020;
+    --edited-line: #d9a53c;
+    --added-wash: #1f3324;
+    --added-line: #58c06a;
+    --deleted-wash: #3a2224;
+    --deleted-line: #ef8a83;
     color-scheme: dark;
 }
 
@@ -100,6 +113,13 @@ body, html {
 :focus-visible {
     outline: 2px solid var(--accent-text);
     outline-offset: 1px;
+}
+
+/* One checkbox colour app-wide. The brand slate, not the red accent: a panel
+   of ticked filters is the default state and must not outshout the red that
+   marks a narrowed one. */
+input[type="checkbox"] {
+    accent-color: var(--brand-border);
 }
 
 /* Shell: rail on top, main content flexes, bottom bar rises from below. */
@@ -1127,12 +1147,12 @@ body {
 }
 
 .insp-section-title {
-    margin: 14px 0 6px 0;
+    margin: 18px 0 4px 0;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--text-muted);
+    color: var(--accent-text);
 }
 
 /* --text-muted, not --text-faint. These are prose, so they owe 4.5:1, and #888
@@ -1296,10 +1316,6 @@ body {
 #inspector .card-labeled {
     width: 100%;
     box-sizing: border-box;
-}
-
-#inspector .card-row {
-    flex-wrap: wrap;
 }
 
 /* Presentation mode (⇧F): stage only, for screenshots and demos. */
@@ -1583,7 +1599,7 @@ h5 {
 .filter-scope {
     display: inline-flex;
     border: 1px solid var(--border-soft);
-    border-radius: 12px;
+    border-radius: 6px;
     overflow: hidden;
 }
 
@@ -1594,6 +1610,7 @@ h5 {
     font: inherit;
     font-size: 11px;
     font-weight: 600;
+    min-height: 24px;
     padding: 3px 11px;
     border: none;
     background: var(--surface-3);
@@ -1662,7 +1679,8 @@ h5 {
     display: none;
 }
 
-#filterContainer .filter-section > .header-card .small-btn,
+#filterContainer .filter-section > .header-card .filter-section-check,
+#filterContainer .filter-section > .header-card .filter-section-reset,
 #filterContainer .filter-section > .header-card .filter-scope-segment {
     pointer-events: auto;
 }
@@ -1755,26 +1773,6 @@ h5 {
     white-space: nowrap;
 }
 
-/* The group triads stay in the DOM and stay tabbable — they carry the
-   "Enable all filters: Nodes > Topology" accessible names. Quieting them is a
-   COLOR change, never opacity: these are non-text controls owing 3:1, and
-   --text-faint at full strength is 3.54:1 while the same token at 30% is
-   ~1.3:1 and fails outright. */
-.sub-header-card .small-btn,
-.filter-section > .header-card .small-btn {
-    border-color: var(--border-soft);
-    color: var(--text-faint);
-    background: transparent;
-}
-
-.sub-header-card .small-btn:hover,
-.sub-header-card .small-btn:focus-visible,
-.filter-section > .header-card .small-btn:hover,
-.filter-section > .header-card .small-btn:focus-visible {
-    border-color: var(--accent-text);
-    color: var(--text-strong);
-}
-
 /*#selectedNodes, #selectedEdges {*/
 /*    display: inline !important;*/
 /*}*/
@@ -1809,23 +1807,16 @@ h5 {
     color: white;
 }
 
-.card-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    margin-top: 4px;
-}
-
 /* Select Elements' typed-list rows: label | input | ＋ Add | − Remove, in
    columns shared by every row. */
 .select-lookup {
     display: grid;
     /* The input column has a floor: the card is otherwise only as wide as
        its button row, which left room for a couple of IDs. */
-    grid-template-columns: max-content minmax(240px, 1fr) auto auto;
+    /* The label column matches .prop-row's, so lookups align with the rows above. */
+    grid-template-columns: 84px minmax(240px, 1fr) auto auto;
     align-items: center;
-    gap: 4px 2px;
+    gap: 4px 8px;
     margin-top: 4px;
 }
 
@@ -2051,6 +2042,447 @@ h5 {
     opacity: 0.5;
 }
 
+/* --------------------------------------------------------------------------
+   Appearance editor (Selection › Nodes / Edges). An inspector, not a card
+   stack: a flat section header with a hairline, then label | control rows.
+   Controls show the selection's shared value or "Mixed" (ui_style_div.js
+   refreshStyleControls).
+   -------------------------------------------------------------------------- */
+.card-labeled.appearance-card {
+    border: none;
+    box-shadow: none;
+    background: none;
+    padding: 0 0 6px;
+    margin-top: 10px;
+}
+
+.appearance-card > .card-collapse-bar {
+    background: none;
+    color: var(--text);
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+}
+
+.appearance-card > .card-collapse-bar:has(.card-collapse-header:hover) {
+    background: none;
+    color: var(--accent-text);
+}
+
+/* Inspector heading levels: section (.insp-section-title, accent eyebrow) >
+   card (this and .flat-card::before, 13px semibold) > sub-group (.prop-subhead). */
+.appearance-card .card-collapse-header {
+    padding: 5px 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.appearance-card .card-collapse-title {
+    flex: 0 1 auto;
+}
+
+.appearance-card .layer-count {
+    flex: 1 1 auto;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-muted);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    opacity: 1;
+}
+
+/* Act on Selection / Arrange Selection / Select Elements: the same flat
+   section header as the appearance sections, with label | control rows. */
+.card-labeled.flat-card {
+    border: none;
+    box-shadow: none;
+    background: none;
+    padding: 0 0 6px;
+    margin-top: 10px;
+    text-align: left;
+}
+
+.card-labeled.flat-card::before {
+    position: static;
+    display: block;
+    transform: none;
+    height: auto;
+    padding: 5px 0 4px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    background: none;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Overlay cards (Groups pane, heatmap) keep their bar but share the rows. */
+.layer-card .prop-row,
+#groupStylePanel .prop-row {
+    padding-inline: 4px;
+}
+
+.prop-row {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    column-gap: 8px;
+    /* Top-aligned so a row whose controls wrap keeps its label on line one. */
+    align-items: start;
+    min-height: 28px;
+    padding: 2px 0;
+}
+
+.prop-row[hidden] {
+    display: none;
+}
+
+.prop-label {
+    line-height: 24px;
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.prop-ctl {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.prop-subhead {
+    margin: 8px 0 2px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-soft);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.prop-mixed {
+    font-size: 11px;
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+.prop-mixed[hidden] {
+    display: none;
+}
+
+/* One control height (24px, WCAG 2.5.8) and one radius for everything in a row. */
+.prop-ctl .insp-btn,
+.prop-select,
+.prop-text,
+.select-lookup .style-input,
+.prop-ctl .color-hex,
+.prop-ctl .style-input-sm {
+    height: 24px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+}
+
+.prop-ctl .insp-btn {
+    padding: 0 8px;
+}
+
+/* A field's border is its only edge when empty, so it owes 3:1 (WCAG 1.4.11);
+   buttons are named by their text and keep the hairline. */
+.prop-select,
+.prop-text,
+.select-lookup .style-input,
+.prop-ctl .color-hex,
+.prop-ctl .style-input-sm,
+.prop-seg,
+.color-well {
+    border-color: var(--text-faint);
+}
+
+.prop-ctl .is-invalid {
+    border-color: var(--danger-text);
+    box-shadow: 0 0 0 1px var(--danger-text);
+}
+
+/* Forces what follows onto its own line (the palette under a colour well). */
+.prop-break {
+    flex-basis: 100%;
+    height: 0;
+}
+
+/* A row whose every control is unavailable dims its label with them. */
+.prop-row:not(:has(.prop-ctl > :not(.disabled))) > .prop-label {
+    opacity: 0.5;
+}
+
+.prop-select {
+    flex: 1 1 96px;
+    min-width: 0;
+    padding: 0 4px;
+}
+
+.prop-text {
+    flex: 1 1 96px;
+    min-width: 72px;
+    padding: 0 6px;
+}
+
+.prop-ctl .style-input-sm {
+    flex: none;
+    width: 52px;
+    padding: 0 4px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-variant-numeric: tabular-nums;
+    /* The spinner arrows ate the field; arrow keys still step the value. */
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.prop-ctl .style-input-sm::-webkit-inner-spin-button,
+.prop-ctl .style-input-sm::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.prop-ctl .color-hex {
+    width: 80px;
+    padding: 0 6px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+/* The UI face, not the field's monospace: "Mixed" and "None" are words. */
+.prop-ctl ::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+    font-family: sans-serif;
+}
+
+.prop-ctl .style-slider-container {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 24px;
+    gap: 4px;
+    justify-content: flex-start;
+}
+
+.prop-ctl .style-slider {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 0;
+    height: 6px;
+}
+
+/* Mixed: no single position is true, so the thumb steps back to an outline. */
+.style-slider.is-mixed::-webkit-slider-thumb {
+    background: transparent;
+    box-shadow: inset 0 0 0 2px var(--text-muted);
+}
+
+.style-slider.is-mixed::-moz-range-thumb {
+    background: transparent;
+    box-shadow: inset 0 0 0 2px var(--text-muted);
+}
+
+.style-slider:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 3px;
+}
+
+/* Segmented control: pressed state is the value. */
+.prop-seg {
+    display: inline-flex;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--input-bg);
+}
+
+.prop-seg > button {
+    min-width: 26px;
+    height: 22px;
+    padding: 0 7px;
+    border: none;
+    border-right: 1px solid var(--border-soft);
+    background: transparent;
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.prop-seg > button:last-child {
+    border-right: none;
+}
+
+.prop-seg > button:hover {
+    color: var(--accent-text);
+}
+
+/* The underline carries the state where fill contrast alone is thin (dark). */
+.prop-seg > button[aria-pressed="true"] {
+    background: var(--brand-border);
+    color: #fff;
+    box-shadow: inset 0 -2px 0 var(--accent-text);
+}
+
+/* Inside the button: the group's overflow clips anything outside. The inner
+   ring keeps it visible on the dark pressed fill. */
+.prop-seg > button:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
+    box-shadow: inset 0 0 0 3px var(--bg);
+}
+
+/* Colour: a painted well over the native picker, a hex field, the palette. */
+.color-well {
+    position: relative;
+    flex: none;
+    width: 28px;
+    height: 24px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.color-well.is-unset {
+    background: repeating-linear-gradient(135deg, var(--input-bg) 0 5px, var(--border) 5px 6px);
+}
+
+.color-well-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+}
+
+.color-well:has(.color-well-input:focus-visible) {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
+}
+
+.prop-ctl .style-color-button-container {
+    gap: 4px;
+}
+
+/* 20px with a 4px gap: the 24px spacing exception of WCAG 2.5.8. */
+.prop-swatch {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.prop-swatch.is-unset {
+    background: repeating-linear-gradient(135deg, var(--input-bg) 0 4px, var(--border) 4px 5px);
+}
+
+.prop-swatch:hover {
+    border-color: var(--accent-text);
+}
+
+.prop-color-input {
+    width: 28px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--input-bg);
+    cursor: pointer;
+}
+
+.prop-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+    font-size: 12px;
+    color: var(--text-strong);
+    cursor: pointer;
+}
+
+.prop-check input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+/* "In selection": one chip per distinct colour, with its count. */
+.prop-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.prop-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 24px;
+    padding: 0 6px 0 4px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 11px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+
+.prop-chip:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+.prop-chip > i {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid var(--border-soft);
+    box-sizing: border-box;
+}
+
+.prop-more[hidden] {
+    display: none;
+}
+
+/* The shared picker behind the chips: present for showPicker(), never seen. */
+.prop-row-selection-colors .prop-ctl {
+    position: relative;
+}
+
+.prop-chip-picker {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.appearance-card .badge-list {
+    margin: 2px 0 4px 92px;
+}
+
 .bubble-set-config-card-header::before {
     font-size: 12px;
 }
@@ -2068,29 +2500,6 @@ h5 {
     border-left: 4px solid #8ca6d9;
     padding: 10px;
     margin: 10px 0;
-}
-
-.vr {
-    width: 1px;
-    background-color: #C33D35;
-    margin-left: 0.2em;
-    margin-right: 0.2em;
-    align-self: stretch;
-}
-
-.vr-label {
-    color: white;
-    background-color: #878996;
-    border-radius: 5px;
-    padding: 0.09rem;
-    font-size: 11px;
-}
-
-.disabled .vr-label,
-.vr-label.disabled {
-    color: #878996;
-    background-color: transparent;
-    outline: 1px solid #878996;
 }
 
 #loadingOverlay {
@@ -2202,10 +2611,9 @@ h5 {
 }
 
 .filter-row-col1 {
-    /* Label column: shared auto width across the sub-group. Nudged down to sit
-       level with the control's first line (slider / dropdown). */
+    /* Label column: shared auto width across the sub-group, its checkbox and
+       name level with the 24px control beside it. */
     min-width: 0;
-    padding-top: 2px;
 }
 
 .filter-row-col2 {
@@ -2235,7 +2643,7 @@ h5 {
 .filter-range-row > div[slider] {
     flex: 1 1 auto;
     min-width: 40px;
-    height: 18px;
+    height: 24px;
     margin: 0;
 }
 
@@ -2254,16 +2662,15 @@ h5 {
     width: auto;
     max-width: 10ch;
     min-width: 0;
-    height: 18px;
-    padding: 0 3px;
+    height: 24px;
+    padding: 0 4px;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     text-align: center;
-    border: 1px solid transparent;
-    border-bottom-color: var(--border-soft);
-    border-radius: 3px;
-    background: transparent;
-    color: var(--text-muted);
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
     box-sizing: border-box;
 }
 
@@ -2279,8 +2686,7 @@ h5 {
 }
 
 .filter-range-row > input:hover {
-    border-color: var(--border-soft);
-    background: var(--surface-3);
+    border-color: var(--text-muted);
 }
 
 /* Focus shows the exact value, so the box needs room for it. */
@@ -2561,10 +2967,20 @@ h5 {
 }
 
 .filter-group-chevron {
-    display: inline-block;
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    margin: 0 -4px 0 -2px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
     font-size: 9px;
-    margin-left: 4px;
-    margin-right: 1px;
+    letter-spacing: 0;
+    cursor: pointer;
     opacity: 0.85;
 }
 
@@ -2629,6 +3045,7 @@ h5 {
 #filterContainer.locked .header-card button,
 #filterContainer.locked .sub-header-card button,
 #filterContainer.locked .filter-row-col1 label,
+#filterContainer.locked .filter-row-col1 .checkboxWrapper,
 #filterContainer.locked .filter-row-col2,
 #filterContainer.locked .slider-container,
 #filterContainer.locked input[type="number"],
@@ -2643,6 +3060,12 @@ h5 {
     opacity: 0.5;
     pointer-events: none !important;
     cursor: not-allowed !important;
+}
+
+/* Folding a group and switching Node/Edge read, not filter: they stay live. */
+#filterContainer.locked :is(.filter-group-chevron, .filter-scope) {
+    pointer-events: auto !important;
+    cursor: pointer;
 }
 
 /* Keep range inputs invisible when locked to prevent browser default disabled styling from showing */
@@ -2991,22 +3414,6 @@ hr {
     border-radius: 3px;
 }
 
-.small-btn {
-    width: 18px;
-    height: 18px;
-    text-align: center;
-    line-height: 16px;
-    font-size: 13px;
-    border: 1px solid var(--border-strong);
-    border-radius: 3px;
-    cursor: pointer;
-    padding: 0;
-    transition: box-shadow 0.2s ease-in-out;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
 .data-source-label {
     font-size: 0.7em;
     color: var(--text-faint);
@@ -3037,26 +3444,6 @@ hr {
     color: var(--accent-text);
 }
 
-.toggle-section-btn {
-    background: var(--surface-3);
-}
-
-.toggle-section-btn:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-.small-btn.red:hover {
-    border: 1px solid var(--brand-border) !important;
-}
-
-.extra-small {
-    width: 14px;
-    height: 14px;
-    line-height: 14px;
-    font-size: 10px;
-}
-
 .mr {
     margin-right: 4px;
 }
@@ -3085,33 +3472,6 @@ hr {
     cursor: not-allowed;
 }
 
-/*************************
- custom checkbox style
- **************************/
-
-.hidden-checkbox {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-    margin: 0;
-    padding: 0;
-    pointer-events: none;
-}
-
-/* A 0x0 transparent input cannot show a ring, but the browser drew one anyway:
-   a black speck floating beside the filter row with no control under it. Hand
-   the ring to the box the user can actually see. */
-.hidden-checkbox:focus-visible {
-    outline: none;
-}
-
-.hidden-checkbox:focus-visible + .checkbox,
-.hidden-checkbox:focus-visible + .custom-checkbox {
-    outline: 2px solid var(--accent-text);
-    outline-offset: 1px;
-}
-
 .checkboxWrapper {
     display: inline-flex;
     align-items: center;
@@ -3129,6 +3489,7 @@ hr {
 .checkboxLabel {
     padding-left: 2px;
     flex-grow: 1;
+    cursor: pointer;
     font-size: 12px;
     /* Long property names wrap (breaking mid-word if unavoidable) so the
        control column never drops below its readable minimum — but clamp at two
@@ -3143,90 +3504,6 @@ hr {
     overflow: hidden;
 }
 
-.checkbox {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    position: relative;
-    text-align: center;
-    line-height: 12px;
-    font-size: 12px;
-    cursor: pointer;
-    font-family: sans-serif;
-    flex-shrink: 0;
-    box-sizing: border-box;
-}
-
-.add-to-query-button {
-    padding: 0;
-    width: 0;
-    height: 14px;
-    font-size: 10px;
-    border: 1px solid var(--brand-border);
-    border-radius: 3px;
-    background: transparent;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-left: 0;
-    box-sizing:border-box;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease-in-out, width 0.2s ease-in-out, margin 0.2s ease-in-out;
-}
-
-.add-to-query-button.show {
-    opacity: 1;
-    pointer-events: auto;
-    width: 14px;
-    margin-left: 1px;
-}
-
-.add-to-query-button.show.tt {
-    display: inline-flex;
-    width: 18px;
-    height: 18px;
-    pointer-events: none;
-}
-
-.add-to-query-button:hover {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 3px;
-}
-
-
-.checkbox-green {
-    color: var(--accent-text);
-    border: 1px solid var(--accent-text);
-    border-radius: 3px;
-}
-
-.checkbox-green:hover {
-    border-color: var(--text);
-}
-
-input:checked + .checkbox-green {
-    color: var(--success-text);
-    border-color: var(--success-text);
-}
-
-input:checked + .checkbox-green::after {
-    color: var(--success-text);
-}
-
-input:checked + .checkbox-red::after {
-    color: var(--accent-text);
-}
-
-input:checked + .checkbox-red::after,
-input:checked + .checkbox-green::after {
-    content: "✔";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
 
 .highlight {
     box-shadow: 0 0 5px #C33D35;
@@ -3234,113 +3511,8 @@ input:checked + .checkbox-green::after {
 }
 
 /*************************
- +/- (add/remove) from selection buttons
- **************************/
-
-.pm-group {
-    display: inline-flex;
-    width: 18px;
-    height: 18px;
-    margin-left: 1px;
-    margin-right: 1px;
-    box-sizing: border-box;
-    border: 0.08em solid var(--border-strong);
-    border-radius: 999px;
-    overflow: hidden;
-    position: relative;
-    background: var(--surface-3);
-    transition: transform 140ms ease, border-color 140ms ease;
-    transform-origin: right center;
-}
-
-.plus-minus-button {
-    flex: 1;
-    height: 100%;
-    padding: 0;
-    margin: 0;
-    border: 0;
-    background: transparent;
-    font-size: 13px;
-    line-height: 18px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 120ms ease, color 120ms ease;
-}
-
-.plus-minus-button + .plus-minus-button {
-    border-left: 1px solid var(--brand-border);
-}
-
-/* Per-row actions sit on every single filter row, so at full strength they
-   out-shout the properties. Quieted by COLOR, not opacity — they are non-text
-   controls owing 3:1, and dimming the token below --border would fail it.
-   .filter-row is display:contents and therefore has no box to hover, so the
-   transition keys off the controls themselves. */
-#filterContainer .filter-row-col3 .pm-group {
-    border-color: var(--border);
-    background: transparent;
-}
-
-#filterContainer .filter-row-col3 .plus-minus-button {
-    color: var(--text-faint);
-}
-
-#filterContainer .filter-row-col3 .pm-group:hover .plus-minus-button,
-#filterContainer .filter-row-col3 .pm-group:focus-within .plus-minus-button {
-    color: var(--text-strong);
-}
-
-/* Transparent at rest is what keeps these quiet; transparent at 2.5x is a
-   control with the group chip and the row behind it showing through its
-   middle. Opaque the moment it grows. */
-#filterContainer .filter-row-col3 .pm-group:hover,
-#filterContainer .filter-row-col3 .pm-group:focus-within {
-    background: var(--surface-3);
-}
-
-.pm-group:hover,
-.pm-group:focus-within {
-    border-color: var(--accent-text);
-    transform: scale(2.5);
-    z-index: 99;
-}
-
-.pm-group:hover .plus-minus-button + .plus-minus-button {
-    border-left-color: var(--accent-text);
-}
-
-.plus-minus-button:hover {
-    background: #C33D35;
-    color: #fff;
-    cursor: pointer;
-}
-
-/*************************
  style button and row
  **************************/
-
-.style-inner-button {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 18px;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 18px;
-    font-size: 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: 3px;
-    cursor: pointer;
-    transition: border 0.2s ease-in-out, color 0.2s ease-in-out, opacity 0.1s ease-in-out;
-}
-
-.style-inner-button:hover {
-    color: var(--accent-text);
-    border: 1px solid var(--accent-text);
-}
 
 .style-color-button-container {
     display: flex;
@@ -3351,13 +3523,6 @@ input:checked + .checkbox-green::after {
 .style-color-button {
     padding-left: 5px;
     padding-right: 5px;
-}
-
-.style-color-gradient-button {
-    background: linear-gradient(to right, #403C53, #C33D35, #8CA6D9, #EFB0AA, #FFFFFF);
-    width: 24px;
-    height: 18px;
-    color: transparent;
 }
 
 .style-input {
@@ -3517,7 +3682,7 @@ input:checked + .checkbox-green::after {
     left: 0;
     height: 8px;
     border-radius: 14px;
-    background-color: #403C53;
+    background-color: var(--brand-text);
 }
 
 [slider] > div > [thumb] {
@@ -3530,9 +3695,19 @@ input:checked + .checkbox-green::after {
     margin-left: -9px;
     cursor: pointer;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-    background-color: var(--surface-3);
+    background-color: var(--input-bg);
+    border: 2px solid var(--brand-text);
+    box-sizing: border-box;
     border-radius: 50%;
     outline: none;
+}
+
+/* The native handles are invisible (opacity 0) over the painted thumbs, so the
+   focus ring goes on the thumb each one drives. */
+[slider]:has(> input[type=range]:first-of-type:focus-visible) > div > [thumb]:first-of-type,
+[slider]:has(> input[type=range]:last-of-type:focus-visible) > div > [thumb]:last-of-type {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
 }
 
 [slider] > input[type=range] {
@@ -3619,91 +3794,49 @@ div[slider] > input[type=range]::-ms-tooltip {
  adapted from https://www.w3schools.com/howto/howto_css_switch.asp
  **************************/
 
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 30px;
-    height: 16px;
-}
-
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--border);
-    -webkit-transition: .2s;
-    transition: .2s;
-}
-
-.slider:before {
-    position: absolute;
-    content: "";
-    height: 12px;
-    width: 12px;
-    left: 2px;
-    bottom: 2px;
-    background-color: var(--input-bg);
-    -webkit-transition: .2s;
-    transition: .2s;
-}
-
-input:checked + .slider {
-    background-color: #403C53;
-}
-
-input:focus + .slider {
-    box-shadow: 0 0 1px #403C53;
-}
-
-input:checked + .slider:before {
-    -webkit-transform: translateX(14px);
-    -ms-transform: translateX(14px);
-    transform: translateX(14px);
-}
-
-.slider.round {
-    border-radius: 16px;
-}
-
-.slider.round:before {
-    border-radius: 50%;
-}
-
 /*************************
  Bubble group controls
  **************************/
 
-/* The per-filter-row group control. 18px is what filter-row-col3 allows, so it
-   shows ONE colour plus a ring meaning "and others" — N colours are not legible
-   at this size and a conic pie would rebuild the 2x2 quadrant wedges this
-   replaced. The tooltip and the menu carry the exact membership.
-   ponytail: 18px misses WCAG 2.5.8's 24px target — the same app-wide issue the
-   rail's icon buttons have; fix globally, not here. */
+/* The per-filter-row group control: ONE colour plus a ring meaning "and
+   others" — N colours are not legible at this size and a conic pie would
+   rebuild the 2x2 quadrant wedges this replaced. The tooltip and the menu carry
+   the exact membership. 14px painted inside a 24px target (WCAG 2.5.8): the
+   transparent border is the hit area. Unassigned, it is hidden until the row is
+   hovered or the dot itself is focused or open — still tabbable, so the
+   keyboard reaches it, and the row's "⋯" menu offers "Add to group…" too. */
 .group-chip {
-    width: 18px;
-    height: 18px;
-    flex: 0 0 18px;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
     padding: 0;
     border-radius: 50%;
-    border: 1.5px dashed var(--text-faint);
-    background: transparent;
+    border: 5px solid transparent;
+    background: content-box transparent;
+    box-shadow: inset 0 0 0 1.5px var(--text-faint);
     cursor: pointer;
     display: inline-flex;
     vertical-align: middle;
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    box-sizing: border-box;
+    transition: opacity 0.12s ease;
 }
 
-.group-chip:hover {
-    transform: scale(1.15);
+.group-chip:not(.assigned) {
+    opacity: 0;
+}
+
+.filter-row:hover .group-chip,
+.group-chip:focus-visible,
+.group-chip[aria-expanded="true"] {
+    opacity: 1;
+}
+
+/* No hover to reveal it on touch: an invisible tap target beside ⋯ only
+   catches near misses. "Add to group…" in the ⋯ menu covers it. */
+@media (hover: none) {
+    .group-chip:not(.assigned) {
+        visibility: hidden;
+    }
 }
 
 .group-chip:focus-visible {
@@ -3713,10 +3846,8 @@ input:checked + .slider:before {
 
 /* A miniature of the bubble: the group's fill inside its stroke colour. */
 .group-chip.assigned {
-    border-style: solid;
-    border-width: 2px;
-    border-color: var(--chip-border, var(--chip-color));
-    background: var(--chip-color);
+    background: content-box var(--chip-color);
+    box-shadow: inset 0 0 0 2px var(--chip-border, var(--chip-color));
 }
 
 /* In several groups: an inset ring reads as "there is more here" without
@@ -3724,10 +3855,10 @@ input:checked + .slider:before {
    takes the panel's own background — `--surface-1` was never defined in either
    theme, which made the shadow compute to `none` and the state invisible. */
 .group-chip.multi {
-    box-shadow: inset 0 0 0 2px var(--input-bg);
+    box-shadow: inset 0 0 0 2px var(--chip-border, var(--chip-color)), inset 0 0 0 4px var(--input-bg);
 }
 
-#filterContainer.locked .group-chip {
+#filterContainer.locked .group-chip.assigned {
     pointer-events: none;
     opacity: 0.4;
 }
@@ -3874,25 +4005,6 @@ input:checked + .slider:before {
     border-color: var(--danger-text);
 }
 
-.group-row-more {
-    flex: 0 0 auto;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: none;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 14px;
-    line-height: 1;
-    cursor: pointer;
-}
-
-.group-row-more:hover {
-    background: var(--surface-3);
-    color: var(--text-strong);
-}
-
 /* The line the old UI never showed: a group can be fed by a live filter AND a
    hand-picked node set at the same time. Two parts, so "follows a filter" and
    "someone put these here" do not run together into one cryptic string. */
@@ -3947,150 +4059,225 @@ input:checked + .slider:before {
     color: var(--text-muted);
 }
 
-/*************************
- dropdown checklist
- **************************/
-
+/* --------------------------------------------------------------------------
+   Filter rows (Filters tab). Same control vocabulary as the appearance editor:
+   24px fields with a --text-faint border, native checkboxes, 6px radius, and
+   the row's verbs behind one "⋯" button (ui_components.js createRowActions).
+   -------------------------------------------------------------------------- */
 .dropdown-check-list {
-    display: inline-block;
+    display: block;
+    min-width: 0;
 }
 
-.dropdown-check-list:focus-visible,
-.dropdown-check-list *:focus-visible {
-    outline: none;
-    box-shadow: none;
-}
-
-.dropdown-check-list .anchor {
-    position: relative;
-    cursor: pointer;
-    display: inline-block;
-    /*padding: 5px 5px 5px 10px;*/
-    border: 1px solid var(--border);
-    width: 100%;
-    height: 16px;
-    line-height: 16px;
-    padding: 0 20px 0 4px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    margin: 0;
-    box-sizing: border-box;
-}
-
-.dropdown-check-list .anchor:after {
-    position: absolute;
-    content: "";
-    border-left: 2px solid var(--border-strong);
-    border-top: 2px solid var(--border-strong);
-    padding: 2px;
-    right: 5px;
-    top: 25%;
-    transform: rotate(-135deg);
-}
-
-.dropdown-check-list ul.items {
-    position: fixed;
-    /* Include padding+border in the height so the JS max-height cap (which uses
-       the available space) matches the rendered box and the panel never spills
-       over the anchor when a huge list opens upward. */
-    box-sizing: border-box;
-    padding: 2px;
-    display: none;
-    margin: 0 0 0 3px;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    border-top: none;
-    background-color: var(--input-bg);
-    z-index: var(--z-menu);
-    width: auto;
-    list-style: none;
-    text-align: left;
-    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.5)
-
-}
-
-.dropdown-check-list ul.items li {
-    padding: 3px 5px 3px 5px;
-    font-size: 14px;
-}
-
-.dropdown-check-list ul.items li label {
-    position: relative;
+.filter-cat-trigger {
     display: flex;
     align-items: center;
+    gap: 6px;
+    width: 100%;
+    height: 24px;
+    box-sizing: border-box;
+    padding: 0 6px 0 8px;
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
     cursor: pointer;
 }
 
-.dropdown-check-list ul.items li input[type="checkbox"] {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-    margin: 0;
-    padding: 0;
-    pointer-events: none;
+.filter-cat-trigger:hover {
+    border-color: var(--text-muted);
 }
 
-.custom-checkbox {
-    display: inline-block;
+.filter-cat-trigger[aria-expanded="true"] {
+    border-color: var(--accent-text);
+    box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+/* Narrowed reads in the accent, so a filter that removes values is visible
+   from across the panel without opening it. */
+.filter-cat-trigger.narrowed .filter-cat-summary {
+    color: var(--accent-text);
+    font-weight: 600;
+}
+
+.filter-cat-summary {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.filter-cat-total,
+.filter-cat-count {
+    color: var(--text-muted);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.filter-cat-chevron {
+    color: var(--text-muted);
+    line-height: 1;
+}
+
+.rail-menu.filter-cat-menu {
+    min-width: 200px;
+    max-width: 320px;
+    gap: 0;
+    font-size: 12px;
+}
+
+.filter-cat-search {
+    height: 24px;
+    box-sizing: border-box;
+    margin-bottom: 4px;
+    padding: 0 8px;
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+}
+
+.filter-cat-item {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 2px;
+    min-height: 24px;
+    padding: 0 6px 0 2px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.filter-cat-item:hover {
+    background: var(--surface-3);
+}
+
+.filter-cat-item[hidden] {
+    display: none;
+}
+
+.filter-cat-item input {
     width: 14px;
     height: 14px;
-    flex-shrink: 0;
-    margin-right: 10px;
-    border: 1px solid var(--accent-text);
-    border-radius: 3px;
-    background-color: var(--input-bg);
-    vertical-align: middle;
-    cursor: pointer;
-    transition: background-color 0.3s ease, border-color 0.3s ease;
+    margin: 0 4px;
 }
 
-.custom-checkbox.checked {
-    background-color: #C33D35;
-    color: white;
-    position: relative;
+.filter-cat-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.custom-checkbox.checked::after {
-    content: "✔";
-    font-size: 14px;
-    color: white;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+.filter-cat-item {
+    /* A fixed "Only" column, so every count lines up with All's. */
+    grid-template-columns: 22px minmax(0, 1fr) auto 44px;
 }
 
-.custom-checkbox:hover {
-    border-color: #A02929;
-    background-color: #FFE5E5;
-}
-
-.dropdown-check-list.visible .items {
-    display: block;
-}
-
-.dropdown-check-list.visible .anchor {
-    color: var(--accent-text);
-}
-
-.dropdown-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    padding: 5px;
-    background-color: var(--surface);
-    border-bottom: 1px solid var(--border);
-}
-
-.dropdown-buttons.button {
-    font-size: 12px;
-    padding: 4px 8px;
+/* "Only": shown on hover and keyboard focus, always on touch. */
+.filter-cat-only {
+    visibility: hidden;
+    justify-self: end;
+    width: 40px;
+    height: 20px;
+    padding: 0;
     border: 1px solid var(--border);
-    border-radius: 3px;
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 11px;
     cursor: pointer;
-    background-color: var(--input-bg);
-    transition: background-color 0.3s ease;
+}
+
+.filter-cat-item:hover .filter-cat-only,
+.filter-cat-item:focus-within .filter-cat-only {
+    visibility: visible;
+}
+
+@media (hover: none) {
+    .filter-cat-only {
+        visibility: visible;
+    }
+}
+
+.filter-cat-status {
+    padding: 0 6px 2px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.filter-cat-status:empty {
+    padding: 0;
+}
+
+.filter-cat-all {
+    margin-bottom: 2px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--border-soft);
+    border-radius: 4px 4px 0 0;
+    font-weight: 600;
+}
+
+.filter-row-check,
+.filter-section-check,
+.filter-strict-checkbox input {
+    width: 16px;
+    height: 16px;
+    margin: 4px;
+    cursor: pointer;
+}
+
+.filter-row-col3 {
+    gap: 0;
+}
+
+.filter-row-spacer {
+    width: 24px;
+    flex: 0 0 24px;
+}
+
+.filter-row-more,
+.group-row-more,
+.filter-section-reset {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-grid;
+    place-items: center;
+}
+
+.filter-row-more:hover,
+.filter-row-more[aria-expanded="true"],
+.group-row-more:hover,
+.group-row-more[aria-expanded="true"],
+.filter-section-reset:hover {
+    border-color: var(--border);
+    background: var(--surface-3);
+    color: var(--text);
+}
+
+/* Inverted ("keep values outside the range"): the kept ends take the accent. */
+[slider].inverted > div > [inverse-left],
+[slider].inverted > div > [inverse-right] {
+    background-color: var(--accent-text);
 }
 
 /*************************
@@ -4823,7 +5010,6 @@ input:checked + .slider:before {
     background: var(--input-bg);
 }
 
-.panel-header-center-buttons .data-buttons,
 .panel-header-center-buttons .query-buttons {
     display: flex;
     flex-direction: row;
@@ -4833,7 +5019,6 @@ input:checked + .slider:before {
     justify-content: center;
 }
 
-.panel-header-center-buttons .data-buttons button,
 .panel-header-center-buttons .query-buttons button {
     height: 24px;
     cursor: pointer;
@@ -4851,20 +5036,17 @@ input:checked + .slider:before {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-.panel-header-center-buttons .data-buttons button:hover,
 .panel-header-center-buttons .query-buttons button:hover {
     border-color: rgba(255, 255, 255, 0.6);
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.panel-header-center-buttons .data-buttons button:active,
 .panel-header-center-buttons .query-buttons button:active {
     transform: translateY(0);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-.panel-header-center-buttons .data-buttons button:disabled,
 .panel-header-center-buttons .query-buttons button:disabled {
     background-color: #2a2733;
     cursor: not-allowed;
@@ -4874,351 +5056,522 @@ input:checked + .slider:before {
     transform: none;
 }
 
-.panel-header-center-buttons .data-buttons button.red,
 .panel-header-center-buttons .query-buttons button.red {
     background-color: #C33D35 !important;
     color: white !important;
 }
 
-.panel-header-center-buttons .data-buttons button.red:hover,
 .panel-header-center-buttons .query-buttons button.red:hover {
     border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
-.panel-header-center-buttons .data-buttons button.pink,
 .panel-header-center-buttons .query-buttons button.pink {
     background-color: #EFB0AA !important;
     color: black !important;
 }
 
-.panel-header-center-buttons .data-buttons button.pink:hover,
 .panel-header-center-buttons .query-buttons button.pink:hover {
     border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
-.panel-header-center-buttons .data-buttons button.blue,
 .panel-header-center-buttons .query-buttons button.blue {
     background-color: #8CA6D9 !important;
     color: black !important;
 }
 
-.panel-header-center-buttons .data-buttons button.blue:hover,
 .panel-header-center-buttons .query-buttons button.blue:hover {
     border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
-.panel-header-center-buttons .data-buttons button.grey,
 .panel-header-center-buttons .query-buttons button.grey {
     background-color: #9998AF !important;
     color: black !important;
 }
 
-.panel-header-center-buttons .data-buttons button.grey:hover,
 .panel-header-center-buttons .query-buttons button.grey:hover {
     border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
-.panel-header-center-buttons .data-buttons button.green,
 .panel-header-center-buttons .query-buttons button.green {
     background-color: #015C0C !important;
     color: white !important;
 }
 
-.panel-header-center-buttons .data-buttons button.green:hover,
 .panel-header-center-buttons .query-buttons button.green:hover {
     border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
-.panel-header-center-buttons .data-buttons button.purple,
 .panel-header-center-buttons .query-buttons button.purple {
     background-color: #015C0C !important;
     color: white !important;
 }
 
-.panel-header-center-buttons .data-buttons button.purple:hover,
 .panel-header-center-buttons .query-buttons button.purple:hover {
     border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
+/* ==========================================================================
+   Data editor (Workbench › Data). Toolbar: Rows | Type switches, filter, count,
+   then + Add / Import / Export at the right. The table is an APG grid: one Tab
+   stop, the active cell ringed. Staged changes are marked per kind (edited
+   cell, added row, deleted row) and counted in the bar under the table, which
+   exists only while something is staged.
+   ========================================================================== */
 #dataTableContainer {
     height: 100%;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--border);
     background: var(--input-bg);
     overflow: hidden;
 }
 
-.data-table-warning-banner {
-    background: #fff3cd;
-    border-bottom: 2px solid #ffc107;
-    padding: 8px 12px;
-    font-size: 12px;
-    color: #856404;
-    text-align: center;
+.data-toolbar,
+.data-changes {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 6px 8px;
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    position: relative;
-}
-
-.data-table-warning-close {
-    background: none;
-    border: none;
-    font-size: 20px;
-    font-weight: bold;
-    color: #856404;
-    cursor: pointer;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-    position: absolute;
-    right: 8px;
-}
-
-.data-table-warning-close:hover {
-    background: rgba(133, 100, 4, 0.1);
-    color: #664d03;
-}
-
-.data-table-wrapper {
-    flex: 1;
-    overflow: auto;
-}
-
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: Arial, sans-serif;
     font-size: 12px;
 }
 
-.data-table th {
-    background-color: var(--surface-3);
-    border: 1px solid var(--border);
-    padding: 2px 4px;
-    text-align: left;
-    font-weight: bold;
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    vertical-align: top;
-    cursor: pointer;
+.data-toolbar {
+    border-bottom: 1px solid var(--border-soft);
 }
 
-.data-table td {
-    border: 1px solid var(--border);
-    padding: 4px 8px;
-    min-width: 80px;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.data-gap {
+    flex: 1;
+}
+
+.data-toolbar .insp-btn,
+.data-changes .insp-btn,
+.data-add-form .insp-btn,
+.data-empty .insp-btn,
+.data-review .insp-btn {
+    height: 24px;
+    box-sizing: border-box;
+}
+
+.data-seg-count {
+    margin-left: 1px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.prop-seg > button[aria-pressed="true"] .data-seg-count {
+    color: inherit;
+}
+
+.data-filter {
+    height: 24px;
+    box-sizing: border-box;
+    width: 200px;
+    max-width: 100%;
+    padding: 0 8px;
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+}
+
+.data-count {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-.data-table td:focus {
-    outline: 2px solid var(--brand-border);
-    background-color: var(--surface-3);
+/* The one filled button per surface: the action the surface exists for. */
+.insp-btn.primary {
+    background: var(--brand-border);
+    border-color: var(--brand-border);
+    color: #fff;
+    font-weight: 600;
 }
 
-.data-table td.editing {
-    background-color: #fff9c4;
-    border: 2px solid var(--brand-border);
-    white-space: normal;
-    text-overflow: clip;
-    overflow: visible;
-    word-wrap: break-word;
+.insp-btn.primary:hover {
+    border-color: var(--accent-text);
+    color: #fff;
 }
 
-.data-table tr:nth-child(even) {
-    background-color: var(--surface);
+.insp-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: var(--border-soft);
+    color: var(--text-strong);
 }
 
-.data-table tr:hover {
-    background-color: var(--row-hover);
+/* A blocked primary drops its fill rather than fading it: faded white on the
+   brand slate was unreadable. */
+.insp-btn.primary:disabled,
+.insp-btn.primary[aria-disabled="true"] {
+    opacity: 1;
+    background: var(--surface-3);
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+    font-weight: 400;
 }
 
-.data-table input {
+.data-table-wrapper {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    /* The sticky group + header rows (20px + 26px): a focused cell scrolled
+       into view lands below them, not under them. */
+    scroll-padding-top: 46px;
+}
+
+.data-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    font-size: 12px;
+}
+
+.data-table th,
+.data-table td {
+    height: 26px;
+    box-sizing: border-box;
+    max-width: 240px;
+    padding: 0 8px;
+    border-right: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    background: var(--input-bg);
+}
+
+.data-table thead th {
+    position: sticky;
+    z-index: 2;
+    background: var(--surface);
+    color: var(--text-strong);
+    font-weight: 600;
+}
+
+.data-group-row th {
+    top: 0;
+    height: 20px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.data-head-row th {
+    top: 20px;
+    border-bottom-color: var(--border);
+}
+
+.data-sort {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     width: 100%;
-    border: none;
-    padding: 2px;
-    font-family: inherit;
-    font-size: inherit;
-    background: transparent;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
 }
 
-.data-table input:focus {
-    outline: none;
+/* Only the sorted column shows its arrow; the others on hover or focus. */
+.data-sort-arrow {
+    visibility: hidden;
+    color: var(--text-faint);
+    font-size: 10px;
+}
+
+.data-head-row th:hover .data-sort-arrow,
+.data-sort:focus .data-sort-arrow {
+    visibility: visible;
+}
+
+.data-head-row th[aria-sort] .data-sort-arrow {
+    visibility: visible;
+    color: var(--accent-text);
+}
+
+/* Row actions and ID stay put while the property columns scroll. */
+.data-table .data-act {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 32px;
+    min-width: 32px;
+    max-width: 32px;
+    padding: 0 3px;
+    text-align: center;
+}
+
+.data-table .data-id {
+    position: sticky;
+    left: 32px;
+    /* Room for an ID plus its New / Deleted pill, so staging a row does not
+       push every column sideways. */
+    min-width: 140px;
+    z-index: 1;
+    box-shadow: inset -1px 0 0 var(--border);
+}
+
+.data-table thead .data-act,
+.data-table thead .data-id {
+    z-index: 3;
+}
+
+.data-row-btn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.data-row-btn:hover,
+.data-row-btn[aria-expanded="true"] {
+    border-color: var(--border);
+    background: var(--surface-3);
+    color: var(--text);
 }
 
 .data-table td.readonly {
-  background-color: var(--surface);
-  color: var(--text-muted);
-  cursor: not-allowed;
+    color: var(--text-muted);
 }
 
-.data-table td.readonly:hover {
-  background-color: var(--surface);
+/* Staged rows and cells keep their wash under the pointer. */
+.data-table tbody tr:not(.data-row-added, .data-row-deleted):hover td:not(.data-cell-edited, .editing) {
+    background: var(--row-hover);
 }
 
-
-.data-table-sortable-header {
-  display: block;
-  cursor: pointer;
-  user-select: none;
-  min-height: 24px;
-  position: relative;
-  padding-right: 20px;
+/* The active cell. :focus, not :focus-visible: a clicked cell is the cell the
+   next key acts on, so it has to show for the mouse too. */
+.data-table td:focus,
+.data-table th:focus,
+.data-table .data-sort:focus,
+.data-table .data-row-btn:focus {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
 }
 
-.data-table-sortable-header:hover {
-  background-color: var(--surface-3);
+.data-table td.editing {
+    max-width: none;
+    overflow: visible;
+    white-space: pre-wrap;
+    background: var(--input-bg);
+    cursor: text;
+    box-shadow: inset 0 0 0 1px var(--accent-text);
 }
 
-.data-table-header-text {
-  width: 100%;
-  display: block;
+.data-table td.data-cell-edited {
+    background: var(--edited-wash);
+    box-shadow: inset 2px 0 0 var(--edited-line);
 }
 
-.data-table-header-group-badge {
-  background-color: #403c53;
-  border: 1px solid var(--border-strong);
-  border-radius: 5px;
-  color: white;
-  padding: 2px 6px;
-  font-size: 10px;
-  font-weight: bold;
-  white-space: nowrap;
-  display: inline-block;
-  margin-right: 0;
-  margin-top: 1px;
-  margin-bottom: 2px;
-  line-height: 1.2;
+.data-table .data-row-added td {
+    background: var(--added-wash);
 }
 
-.data-table-header-property {
-  display: inline-block;
-  font-size: 12px;
-  margin-top: 1px;
-  line-height: 1.3;
+.data-table .data-row-added td.data-act {
+    box-shadow: inset 3px 0 0 var(--added-line);
 }
 
-.data-table-header-property.size-xs {
-  font-size: 9px;
+.data-table .data-row-deleted td {
+    background: var(--deleted-wash);
+    color: var(--text-muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--deleted-line);
 }
 
-.data-table-header-property.size-s {
-  font-size: 10px;
+.data-table .data-row-deleted td.data-act {
+    box-shadow: inset 3px 0 0 var(--deleted-line);
+    text-decoration: none;
 }
 
-.data-table-header-property.size-m {
-  font-size: 11px;
+/* Colour is never the only signal: the ID cell says New / Deleted in words. */
+.data-pill {
+    display: inline-block;
+    margin-left: 2px;
+    padding: 0 5px;
+    border: 1px solid currentColor;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 14px;
+    vertical-align: 1px;
 }
 
-.data-table-header-property.size-l {
-  font-size: 12px;
+.data-pill.added {
+    color: var(--added-line);
 }
 
-.data-table-sort-indicator {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  font-size: 10px;
-  color: var(--brand-text);
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(64, 60, 83, 0.1);
-  border: 1px solid var(--brand-border);
-  border-radius: 3px;
-  font-weight: bold;
-  transition: all 0.2s ease;
+.data-pill.deleted {
+    color: var(--deleted-line);
 }
 
-.data-table-sortable-header:hover .data-table-sort-indicator {
-  background: rgba(64, 60, 83, 0.2);
-  border-color: var(--brand-border);
-}
-
-.data-table th:hover {
-  background-color: var(--surface-3);
-}
-
-.data-table th.data-table-delete-row-column {
-  cursor: default;
-}
-
-
-.data-table-delete-row-column {
-    width: 20px !important;
-    min-width: 20px !important;
-    max-width: 20px !important;
+.data-empty {
+    padding: 32px 16px;
+    color: var(--text-muted);
+    font-size: 13px;
     text-align: center;
-    padding: 2px !important;
 }
 
-.data-table-delete-row-btn {
-    background-color: #C33D35;
-    color: white;
-    border: none;
-    border-radius: 3px;
-    width: 18px;
-    height: 18px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    display: flex;
+.data-empty p {
+    margin: 0 0 10px;
+}
+
+.data-changes {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.data-changes[hidden] {
+    display: none;
+}
+
+.data-changes-count {
+    font-weight: 600;
+}
+
+.data-changes-meta {
+    color: var(--text-muted);
+}
+
+.data-changes-meta.problem {
+    color: var(--danger-text);
+}
+
+/* The + Add forms and the review list live in RailMenus. */
+.data-add-form {
+    width: 260px;
+    padding: 4px 6px;
+    font-size: 12px;
+}
+
+.data-add-form h4 {
+    margin: 0 0 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.data-form-row {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 4px 8px;
     align-items: center;
-    justify-content: center;
-    line-height: 1;
+    margin-bottom: 6px;
 }
 
-.data-table-delete-row-btn:hover {
-    background-color: #ff0000;
+.data-form-row > label,
+.data-form-row > span {
+    color: var(--text-muted);
 }
 
-.data-table-delete-row-btn.tt {
-    display: inline-flex;
+.data-form-row input {
+    height: 24px;
+    box-sizing: border-box;
+    min-width: 0;
+    padding: 0 8px;
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
 }
 
-.data-table-tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 2px solid var(--border);
-  flex-shrink: 0;
-  overflow-x: auto;
-  background: var(--input-bg);
+.data-form-row input[readonly] {
+    background: var(--surface);
+    color: var(--text-muted);
 }
 
-.data-table-tab {
-  padding: 8px 16px;
-  background: var(--surface);
-  border: none;
-  border-top: 2px solid transparent;
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s ease;
+.data-form-row input[aria-invalid="true"] {
+    border-color: var(--danger-text);
 }
 
-.data-table-tab:hover {
-  background: var(--surface-3);
+.data-form-error {
+    grid-column: 2;
+    color: var(--danger-text);
+    font-size: 11px;
 }
 
-.data-table-tab.active {
-  background: var(--input-bg);
-  border-top-color: #4CAF50;
-  font-weight: bold;
+.data-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.data-review {
+    width: 320px;
+    max-height: 300px;
+    overflow: auto;
+}
+
+.data-review h4 {
+    margin: 2px 4px 4px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.data-review-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 8px;
+    align-items: center;
+    padding: 6px 4px;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 12px;
+}
+
+.data-review-item:last-child {
+    border-bottom: 0;
+}
+
+.data-review-what {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.data-review-detail {
+    grid-column: 1 / -1;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.data-review-detail del {
+    color: var(--deleted-line);
+}
+
+.data-review-detail ins {
+    color: var(--added-line);
+    text-decoration: none;
+}
+
+.data-review-empty {
+    padding: 8px;
+    color: var(--text-muted);
+}
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 /*************************

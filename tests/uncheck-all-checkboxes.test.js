@@ -15,10 +15,9 @@ const PROPS = ['Node filters::G::A', 'Node filters::G::B'];
 function mount(cache) {
   document.body.innerHTML = PROPS.map(
     (id) => `
-      <label id="filter-${id}-checkbox-wrapper">
+      <span id="filter-${id}-checkbox-wrapper">
         <input type="checkbox" id="filter-${id}-checkbox" checked>
-        <span id="filter-${id}-checkbox-inner">✔</span>
-      </label>`,
+      </span>`,
   ).join('');
   return new UIManager(cache);
 }
@@ -47,7 +46,6 @@ describe('UIManager.uncheckAllCheckboxes', () => {
 
     for (const id of PROPS) {
       expect(document.getElementById(`filter-${id}-checkbox`).checked).toBe(false);
-      expect(document.getElementById(`filter-${id}-checkbox-inner`).textContent).toBe('');
       expect(cache.data.layouts.Default.filters.get(id).active).toBe(false);
     }
     expect(cache.activeProps.size).toBe(0);

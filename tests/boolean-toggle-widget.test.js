@@ -129,12 +129,12 @@ describe('BooleanToggle in the shared filter surfaces', () => {
     const ui = new UIComponentManager(cache);
 
     // Any: both leaves, matching what the query generator emits.
-    ui.createAddToQueryButton(PROP).click();
+    ui.addToQuery(PROP);
     expect(cache.data.layouts.L.query).toBe(`((${PROP} IS TRUE) OR (${PROP} IS FALSE))`);
 
     delete cache.data.layouts.L.query;
     await toggle.handleSelection('false');
-    ui.createAddToQueryButton(PROP).click();
+    ui.addToQuery(PROP);
     expect(cache.data.layouts.L.query).toBe(`(${PROP} IS FALSE)`);
     expect(cache.data.layouts.L.query).not.toContain('undefined');
   });
