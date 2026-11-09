@@ -274,6 +274,8 @@ export async function prepareGold(gold) {
 // the harness swaps in a recording fetch around each item to capture raw
 // output, token counts and server timings without touching the client.
 // ponytail: global swap, safe only because items run strictly sequentially.
+const DEGENERATE_GENERATION = /token repeat limit reached/
+
 async function withRecordedCalls(fetchImpl, fn) {
   const calls = []
   const original = globalThis.fetch
@@ -290,7 +292,11 @@ async function withRecordedCalls(fetchImpl, fn) {
     }
     call.status = res.status
     if (!res.ok) {
-      call.transportError = `HTTP ${res.status}: ${await res.clone().text().catch(() => '')}`
+      const text = await res.clone().text().catch(() => '')
+      // Ollama aborts a looping generation with a 500. That is the model's
+      // answer (the panel shows an error), not an outage, so it gets scored.
+      if (res.status === 500 && DEGENERATE_GENERATION.test(text)) call.degenerate = true
+      else call.transportError = `HTTP ${res.status}: ${text}`
       return res
     }
     const data = await res.clone().json().catch(() => null)
@@ -335,6 +341,7 @@ async function runItem({client, item, g, fetchImpl}) {
     latencyMs,
     calls: calls.length,
     repairUsed: calls.some((c) => c.repair),
+    degenerateCalls: calls.filter((c) => c.degenerate).length,
     // First reply only: did the constrained decoder alone produce a reply
     // that conforms to the schema it was given?
     schemaValid: analyses[0] ? analyses[0].schemaViolation === null : false,

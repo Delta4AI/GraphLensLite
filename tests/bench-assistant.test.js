@@ -108,6 +108,23 @@ describe('assistant query benchmark', () => {
     expect(md).toContain('| stub-model | two_clause | 1 | 100.0 |');
   });
 
+  it('scores a looping reply Ollama aborts as no query instead of failing the model', async () => {
+    const prepared = await prepareGold({
+      graphs: { airports: { file: AIRPORTS } },
+      items: [{ id: 'loop', graph: 'airports', tier: 'categorical', question: 'Airports in Africa.', gold: `(${REGION} IN [Africa])` }],
+    });
+    const loopingFetch = () => Promise.resolve(new Response(
+      JSON.stringify({ error: 'prediction aborted, token repeat limit reached' }), { status: 500 },
+    ));
+
+    const { results, failedModels } = await runBenchmark({
+      prepared, models: ['stub-model'], endpoint: 'http://stub', fetchImpl: loopingFetch,
+    });
+    expect(failedModels).toEqual({});
+    // The generator's one-shot retry also loops: two aborted calls, no query.
+    expect(results[0]).toMatchObject({ abstained: true, exact: false, jaccard: 0, degenerateCalls: 2 });
+  });
+
   it('every gold query parses and selects a non-empty set', async () => {
     const { items } = await prepareGold(loadGold());
     expect(items.length).toBeGreaterThanOrEqual(50);
