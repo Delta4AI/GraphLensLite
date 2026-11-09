@@ -15,6 +15,8 @@ const MIN_HEIGHT_PX = 120;
 const KEYBOARD_RESIZE_STEP_PX = 24;
 const KEYBOARD_RESIZE_COARSE = 4; // Shift+arrow, for crossing the stage quickly
 const DEFAULT_HEIGHT_FRACTION = 0.35;
+// A phone's toolbars wrap to several lines; at 0.35 a table had room for less than one row.
+const PHONE_HEIGHT_FRACTION = 0.6;
 
 /**
  * Static per-tab wiring. Each `toolbar` lives inside its `pane` (the command
@@ -180,7 +182,7 @@ class Workbench {
   #currentHeight() {
     const stage = this.#stageHeight();
     // ⤢ takes the whole stage; the drag handle is the way to a partial view.
-    return this.expanded ? stage : (this.heights[this.tab] ?? stage * DEFAULT_HEIGHT_FRACTION);
+    return this.expanded ? stage : (this.heights[this.tab] ?? stage * (isPhone() ? PHONE_HEIGHT_FRACTION : DEFAULT_HEIGHT_FRACTION));
   }
 
   #applyHeight() {

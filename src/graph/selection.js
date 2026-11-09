@@ -443,6 +443,8 @@ class GraphSelectionManager {
         this.cache.dataTable.currentTab === 'selectedElements'
       ) {
         this.cache.dataTable.refreshCurrentTab();
+      } else {
+        this.cache.dataTable.syncCounts();
       }
     }
   }
