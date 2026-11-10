@@ -7,7 +7,7 @@
    while everything around it flips, which is what produced this release's
    repeated one-off dark-mode fixes. The exception is a border that traces its
    OWN same-coloured background (`.p-button:hover`, `.p-button-primary`,
-   `.tour-btn-next`, `.panel-header-btn:hover`): the fill is deliberately fixed,
+   `.panel-header-btn:hover`): the fill is deliberately fixed,
    so a tokenized border would slide off it in dark.
    ========================================================================== */
 :root {
@@ -5789,16 +5789,6 @@ div[slider] > input[type=range]::-ms-tooltip {
    step, where Back/Finish stay right-aligned on their own. */
 .tour-btn-skip {
     margin-right: auto;
-}
-
-.tour-btn-next {
-    background-color: #015C0C;
-    border-color: #015C0C;
-}
-
-.tour-btn-next:hover {
-    background-color: #018a12;
-    border-color: #018a12;
 }
 
 .tour-green {
