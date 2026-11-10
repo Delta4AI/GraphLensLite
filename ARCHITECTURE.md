@@ -162,7 +162,9 @@ Business logic and UI:
 - `data_editor.js` — spreadsheet-like data editor (`DataTable`): Rows/Type switches, row filter, APG grid keyboard, staged changes with a count bar, Excel import/export
 - `data_editor_forms.js` — the data editor's popovers: + Add menu and its node/edge/column forms, the review list of unsaved changes, the row ⋯ menu
 - `demo_loader.js` — STRING DB protein-interaction demo data
-- `neo4j_loader.js` — Neo4j connector (HTTP transactional Cypher API, no driver dependency)
+- `neo4j_loader.js` / `neo4j_cypher.js` / `neo4j_convert.js` — Neo4j connector: import popup and
+  session state; HTTP transactional Cypher transport (no driver dependency) with the row-count
+  preflight; raw entities → app payload, auto-colors and the property census
 - `neo4j_session.js` — Neo4j session extensions: expand selected nodes, merge additional queries
 - `tour.js` — guided tour with a sample dataset
 - `color_scale_picker.js` / `numeric_scale_picker.js` / `pie_chart_picker.js` — styling pickers
