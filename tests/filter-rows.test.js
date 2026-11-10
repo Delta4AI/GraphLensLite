@@ -188,3 +188,16 @@ describe('locked filters', () => {
     expect(frozen.some((el) => el.disabled)).toBe(false);
   });
 });
+
+describe('category share bar', () => {
+  it('sizes a segment per value by its count and marks only the kept ones', () => {
+    const cache = makeCache();
+    cache.data.layouts.L.filters.get(PROP).categories = new Set(['b']);
+    const list = mountList(cache);
+    const segs = [...list.anchor.querySelectorAll('.filter-cat-bar > i')];
+    // "c" has no carriers, so no segment; "a" holds 2 of 3 elements.
+    expect(segs.map((s) => s.dataset.value)).toEqual(['a', 'b']);
+    expect(Number(segs[0].style.flexGrow)).toBeCloseTo(2 / 3);
+    expect(segs.map((s) => s.classList.contains('kept'))).toEqual([false, true]);
+  });
+});

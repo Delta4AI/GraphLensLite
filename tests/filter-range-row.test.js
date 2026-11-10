@@ -303,3 +303,29 @@ describe('numeric filter row', () => {
     }
   });
 });
+
+describe('numeric filter histogram', () => {
+  it('bins the column over the track and tints only the kept range', () => {
+    const cache = createMockCache({ [PROP]: { lowerThreshold: 0, upperThreshold: 24, hasFloatValues: false } });
+    // One element in the first bin, three in the last.
+    cache.nodeRef = new Map([0, 24, 24, 24].map((v, i) => [`n${i}`, { featureValues: new Map([[PROP, v]]) }]));
+    document.body.innerHTML = '<div id="host"></div>';
+    const slider = new InvertibleRangeSlider(PROP, cache);
+    slider.appendTo(document.getElementById('host'));
+    slider.appendListeners();
+    const bars = [...document.querySelectorAll('.filter-hist > i')];
+    expect(bars).toHaveLength(InvertibleRangeSlider.HISTOGRAM_BINS);
+    expect(bars.at(-1).style.height).toBe('100%');
+    expect(parseFloat(bars[0].style.height)).toBeCloseTo(100 / 3);
+    expect(bars[0].style.minHeight).toBe('1px');
+    expect(bars[5].style.height).toBe('0%');
+    expect(bars[5].style.minHeight).toBe('');
+
+    slider.setTo(10, 24, false);
+    expect(bars[0].classList.contains('kept')).toBe(false);
+    expect(bars.at(-1).classList.contains('kept')).toBe(true);
+    slider.setTo(10, 24, true); // inverted keeps the outside
+    expect(bars[0].classList.contains('kept')).toBe(true);
+    expect(bars.at(-1).classList.contains('kept')).toBe(false);
+  });
+});
