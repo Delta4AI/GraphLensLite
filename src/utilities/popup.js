@@ -1,7 +1,7 @@
-// Popups nest: a flow inside one opens Popup.confirm on top of it. Escape has
-// to dismiss the topmost only, which a per-popup document listener cannot know
-// on its own.
-const openPopups = [];
+// A native modal <dialog>: showModal() puts it in the top layer, makes the
+// page behind inert, traps focus and turns Escape into a `cancel` event on the
+// topmost dialog only — so popups nest (a flow inside one opens Popup.confirm
+// on top of it) without any bookkeeping here.
 let dialogSeq = 0;
 
 class Popup {
@@ -38,7 +38,6 @@ class Popup {
     };
 
     this.popup = null;
-    this.overlay = null;
     this.closeBtn = null;
     this.fullscreenBtn = null;
     this.isExpanded = false;
@@ -182,7 +181,6 @@ class Popup {
       this.setupFullscreenButton();
     }
     this.show();
-    openPopups.push(this);
     // Focus the dialog itself, not a control inside it: the static helpers
     // (confirm/prompt) focus their own button or input from a timeout, which
     // runs after this and still wins.
@@ -206,12 +204,8 @@ class Popup {
   }
 
   createPopup(content) {
-    this.popup = document.createElement('div');
+    this.popup = document.createElement('dialog');
     this.popup.className = 'p-custom';
-    // A screen reader has to be told this is a modal dialog; without the role
-    // it reads as one more div and the user never learns focus is trapped in it.
-    this.popup.setAttribute('role', 'dialog');
-    this.popup.setAttribute('aria-modal', 'true');
     // Focusable so the dialog itself can take focus when it has no controls of
     // its own to hand it to.
     this.popup.tabIndex = -1;
@@ -271,10 +265,6 @@ class Popup {
       this.popup.appendChild(footer);
     }
 
-    this.overlay = document.createElement('div');
-    this.overlay.className = 'p-overlay';
-
-    document.body.appendChild(this.overlay);
     document.body.appendChild(this.popup);
 
     this.popup.style.width = this.options.width;
@@ -296,12 +286,11 @@ class Popup {
       height: this.popup.style.height,
       maxWidth: this.popup.style.maxWidth,
       maxHeight: this.popup.style.maxHeight,
+      inset: this.popup.style.inset,
       top: this.popup.style.top,
       left: this.popup.style.left,
-      transform: this.popup.style.transform,
       borderRadius: this.popup.style.borderRadius,
-      margin: this.popup.style.margin,
-      position: this.popup.style.position
+      margin: this.popup.style.margin
     };
   }
 
@@ -356,9 +345,8 @@ class Popup {
     this.popup.style.height = fitH + 'px';
     this.popup.style.maxWidth = '100vw';
     this.popup.style.maxHeight = '100vh';
-    this.popup.style.top = '50%';
-    this.popup.style.left = '50%';
-    this.popup.style.transform = 'translate(-50%, -50%)';
+    this.popup.style.inset = '0';
+    this.popup.style.margin = 'auto';
     this.popup.style.borderRadius = (fitW >= vw || fitH >= vh) ? '0' : '';
   }
 
@@ -382,49 +370,45 @@ class Popup {
     }
   }
 
+  // Centered popups keep the modal dialog's own centering (inset 0, margin
+  // auto). Never a transform: it would make the dialog the containing block of
+  // the fixed-position tooltip that ui_tooltip renders inside it.
   setPosition() {
-    if (!this.isExpanded) {
-      if (this.options.position === 'center') {
-        this.popup.style.top = '50%';
-        this.popup.style.left = '50%';
-        this.popup.style.transform = 'translate(-50%, -50%)';
-      } else {
-        const margin = 8;
-        const y = this.options.position.y;
-        this.popup.style.top = `${y}px`;
-        this.popup.style.left = `${this.options.position.x}px`;
-        this.popup.style.transform = 'none';
-        this.popup.style.maxHeight = (window.innerHeight - y - margin) + 'px';
-      }
+    if (!this.isExpanded && this.options.position !== 'center') {
+      const margin = 8;
+      const y = this.options.position.y;
+      this.popup.style.inset = 'auto';
+      this.popup.style.margin = '0';
+      this.popup.style.top = `${y}px`;
+      this.popup.style.left = `${this.options.position.x}px`;
+      this.popup.style.maxHeight = (window.innerHeight - y - margin) + 'px';
     }
   }
 
   setupCloseHandlers() {
     this.closeBtn.addEventListener('click', () => this.close());
 
+    // A backdrop click targets the dialog element itself; so does a click on
+    // its border, hence the bounds check.
     if (this.options.closeOnClickOutside) {
-      this.overlay.addEventListener('click', () => this.close());
+      this.popup.addEventListener('click', (e) => {
+        if (e.target !== this.popup) return;
+        const r = this.popup.getBoundingClientRect();
+        const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+        if (!inside) this.close();
+      });
     }
 
-    // Escape is the only dismissal a keyboard user can reach without hunting
-    // for the × in the tab order; Tab is what aria-modal="true" promises and
-    // a plain div cannot deliver. Topmost popup only, so a nested confirm does
-    // not take its parent down with it — or steal its parent's Tab.
-    this._escapeHandler = (e) => {
-      if (openPopups[openPopups.length - 1] !== this) return;
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        this.close();
-        return;
-      }
-      if (e.key === 'Tab') trapTab(e, this.popup);
-    };
-    document.addEventListener('keydown', this._escapeHandler, true);
+    // Escape: the browser would only hide the dialog, skipping onClose and the
+    // cleanup below.
+    this.popup.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      this.close();
+    });
   }
 
   show() {
-    this.popup.style.display = 'flex';
-    this.overlay.style.display = 'block';
+    this.popup.showModal();
   }
 
   close() {
@@ -432,53 +416,14 @@ class Popup {
       window.removeEventListener('resize', this._resizeHandler);
       this._resizeHandler = null;
     }
-    if (this._escapeHandler) {
-      document.removeEventListener('keydown', this._escapeHandler, true);
-      this._escapeHandler = null;
-    }
-    const at = openPopups.indexOf(this);
-    if (at !== -1) openPopups.splice(at, 1);
     if (this.options.onClose) {
       this.options.onClose();
     }
+    this.popup.close();
     this.popup.remove();
-    this.overlay.remove();
     // Only if it is still in the document — the popup may have replaced the very
     // control that opened it.
     if (this._invoker?.isConnected) this._invoker.focus?.();
-  }
-}
-
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
-  'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-/**
- * Keep Tab inside the dialog. `aria-modal="true"` tells assistive tech focus
- * is trapped; nothing traps it, so Tab walked straight out into the page
- * behind — which is still there, still clickable, and reads as if the dialog
- * had closed.
- */
-function trapTab(event, dialog) {
-  // `hidden` is how this codebase hides dialog sections (the Neo4j error box,
-  // the checklist's empty groups). Elements hidden by display:none instead are
-  // not focusable anyway, so focus simply stays where it is.
-  const items = [...dialog.querySelectorAll(FOCUSABLE)].filter((el) => !el.closest('[hidden]'));
-  if (items.length === 0) {
-    // Nothing to tab to: hold focus on the dialog rather than let it escape.
-    event.preventDefault();
-    dialog.focus();
-    return;
-  }
-  const first = items[0];
-  const last = items[items.length - 1];
-  const active = document.activeElement;
-  if (event.shiftKey && (active === first || !dialog.contains(active))) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
-    event.preventDefault();
-    first.focus();
   }
 }
 

@@ -4,6 +4,8 @@ import { defineConfig } from 'vitest/config';
 // directives, so no global `environment` is set here — only coverage config.
 export default defineConfig({
   test: {
+    // Stubs the <dialog> methods jsdom lacks (a no-op outside jsdom).
+    setupFiles: ['tests/setup/dialog-shim.js'],
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'html'],

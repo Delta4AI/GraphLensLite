@@ -446,15 +446,7 @@ describe('the palette dialog', () => {
     dom();
     cache = makeCache();
     Element.prototype.scrollIntoView = vi.fn();
-    // jsdom 29 still ships <dialog> without showModal/close, so open/closed
-    // state is stubbed here. Escape, the focus trap and the backdrop come from
-    // the platform and are verified in a real browser, not in this file.
-    HTMLDialogElement.prototype.showModal = function () {
-      this.open = true;
-    };
-    HTMLDialogElement.prototype.close = function () {
-      this.open = false;
-    };
+    // <dialog> open/close state: tests/setup/dialog-shim.js.
     palette = initCommandPalette(cache);
   });
 
