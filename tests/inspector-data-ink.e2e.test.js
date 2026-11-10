@@ -69,9 +69,32 @@ describe.skipIf(!E2E)('data-ink inspector, end to end', () => {
     const widths = await segments.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width));
     expect(Math.min(...widths)).toBeGreaterThanOrEqual(24);
 
-    // Map by data is a column: one header, a button per mappable row.
-    expect(await page.locator('[data-label="Node Configuration"] .prop-map-head').textContent()).toBe('Map');
-    expect(await page.locator('[data-label="Node Configuration"] .prop-row > .prop-map-btn').count()).toBeGreaterThan(4);
+    // Card heads are slate bars, a level above the eyebrow and the folds.
+    const nodesBar = page.locator('[data-label="Node Configuration"] > .card-collapse-bar');
+    expect(await nodesBar.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+
+    // Map by data lives inside its control: a ramp in each number field, the
+    // last swatch of each palette. No column, no header.
+    const nodes = page.locator('[data-label="Node Configuration"]');
+    expect(await nodes.locator('.prop-num-map > .prop-map-btn').count()).toBeGreaterThan(3);
+    expect(await nodes.locator('.style-color-button-container > .prop-map-swatch:last-child').count())
+      .toBeGreaterThan(2);
+    // A colour row is one line at the default width: palette beside the well.
+    const fill = nodes.locator('.prop-row[data-name="Fill color"]');
+    const [wellTop, paletteTop] = await Promise.all([
+      fill.locator('.color-well').evaluate((el) => el.getBoundingClientRect().top),
+      fill.locator('.style-color-button-container').evaluate((el) => el.getBoundingClientRect().top),
+    ]);
+    expect(Math.abs(wellTop - paletteTop)).toBeLessThan(4);
+    // Pie charts are a fill driven by data: Fill's swatch opens a menu with them.
+    await fill.locator('.prop-map-swatch').click();
+    const pieItem = page.locator('.rail-menu.open .rail-menu-item', { hasText: 'Pie chart…' });
+    expect(await pieItem.isVisible()).toBe(true);
+    await page.keyboard.press('Escape');
+    // The narrower label column still fits every label it holds.
+    const clipped = await page.locator('#inspectorSelection .prop-label').evaluateAll((els) =>
+      els.filter((el) => el.offsetParent && el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent));
+    expect(clipped).toEqual([]);
 
     // Label folds to one line that still says what it holds.
     const label = page.locator('[data-label="Node Configuration"] .prop-fold').first();
