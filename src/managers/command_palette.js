@@ -514,15 +514,15 @@ class CommandPalette {
 }
 
 /**
- * "⌘K" everywhere would be a lie on Linux and Windows, where the palette
- * answers to Ctrl+K. One source for every rail pill, tooltip and keyboard-sheet
+ * Key names as words ("Ctrl+K", "Cmd+K" on a Mac), never ⌘/⇧ glyphs: the
+ * palette answers to Ctrl+K on Linux and Windows. One source for every rail pill, tooltip and keyboard-sheet
  * row that names a modified key.
  */
 export function hotkeyLabel(key) {
   const platform = globalThis.navigator?.platform ?? '';
   // "Ctrl Z" (space) parsed as neither an accelerator nor a shortcut, so the
   // kbd chip vanished on Windows and Linux; "+" is what both readers expect.
-  return /Mac|iPhone|iPad/.test(platform) ? `⌘${key}` : `Ctrl+${key}`;
+  return /Mac|iPhone|iPad/.test(platform) ? `Cmd+${key}` : `Ctrl+${key}`;
 }
 
 export function paletteAccelerator() {

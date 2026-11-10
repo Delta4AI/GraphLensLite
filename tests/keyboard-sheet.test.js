@@ -35,6 +35,13 @@ describe("UIManager.toggleKeyboardSheet", () => {
     });
   });
 
+  it("names keys in words, never Mac glyphs", () => {
+    ui.toggleKeyboardSheet();
+    const keys = [...document.querySelectorAll(".keyboard-sheet kbd")].map((el) => el.textContent);
+    expect(keys).toContain("Shift+F");
+    expect(keys.join(" ")).not.toMatch(/[⌘⇧⌥]/);
+  });
+
   it("acts as a toggle: a second ? closes the sheet", () => {
     ui.toggleKeyboardSheet();
     expect(document.querySelector(".keyboard-sheet")).not.toBeNull();

@@ -52,17 +52,7 @@ const FILTER_LINK_LABELS = [
   ['none', 'None'],
 ];
 
-/** "Ctrl+⇧ drag" → "Ctrl Shift drag": the cheat sheet's keys as words. */
-function spokenKeys(key) {
-  return key
-    .replace(/⇧/g, ' Shift ')
-    .replace(/⌘/g, ' Command ')
-    .replace(/\+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// "Ctrl" or "⌘": the modifier a replacing lasso is drawn with.
+// "Ctrl" or "Cmd": the modifier a replacing lasso is drawn with.
 const LASSO_MODIFIER = hotkeyLabel('').replace(/\+$/, '');
 
 // The keyboard cheat sheet (opened with "?"). Must mirror the hotkey switch
@@ -70,7 +60,7 @@ const LASSO_MODIFIER = hotkeyLabel('').replace(/\+$/, '');
 const KEYBOARD_SHORTCUTS = [
   [paletteAccelerator(), 'Find any control, node or property by name'],
   [hotkeyLabel('Z'), 'Undo the last change to this workspace'],
-  [hotkeyLabel('Y'), 'Redo it (⇧ with undo works too)'],
+  [hotkeyLabel('Y'), 'Redo it (Shift with undo works too)'],
   ['P', 'Export PNG image (at the remembered resolution)'],
   ['S', 'Save graph as JSON'],
   ['F', 'Fit view to visible elements'],
@@ -79,12 +69,13 @@ const KEYBOARD_SHORTCUTS = [
   ['M', 'Toggle metrics panel'],
   ['Y', 'Jump to the inspector’s appearance controls'],
   ['L', 'Toggle lasso selection'],
-  ['⇧ drag', 'Lasso on empty canvas: add to the selection (⇧ click toggles one element)'],
-  [`${LASSO_MODIFIER} drag`, 'Lasso on empty canvas: replace the selection'],
-  [`${LASSO_MODIFIER}+⇧ drag`, 'Lasso on empty canvas: remove from the selection'],
+  ['Shift+drag', 'Lasso on empty canvas: add to the selection'],
+  ['Shift+click', 'Add or remove one element'],
+  [`${LASSO_MODIFIER}+drag`, 'Lasso on empty canvas: replace the selection'],
+  [`${LASSO_MODIFIER}+Shift+drag`, 'Lasso on empty canvas: remove from the selection'],
   ['H', 'Toggle hover highlight'],
   ['A', 'Toggle assistant'],
-  ['⇧F', 'Presentation mode (hide the rail and inspector)'],
+  ['Shift+F', 'Presentation mode (hide the rail and inspector)'],
   ['Esc', 'Exit lasso or presentation mode'],
   ['?', 'Show this sheet'],
 ];
@@ -535,7 +526,7 @@ class UIManager {
       this.info(
         globalThis.matchMedia?.('(hover: none)').matches
           ? 'Presentation mode — tap ✕ Exit presentation to bring the interface back'
-          : 'Presentation mode — press Escape or ⇧F to bring the interface back'
+          : 'Presentation mode — press Escape or Shift+F to bring the interface back'
       );
     } else if (this._presentationEscape) {
       document.removeEventListener('keydown', this._presentationEscape, true);
@@ -762,9 +753,6 @@ class UIManager {
       row.className = 'keyboard-sheet-row';
       const kbd = document.createElement('kbd');
       kbd.textContent = key;
-      // Screen readers spell ⇧ and ⌘ as symbol names; give them the key names.
-      const spoken = spokenKeys(key);
-      if (spoken !== key) kbd.setAttribute('aria-label', spoken);
       const label = document.createElement('span');
       label.textContent = action;
       row.append(kbd, label);

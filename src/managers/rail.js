@@ -572,7 +572,7 @@ class Rail {
     const lasso = menuItem({
       icon: '➰',
       label: 'Lasso',
-      title: 'Drag a freeform area around elements (L, Escape to stop). Without it: drag on empty canvas holding ⇧ to add, Ctrl/⌘ to replace, both to remove',
+      title: 'Drag a freeform area around elements (L, Escape to stop). Without it: drag on empty canvas holding Shift to add, Ctrl (Cmd on a Mac) to replace, both to remove',
       onClick: this.#closeAnd(() => this.cache.ui.toggleLassoSelection()),
     });
     lasso.id = 'lassoMenuItem';
@@ -655,7 +655,7 @@ class Rail {
       menuItem({
         icon: '⛶',
         label: 'Presentation mode',
-        title: 'Hide the rail and the inspector for a clean screenshot (⇧F, Escape to exit)',
+        title: 'Hide the rail and the inspector for a clean screenshot (Shift+F, Escape to exit)',
         onClick: this.#closeAnd(() => this.cache.ui.togglePresentationMode()),
       })
     );

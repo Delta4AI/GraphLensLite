@@ -1,5 +1,6 @@
 import { Popup } from './popup.js';
 import { isPhone } from '../managers/inspector.js';
+import { hotkeyLabel } from '../managers/command_palette.js';
 
 // Gap between a tour popup and the viewport edge or the element it explains.
 const POPUP_MARGIN = 16;
@@ -136,218 +137,110 @@ function generateTourData() {
   };
 }
 
+// Short on purpose: one idea per line, the full story lives in each panel's
+// 🛈 help and the ? shortcut sheet.
+const CTRL = hotkeyLabel('').replace(/\+$/, '');
+
 const TOUR_STEPS = [
   {
     title: 'Welcome to Graph Lens Lite! 👋',
-    text: `This tour will walk you through the main features of the application.
-           We've loaded a small sample network of 25 protein nodes and their interactions.
+    text: `A quick look around, using a sample network of 25 proteins.
            <br><br>
-           <strong>3 nodes are disconnected</strong> — they have no edges. This is intentional, so you can see how filtering works.
-           <br><br>
-           Let's explore the interface!`,
+           Three of them have <strong>no edges</strong> on purpose, so you can see filtering at work.`,
     target: null,
   },
   {
     title: 'The Rail',
-    text: `Everything session-level lives on the <strong>rail</strong> at the top:
+    text: `The bar along the top:
+           <br>• <strong>📂 File</strong> — open data, save as JSON, start over
+           <br>• <strong>Workspace chip</strong> — switch between saved views
+           <br>• <strong>↶ ↷</strong> — undo / redo
+           <br>• <strong>Fit</strong>, <strong>Layout</strong> and <strong>Search</strong> (${hotkeyLabel('K')})
+           <br>• <strong>Selection chip</strong> — what is selected, and ways to select
            <br><br>
-           <strong>📂 File</strong>, far left — open data (Excel, JSON, GraphML, CX2, the STRING database
-           or Neo4j), <strong>Save as JSON</strong> (<strong>S</strong>) to keep everything, download the
-           Excel template, take this tour or start over. Closing with unsaved changes asks first
-           <br><strong>Workspace chip</strong> — which workspace you're in, plus live shown/total counts
-           <br><strong>↶ ↷</strong> — undo / redo the last change to the workspace
-           (<strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong>)
-           <br><strong>⊡ Fit · ↻ Layout</strong> — frame the graph, or lay it out again
-           <br><strong>⌕ Search</strong> (<strong>Ctrl+K</strong>) — find any control, node or
-           property by name. Each result tells you where it lives, so you only have to look it up once
-           <br><strong>Selection chip</strong> — what's selected; click it to select all, by name, with
-           the lasso, zoom to the selection or undo a selection change
-           <br><br>
-           The <strong>tab strip</strong> opens the main panels:
-           <br><br>
-           🔢 <strong>Data</strong> — view and edit your graph data in a spreadsheet
-           <br>📝 <strong>Query</strong> — write filter/selection queries using our query language
-           <br>📊 <strong>Metrics</strong> — compute network metrics
-           <br>🤖 <strong>Assist</strong> — ask natural-language questions about your graph
-           <br><br>
-           On the right: <strong>⤓ Export</strong> (PNG, SVG, JSON model, Excel data, and presentation
-           mode for clean screenshots), the theme toggle, and the <strong>?</strong> keyboard cheat sheet. Each tab stays highlighted while its panel is open.`,
-    phoneNote: `The bar keeps File, the workspace, undo/redo, <strong>▤ Panel</strong> (the inspector, with the
-           selection count) and <strong>⋯ More</strong>, which lists everything else by name.`,
+           On the right, <strong>Data · Query · Metrics · Assist</strong> open panels under the graph,
+           then <strong>Export</strong> and <strong>?</strong> for shortcuts.`,
+    phoneNote: `The bar keeps File, the workspace, undo/redo and <strong>▤ Panel</strong>; everything else is under <strong>⋯ More</strong>.`,
     targets: [{ selector: '#rail' }],
     position: 'below',
   },
   {
     title: 'Workspaces',
-    text: `Workspaces let you save <strong>independent views</strong> of the same data.
-           Each workspace preserves its own:
+    text: `A workspace is one <strong>view</strong> of your data, with its own layout, filters,
+           query, groups and styles.
            <br><br>
-           • Node positions and layout
-           <br>• Filter settings
-           <br>• Query state
-           <br>• Bubble groups
-           <br>• Visual styles applied per workspace
+           Click the chip to switch, create, duplicate, rename or reset one. Its second line counts
+           what is shown right now.
            <br><br>
-           Click the <strong>workspace chip</strong> to switch workspaces or to create
-           (<strong class="tour-green">✚</strong> clone or template-based), rename, or delete one.
-           Its second line always shows how many nodes and edges the current filters leave visible.
-           <br><br>
-           Next to it, <strong>↻ Layout</strong> is labelled with this workspace's current layout
-           algorithm — its menu re-layouts the whole workspace with a chosen algorithm
-           (overwrites manual positions), nudges overlapping nodes apart (<strong>↔️</strong>),
-           and hides disconnected elements (<strong>🚫</strong>).`,
+           <strong>Layout</strong> next to it re-arranges the workspace, removes overlaps, or hides
+           nodes without edges.`,
     target: '#workspaceChip',
     position: 'below',
   },
   {
-    title: 'Filtering Panel',
-    text: `Every property from your data becomes a <strong>filter</strong>.
-           <div style="margin:8px 0;padding:8px 10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border-soft);">
-             <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">
-               <span style="display:inline-block;width:14px;height:14px;border:1px solid var(--success-text);border-radius:3px;box-sizing:border-box;text-align:center;line-height:12px;font-size:12px;color:var(--success-text);flex-shrink:0;margin-top:2px;">✔</span>
-               <span style="font-size:12px;color:var(--brand-text);font-weight:600;padding-top:2px;">Expression Level</span>
-               <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
-                 <div style="position:relative;height:8px;border-radius:10px;background:var(--border);margin-top:4px;">
-                   <div style="position:absolute;left:20%;right:30%;height:100%;border-radius:10px;background:var(--brand-text);"></div>
-                   <div style="position:absolute;left:calc(20% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:var(--surface-3);box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
-                   <div style="position:absolute;left:calc(70% - 7px);top:-3px;width:14px;height:14px;border-radius:50%;background:var(--surface-3);box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
-                 </div>
-                 <div style="display:flex;gap:6px;">
-                   <input disabled value="20" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--input-bg);color:var(--brand-text);box-sizing:border-box;">
-                   <input disabled value="70" style="width:50%;font-size:11px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--input-bg);color:var(--brand-text);box-sizing:border-box;">
-                 </div>
-               </div>
-               <span style="display:inline-block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:2px solid var(--brand-text);background:var(--brand-text);flex-shrink:0;margin-top:2px;"></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text-muted);flex-shrink:0;">⋯</span>
-             </div>
-             <div style="display:flex;align-items:center;gap:8px;">
-               <span style="display:inline-block;width:14px;height:14px;border:1px solid var(--accent-text);border-radius:3px;box-sizing:border-box;flex-shrink:0;"></span>
-               <span style="font-size:12px;color:var(--brand-text);font-weight:600;">Type</span>
-               <select disabled style="flex:1;font-size:11px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--input-bg);">
-                 <option>4 of 6</option>
-               </select>
-               <span style="display:inline-block;width:16px;flex-shrink:0;"></span>
-               <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text-muted);flex-shrink:0;">⋯</span>
-             </div>
-           </div>
-           • <strong>Numeric properties</strong> get two-thumbed range sliders — drag the left thumb to set
-           a minimum threshold (≥), the right thumb for a maximum (≤), double-click to reset
-           <br>• <strong>Categorical properties</strong> get a checklist with a count per value — Alt-click a value to keep only that one
-           <br>• The <strong>checkbox</strong> toggles whether that filter is active.
-           The
-           <span style="display:inline-flex;gap:2px;padding:2px;border-radius:6px;vertical-align:middle;background:var(--surface-3);font-size:11px;"><span style="padding:1px 9px;border-radius:5px;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,0.18);font-weight:700;color:var(--text-strong);"><span style="color:var(--accent-text);">＋</span> Build up</span><span style="padding:1px 9px;color:var(--text-strong);">− Narrow down</span></span>
-           switch at the top of the panel picks how the filters work. <strong>Build up</strong> (the default) starts from an empty graph:
-           every ticked filter adds the nodes and edges it matches (<em>any</em> of them, OR) — untick everything and the stage is empty,
-           ready to build a view one property at a time. Its <strong>Links</strong> option decides which edges show between those nodes:
-           <em>All between shown nodes</em>, <em>Only edge-filter matches</em> (which bring their end nodes along) or <em>None</em>.
-           <strong>Narrow down</strong> starts from the full graph and keeps only what matches <em>all</em> the filters you've narrowed (AND);
-           its <strong>Complete cases only</strong> option additionally hides elements missing any of those filters.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <span style="display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:middle;background:var(--brand-text);"></span>
-           <strong>Bubble group dot</strong> — click it to put that filter's matching nodes into a
-           <strong>group</strong>, or to make a new group from the filter. The dot appears when you hover the row and is
-           filled with the group's colour when it is in one, and ringed when
-           it is in several (hover it to read the names). Groups fed this way are <em>filter-driven</em>:
-           they update as the filter changes. Manage them all under <strong>Overlays › Groups</strong>.
+    title: 'Filters',
+    text: `Every column in your data becomes a <strong>filter</strong>: a range slider for numbers,
+           a checklist for categories. Tick a row to use it.
            <br><br>
-           <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;font-size:12px;vertical-align:middle;color:var(--text-muted);">⋯</span>
-           <strong>Row actions</strong> — add or remove everything the filter matches to/from the selection,
-           keep the values <em>outside</em> a range, add the property to a group, add it to the query, or reset the row.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           Every numeric property also carries <strong>exact min/max input boxes</strong> under its slider, so you can type a threshold instead of dragging for it. When the list gets long, fold a whole property group — <em>Classification</em>, <em>Annotation</em>, whatever your spreadsheet calls them — away with the <strong>▾</strong> chevron on its heading.
+           The switch on top sets how ticked filters combine:
+           <br>• <strong>＋ Build up</strong> — start empty, each filter adds what it matches
+           <br>• <strong>− Narrow down</strong> — start full, keep what matches all of them
            <br><br>
-           <span style="display:inline-flex;align-items:stretch;border:1px solid var(--border-soft);border-radius:12px;overflow:hidden;vertical-align:middle;font-size:11px;font-weight:600;"><span style="padding:2px 9px;background:#C33D35;color:#fff;">Node&nbsp;5</span><span style="padding:2px 9px;background:var(--surface-3);color:var(--brand-text);border-left:1px solid var(--border-soft);">Edge&nbsp;2</span></span>
-           The <strong>Node / Edge</strong> segment in the section header picks which half of your filters
-           the panel shows — one at a time, each labelled with how many filters it holds.
-           <br><br>
-           With a lot of properties, the <strong>search box</strong> at the top of the panel jumps straight to one — it matches on the section and group names too. While a search is running both sections are shown, so a hit in the half you are not looking at is still visible.`,
+           A row's <strong>⋯</strong> sends its matches to the selection, a group or the query.`,
     target: '#filterContainer',
     position: 'left',
   },
   {
-    title: 'Graph Canvas',
-    text: `This is the main graph visualization area.
+    title: 'The Graph',
+    text: `• <strong>Drag the background</strong> to pan, <strong>scroll</strong> to zoom
+           <br>• <strong>Drag a node</strong> to move it — or the whole selection, if it is selected
+           <br>• <strong>Click</strong> selects one element and shows its details
+           <br>• <strong>Shift+click</strong> adds or removes one element
+           <br>• <strong>Shift+drag</strong> on empty space lassoes more in;
+           <strong>${CTRL}+drag</strong> replaces the selection, <strong>${CTRL}+Shift+drag</strong> takes elements out
            <br><br>
-           • <strong>Click + drag on canvas</strong> — pan/navigate the network
-           <br>• <strong>Scroll</strong> — zoom in/out
-           <br>• <strong>Click on a node/edge</strong> — selects it (clearing any other selection) and opens a tooltip with details
-           <br>• <strong>Shift + click</strong> — adds or removes elements from the selection (no tooltip)
-           <br>• <strong>Click + drag a node</strong> — moves that node
-           <br>• <strong>Click + drag selected nodes</strong> — moves the entire selection
-           <br><br>
-           The <strong>minimap</strong> (bottom-right corner) shows an overview of the entire graph. Click or drag inside it to quickly navigate to different parts of the network — the inspector's <strong>Overlays</strong> tab hides it, along with everything else drawn over the graph. For a chrome-free screenshot, <strong>presentation mode</strong> (<strong>⤓ Export</strong> menu, or ⇧F) hides the rail and the inspector.`,
+           The <strong>minimap</strong> in the corner jumps anywhere in the graph.`,
     targets: [{ selector: '#innerGraphContainer' }, { selector: '.gll-minimap' }],
     position: 'left',
   },
   {
-    title: 'Making a Selection',
-    text: `The rail's <strong>selection chip</strong> always shows the live
-           <strong>node</strong> and <strong>edge</strong> counts, with <strong class="tour-red">×</strong> to clear
-           it. Click the chip for <strong>Zoom to selection</strong> and <strong>Undo / Redo selection change</strong>
-           (up to 25 states). It also warns when active filters are hiding part of what you have selected.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           Three ways to build one:
-           <br>• <strong>Click</strong> an element on the canvas, <strong>Shift+click</strong> to add more
-           <br>• <strong>Drag</strong> on empty canvas holding <strong>Shift</strong> (add) or <strong>Ctrl/⌘</strong>
-           (replace) to lasso an area, or turn the lasso on with <strong>L</strong> or from the chip
-           <br>• <strong>The chip's menu</strong> — all/no nodes, all/no edges, or select by
-           <strong>Node/Edge IDs</strong> or <strong>Labels</strong> with an include/exclude switch
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           The <strong>query editor</strong> can also turn any predicate into a selection with <strong>Select matches</strong>.`,
-    phoneNote: `The chip's menu is <strong>⋯ More › Selection…</strong>; <strong>▤ Panel</strong> shows the counts.`,
+    title: 'Selecting',
+    text: `The <strong>selection chip</strong> counts what is selected; <strong>×</strong> clears it.
+           <br><br>
+           Its menu holds:
+           <br>• <strong>Zoom to selection</strong> and <strong>undo / redo</strong> of selection changes
+           <br>• <strong>Lasso</strong> (<strong>L</strong>) — draw around elements, no key needed
+           <br>• <strong>Select elements</strong> — all nodes or edges, or by ID or label
+           <br><br>
+           It warns you when filters hide part of the selection.`,
+    phoneNote: `The chip's menu is <strong>⋯ More › Selection…</strong>.`,
     targets: [{ selector: '#selectionChip' }, { selector: '#selectMenuBtn' }],
     position: 'below',
   },
   {
     title: 'Inspector — Selection',
-    text: `The <strong>inspector</strong> on the right is the app's single panel. Its
-           <strong>Filters</strong> / <strong>Overlays</strong> / <strong>Selection</strong> pills switch
-           what it shows. Nothing switches on its own — when a selection changes while you are in
-           another context, the Selection pill flashes and waits for you.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Act on selection</strong>
-           <br>• <strong>＋ Add to group</strong> — opens a list of your bubble groups and drops the
-           selected nodes into one (or takes them out again); the same menu makes a new group from the
-           selection. Groups themselves live under <strong>Overlays › Groups</strong>
-           <br>• <strong>⟳ Reset style</strong> — revert the selection's styles to defaults
-           <br>• <strong>Expand/Reduce Edges</strong> and <strong>Expand/Reduce Neighbors</strong> — grow or shrink the selection by one hop
-           <br>• <strong>Shortest Path</strong> — with exactly two nodes selected, add the path between them
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Arrange Selection</strong> — <strong>Shrink/Expand</strong> pull nodes together or apart;
-           <strong>Circle/Force/Grid/Random</strong> apply a sub-layout to the selection only.`,
+    text: `The panel on the right has three tabs: <strong>Filters</strong>, <strong>Overlays</strong>
+           and <strong>Selection</strong>. It never switches on its own — the Selection tab flashes
+           when the selection changes.
+           <br><br>
+           Here you act on what is selected:
+           <br>• <strong>＋ Add to group</strong>
+           <br>• <strong>Expand / reduce</strong> by one hop, <strong>shortest path</strong> between two nodes
+           <br>• <strong>Arrange</strong> — pull together, spread out, or lay out just these nodes
+           <br>• <strong>⟳ Reset style</strong>`,
     targets: [{ selector: '#inspectorSelection' }, { selector: '#inspectorPillSelection' }],
     position: 'left',
     action: 'openSelectionContext',
   },
   {
     title: 'Inspector — Appearance 🎨',
-    text: `Appearance lives at the bottom of the inspector's <strong>Selection</strong> context
-           (<strong>Y</strong> jumps straight to it). Styles apply <strong>only to selected elements</strong> —
-           select nodes/edges first, then adjust. Each control shows the selection's current value,
-           or <em>Mixed</em> when the selected elements differ. All styles are <strong>per-workspace</strong>.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Nodes</strong>
-           <br>• Shape, size, fill color, border size &amp; color — <strong>In selection</strong> recolours one colour at a time
-           <br>• Label text, font size, placement, color &amp; background
-           <br>• <strong>Badges</strong> — small text markers at any corner of a node
-           <br>• <strong>Pie-chart nodes</strong> — render a node as a multi-slice pie driven by category data
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Edges</strong>
-           <br>• Type (line/quadratic/cubic), width, dash pattern, color
-           <br>• Label text, font size, placement, rotation, offset &amp; color
-           <br>• <strong>Arrows</strong> — start/end arrows with configurable size and type
-           <br>• <strong>Halos</strong> — colored glow around edges with adjustable width
-           <br>• <strong>Edge flow</strong> — animated directional motion along edges (comet or chevron), with adjustable opacity and density
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Scale tools</strong> — map any data property or computed network metric to a visual property:
-           <br>• <span style="display:inline-block;width:20px;height:16px;border:1px solid var(--border-strong);border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> <strong>Numeric scale</strong> — e.g. scale node size by PageRank
-           <br>• <span style="display:inline-block;width:24px;height:16px;border:1px solid var(--border-strong);border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> <strong>Color scale</strong> — continuous gradient or discrete colors per category
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           💡 Color inputs accept any hex code — type it in the text field and press <strong>Enter</strong> to apply.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           Anything drawn over the whole graph rather than over your selection — groups, the density
-           heatmap, notes, the minimap — lives in the <strong>Overlays</strong> context instead. That is
-           the next step.`,
+    text: `<strong>Appearance</strong> styles the selected elements only (<strong>Y</strong> jumps here).
+           Each control shows the current value, or <em>Mixed</em> when they differ.
+           <br>• <strong>Nodes</strong> — shape, size, colour, border, label, badges, pie charts
+           <br>• <strong>Edges</strong> — type, width, colour, arrows, halos, animated flow
+           <br>• <strong>Map…</strong> — drive a style from your data or a metric, e.g. size by PageRank
+           <br><br>
+           Styles belong to the workspace.`,
     targets: [{ selector: '#inspectorAppearanceMount' }],
     position: 'left',
     positionOffset: { y: 120 },
@@ -355,154 +248,81 @@ const TOUR_STEPS = [
   },
   {
     title: 'Inspector — Overlays',
-    text: `<strong>Overlays</strong> is the stack of everything drawn <em>over</em> the graph. Every row
-           owns its own switch, a row with nothing to draw is greyed out, and the two rows with
-           settings open onto them. These are <strong>workspace-level</strong>, not per-selection.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Groups</strong> — one row per bubble group: its colour, its name, how many nodes it
-           holds, and a <strong>＋</strong> that drops the current selection into it
-           (<strong>－</strong> takes it back out). Build them with <strong>＋ New group</strong>,
-           <strong>＋ From selection</strong>, or <strong>🧩 Auto-detect</strong>, which turns the graph's
-           communities into groups. Click a row for its fill, outline, padding, corridor and label
-           settings; <strong>⋯</strong> renames, duplicates, clears or deletes it. Make as many as you
-           like — there is no cap.
-           <br><br>
-           A group fed from a filter row is marked <strong>⚙</strong> and follows that filter as it
-           changes. The two sources add up, so a row can read <em>⚙ Type · +8 manual</em>: eight nodes
-           you put there by hand, on top of everything the filter matches.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Density heatmap</strong> — a continuous density field under the graph, showing where
-           nodes crowd together whatever their styling. <strong>Fade graph</strong> dims nodes, labels
-           and edges so the field reads through; <strong>Intensity</strong>, <strong>Opacity</strong>,
-           <strong>Radius</strong>, <strong>Contrast</strong> and <strong>Threshold</strong> shape it.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Notes</strong> — free text pinned to graph coordinates, so it pans and zooms with the
-           network. Place one with <strong>+ Add note</strong> on the Notes row, then click the canvas. Drag to
-           move it, double-click (or <strong>Enter</strong>) to edit the text, single-click for its style
-           popover — font size and colour, border, background, shadow, and <strong>✗ Delete note</strong>.
-           Notes are per workspace and come along in PNG and SVG exports.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Hover highlight</strong> — light up an element's neighbours while the pointer rests on it
-           (<strong>H</strong>).
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Minimap</strong> — the overview thumbnail in the bottom-right corner.`,
+    text: `Everything drawn over the whole graph, each with its own switch:
+           <br>• <strong>Groups</strong> — bubbles around nodes, made from the selection, a filter or
+           <strong>🧩 Auto-detect</strong>. Click one to change its look
+           <br>• <strong>Density heatmap</strong> — where nodes crowd together
+           <br>• <strong>Notes</strong> — text pinned to the graph
+           <br>• <strong>Hover highlight</strong> (<strong>H</strong>) and the <strong>minimap</strong>`,
     targets: [{ selector: '#inspectorOverlays' }, { selector: '#inspectorPillOverlays' }],
     position: 'left',
     action: 'openOverlaysContext',
   },
   {
     title: 'Network Metrics 📊',
-    text: `The metrics panel computes graph-theoretic measures for all visible nodes.
+    text: `Compute <strong>degree</strong>, <strong>betweenness</strong>, <strong>closeness</strong>,
+           <strong>eigenvector</strong> or <strong>PageRank</strong> for the visible nodes.
            <br><br>
-           Select a metric from the dropdown:
-           <br>• <strong>Degree Centrality</strong> — number of connections per node
-           <br>• <strong>Betweenness Centrality</strong> — how often a node lies on shortest paths
-           <br>• <strong>Closeness Centrality</strong> — average distance to all other nodes
-           <br>• <strong>Eigenvector Centrality</strong> — influence based on neighbor importance
-           <br>• <strong>PageRank</strong> — iterative ranking algorithm
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           Results appear as a <strong>ranked node list</strong> — select entries and use
-           <strong>Add to Selection</strong> / <strong>Remove from Selection</strong> to update the graph selection.
-           <br><br>
-           Below the list, <strong>graph-level metrics</strong> (density, avg degree, etc.) are shown in a summary table.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           Computed metrics become available as mapping sources in the styling panel's
-           <span style="display:inline-block;width:20px;height:16px;border:1px solid var(--border-strong);border-radius:3px;text-align:center;line-height:16px;font-size:12px;vertical-align:middle;">∿</span> numeric scale and
-           <span style="display:inline-block;width:24px;height:16px;border:1px solid var(--border-strong);border-radius:3px;background:linear-gradient(to right,#403C53,#C33D35,#8CA6D9,#EFB0AA,#FFF);vertical-align:middle;"></span> color scale tools.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           Click the <strong style="color:#8CA6D9">🛈</strong> button next to the metric dropdown for a detailed explanation of the selected metric.`,
+           You get a ranked list you can add to the selection, plus graph-wide numbers. Computed
+           metrics also appear under <strong>Map…</strong> in Appearance. <strong>🛈</strong> explains each one.`,
     targets: [{ selector: '#workbench' }, { selector: '#metricsToggleBtn' }],
     position: 'above',
     action: 'openMetricsPanel',
   },
   {
     title: 'Data Editor 🔢',
-    text: `The data editor is a <strong>spreadsheet view</strong> of the graph's nodes and edges.
-           Choose <strong>Selection | All</strong> and <strong>Nodes | Edges | Both</strong>, filter the rows, and edit cells
-           in place (Enter or typing edits, Escape cancels).
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           Edits are marked until you apply them: amber cells, green new rows, struck-through deletions. The bar under
-           the table counts them, with <strong>Review</strong>, <strong>Discard</strong> and <strong>Apply</strong>.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>+ Add</strong> creates a node, an edge or a property column; <strong>⤒ Import</strong> merges an
-           Excel file (with a preview); <strong>⤓ Export</strong> saves the rows shown as Excel.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           Click the <strong style="color:#8CA6D9">🛈</strong> button in the header for usage details.`,
+    text: `A spreadsheet of your nodes and edges. Edit cells in place — changes stay marked until
+           you <strong>Apply</strong> them.
+           <br><br>
+           <strong>+ Add</strong> creates nodes, edges or columns, <strong>⤒ Import</strong> merges an
+           Excel file, <strong>⤓ Export</strong> saves the rows shown.`,
     targets: [{ selector: '#workbench' }, { selector: '#dataToggleBtn' }],
     position: 'above',
     action: 'openDataEditor',
   },
   {
     title: 'Query Editor 📝',
-    text: `The query editor uses a custom query language that goes beyond what the filter panel can do.
-           While the filter panel either builds up (OR) or narrows down (AND), the query editor
-           adds <span class="q-connector-not">&nbsp;NOT&nbsp;</span>, nested parentheses, and free mixing of <span class="q-connector-and">&nbsp;AND&nbsp;</span> <span class="q-connector-or">&nbsp;OR&nbsp;</span> and conditional operators:
-           <br>
+    text: `For conditions the filters can't express: <span class="q-connector-not">&nbsp;NOT&nbsp;</span>,
+           parentheses, and <span class="q-connector-and">&nbsp;AND&nbsp;</span> / <span class="q-connector-or">&nbsp;OR&nbsp;</span> mixed freely.
            <div class="tour-query-example">
              <span class="q-property-wrapper"><span class="q-subgroup">group</span><span class="q-prop-group-separator">::</span><span class="q-property">prop</span></span>
              <span class="q-kw-between">BETWEEN</span> <span class="q-number">0.5</span>
              <span class="q-kw-between-and">AND</span> <span class="q-number">1.0</span>
-             <br>
-             <span class="q-property-wrapper"><span class="q-subgroup">group</span><span class="q-prop-group-separator">::</span><span class="q-property">prop</span></span>
-             <span class="q-in-cat-bracket-open">IN [</span><span class="q-string">foo</span><span class="q-comma">,</span> <span class="q-string">bar</span><span class="q-cat-bracket-close">]</span>
-             <br>
-             <span class="q-property-wrapper"><span class="q-subgroup">group</span><span class="q-prop-group-separator">::</span><span class="q-property">prop</span></span>
-             <span class="q-lower-than">LOWER THAN</span> <span class="q-number">50</span>
            </div>
-           The query <strong>syncs with the filter panel</strong> — changing filters updates the query text, and vice versa.
-           When you manually edit the query, filters get <strong>locked</strong> (🔒) to prevent conflicts.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           The toolbar's status line tells you whether the box matches the filter panel, holds an edit you have not applied, or is filtering the graph.
-           <br><strong>Filter graph</strong> (<kbd>Ctrl</kbd>+<kbd>Enter</kbd>) — hide everything the query does not match
-           <br><strong>Select matches</strong> — select the matching elements without hiding anything
-           <br><strong>Reset to filters</strong> — drop the edited query and let the filter panel drive the graph again
-           <br><strong>Clear text</strong> — empty the box; the graph keeps the last applied query
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           Each filter row's <strong>⋯</strong> menu has <strong>📝 Add to query</strong>: it <strong>appends</strong> that filter's current range or category selection as a query fragment — a quick way to build complex queries from existing filters.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           Click the <strong style="color:#8CA6D9">🛈</strong> button in the query editor header for a full syntax reference.`,
+           It stays in sync with the filters. Typing your own query locks them (🔒) until
+           <strong>Reset to filters</strong>.
+           <br>• <strong>Filter graph</strong> (${hotkeyLabel('Enter')}) hides what doesn't match
+           <br>• <strong>Select matches</strong> selects it instead
+           <br><br>
+           <strong>🛈</strong> has the full syntax.`,
     targets: [{ selector: '#workbench' }, { selector: '#queryToggleBtn' }],
     position: 'above',
     action: 'openQueryEditor',
   },
   {
     title: 'Graph Assistant 🤖',
-    text: `Ask natural-language questions about your graph and get answers grounded in the current workspace. The assistant can also suggest queries you run with one click:
-           <br>• <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">🎯 Select</span> applies the query immediately
-           <br>• <span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;color:#000;background:#8CA6D9;border:1px solid rgba(0,0,0,0.3);">📝 Open in query editor</span> drops it into the editor for review
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           <strong>Setup &amp; privacy</strong>
-           <br>The assistant talks to an <strong>Ollama</strong> server you control, local by default. Every message ships a snapshot of the current graph state, so use a local endpoint for sensitive data. Click <strong>⚙ Settings</strong> at the top of the assistant pane to configure the endpoint and pick a model. Results vary by model. Tested with <code>qwen3.5:9b</code>.
-           <hr style="margin:6px 0;border-color:var(--border-soft);">
-           The <strong>budget pill</strong> at the bottom shows how much of the model's context window the next request will consume. Click it for a per-section breakdown.`,
+    text: `Ask about your graph in plain language. Suggested queries come with buttons to
+           <strong>🎯 Select</strong> the matches or open them in the query editor.
+           <br><br>
+           It runs on an <strong>Ollama</strong> server you choose (<strong>⚙ Settings</strong>). Each
+           message sends a summary of the graph, so use a local server for sensitive data.`,
     targets: [{ selector: '#workbench' }, { selector: '#assistantToggleBtn' }],
     position: 'above',
     action: 'openAssistantPanel',
   },
   {
     title: "You're all set! 🎉",
-    text: `That covers the main features. Here are the <strong>keyboard shortcuts</strong> — the
-           <strong>?</strong> button on the rail shows this list any time:
-           <br><br>
-           <strong>Ctrl+K</strong> — Find any control, node or property by name
-           <br><strong>Ctrl+Z</strong> / <strong>Ctrl+Y</strong> — Undo / redo the last change to the workspace
-           <br><strong>P</strong> — Export as PNG
-           <br><strong>S</strong> — Save as JSON
-           <br><strong>F</strong> — Fit graph to screen
-           <br><strong>D</strong> — Toggle data editor
-           <br><strong>Q</strong> — Toggle query editor
-           <br><strong>M</strong> — Toggle metrics panel
-           <br><strong>A</strong> — Toggle Graph Assistant
-           <br><strong>Y</strong> — Jump to the inspector's appearance controls
-           <br><strong>L</strong> — Toggle lasso selection
-           <br><strong>H</strong> — Toggle hover highlight effect
-           <br><strong>⇧F</strong> — Presentation mode (hide the rail and inspector)
-           <br><strong>Esc</strong> — Exit lasso or presentation mode
-           <br><strong>?</strong> — Show the shortcut sheet
-           <br><br>
-           Try loading your own data from an <strong>Excel file</strong> or <strong>JSON export</strong>, or fetch protein networks from the <strong>STRING database</strong>.
-           <br><br>
-           <em>Enjoy exploring your graphs!</em>`,
+    text: `The shortcuts you will use most — <strong>?</strong> lists them all:
+           <div class="tour-keys">
+             <kbd>${hotkeyLabel('K')}</kbd><span>Search</span>
+             <kbd>${hotkeyLabel('Z')}</kbd><span>Undo</span>
+             <kbd>F</kbd><span>Fit graph</span>
+             <kbd>L</kbd><span>Lasso</span>
+             <kbd>S</kbd><span>Save as JSON</span>
+             <kbd>P</kbd><span>Export PNG</span>
+             <kbd>Shift+F</kbd><span>Presentation mode</span>
+           </div>
+           Load your own data from <strong>📂 File</strong>: Excel, JSON, GraphML, CX2, STRING or Neo4j.`,
     target: null,
   },
 ];
