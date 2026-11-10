@@ -57,9 +57,10 @@ The rendering and graph-operation core. Key modules:
   canvas layer and the SVG export draw through
 - `badges.js` — node badges: one pill per perimeter slot (set, replace, remove,
   text taken from a column) and the per-slot summary the badge list shows
-- `annotation_layer.js` / `annotation_geometry.js` — text notes: a DOM overlay
-  over the stage (place/drag/edit/style popover) plus the node-safe box metrics
-  the layer, the PNG export and the SVG export all measure with
+- `annotation_layer.js` / `annotation_popover.js` / `annotation_geometry.js` —
+  text notes: a DOM overlay over the stage (place/drag/edit), the per-note
+  style popover it opens, plus the node-safe box metrics the layer, the PNG
+  export and the SVG export all measure with
 - `heatmap_layer.js` / `heatmap_geometry.js` — node-density heatmap overlay (off by
   default; one row of the inspector's Overlays layer stack, which owns both its
   switch and its parameters — see `UIManager.OVERLAYS`)
