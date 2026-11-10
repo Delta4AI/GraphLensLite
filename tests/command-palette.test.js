@@ -98,9 +98,13 @@ function dom() {
         </div>
       </section>
       <section id="inspectorSelection" class="insp-panel" hidden>
-        <h4 class="insp-section-title">Appearance</h4>
+        <h4 class="insp-section-title">Act on selection</h4>
         <button id="shortestPathBtn" aria-disabled="true"
                 title="Shortest path (needs 2 selected nodes)">Shortest path</button>
+        <div class="insp-section-head">
+          <h4 class="insp-section-title">Appearance</h4>
+          <button id="resetStyleBtn" title="Reset the style of selected elements to defaults">⟳ Reset style</button>
+        </div>
       </section>
       <div id="inspectorLog">
         <button id="logToggleBtn" aria-expanded="false" title="Activity log — every message this session">
@@ -210,6 +214,10 @@ describe('the index is derived from the DOM', () => {
     });
     // And one under a heading: context › section › card.
     expect(named(cmds, 'Shortest path')).toMatchObject({
+      trail: 'Inspector › Selection › Act on selection',
+    });
+    // A section's own action sits in its heading row, and belongs to it.
+    expect(named(cmds, '⟳ Reset style')).toMatchObject({
       trail: 'Inspector › Selection › Appearance',
     });
   });

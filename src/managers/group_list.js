@@ -117,8 +117,9 @@ export function renderGroupList(bs) {
     bs.selectedGroup = groups[0];
   }
   let openRow = null;
+  const largest = Math.max(...groups.map((g) => bs.getEffectiveGroupMembers(g).size));
   for (const group of groups) {
-    const row = buildGroupRow(bs, group, layout);
+    const row = buildGroupRow(bs, group, layout, largest);
     if (group === bs.selectedGroup) openRow = row;
     list.appendChild(row);
   }
@@ -158,7 +159,7 @@ function restoreRowFocus(list, focused) {
   }
 }
 
-function buildGroupRow(bs, group, layout) {
+function buildGroupRow(bs, group, layout, largest) {
   const style = layout.bubbleSetStyle[group];
   const name = style.labelText || group;
   const count = bs.getEffectiveGroupMembers(group).size;
@@ -178,7 +179,7 @@ function buildGroupRow(bs, group, layout) {
     buildChevron(bs, group, name, expanded),
     buildSwatch(bs, group, name, style),
     buildNameInput(bs, group, name),
-    buildCount(count),
+    buildCount(count, largest, bs.cache.nodeRef?.size ?? 0),
     buildToggle(bs, group),
     buildRowMenuButton(bs, group, name)
   );
@@ -233,10 +234,22 @@ function buildNameInput(bs, group, name) {
   return input;
 }
 
-function buildCount(count) {
+/** "125 nodes" behind a bar of its size against the largest group (the title gives the share of the graph). */
+function buildCount(count, largest, total) {
   const el = document.createElement('span');
   el.className = 'group-count';
-  el.textContent = `${count} node${count === 1 ? '' : 's'}`;
+  const bar = document.createElement('i');
+  bar.className = 'group-count-bar';
+  bar.setAttribute('aria-hidden', 'true');
+  const fill = document.createElement('b');
+  fill.style.width = `${largest ? (count / largest) * 100 : 0}%`;
+  bar.appendChild(fill);
+  // The noun is for screen readers; on screen the bar says what the number is.
+  const noun = document.createElement('span');
+  noun.className = 'visually-hidden';
+  noun.textContent = ` node${count === 1 ? '' : 's'}`;
+  el.append(bar, String(count), noun);
+  if (total) el.title = `${count} of ${total} nodes (${Math.round((count / total) * 100)}%)`;
   return el;
 }
 

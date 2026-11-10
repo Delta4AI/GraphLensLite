@@ -99,7 +99,7 @@ describe('filter constraint census', () => {
     ui.updateFilterConstraintHints();
 
     expect(census().hidden).toBe(false);
-    expect(census().textContent).toBe('1 of 3 filters constrain the graph');
+    expect(census().textContent).toBe('1 of 3 filters constrain');
     expect(inertIds()).toEqual(['N::g::zone', 'N::g::score']);
   });
 
@@ -114,7 +114,7 @@ describe('filter constraint census', () => {
     });
     ui.updateFilterConstraintHints();
 
-    expect(census().textContent).toMatch(/^No filter constrains the graph/);
+    expect(census().textContent).toBe('No filter constrains yet');
     expect(inertIds()).toEqual(['N::g::type', 'N::g::zone']);
   });
 
@@ -126,7 +126,7 @@ describe('filter constraint census', () => {
     ui.updateFilterConstraintHints();
 
     expect(census().hidden).toBe(false);
-    expect(census().textContent).toBe('3 of 3 filters contribute to the graph');
+    expect(census().textContent).toBe('3 of 3 filters contribute');
     expect(inertIds()).toEqual([]);
   });
 
@@ -137,7 +137,7 @@ describe('filter constraint census', () => {
       filters: THREE.filters.map(([id, filter]) => [id, { ...filter, active: false }]),
     });
     ui.updateFilterConstraintHints();
-    expect(census().textContent).toBe('No filter contributes to the graph');
+    expect(census().textContent).toBe('No filter contributes');
   });
 
   it('clears the dimming when the join switches back to OR', () => {
@@ -163,7 +163,7 @@ describe('filter constraint census', () => {
     ui.updateFilterConstraintHints();
 
     expect(inertIds()).toEqual([]);
-    expect(census().textContent).toBe('1 of 2 filters constrain the graph');
+    expect(census().textContent).toBe('1 of 2 filters constrain');
   });
 
   it('leaves unusable properties out of the census entirely', () => {
@@ -177,7 +177,7 @@ describe('filter constraint census', () => {
     });
     ui.updateFilterConstraintHints();
 
-    expect(census().textContent).toBe('1 of 1 filters constrain the graph');
+    expect(census().textContent).toBe('1 of 1 filters constrain');
     expect(inertIds()).toEqual([]);
   });
 
@@ -197,7 +197,7 @@ describe('filter constraint census', () => {
     });
     ui.updateFilterConstraintHints();
 
-    expect(census().textContent).toBe('2 of 3 filters constrain the graph');
+    expect(census().textContent).toBe('2 of 3 filters constrain');
     expect(inertIds()).toEqual(['N::g::c']);
   });
 

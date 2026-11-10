@@ -116,7 +116,7 @@ describe('Build up with links on All', () => {
     rows([NODE_P, EDGE_P]);
     ui.updateFilterConstraintHints();
     expect(document.getElementById('filterConstraintCount').textContent).toBe(
-      '1 of 2 filters contribute to the graph'
+      '1 of 2 filters contribute'
     );
   });
 });

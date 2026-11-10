@@ -7,7 +7,7 @@
    while everything around it flips, which is what produced this release's
    repeated one-off dark-mode fixes. The exception is a border that traces its
    OWN same-coloured background (`.p-button:hover`, `.p-button-primary`,
-   `.tour-btn-next`, `.panel-header-btn:hover`): the fill is deliberately fixed,
+   `.panel-header-btn:hover`): the fill is deliberately fixed,
    so a tokenized border would slide off it in dark.
    ========================================================================== */
 :root {
@@ -897,9 +897,10 @@ body {
 
 .layer-row .layer-row-action {
     margin-left: auto;
-    height: 20px;
+    height: 24px;
     padding: 0 8px;
     font-size: 11px;
+    font-weight: 400;
 }
 
 .layer-row .layer-row-action.active {
@@ -1074,7 +1075,8 @@ body {
 .filter-links {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    min-width: 0;
 }
 
 .filter-links-select {
@@ -1098,8 +1100,7 @@ body {
 
 .filter-links-label {
     font-size: 11px;
-    font-weight: 600;
-    color: var(--text-strong);
+    color: var(--text-muted);
 }
 
 /* A group label can be grabbed and dragged (interactions.js). */
@@ -1330,63 +1331,12 @@ body {
     color: var(--danger-text);
 }
 
-.insp-groups,
-.insp-act-row {
+.insp-groups {
+    display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-}
-
-.insp-groups {
-    display: flex;
-    /* Matches .insp-note's, so the prose above and the tab bar below sit on one
-       rhythm instead of the tools touching the tabs. */
     margin-bottom: 8px;
-}
-
-/* --- group membership (Selection context) ------------------------------- */
-
-/* Meaningless with nothing selected, so it follows .insp-act-row's rule rather
-   than invariant 4's "show and self-disable" — same reason, same treatment. */
-.sel-group-title,
-.sel-group-panel {
-    display: none;
-}
-
-#inspectorSelection.has-selection .sel-group-title {
-    display: block;
-}
-
-#inspectorSelection.has-selection .sel-group-panel {
-    display: flex;
-}
-
-.sel-group-panel {
-    align-items: center;
-    gap: 12px;
-    padding: 10px;
-    margin-bottom: 10px;
-    box-sizing: border-box;
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
-    background: var(--surface-2);
-}
-
-.sel-group-hint {
-    font-size: 11px;
-    line-height: 1.4;
-    color: var(--text-muted);
-}
-
-.sel-group-hint strong {
-    color: var(--text-strong);
-}
-
-/* clip-path used to clip the focus ring on the quadrant pie; a plain button
-   takes the standard one. */
-#addToGroupBtn:focus-visible {
-    outline: 2px solid var(--accent-text);
-    outline-offset: 2px;
 }
 
 /* --- Selection context: empty state vs live state --- */
@@ -1410,17 +1360,6 @@ body {
 
 #inspectorSelection.has-selection .insp-empty {
     display: none;
-}
-
-/* The act row is meaningless with nothing selected; everything below it
-   (arrange, appearance) stays rendered and self-disables, per invariant 4 —
-   a control that exists for this context is shown, not hidden. */
-.insp-act-row {
-    display: none;
-}
-
-#inspectorSelection.has-selection .insp-act-row {
-    display: flex;
 }
 
 .insp-empty-title {
@@ -1844,6 +1783,20 @@ h5 {
     margin-bottom: 8px;
 }
 
+/* The census rides beside the switch whose counts it adds up. */
+#filterContainer .filter-section > .header-card > .filter-scope:has(+ .filter-constraint-count) {
+    margin-right: 0;
+}
+
+#filterContainer .filter-section > .header-card > .filter-constraint-count {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* A running search spans both sections, so the segment steps aside and every
    section with a match comes back. */
 #filterContainer.filters-searching .filter-scope {
@@ -1913,6 +1866,17 @@ h5 {
     flex: 1;
     height: 1px;
     background: var(--border-soft);
+}
+
+/* "3 filters", after the rule. */
+.filter-group-count {
+    order: 1;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
 }
 
 .sub-header-card h5 {
@@ -1989,18 +1953,14 @@ h5 {
     display: none;
 }
 
-/* The dark bar lives on the WRAPPER, not the header button, so a layer row's
-   switch sits inside it beside the title rather than out on the panel
-   background — the switch's contrast is designed against this bar. */
+/* The header row lives on the WRAPPER, not the header button, so a layer row's
+   switch sits inside it beside the title. */
 .card-collapse-bar {
     display: flex;
     align-items: center;
     gap: 7px;
     box-sizing: border-box;
-    padding: 0 8px;
-    background: var(--brand-border);
-    color: #fff;
-    border-radius: 4px;
+    color: var(--text);
 }
 
 .card-collapse-header {
@@ -2014,18 +1974,12 @@ h5 {
     padding: 4px 0;
     cursor: pointer;
     font: inherit;
-    font-weight: bold;
+    font-weight: 600;
     font-size: 13px;
 }
 
-/* Hover tints the whole bar, as it did when the header WAS the bar — reaching
-   up rather than colouring a block that stops short of the switch.
-
-   The brand accent in BOTH themes, not --accent-text: that token flips to
-   #e0635b in dark, where the bar's white bold title drops to 3.3:1. Fixed, it
-   is 5.2:1 — the same trade the layer switch makes below. */
 .card-collapse-bar:has(.card-collapse-header:hover) {
-    background: #C33D35;
+    color: var(--accent-text);
 }
 
 /* Pushes the count and the chevron to the right edge of the bar. */
@@ -2045,47 +1999,87 @@ h5 {
    switch; Notes and the minimap have no parameters, so they are bare rows.
    Both shapes share the bar geometry so the four read as one stack.
    -------------------------------------------------------------------------- */
-/* A row with no parameters: the same bar as a card's, minus the disclosure. */
-.layer-row {
+/* A row with no parameters: the same line as a card's header, minus the
+   disclosure. Every layer is switch | glyph | name | end, over a hairline, so
+   the five read as one stack. */
+.layer-row,
+.card-labeled.layer-card > .card-collapse-bar {
     display: flex;
     align-items: center;
     gap: 7px;
-    margin: 8px 0 0;
-    padding: 4px 8px;
+    min-height: 32px;
+    margin: 0;
+    padding: 0 2px;
     box-sizing: border-box;
-    border-radius: 4px;
-    background: var(--brand-border);
-    color: #fff;
-    font-weight: bold;
+    border-bottom: 1px solid var(--border-soft);
+    font-weight: 600;
     font-size: 13px;
 }
 
-/* A COLLAPSED layer card is nothing but its bar, so all four rows read as one
-   stack; expanded, the card frame comes back to group the parameters under it. */
 .card-labeled.layer-card {
     padding: 0;
+    margin-top: 0;
     border: none;
     background: none;
     box-shadow: none;
 }
 
-.card-labeled.layer-card:not(.collapsed) {
-    border: 1px solid var(--brand-border);
-    background-color: var(--card-wash);
-    padding-bottom: 6px;
-}
-
-/* The card cannot carry the inset itself: the bar is its header and has to stay
-   full-bleed, so everything BELOW the bar is inset instead. Without this the
-   prose and the tab bar sit flush against the card border. */
+/* Everything under an open layer hangs off its name, past the switch and glyph. */
 .card-labeled.layer-card > :not(.card-collapse-bar) {
-    margin-left: 6px;
-    margin-right: 6px;
+    margin-left: 30px;
 }
 
-/* Breathing room under the bar, which the contents would otherwise touch. */
 .card-labeled.layer-card > .card-collapse-bar + * {
     margin-top: 6px;
+}
+
+.card-labeled.layer-card:not(.collapsed) {
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+/* What the layer draws, in miniature. */
+.layer-glyph {
+    flex: none;
+    position: relative;
+    width: 26px;
+    height: 18px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    background: var(--bg);
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+}
+
+.layer-glyph > svg {
+    display: block;
+}
+
+.layer-glyph-groups {
+    background:
+        radial-gradient(ellipse 7px 5.5px at 9px 8px, color-mix(in srgb, var(--brand-text) 40%, transparent) 95%, transparent 100%),
+        radial-gradient(ellipse 7px 5.5px at 16px 8px, color-mix(in srgb, var(--accent-text) 40%, transparent) 95%, transparent 100%),
+        var(--bg);
+}
+
+.layer-glyph-heatmap {
+    background: radial-gradient(circle at 40% 55%, #C33D35 0, #EFB0AA 30%, transparent 70%), var(--bg);
+}
+
+.layer-glyph-notes {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.layer-glyph-minimap::after {
+    content: "";
+    position: absolute;
+    inset: 3px 6px;
+    border: 1px solid var(--accent-text);
+    border-radius: 1px;
 }
 
 .layer-title {
@@ -2093,31 +2087,27 @@ h5 {
     text-align: left;
 }
 
-/* Counts are secondary to the name they follow, and sit on the same dark bar
-   as the title — a plain white at lower weight rather than a muted grey.
-   0.9, not 0.8: at 0.8 this lands on 4.22:1 over the dark theme's lighter bar,
-   and 11px prose owes 4.5. */
+/* Counts are secondary to the name they follow. */
 .layer-count {
     font-weight: normal;
     font-size: 11px;
-    opacity: 0.9;
+    color: var(--text-muted);
 }
 
-/* A track with a knob, sized off the 13px bar text so it never dominates the
+/* A track with a knob, sized off the 13px row text so it never dominates the
    row. role=switch, so aria-checked is the state and CSS follows it.
    The KNOB POSITION is the state signal, not the fill — colour alone would
-   fail 1.4.1, and no green both contrasts 3:1 with the white knob and 3:1
-   with the bar behind it. The border carries the 3:1 component boundary
-   instead (0.7 alpha: 0.55 lands on 2.88:1 over the dark theme's bar). */
+   fail 1.4.1. The --text-faint border carries the 3:1 component boundary
+   against the panel in both themes. */
 .layer-switch {
     flex: 0 0 auto;
     position: relative;
     width: 26px;
     height: 14px;
     padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    border: 1px solid var(--text-faint);
     border-radius: 7px;
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--surface-3);
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
 }
@@ -2130,7 +2120,7 @@ h5 {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--text-muted);
     transition: transform 0.15s ease;
 }
 
@@ -2140,15 +2130,16 @@ h5 {
    else, and the knob position — not the fill — is what states the switch. */
 .layer-switch[aria-checked="true"] {
     background: #C33D35;
-    border-color: rgba(255, 255, 255, 0.9);
+    border-color: #C33D35;
 }
 
 .layer-switch[aria-checked="true"]::after {
+    background: #fff;
     transform: translateX(12px);
 }
 
 .layer-switch:hover:not(:disabled):not(.disabled) {
-    border-color: #fff;
+    border-color: var(--text-strong);
 }
 
 /* Dead by CLASS as well as by attribute: syncOverlays uses the class so the
@@ -2160,7 +2151,7 @@ h5 {
 }
 
 .layer-switch:focus-visible {
-    outline: 2px solid #fff;
+    outline: 2px solid var(--accent-text);
     outline-offset: 1px;
 }
 
@@ -2206,16 +2197,7 @@ h5 {
 }
 
 .appearance-card > .card-collapse-bar {
-    background: none;
-    color: var(--text);
-    padding: 0;
     border-bottom: 1px solid var(--border);
-    border-radius: 0;
-}
-
-.appearance-card > .card-collapse-bar:has(.card-collapse-header:hover) {
-    background: none;
-    color: var(--accent-text);
 }
 
 /* Inspector heading levels: section (.insp-section-title, accent eyebrow) >
@@ -2230,7 +2212,8 @@ h5 {
     flex: 0 1 auto;
 }
 
-.appearance-card .layer-count {
+.appearance-card .layer-count,
+.flat-card-count {
     flex: 1 1 auto;
     text-align: left;
     font-size: 11px;
@@ -2239,7 +2222,6 @@ h5 {
     font-family: var(--font-mono, ui-monospace, monospace);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
-    opacity: 1;
 }
 
 /* Act on Selection / Arrange Selection / Select Elements: the same flat
@@ -2266,6 +2248,175 @@ h5 {
     color: var(--text);
     font-size: 13px;
     font-weight: 600;
+}
+
+/* A card with a header element of its own (Act on Selection: "Selection" and
+   its count) instead of the data-label pseudo-title. */
+.card-labeled.flat-card.has-head::before,
+.card-labeled.flat-card.flat-card-cont::before {
+    display: none;
+}
+
+.flat-card-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 5px 0 4px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+#inspectorActMount > .flat-card {
+    padding-bottom: 0;
+}
+
+/* Arrange Selection continues the card above it. */
+.card-labeled.flat-card.flat-card-cont {
+    margin-top: 0;
+}
+
+/* Neo4j's Expand, under the Grow row, in the control column. */
+.sel-neo4j-row {
+    padding-left: 92px;
+}
+
+/* A section eyebrow that carries the section's own action at its end. */
+.insp-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 18px 0 4px;
+}
+
+.insp-section-head > .insp-section-title {
+    margin: 0;
+}
+
+/* A secondary action that should not compete with the rows: no border until
+   hovered or focused. */
+.insp-btn.insp-btn-quiet {
+    border-color: transparent;
+    background: none;
+    color: var(--text-muted);
+    padding: 1px 6px;
+}
+
+.insp-btn.insp-btn-quiet[aria-disabled="true"] {
+    border-color: transparent;
+}
+
+.insp-btn.insp-btn-quiet:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+/* The reason a row's action is blocked, shown only while it is. */
+.prop-hint {
+    display: none;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.prop-ctl:has(> .disabled) > .prop-hint {
+    display: inline;
+}
+
+/* A sub-group that folds to its heading plus a one-line summary. */
+.prop-fold-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    width: 100%;
+    background: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding-inline: 0;
+    padding-bottom: 2px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-strong);
+    text-align: left;
+    cursor: pointer;
+}
+
+.prop-fold-head:hover {
+    color: var(--accent-text);
+}
+
+.prop-fold-chevron {
+    flex: none;
+    width: 10px;
+    font-size: 10px;
+}
+
+.prop-fold-summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.prop-fold.collapsed > .prop-fold-body {
+    display: none;
+}
+
+/* "In selection" hangs under Fill color: no label of its own (the element
+   stays as the palette's row name and holds the label column), the strip in
+   the control column. Each segment names itself for screen readers. */
+.prop-row-selection-colors > .prop-label {
+    visibility: hidden;
+}
+
+/* Appearance cards: a third, 24px column holds each row's map-by-data button,
+   headed "Map" once at the top of the card. */
+.appearance-card .prop-row {
+    grid-template-columns: 84px minmax(0, 1fr) 24px;
+}
+
+.prop-map-head {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr) 24px;
+    column-gap: 8px;
+    margin-bottom: -4px;
+    text-align: center;
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.prop-map-head::before {
+    content: "";
+    grid-column: 1 / 3;
+}
+
+.prop-map-btn {
+    grid-column: 3;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 13px;
+    line-height: 22px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.prop-map-btn:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
 }
 
 /* Overlay cards (Groups pane, heatmap) keep their bar but share the rows. */
@@ -2369,7 +2520,7 @@ h5 {
 }
 
 /* A row whose every control is unavailable dims its label with them. */
-.prop-row:not(:has(.prop-ctl > :not(.disabled))) > .prop-label {
+.prop-row:not(:has(.prop-ctl > :not(.disabled, .prop-hint))) > .prop-label {
     opacity: 0.5;
 }
 
@@ -2572,43 +2723,61 @@ h5 {
     margin: 0;
 }
 
-/* "In selection": one chip per distinct colour, with its count. */
-.prop-chips {
+/* "In selection": one strip, a segment per distinct colour as wide as its
+   share (flex-grow = count, set inline) over its count. 24px minimum, so a
+   rare colour stays a target (WCAG 2.5.8); past the row's width it wraps. */
+.prop-share {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 1px;
+    width: 100%;
 }
 
 .prop-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    height: 24px;
-    padding: 0 6px 0 4px;
-    box-sizing: border-box;
-    border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    background: var(--input-bg);
+    flex: 1 1 0;
+    min-width: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: 2px 0 0;
+    border: none;
+    border-radius: 3px;
+    background: none;
     color: var(--text-muted);
     font: inherit;
-    font-size: 11px;
+    font-size: 10px;
+    line-height: 12px;
     font-family: var(--font-mono, ui-monospace, monospace);
     font-variant-numeric: tabular-nums;
+    text-align: center;
+    overflow: hidden;
     cursor: pointer;
-}
-
-.prop-chip:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
 }
 
 .prop-chip > i {
     display: block;
-    width: 14px;
-    height: 14px;
-    border-radius: 3px;
-    border: 1px solid var(--border-soft);
-    box-sizing: border-box;
+    height: 12px;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.prop-chip > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.prop-chip:hover {
+    color: var(--accent-text);
+}
+
+.prop-chip:hover > i {
+    box-shadow: inset 0 0 0 2px var(--accent-text);
+}
+
+.prop-row-selection-colors {
+    margin-top: -2px;
 }
 
 .prop-more[hidden] {
@@ -2774,6 +2943,58 @@ h5 {
     gap: 3px;
 }
 
+/* A slider with a distribution: the track drops under 16px of bars, the
+   value boxes stay level with the track. */
+.filter-range-row.has-hist {
+    align-items: flex-end;
+}
+
+.filter-range-row.has-hist > div[slider] {
+    height: 40px;
+}
+
+.filter-range-row.has-hist > div[slider] > div {
+    top: 20px;
+}
+
+/* The handles move down with the track (the value-box rules above never reach them). */
+.has-hist > div[slider] > input[type=range] {
+    top: 18px;
+}
+
+/* Typing a threshold widens its box less here, so the bars stay readable. */
+.filter-range-row.has-hist > input:focus {
+    max-width: 11ch;
+}
+
+/* The row's name and ⋯ stay level with the track, not with the bars. */
+.filter-row:has(.has-hist) > :is(.filter-row-col1, .filter-row-col3) {
+    padding-top: 16px;
+}
+
+.filter-hist {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 16px;
+    height: 16px;
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    border-bottom: 1px solid var(--border);
+    pointer-events: none;
+}
+
+.filter-hist > i {
+    flex: 1 1 0;
+    background: var(--border);
+    border-radius: 1px 1px 0 0;
+}
+
+.filter-hist > i.kept {
+    background: color-mix(in srgb, var(--brand-text) 55%, transparent);
+}
+
 /* The exact-value boxes sit at the two ends of the track, on the slider's own
    line — one row instead of slider-over-boxes, and no second copy of the same
    two numbers in position:fixed bubbles. They are sized to the column's
@@ -2918,17 +3139,22 @@ h5 {
     font-style: italic;
 }
 
+/* The mode and its option on one line: the switch, then Links (build up) or
+   Complete cases (narrow down); the elements-without-properties box wraps
+   under them when the graph has any. */
 .filter-toolbar-join {
     flex-basis: 100%;
-    padding: 3px;
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
 }
 
 /* The mode is a setting, not a call to action: a neutral track whose chosen
    half is lifted, so it does not compete with the red scope and inspector
-   pills around it. Full width, halves equal. */
+   pills around it. */
 .filter-mode-switch.filter-join-toggle {
+    flex: none;
     display: flex;
     padding: 2px;
     gap: 2px;
@@ -2971,12 +3197,13 @@ h5 {
     color: var(--accent-text);
 }
 
-/* The chosen mode's options, inside the same card. */
+/* The chosen mode's options, to the right of the switch. */
 .filter-mode-options {
+    flex: 1 1 160px;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 5px;
-    padding: 6px 5px 3px;
 }
 
 .filter-strict-checkbox {
@@ -4004,27 +4231,23 @@ div[slider] > input[type=range]::-ms-tooltip {
    read as an undifferentiated block, and the open one has a settings pane
    inside it that has to be visibly part of THAT group. */
 .group-row {
-    padding: 6px;
-    border: 1px solid var(--border-soft);
-    border-radius: 7px;
+    padding: 2px 4px;
+    border-radius: 6px;
     background: transparent;
     cursor: pointer;
 }
 
+/* --surface-3, not --row-hover: muted counts on the dark --row-hover fall to 4.47:1. */
 .group-row:hover {
-    border-color: var(--border-strong);
+    background: var(--surface-3);
 }
 
-/* The open row carries its own settings, so it reads as a container rather
-   than a highlighted line. Its edge takes the GROUP's colour (set inline), not
-   the accent: a red frame beside the group's own swatch reads as an error, and
-   this ties the open panel to the bubble it belongs to. */
 .group-row.active {
-    background: var(--surface-2);
-    border-color: var(--border-strong);
-    border-left: 3px solid var(--row-color, var(--border-strong));
-    padding-left: 4px;
     cursor: default;
+}
+
+.group-row.active:hover {
+    background: none;
 }
 
 .group-row-head {
@@ -4080,7 +4303,7 @@ div[slider] > input[type=range]::-ms-tooltip {
     background: transparent;
     color: var(--text-strong);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     text-overflow: ellipsis;
 }
 
@@ -4097,9 +4320,29 @@ div[slider] > input[type=range]::-ms-tooltip {
 
 .group-count {
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-size: 11px;
+    font-variant-numeric: tabular-nums;
     color: var(--text-muted);
     white-space: nowrap;
+}
+
+/* The group's share of every node in the graph. */
+.group-count-bar {
+    position: relative;
+    width: 28px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-soft);
+    overflow: hidden;
+}
+
+.group-count-bar > b {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: color-mix(in srgb, var(--brand-text) 60%, transparent);
 }
 
 .group-row-toggle {
@@ -4151,11 +4394,13 @@ div[slider] > input[type=range]::-ms-tooltip {
     display: none;
 }
 
-/* Inside the open row, so it needs its own edge against the row's fill. */
+/* The open group's settings hang under it, behind a rule in the GROUP's colour
+   (set inline), not the accent: a red edge beside the group's own swatch reads
+   as an error, and this ties the settings to the bubble they belong to. */
 .group-row .group-style-panel {
-    margin-top: 6px;
-    padding-top: 6px;
-    border-top: 1px dashed var(--border-soft);
+    margin: 4px 0 6px 24px;
+    padding-left: 8px;
+    border-left: 2px solid color-mix(in srgb, var(--row-color, var(--border)) 60%, var(--text-muted));
 }
 
 /* --- the shared group menu ---------------------------------------------- */
@@ -4225,11 +4470,40 @@ div[slider] > input[type=range]::-ms-tooltip {
 }
 
 .filter-cat-summary {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Each value's share of the graph inside the closed field: kept in slate,
+   dropped in grey. Not interactive; the list does the choosing. */
+.filter-cat-bar {
+    flex: 1 1 40px;
+    min-width: 24px;
+    display: flex;
+    gap: 1px;
+    height: 6px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+/* Dropped: a hollow outline (3:1+ in both themes), so narrowing greys values
+   out instead of making them vanish. */
+.filter-cat-bar > i {
+    flex-basis: 0;
+    min-width: 1px;
+    box-shadow: inset 0 0 0 1px var(--text-faint);
+}
+
+.filter-cat-bar > i.kept {
+    background: color-mix(in srgb, var(--brand-text) 70%, transparent);
+    box-shadow: none;
+}
+
+.filter-cat-bar > i.kept:nth-child(even) {
+    background: color-mix(in srgb, var(--brand-text) 50%, transparent);
 }
 
 .filter-cat-total,
@@ -5789,16 +6063,6 @@ div[slider] > input[type=range]::-ms-tooltip {
    step, where Back/Finish stay right-aligned on their own. */
 .tour-btn-skip {
     margin-right: auto;
-}
-
-.tour-btn-next {
-    background-color: #015C0C;
-    border-color: #015C0C;
-}
-
-.tour-btn-next:hover {
-    background-color: #018a12;
-    border-color: #018a12;
 }
 
 .tour-green {

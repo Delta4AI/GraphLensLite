@@ -223,11 +223,10 @@ const TOUR_STEPS = [
            and <strong>Selection</strong>. It never switches on its own — the Selection tab flashes
            when the selection changes.
            <br><br>
-           Here you act on what is selected:
+           <strong>Act on selection</strong> works on what is selected:
            <br>• <strong>＋ Add to group</strong>
-           <br>• <strong>Expand / reduce</strong> by one hop, <strong>shortest path</strong> between two nodes
-           <br>• <strong>Arrange</strong> — pull together, spread out, or lay out just these nodes
-           <br>• <strong>⟳ Reset style</strong>`,
+           <br>• <strong>Grow</strong> by one hop, <strong>shortest path</strong> between two nodes
+           <br>• <strong>Arrange</strong> — pull together, spread out, or lay out just these nodes`,
     targets: [{ selector: '#inspectorSelection' }, { selector: '#inspectorPillSelection' }],
     position: 'left',
     action: 'openSelectionContext',
@@ -238,7 +237,8 @@ const TOUR_STEPS = [
            Each control shows the current value, or <em>Mixed</em> when they differ.
            <br>• <strong>Nodes</strong> — shape, size, colour, border, label, badges, pie charts
            <br>• <strong>Edges</strong> — type, width, colour, arrows, halos, animated flow
-           <br>• <strong>Map…</strong> — drive a style from your data or a metric, e.g. size by PageRank
+           <br>• <strong>◇</strong> in the <strong>Map</strong> column — drive a style from your data or a metric, e.g. size by PageRank
+           <br>• <strong>⟳ Reset style</strong> — back to the defaults
            <br><br>
            Styles belong to the workspace.`,
     targets: [{ selector: '#inspectorAppearanceMount' }],
@@ -264,7 +264,7 @@ const TOUR_STEPS = [
            <strong>eigenvector</strong> or <strong>PageRank</strong> for the visible nodes.
            <br><br>
            You get a ranked list you can add to the selection, plus graph-wide numbers. Computed
-           metrics also appear under <strong>Map…</strong> in Appearance. <strong>🛈</strong> explains each one.`,
+           metrics also appear under <strong>◇ Map</strong> in Appearance. <strong>🛈</strong> explains each one.`,
     targets: [{ selector: '#workbench' }, { selector: '#metricsToggleBtn' }],
     position: 'above',
     action: 'openMetricsPanel',
@@ -404,7 +404,7 @@ class GuidedTour {
     }
 
     const nextBtn = document.createElement('button');
-    nextBtn.className = 'p-button tour-btn-next';
+    nextBtn.className = 'p-button p-button-primary tour-btn-next';
     nextBtn.textContent = isLast ? 'Finish ✓' : 'Next →';
     nextBtn.addEventListener('click', () => {
       this.currentStep++;

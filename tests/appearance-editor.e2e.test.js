@@ -29,6 +29,10 @@ describe.skipIf(!E2E)('appearance editor, end to end', () => {
     return { size: n.style.size, fill: n.style.fill, type: n.type };
   }, id);
   const sizeField = () => page.locator('[data-property="Node Size"] .style-input-sm');
+  // An edit is done once its undo step exists: the loading overlay hides before
+  // updateNodes reaches history.commit, which under software WebGL is seconds later.
+  const recorded = (n) => page.waitForFunction((count) => window.cache.history.past.length >= count, n,
+    { timeout: 30_000, polling: 100 });
 
   beforeAll(async () => {
     const { _electron } = await import('playwright');
@@ -70,10 +74,12 @@ describe.skipIf(!E2E)('appearance editor, end to end', () => {
     await sizeField().fill('33');
     await sizeField().press('Enter');
     await settled();
+    await recorded(1);
     expect((await node('n0')).size).toBe(33);
     expect((await node('n999')).size).toBe(33);
     await page.getByRole('button', { name: 'Star' }).click();
     await settled();
+    await recorded(2);
     expect((await node('n0')).type).toBe('star');
     expect(await page.getByRole('button', { name: 'Star' }).getAttribute('aria-pressed')).toBe('true');
 
@@ -97,6 +103,7 @@ describe.skipIf(!E2E)('appearance editor, end to end', () => {
     }, targetFill);
     await settled();
     await expect.poll(async () => (await node('n0')).fill).toBe('#123456');
+    await recorded(3);
     const recoloured = await page.evaluate(() =>
       [...window.cache.nodeRef.values()].filter((n) => n.style.fill === '#123456').length);
     expect(recoloured).toBe(sameFill);
