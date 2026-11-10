@@ -9,10 +9,10 @@ z-index values live as tokens at the top of `src/style.css` (`:root` and
 - Neutrals lean toward the brand slate in both themes: cool slate greys in
   light, violet-tinted surfaces in dark. No pure greys.
 - The brand red (`--accent-text`) is the one accent: the selected pill or
-  segment, the focus ring, a narrowed filter, section eyebrows. It also marks
-  destructive actions; a separate indigo accent was considered and declined
-  (2026-11). The brand slate (`--brand-border`) carries checkboxes, primary
-  buttons and the Overlays bars, so a column of defaults stays quiet.
+  segment, the focus ring, a narrowed filter, section eyebrows, a layer switch
+  that is on. It also marks destructive actions; a separate indigo accent was
+  considered and declined (2026-11). The brand slate (`--brand-border`) carries
+  checkboxes and primary buttons, so a column of defaults stays quiet.
 
 ## Mental model
 
@@ -28,17 +28,26 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - Labels are plain text tied to their control (`<label for>` or
   `aria-labelledby`), never filled chips; nothing that is not clickable may
   look like a button.
-- Sub-groups inside a section get a small heading with a hairline above it
-  (`propSubhead`: "Label", "Badges", "Start arrow"; level 3 below). The command palette names
-  a row by its sub-group ("Label size") so repeated labels stay distinct.
+- Sub-groups inside a section fold (`propFold`: "Label", "Badges", "Start
+  arrow"; level 3 below): a disclosure heading with a hairline above it and a
+  one-line summary of what the rows hold ("Label · Label, bottom, 12",
+  "Badges · none", "Halo · off"). Open or closed is remembered per viewer. The
+  command palette names a row by its sub-group ("Label size") so repeated
+  labels stay distinct, and opens the fold to reveal it.
 - Headings come in three distinct levels, never two at the same weight:
   1. Section: an uppercase eyebrow in the accent colour (`.insp-section-title`:
-     "Actions", "Appearance"). Every card sits under one.
-  2. Card: 13px semibold in the text colour with a 1px hairline below
-     (`.flat-card`, `.appearance-card`: "Nodes", "Act on Selection").
-  3. Sub-group: 12px semibold with a soft hairline above (`propSubhead`).
-- The dark bar is reserved for the Overlays layer stack, where it carries the
-  layer's on/off switch.
+     "Act on selection", "Appearance"). Every card sits under one. A section
+     action that applies to all its cards sits at the eyebrow's end
+     (`.insp-section-head`: Appearance › ⟳ Reset style).
+  2. Card: 13px semibold in the text colour with a 1px hairline below, and its
+     count in mono after the title (`.flat-card`, `.appearance-card`: "Nodes
+     1000", "Selection 1000 nodes · 0 edges").
+  3. Sub-group: 12px semibold with a soft hairline above (`propFold`).
+- Every verb on the selection lives in one card: Group, Grow, Path, then
+  Spacing and Layout. A blocked row says why inline ("needs exactly 2 nodes").
+- No dark bars in the inspector. The Overlays stack is one line per layer:
+  switch, a small glyph of what the layer draws, name, then its count or
+  action, over a hairline. An open layer's settings indent under its name.
 
 ## Controls
 
@@ -60,13 +69,15 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
     "3 of 42 values" line under it, and "Only" on each value (Enter on a
     focused value, or Alt-click, does the same).
   - Number with a range: slider plus number field; arrow keys step.
-  - Colour: painted well over the native picker, hex field, palette, then
-    **Map…** when the property can be driven by data.
+  - Colour: painted well over the native picker, hex field, palette.
 - A control that is frozen (filters held by an edited query) is `disabled`,
   not just dimmed, so the keyboard skips it too. What only reads (fold a
   group, switch Node/Edge, search, the row's ⋯ menu) stays live.
-- "Map by data" is always a labelled **Map…** button at the row's end, never a
-  bare glyph.
+- "Map by data" is a column, not a button per row: in the Nodes and Edges
+  cards every row has a 24px third cell, headed **Map** once at the card's
+  top, holding a ◇ button where the property can be driven by data (its
+  accessible name says "map by data"). The app keeps no record of a mapping,
+  so the cell shows no on state.
 - A "select all in this group" control is one tri-state checkbox (ticked,
   mixed, empty), not separate enable/disable buttons.
 
@@ -91,8 +102,25 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - Edits apply on commit (slider release, Enter or leaving a field, a click on a
   swatch or segment), each one undo step. There is no Apply/Save button in the
   inspector; undo is the safety net.
-- When a colour is mixed, an **In selection** row lists each distinct colour
-  with its count; recolouring one changes only those elements.
+- When a colour is mixed, a strip under the colour row shows each distinct
+  colour as wide as its share, over its count; recolouring a segment changes
+  only those elements. Segments keep a 24px minimum and wrap.
+
+## Data graphics
+
+The inspector's character comes from the data, not from decoration: every
+picture is also a reading of the graph, in the slate neutrals, with the accent
+kept for state.
+
+- Numeric filters draw the column's distribution over the track; bars the
+  filter keeps are tinted, the rest grey.
+- Category filters show each value's share of the graph inside the closed
+  field, kept values slate and dropped ones grey. No colour per value: the app
+  has none, and inventing one would suggest an encoding that is not there.
+- Counts sit where they explain something: the filter census beside the
+  Node/Edge switch, "N filters" at the end of a filter group's rule, a group's
+  share of all nodes as a bar beside its count, "4 groups · 500 nodes" on the
+  Groups layer.
 
 ## Top bar
 
