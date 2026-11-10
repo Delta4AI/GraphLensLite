@@ -641,7 +641,7 @@ class UIManager {
       switchId: 'overlaySwitchGroups',
       layer: (c) => c.graph?.bubbleLayer,
       // A group with no members draws nothing, so the count IS the content.
-      empty: (c) => UIManager.#groupSetCount(c) === 0,
+      empty: (c) => UIManager.#groupCensus(c).sets === 0,
       emptyHint: 'No group has nodes yet — select nodes, then click ＋ From selection',
     },
     heatmap: { switchId: 'overlaySwitchHeatmap', layer: (c) => c.graph?.heatmapLayer },
@@ -654,16 +654,21 @@ class UIManager {
     minimap: { switchId: 'overlaySwitchMinimap', layer: (c) => c.graph?.minimap },
   };
 
-  /** Groups that actually draw something: the "N sets" beside the Groups row. */
-  static #groupSetCount(cache) {
+  /** Groups that actually draw something, and the nodes they cover between them. */
+  static #groupCensus(cache) {
     const bs = cache.bs;
-    if (!bs || !cache.data?.layouts?.[cache.data.selectedLayout]) return 0;
+    if (!bs || !cache.data?.layouts?.[cache.data.selectedLayout]) return { sets: 0, nodes: 0 };
     let sets = 0;
+    const covered = new Set();
     for (const group of bs.traverseBubbleSets()) {
-      if (bs.getEffectiveGroupMembers(group).size > 0) sets++;
+      const members = bs.getEffectiveGroupMembers(group);
+      if (members.size === 0) continue;
+      sets++;
+      for (const id of members) covered.add(id);
     }
-    return sets;
+    return { sets, nodes: covered.size };
   }
+
 
   /** @param {'groups'|'heatmap'|'notes'|'minimap'} name */
   toggleOverlay(name) {
@@ -720,11 +725,11 @@ class UIManager {
       btn.title = blank ? emptyHint : btn.dataset.baseTitle;
     }
 
-    // "3 sets" beside the Groups row — only groups with members count.
+    // "3 groups · 480 nodes" beside the Groups row — only groups with members count.
     const count = document.getElementById('overlayCountGroups');
     if (!count) return;
-    const sets = UIManager.#groupSetCount(this.cache);
-    count.textContent = sets ? `${sets} ${sets === 1 ? 'set' : 'sets'}` : '';
+    const { sets, nodes } = UIManager.#groupCensus(this.cache);
+    count.textContent = sets ? `${sets} ${sets === 1 ? 'group' : 'groups'} · ${nodes} ${nodes === 1 ? 'node' : 'nodes'}` : '';
   }
 
   async toggleHoverEffect(btn) {

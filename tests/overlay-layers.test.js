@@ -263,15 +263,16 @@ describe('UIManager overlay layer stack', () => {
     const [ui, cache] = makeUI();
     cache.bs = {
       traverseBubbleSets: () => ['group1', 'group2', 'group3'],
-      getEffectiveGroupMembers: (g) => new Set(g === 'group3' ? [] : ['n1']),
+      getEffectiveGroupMembers: (g) => new Set({ group1: ['n1', 'n2'], group2: ['n2', 'n3'] }[g] ?? []),
     };
     cache.data = { selectedLayout: 'Default', layouts: { Default: {} } };
 
     ui.syncOverlays();
-    expect(document.getElementById('overlayCountGroups').textContent).toBe('2 sets');
+    // n2 sits in both groups and is one node.
+    expect(document.getElementById('overlayCountGroups').textContent).toBe('2 groups · 3 nodes');
   });
 
-  it('singularises one set and blanks zero', () => {
+  it('singularises one group and blanks zero', () => {
     const [ui, cache] = makeUI();
     cache.data = { selectedLayout: 'Default', layouts: { Default: {} } };
     cache.bs = {
@@ -279,7 +280,7 @@ describe('UIManager overlay layer stack', () => {
       getEffectiveGroupMembers: () => new Set(['n1']),
     };
     ui.syncOverlays();
-    expect(document.getElementById('overlayCountGroups').textContent).toBe('1 set');
+    expect(document.getElementById('overlayCountGroups').textContent).toBe('1 group · 1 node');
 
     cache.bs.getEffectiveGroupMembers = () => new Set();
     ui.syncOverlays();
