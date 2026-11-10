@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { propRow, propSubhead } from '../src/managers/appearance_controls.js';
+import { propRow, propFold } from '../src/managers/appearance_controls.js';
 import {
   createSwitch,
   createButton,
@@ -86,8 +86,7 @@ describe('propRow', () => {
     expect(card.querySelector('.prop-label').title).toBe('What it does');
     expect(plain.dataset.labelText).toBe('Edge color');
 
-    propSubhead(card, 'Start arrow');
-    const sub = propRow(card, 'Color');
+    const sub = propRow(propFold(card, 'Start arrow'), 'Color');
     expect(sub.dataset.labelText).toBe('Edge start arrow color');
     expect(sub.parentElement.dataset.name).toBe('Start arrow color');
   });

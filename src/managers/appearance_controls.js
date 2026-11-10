@@ -105,15 +105,6 @@ function propRow(parent, text, tooltip = undefined) {
   return ctl;
 }
 
-/** A sub-group heading inside a section ("Label", "Badges", "Arrows"). */
-function propSubhead(parent, text) {
-  const head = document.createElement("div");
-  head.className = "prop-subhead";
-  head.textContent = text;
-  parent.appendChild(head);
-  parent.dataset.propGroup = text;
-}
-
 const FOLD_STORAGE_PREFIX = "gll.fold.";
 let propFoldSeq = 0;
 
@@ -893,7 +884,6 @@ export {
   createInput,
   createColorPicker,
   propRow,
-  propSubhead,
   propFold,
   rowValue,
   nameControl,
