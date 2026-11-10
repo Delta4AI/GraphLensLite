@@ -101,7 +101,6 @@ const MAX_TOASTS = 4;
 // unbounded strip grows for the whole session.
 const LOG_MAX_LINES = 200;
 
-
 /**
  * The toast stack is a manual popover so it can sit above a modal <dialog>,
  * which the top layer puts above every z-index. Re-showing moves it to the top
@@ -120,6 +119,24 @@ function raiseToastHost(host) {
   }
   host.showPopover();
 }
+
+/**
+ * Everything outside an open modal is inert, which hides the toast stack's live
+ * region from screen readers however high the popover is raised. A hidden copy
+ * inside the topmost modal is what gets read: an alert for errors and warnings.
+ */
+function announceInModal(text, colorClass, lifetimeMs) {
+  const modal = [...document.querySelectorAll('dialog:modal')].at(-1);
+  if (!modal) return;
+  const note = document.createElement('div');
+  note.className = 'visually-hidden';
+  note.setAttribute('role', TOAST_MS[colorClass] ? 'alert' : 'status');
+  modal.appendChild(note);
+  // Filled after insertion: a live region announces a change, not its first content.
+  setTimeout(() => (note.textContent = text), 0);
+  setTimeout(() => note.remove(), lifetimeMs);
+}
+
 class UIManager {
   constructor(cache, debugEnabled = false) {
     this.cache = cache;
@@ -415,8 +432,10 @@ class UIManager {
         host.firstElementChild;
       victim.remove();
     }
-    setTimeout(() => toast.remove(), TOAST_MS[colorClass] ?? TOAST_DEFAULT_MS);
+    const lifetimeMs = TOAST_MS[colorClass] ?? TOAST_DEFAULT_MS;
+    setTimeout(() => toast.remove(), lifetimeMs);
     raiseToastHost(host);
+    announceInModal(text, colorClass, lifetimeMs);
 
     return toast;
   }

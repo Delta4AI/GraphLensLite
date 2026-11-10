@@ -40,6 +40,7 @@ describe("UIManager toasts", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   // The top layer outranks every z-index, so a toast fired while a modal
@@ -66,7 +67,25 @@ describe("UIManager toasts", () => {
     ui.success("third");
     expect(host.hidePopover).toHaveBeenCalledOnce();
     expect(host.showPopover).toHaveBeenCalledTimes(2);
-    vi.restoreAllMocks();
+  });
+
+  // Everything outside an open modal is inert, so the stack's live region goes
+  // unread there: the message has to be spoken from inside the dialog.
+  it("speaks a toast from inside an open modal, as an alert for errors", () => {
+    const modal = document.createElement("dialog");
+    document.body.appendChild(modal);
+    const realQueryAll = document.querySelectorAll.bind(document);
+    vi.spyOn(document, "querySelectorAll").mockImplementation((sel) =>
+      sel === "dialog:modal" ? [modal] : realQueryAll(sel));
+
+    ui.error("Please enter at least one gene");
+    vi.advanceTimersByTime(0);
+
+    const spoken = modal.querySelector(".visually-hidden");
+    expect(spoken.getAttribute("role")).toBe("alert");
+    expect(spoken.textContent).toBe("Please enter at least one gene");
+    vi.advanceTimersByTime(10_000);
+    expect(modal.querySelector(".visually-hidden")).toBeNull();
   });
 
   it("shows the message as a toast AND keeps it in the log", () => {

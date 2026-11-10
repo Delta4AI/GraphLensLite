@@ -389,16 +389,30 @@ class Popup {
     this.closeBtn.addEventListener('click', () => this.close());
 
     // A backdrop click targets the dialog element itself; so does a click on
-    // its border, hence the bounds check.
+    // its border, hence the bounds check. The press must start on the backdrop
+    // too: a text selection dragged out of the dialog ends in a click on it.
     if (this.options.closeOnClickOutside) {
-      this.popup.addEventListener('click', (e) => {
-        if (e.target !== this.popup) return;
+      const onBackdrop = (e) => {
+        if (e.target !== this.popup) return false;
         const r = this.popup.getBoundingClientRect();
-        const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-        if (!inside) this.close();
+        return !(e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+      };
+      let pressedOnBackdrop = false;
+      this.popup.addEventListener('pointerdown', (e) => {
+        pressedOnBackdrop = onBackdrop(e);
+      });
+      this.popup.addEventListener('click', (e) => {
+        if (pressedOnBackdrop && onBackdrop(e)) this.close();
+        pressedOnBackdrop = false;
       });
     }
 
+    // Escape belongs to the dialog: page-level Escape handlers behind it (lasso
+    // mode, presentation mode) must not act on the same key. The browser's
+    // close request is the keydown's default action, so it still happens.
+    this.popup.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') e.stopPropagation();
+    });
     // Escape: the browser would only hide the dialog, skipping onClose and the
     // cleanup below.
     this.popup.addEventListener('cancel', (e) => {
