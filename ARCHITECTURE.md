@@ -138,7 +138,7 @@ Business logic and UI:
   shared value or "Mixed"
 - `appearance_controls.js` — the inspector's control primitives (`propRow`, `createButton`,
   `createInput`, …) and `createAppearanceControls(cache)`: every selection-bound builder
-  (slider, colour, segmented, label, "In selection" chips) plus `refreshStyleControls`.
+  (slider, colour, segmented, label, "In selection" strip, `propFold` sub-groups) plus `refreshStyleControls`.
   `ui_style_div.js` arranges them into cards
 - `selection_style_values.js` — pure side of that sync: the editor property →
   style key table (also what `handleStyleChangeEvent` writes), the shared-or-MIXED
