@@ -438,22 +438,23 @@ function createStyleDiv(cache) {
     const D = cache.DEFAULTS;
 
     createNodeShapeControls(propRow(nodeDiv, "Shape"));
-    const pie = propRow(nodeDiv, "Pie chart",
-      "Draw the selected nodes as pie charts of their categorical or numeric properties.");
-    propButton(pie, "Pie…",
-      "Render the selected nodes as pie charts: map categorical values (equal slices) or numeric properties (sized slices) to wedges.",
-      async () => {
-        await cache.gcm.updateNodes({}, ["set_pie_chart"]);
-        refreshStyleControls();
-      });
-    propButton(pie, "Clear pie", "Remove pie-chart rendering and restore the nodes' shape.",
-      async () => {
-        await cache.gcm.updateNodes({}, ["clear_pie_chart"]);
-        refreshStyleControls();
-      });
-
     createNumericalSlider(propRow(nodeDiv, "Size"), "Node Size", D.NODE.SIZE, {min: 10, max: 50, step: 1});
-    createColorControls(propRow(nodeDiv, "Fill color"), "Node Fill Color", D.NODE.FILL_COLOR, D.STYLES.NODE_COLORS);
+    // A pie chart is a fill driven by data, so it lives in Fill's map-by-data menu.
+    const pieItems = [
+      {label: "Pie chart…",
+        title: "Render the selected nodes as pie charts: map categorical values (equal slices) or numeric properties (sized slices) to wedges.",
+        onClick: async () => {
+          await cache.gcm.updateNodes({}, ["set_pie_chart"]);
+          refreshStyleControls();
+        }},
+      {label: "Clear pie", title: "Remove pie-chart rendering and restore the nodes' shape.",
+        onClick: async () => {
+          await cache.gcm.updateNodes({}, ["clear_pie_chart"]);
+          refreshStyleControls();
+        }},
+    ];
+    createColorControls(propRow(nodeDiv, "Fill color"), "Node Fill Color", D.NODE.FILL_COLOR, D.STYLES.NODE_COLORS,
+      true, undefined, pieItems);
     createSelectionColorsRow(nodeDiv, "Node Fill Color", "nodes");
     createNumericalSlider(propRow(nodeDiv, "Border width", "Width of the selected nodes' border."),
       "Node Border Size", D.NODE.LINE_WIDTH, {min: 1, max: 10, step: 1});
@@ -1097,14 +1098,6 @@ function createStyleDiv(cache) {
   // `overlay`), which is what keeps on/off and parameters in one place.
   makeCollapsible("Node Configuration", false, {title: "Nodes", countId: "styleNodeCount"});
   makeCollapsible("Edge Configuration", true, {title: "Edges", countId: "styleEdgeCount"});
-  for (const label of ["Node Configuration", "Edge Configuration"]) {
-    // Heads the column the rows' map buttons sit in.
-    const head = document.createElement("div");
-    head.className = "prop-map-head";
-    head.setAttribute("aria-hidden", "true");
-    head.textContent = "Map";
-    root.querySelector(`[data-label="${label}"] > .card-collapse-bar`).after(head);
-  }
   makeCollapsible("Bubble Sets", true, {
     title: "Groups",
     overlay: "groups",

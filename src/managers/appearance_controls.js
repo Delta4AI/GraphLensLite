@@ -1,4 +1,5 @@
 import {safePaint} from "../graph/shape_textures.js";
+import {RailMenu, menuItem} from "./rail.js";
 import {FONT_STYLES} from "../graph/label_renderers.js";
 import {MIXED, STYLE_PROPERTIES, styleOverride, readProperty, sharedBy, colorBuckets, labelSource}
   from "./selection_style_values.js";
@@ -342,22 +343,38 @@ function createAppearanceControls(cache) {
   }
 
   /**
-   * Map by data: the row's cell in the card's Map column (the column header
-   * labels it; the button's own name says "map by data").
+   * Map by data, inside the control it drives: a ramp glyph in a number
+   * field's trailing edge (`className` "prop-map-btn"), or the last swatch of
+   * a colour palette ("prop-map-swatch"). With `menuExtras` the button opens a
+   * menu instead: "Colour by data…" first, then the extra items.
    */
-  function createMapButton(parent, property, title, sentinel) {
+  function createMapButton(parent, property, title, sentinel, className, menuExtras = undefined) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "prop-map-btn";
-    btn.textContent = "◇";
+    btn.className = className;
     btn.title = title;
     btn.dataset.property = property;
-    nameControl(parent, btn, property, "— map by data");
-    btn.onclick = () => {
+    nameControl(parent, btn, property, menuExtras ? "— map by data, pie chart" : "— map by data");
+    const map = () => {
       if (sentinel === "set_numeric_scale") cache.numericPicker.currentProperty = property;
       Promise.resolve(handleStyleChangeEvent(property, sentinel)).catch(reportButtonFailure);
     };
-    parent.parentElement.appendChild(btn); // the row's third column
+    if (!menuExtras) {
+      btn.onclick = map;
+      return btn;
+    }
+    const menu = new RailMenu(btn, (el) => {
+      for (const item of [{label: "Colour by data…", title, onClick: map}, ...menuExtras]) {
+        el.appendChild(menuItem({
+          label: item.label,
+          title: item.title,
+          onClick: () => {
+            menu.close();
+            Promise.resolve(item.onClick()).catch(reportButtonFailure);
+          },
+        }));
+      }
+    });
     return btn;
   }
 
@@ -540,14 +557,18 @@ function createAppearanceControls(cache) {
       showValue(shown);
     });
 
-    container.append(slider, valueInput);
-    parent.appendChild(container);
-
     if (enableNumericScale) {
-      createMapButton(parent, property,
+      // The glyph sits inside the field's trailing edge, so it costs no width of its own.
+      const field = document.createElement("span");
+      field.className = "prop-num-map";
+      field.append(valueInput, createMapButton(parent, property,
         `Map by data: scale ${property} from a numeric property's values (e.g. larger nodes for higher degree)`,
-        "set_numeric_scale");
+        "set_numeric_scale", "prop-map-btn"));
+      container.append(slider, field);
+    } else {
+      container.append(slider, valueInput);
     }
+    parent.appendChild(container);
     bind(property, (value) => showValue(value === null ? typedDefaultValue : value),
       {fallback: typedDefaultValue});
     return container;
@@ -560,7 +581,12 @@ function createAppearanceControls(cache) {
     "Edge Flow Color": "Auto",
   };
 
-  function createColorControls(parent, property, defaultColor, colors, continuousScaleBtn = true, customCSSClass = undefined) {
+  /**
+   * @param {{label: string, title: string, onClick: () => unknown}[]} [mapMenuExtras] items after
+   *   "Colour by data…" in the map swatch's menu (Fill: pie charts); without them the swatch maps directly.
+   */
+  function createColorControls(parent, property, defaultColor, colors, continuousScaleBtn = true,
+                               customCSSClass = undefined, mapMenuExtras = undefined) {
     const unsetText = UNSET_COLOR_TEXT[property] ?? "None";
 
     // The well is the native picker under a painted swatch: <input type=color>
@@ -664,11 +690,8 @@ function createAppearanceControls(cache) {
     parent.append(well, colorInput);
 
     const palette = Object.entries(colors);
-    if (palette.length) {
-      // The palette always starts its own line, so every colour row wraps alike.
-      const lineBreak = document.createElement("span");
-      lineBreak.className = "prop-break";
-      parent.appendChild(lineBreak);
+    if (palette.length || continuousScaleBtn) {
+      // The palette sits on the value's line and wraps as one block when the panel is narrow.
       const swatches = document.createElement("div");
       swatches.className = "style-color-button-container";
       for (const [name, value] of palette) {
@@ -686,13 +709,14 @@ function createAppearanceControls(cache) {
         if (customCSSClass) swatch.classList.add(customCSSClass);
         swatches.appendChild(swatch);
       }
+      if (continuousScaleBtn) {
+        swatches.appendChild(createMapButton(parent, property,
+          mapMenuExtras
+            ? `Map by data: colour ${property} by a property's values, or draw the nodes as pie charts`
+            : `Map by data: colour ${property} on a gradient or by category from a property's values`,
+          "set_continuous_color_scale", "prop-map-swatch", mapMenuExtras));
+      }
       parent.appendChild(swatches);
-    }
-
-    if (continuousScaleBtn) {
-      createMapButton(parent, property,
-        `Map by data: colour ${property} on a gradient or by category from a property's values`,
-        "set_continuous_color_scale");
     }
 
     // bubble_sets.refreshBubbleStyleElements writes the hex field directly

@@ -40,6 +40,9 @@ class RailMenu {
     // via aria-expanded (no role=menu, so no arrow-key contract to honor).
     this._anchorClick = () => this.toggle();
     anchor.setAttribute('aria-expanded', 'false');
+    // Marks the anchor for the command palette, which reveals an inspector
+    // control that opens a menu rather than clicking it out of sight.
+    anchor.dataset.railMenu = '';
     anchor.addEventListener('click', this._anchorClick);
   }
 

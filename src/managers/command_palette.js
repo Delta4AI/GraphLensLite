@@ -189,7 +189,10 @@ function collectInspector(out) {
       // once you are there — the palette says where colours live, it is not a
       // paint program.
       if (el.classList.contains('style-color-button')) continue;
-      out.push(command(el, trailFor(el), { glyph: '⚙' }));
+      // A menu anchored to a control on a hidden tab would open nowhere: show
+      // the control instead (Fill's map-by-data menu, ＋ Add to group).
+      const opensMenu = el.dataset?.railMenu !== undefined;
+      out.push(command(el, trailFor(el), { glyph: '⚙', ...(opensMenu && { kind: 'reveal' }) }));
     }
     // A row of inputs is one destination, not one command per field: the label
     // names it and revealing it puts the whole row on screen.
