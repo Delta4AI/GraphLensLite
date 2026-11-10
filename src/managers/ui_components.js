@@ -81,7 +81,22 @@ class DropdownChecklist {
     chevron.className = 'filter-cat-chevron';
     chevron.setAttribute('aria-hidden', 'true');
     chevron.textContent = '⌄';
-    this.anchor.append(this.summaryText, this.totalText, chevron);
+    // How the values share the graph, kept ones in slate and dropped ones grey:
+    // the field shows what the filter keeps before it is opened.
+    this.shareBar = document.createElement('span');
+    this.shareBar.className = 'filter-cat-bar';
+    this.shareBar.setAttribute('aria-hidden', 'true');
+    const { counts } = this.#countValues();
+    const total = [...counts.values()].reduce((a, b) => a + b, 0);
+    for (const value of this.categories) {
+      const n = counts.get(String(value)) ?? 0;
+      if (!n) continue;
+      const seg = document.createElement('i');
+      seg.dataset.value = String(value);
+      seg.style.flexGrow = String(n / total);
+      this.shareBar.appendChild(seg);
+    }
+    this.anchor.append(this.summaryText, this.shareBar, this.totalText, chevron);
     this.container.appendChild(this.anchor);
     this.#syncSummary();
 
@@ -109,10 +124,12 @@ class DropdownChecklist {
     this.anchor.setAttribute('aria-label', `${prop}: ${shown} values shown${n === 1 ? ` (${summary})` : ''}`);
     this.anchor.title = `Choose which ${prop} values to show`;
     this.anchor.classList.toggle('narrowed', summary !== 'All');
+    const kept = new Set([...this.selectedCategories].map(String));
+    for (const seg of this.shareBar?.children ?? []) seg.classList.toggle('kept', kept.has(seg.dataset.value));
   }
 
-  /** How many elements carry each value, over the whole graph. Counted on open:
-   * values change with the data editor and the list is opened rarely. */
+  /** How many elements carry each value, over the whole graph. Counted for the
+   * share bar when the field is built (every load and data edit) and again on open. */
   #countValues() {
     const counts = new Map();
     let carriers = 0;
@@ -706,9 +723,62 @@ class InvertibleRangeSlider {
     this.inputEnd.title = 'Upper threshold — type an exact value and press Enter';
     this.inputEnd.setAttribute('aria-label', `${this.propLabel()} — upper threshold`);
     row.append(this.inputStart, slider, this.inputEnd);
+    this.#appendHistogram(slider, row);
 
     parent.appendChild(row);
     this.rangeRow = row;
+  }
+
+  /** How many bars the distribution above the track gets. */
+  static HISTOGRAM_BINS = 24;
+
+  /**
+   * The column's distribution, drawn over the track in the slider's own
+   * coordinates: bars inside the kept range are tinted (#shadeHistogram), so
+   * the row shows what a threshold drops before it is moved. Counted once, here:
+   * the filter panel is rebuilt on every load and data edit.
+   */
+  #appendHistogram(slider, row) {
+    const span = this.sliderMax - this.sliderMin;
+    if (!(span > 0)) return;
+    const bins = new Array(InvertibleRangeSlider.HISTOGRAM_BINS).fill(0);
+    for (const ref of [this.cache.nodeRef, this.cache.edgeRef]) {
+      for (const element of ref?.values() ?? []) {
+        const value = Number(element.featureValues?.get(this.propID));
+        if (!Number.isFinite(value)) continue;
+        const bin = Math.floor(((value - this.sliderMin) / span) * bins.length);
+        bins[StaticUtilities.clamp(bin, 0, bins.length - 1)] += 1;
+      }
+    }
+    const peak = Math.max(...bins);
+    if (!peak) return;
+    const hist = document.createElement('div');
+    hist.className = 'filter-hist';
+    hist.setAttribute('aria-hidden', 'true');
+    hist.title = `Distribution of ${this.propLabel()}; tinted bars are kept`;
+    for (const count of bins) {
+      const bar = document.createElement('i');
+      bar.style.height = `${(count / peak) * 100}%`;
+      // A bin with anything in it stays visible next to a tall peak.
+      if (count) bar.style.minHeight = '1px';
+      hist.appendChild(bar);
+    }
+    slider.firstElementChild.appendChild(hist);
+    row.classList.add('has-hist');
+    this.histogram = hist;
+  }
+
+  /** Tint the bars whose middle the filter keeps (inside the range, or outside it when inverted). */
+  #shadeHistogram() {
+    if (!this.histogram) return;
+    const lo = Math.min(this.currentMin, this.currentMax);
+    const hi = Math.max(this.currentMin, this.currentMax);
+    const bars = this.histogram.children;
+    for (let i = 0; i < bars.length; i++) {
+      const mid = this.sliderMin + ((i + 0.5) / bars.length) * (this.sliderMax - this.sliderMin);
+      const inside = mid >= lo && mid <= hi;
+      bars[i].classList.toggle('kept', this.isInverted ? !inside : inside);
+    }
   }
 
   /** Bare property name, for the inputs' accessible names. */
@@ -856,6 +926,7 @@ class InvertibleRangeSlider {
       box.value = this.formatThreshold(primaryValue);
     }
     this.#describeThresholds();
+    this.#shadeHistogram();
   }
 
   /**

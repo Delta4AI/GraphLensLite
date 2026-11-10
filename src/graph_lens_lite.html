@@ -307,6 +307,7 @@
           <button type="button" id="hoverToggleBtn" class="layer-switch" role="switch" aria-checked="true"
                   aria-label="Hover highlight" title="Highlight an element's neighbours while the pointer rests on it (H)"
                   onclick="cache.ui.toggleHoverEffect(this)"></button>
+          <span class="layer-glyph" aria-hidden="true"><svg viewBox="0 0 26 18" width="26" height="18"><path d="M5 13 L13 6 L21 12" fill="none" stroke="var(--accent-text)"/><circle cx="13" cy="6" r="2.5" fill="var(--accent-text)"/><circle cx="5" cy="13" r="2" fill="var(--text-faint)"/><circle cx="21" cy="12" r="2" fill="var(--text-faint)"/></svg></span>
           <span class="layer-title">Hover highlight</span>
         </div>
         <div class="layer-row">
@@ -314,6 +315,7 @@
                   aria-checked="false" aria-disabled="true" aria-label="Notes"
                   title="Show or hide every text note"
                   onclick="cache.ui.toggleOverlay('notes')"></button>
+          <span class="layer-glyph layer-glyph-notes" aria-hidden="true">Aa</span>
           <span class="layer-title">Notes</span>
           <button type="button" id="noteToggleBtn" class="insp-btn layer-row-action" aria-pressed="false"
                   title="Place a text note: click the canvas to place, drag to move, double-click to edit, single-click for style and delete"
@@ -324,6 +326,7 @@
                   aria-checked="false" aria-disabled="true" aria-label="Minimap"
                   title="Show or hide the overview thumbnail in the bottom-right corner"
                   onclick="cache.ui.toggleOverlay('minimap')"></button>
+          <span class="layer-glyph layer-glyph-minimap" aria-hidden="true"></span>
           <span class="layer-title">Minimap</span>
         </div>
       </section>
@@ -347,32 +350,25 @@
           </div>
         </div>
 
-        <!-- Group membership gets its own framed section: it is the one action
-             here that changes what the graph DRAWS. The h4 stays a direct child
-             of the panel so the palette's sectionOf() finds it. One button
-             opening a named checklist replaces the 2x2 quadrant pie, which used
-             the same glyph as the filter rows for a different verb and could
-             only ever address four groups. -->
-        <h4 class="insp-section-title sel-group-title">Group membership</h4>
-        <div class="sel-group-panel">
-          <button type="button" id="addToGroupBtn" class="insp-btn"
-                  title="Add or remove the selected nodes in a bubble group">＋ Add to group ⌄</button>
-          <div class="sel-group-hint">Groups are listed under <strong>Overlays › Groups</strong>,
-            where you can rename, recolour and restyle them.</div>
-        </div>
-
-        <h4 class="insp-section-title" id="inspectorActionsTitle">Actions</h4>
-        <div class="insp-act-row">
-          <button class="insp-btn disabled" title="Reset the style of selected elements to defaults" id="resetSelectedElementsStyleBtn"
-                  onclick="cache.style.resetStyleForSelectedElements()">⟳ Reset style</button>
+        <!-- One section for every verb on the selection: Group, Grow, Path
+             (Act on Selection card) and Spacing, Layout (Arrange Selection,
+             drawn as the same card's lower rows). Both cards are built in
+             ui_style_div.js; the h4s stay direct children of the panel so the
+             palette's sectionOf() finds them. -->
+        <h4 class="insp-section-title" id="inspectorActionsTitle">Act on selection</h4>
+        <div id="inspectorActMount"></div>
+        <div class="sel-neo4j-row">
           <button class="insp-btn disabled" style="display: none;" id="neo4jExpandBtn"
                   title="Fetch the neighbors of the selected nodes from Neo4j and merge them into the graph"
-                  onclick="expandNeo4jSelection()">🛢️ Expand</button>
+                  onclick="expandNeo4jSelection()">🛢️ Expand from Neo4j</button>
         </div>
-        <div id="inspectorActMount"></div>
         <div id="inspectorArrangeMount"></div>
 
-        <h4 class="insp-section-title" id="inspectorAppearanceTitle">Appearance</h4>
+        <div class="insp-section-head">
+          <h4 class="insp-section-title" id="inspectorAppearanceTitle">Appearance</h4>
+          <button class="insp-btn insp-btn-quiet disabled" title="Reset the style of selected elements to defaults" id="resetSelectedElementsStyleBtn"
+                  onclick="cache.style.resetStyleForSelectedElements()">⟳ Reset style</button>
+        </div>
         <div id="inspectorAppearanceMount"></div>
       </section>
     </div>
