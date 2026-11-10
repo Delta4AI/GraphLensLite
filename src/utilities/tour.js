@@ -223,11 +223,10 @@ const TOUR_STEPS = [
            and <strong>Selection</strong>. It never switches on its own — the Selection tab flashes
            when the selection changes.
            <br><br>
-           Here you act on what is selected:
+           <strong>Act on selection</strong> works on what is selected:
            <br>• <strong>＋ Add to group</strong>
-           <br>• <strong>Expand / reduce</strong> by one hop, <strong>shortest path</strong> between two nodes
-           <br>• <strong>Arrange</strong> — pull together, spread out, or lay out just these nodes
-           <br>• <strong>⟳ Reset style</strong>`,
+           <br>• <strong>Grow</strong> by one hop, <strong>shortest path</strong> between two nodes
+           <br>• <strong>Arrange</strong> — pull together, spread out, or lay out just these nodes`,
     targets: [{ selector: '#inspectorSelection' }, { selector: '#inspectorPillSelection' }],
     position: 'left',
     action: 'openSelectionContext',
@@ -239,6 +238,7 @@ const TOUR_STEPS = [
            <br>• <strong>Nodes</strong> — shape, size, colour, border, label, badges, pie charts
            <br>• <strong>Edges</strong> — type, width, colour, arrows, halos, animated flow
            <br>• <strong>Map…</strong> — drive a style from your data or a metric, e.g. size by PageRank
+           <br>• <strong>⟳ Reset style</strong> — back to the defaults
            <br><br>
            Styles belong to the workspace.`,
     targets: [{ selector: '#inspectorAppearanceMount' }],

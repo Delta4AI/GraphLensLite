@@ -1330,8 +1330,7 @@ body {
     color: var(--danger-text);
 }
 
-.insp-groups,
-.insp-act-row {
+.insp-groups {
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
@@ -1342,51 +1341,6 @@ body {
     /* Matches .insp-note's, so the prose above and the tab bar below sit on one
        rhythm instead of the tools touching the tabs. */
     margin-bottom: 8px;
-}
-
-/* --- group membership (Selection context) ------------------------------- */
-
-/* Meaningless with nothing selected, so it follows .insp-act-row's rule rather
-   than invariant 4's "show and self-disable" — same reason, same treatment. */
-.sel-group-title,
-.sel-group-panel {
-    display: none;
-}
-
-#inspectorSelection.has-selection .sel-group-title {
-    display: block;
-}
-
-#inspectorSelection.has-selection .sel-group-panel {
-    display: flex;
-}
-
-.sel-group-panel {
-    align-items: center;
-    gap: 12px;
-    padding: 10px;
-    margin-bottom: 10px;
-    box-sizing: border-box;
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
-    background: var(--surface-2);
-}
-
-.sel-group-hint {
-    font-size: 11px;
-    line-height: 1.4;
-    color: var(--text-muted);
-}
-
-.sel-group-hint strong {
-    color: var(--text-strong);
-}
-
-/* clip-path used to clip the focus ring on the quadrant pie; a plain button
-   takes the standard one. */
-#addToGroupBtn:focus-visible {
-    outline: 2px solid var(--accent-text);
-    outline-offset: 2px;
 }
 
 /* --- Selection context: empty state vs live state --- */
@@ -1410,17 +1364,6 @@ body {
 
 #inspectorSelection.has-selection .insp-empty {
     display: none;
-}
-
-/* The act row is meaningless with nothing selected; everything below it
-   (arrange, appearance) stays rendered and self-disables, per invariant 4 —
-   a control that exists for this context is shown, not hidden. */
-.insp-act-row {
-    display: none;
-}
-
-#inspectorSelection.has-selection .insp-act-row {
-    display: flex;
 }
 
 .insp-empty-title {
@@ -2266,6 +2209,132 @@ h5 {
     color: var(--text);
     font-size: 13px;
     font-weight: 600;
+}
+
+/* A card with a header element of its own (Act on Selection: "Selection" and
+   its count) instead of the data-label pseudo-title. */
+.card-labeled.flat-card.has-head::before,
+.card-labeled.flat-card.flat-card-cont::before {
+    display: none;
+}
+
+.flat-card-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 5px 0 4px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.flat-card-head .layer-count {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-muted);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-variant-numeric: tabular-nums;
+    opacity: 1;
+}
+
+/* Arrange Selection continues the card above it. */
+.card-labeled.flat-card.flat-card-cont {
+    margin-top: 0;
+}
+
+/* Neo4j's Expand, under the Grow row, in the control column. */
+.sel-neo4j-row {
+    padding-left: 92px;
+}
+
+/* A section eyebrow that carries the section's own action at its end. */
+.insp-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 18px 0 4px;
+}
+
+.insp-section-head > .insp-section-title {
+    margin: 0;
+}
+
+/* A secondary action that should not compete with the rows: no border until
+   hovered or focused. */
+.insp-btn.insp-btn-quiet {
+    border-color: transparent;
+    background: none;
+    color: var(--text-muted);
+    padding: 1px 6px;
+}
+
+.insp-btn.insp-btn-quiet:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+/* The reason a row's action is blocked, shown only while it is. */
+.prop-hint {
+    display: none;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.prop-ctl:has(> .disabled) > .prop-hint {
+    display: inline;
+}
+
+/* A sub-group that folds to its heading plus a one-line summary. */
+.prop-fold-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    width: 100%;
+    background: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding-inline: 0;
+    padding-bottom: 2px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-strong);
+    text-align: left;
+    cursor: pointer;
+}
+
+.prop-fold-head:hover {
+    color: var(--accent-text);
+}
+
+.prop-fold-chevron {
+    flex: none;
+    width: 10px;
+    font-size: 10px;
+}
+
+.prop-fold-summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.prop-fold.collapsed > .prop-fold-body {
+    display: none;
+}
+
+/* "In selection" hangs under Fill color: no label of its own on screen (the
+   label stays for the palette and screen readers), the strip in the control
+   column. */
+.prop-row-selection-colors > .prop-label {
+    visibility: hidden;
 }
 
 /* Overlay cards (Groups pane, heatmap) keep their bar but share the rows. */

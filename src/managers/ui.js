@@ -269,6 +269,7 @@ class UIManager {
     this.toggleDisabledElements(
       [
         'Node Configuration',
+        'addToGroupBtn',
         'Expand Edges',
         'Reduce Edges',
         'Expand Neighbors',
@@ -840,11 +841,12 @@ class UIManager {
     div.innerHTML = '';
     div.appendChild(this.cache.metrics.buildMetricUI());
 
-    this.buildAddToGroupButton();
-
     this.buildFilterUI();
 
     this.buildStylingPanelUI();
+
+    // The button lives in the Act on Selection card, so after it is built.
+    this.buildAddToGroupButton();
 
     this.showUI(true);
 
