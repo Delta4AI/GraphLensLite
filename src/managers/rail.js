@@ -97,8 +97,9 @@ class RailMenu {
       }
       if (e.key === 'Escape') {
         // The menu is the innermost layer while it is open, so Escape belongs to
-        // it alone — Popup's own Escape would otherwise close the dialog under
-        // an open menu at the same time (the annotation popover does the same).
+        // it alone. preventDefault cancels a native dialog's close request under
+        // an open menu; stopPropagation keeps page-level Escape handlers out.
+        e.preventDefault();
         e.stopPropagation();
         this.close(); // restores focus to the anchor
       }

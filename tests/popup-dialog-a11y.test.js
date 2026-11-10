@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Popup } from '../src/utilities/popup.js';
 
 // ==========================================================================
@@ -21,6 +21,10 @@ beforeEach(() => {
   document.body.innerHTML = '';
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('Popup dialog semantics', () => {
   it('is a labelled, open modal dialog', () => {
     const showModal = vi.spyOn(HTMLDialogElement.prototype, 'showModal');
@@ -30,7 +34,6 @@ describe('Popup dialog semantics', () => {
     expect(el.tagName).toBe('DIALOG');
     expect(showModal).toHaveBeenCalledOnce();
     expect(el.open).toBe(true);
-    showModal.mockRestore();
     const labelId = el.getAttribute('aria-labelledby');
     expect(document.getElementById(labelId).textContent).toBe('Settings');
     popup.close();
@@ -101,15 +104,35 @@ describe('Popup dialog semantics', () => {
     expect(dialogs()).toHaveLength(0);
   });
 
+  it('keeps Escape from reaching page-level handlers behind it', () => {
+    const behind = vi.fn();
+    document.addEventListener('keydown', behind);
+    const popup = new Popup('<p>body</p>', { title: 'Settings' });
+
+    popup.popup.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(behind).not.toHaveBeenCalled();
+    document.removeEventListener('keydown', behind);
+    popup.close();
+  });
+
   it('closes on a backdrop click, not on a click inside', () => {
     const onClose = vi.fn();
     const popup = new Popup('<p>body</p>', { title: 'Settings', onClose });
     const el = popup.popup;
     el.getBoundingClientRect = () => ({ left: 100, top: 100, right: 300, bottom: 200 });
-    const clickAt = (x, y) =>
-      el.dispatchEvent(new window.MouseEvent('click', { clientX: x, clientY: y, bubbles: true }));
+    const at = (type, x, y) =>
+      el.dispatchEvent(new window.MouseEvent(type, { clientX: x, clientY: y, bubbles: true }));
+    const clickAt = (x, y) => {
+      at('pointerdown', x, y);
+      at('click', x, y);
+    };
 
     clickAt(150, 150); // the dialog's own border/padding
+    expect(onClose).not.toHaveBeenCalled();
+    // A text selection pressed inside and released over the backdrop.
+    at('pointerdown', 150, 150);
+    at('click', 20, 20);
     expect(onClose).not.toHaveBeenCalled();
     clickAt(20, 20); // the ::backdrop
     expect(onClose).toHaveBeenCalledOnce();
