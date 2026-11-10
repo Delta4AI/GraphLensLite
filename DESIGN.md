@@ -22,7 +22,7 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 
 ## Inspector rows
 
-- Every property is one row: a muted label column (84px) and a control column
+- Every property is one row: a muted label column (`--prop-label-w`, 76px) and a control column
   (`propRow` in `src/managers/ui_style_div.js`, `.prop-row` in CSS). Rows are
   28px tall, top-aligned, so a row whose controls wrap keeps its label on line one.
 - Labels are plain text tied to their control (`<label for>` or
@@ -35,17 +35,20 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
   command palette names a row by its sub-group ("Label size") so repeated
   labels stay distinct, and opens the fold to reveal it.
 - Headings come in three distinct levels, never two at the same weight:
-  1. Section: an uppercase eyebrow in the accent colour (`.insp-section-title`:
-     "Act on selection", "Appearance"). Every card sits under one. A section
-     action that applies to all its cards sits at the eyebrow's end
+  1. Section: an uppercase eyebrow in the accent colour followed by a hairline
+     to the panel edge (`.insp-section-title`: "Act on selection",
+     "Appearance"). Every card sits under one. A section action that applies to
+     all its cards sits at the eyebrow's end, after the rule
      (`.insp-section-head`: Appearance › ⟳ Reset style).
-  2. Card: 13px semibold in the text colour with a 1px hairline below, and its
-     count in mono after the title (`.flat-card`, `.appearance-card`: "Nodes
-     1000", "Selection 1000 nodes · 0 edges").
-  3. Sub-group: 12px semibold with a soft hairline above (`propFold`).
+  2. Card: a 26px brand-slate bar (`--insp-bar` tokens), 13px semibold title,
+     its count in mono after the title (`.flat-card-head`, `.appearance-card`:
+     "Nodes 1000", "Selection 1000 nodes · 0 edges"). The bar is the
+     Selection tab's character, after 1.17's card bars; it is for the Selection
+     tab's cards only.
+  3. Sub-group: 12px semibold on a soft `--surface-2` wash (`propFold`).
 - Every verb on the selection lives in one card: Group, Grow, Path, then
   Spacing and Layout. A blocked row says why inline ("needs exactly 2 nodes").
-- No dark bars in the inspector. The Overlays stack is one line per layer:
+- No dark bars outside the Selection tab's cards. The Overlays stack is one line per layer:
   switch, a small glyph of what the layer draws, name, then its count or
   action, over a hairline. An open layer's settings indent under its name.
 
@@ -73,11 +76,16 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - A control that is frozen (filters held by an edited query) is `disabled`,
   not just dimmed, so the keyboard skips it too. What only reads (fold a
   group, switch Node/Edge, search, the row's ⋯ menu) stays live.
-- "Map by data" is a column, not a button per row: in the Nodes and Edges
-  cards every row has a 24px third cell, headed **Map** once at the card's
-  top, holding a ◇ button where the property can be driven by data (its
-  accessible name says "map by data"). The app keeps no record of a mapping,
-  so the cell shows no on state.
+- "Map by data" sits inside the control it drives, never in a column of its
+  own: a rising-bars glyph in a number field's trailing edge (`.prop-map-btn`),
+  and the last swatch of a colour palette, a gradient with "⋯"
+  (`.prop-map-swatch`). Its accessible name says "map by data". Fill's swatch
+  opens a menu, Colour by data… then Pie chart… and Clear pie, because a pie
+  chart is a fill driven by data. The app keeps no record of a mapping, so
+  neither shows an on state.
+- A colour row is one line: well, hex field, palette, by-data swatch. When the
+  palette does not fit (a row with a None swatch at the default 356px), it
+  wraps to the next line as one block.
 - A "select all in this group" control is one tri-state checkbox (ticked,
   mixed, empty), not separate enable/disable buttons.
 
