@@ -9,7 +9,6 @@ import {
   createInput,
   createColorPicker,
   propRow,
-  propSubhead,
   propFold,
   rowValue,
   nameControl,
@@ -489,6 +488,19 @@ function createStyleDiv(cache) {
     return ["Label text", "Label position", "Label size"].map((name) => rowValue(body, name)).filter(Boolean).join(", ");
   }
 
+  /**
+   * For a sub-group behind its own on/off row: "off", or what the other rows
+   * hold ("triangle, 10"). Row names are the fold's ("Start arrow show").
+   */
+  function switchedSummary(toggleRow, rows) {
+    return (body) => {
+      const group = body.dataset.propGroup;
+      const shown = rowValue(body, `${group} ${toggleRow.toLowerCase()}`);
+      if (shown !== "on") return shown;
+      return rows.map((r) => rowValue(body, `${group} ${r.toLowerCase()}`)).filter(Boolean).join(", ");
+    };
+  }
+
   /** "none", the one spot in use ("top right"), or "3 badges". */
   function badgeSummary(body) {
     const rows = body.querySelectorAll(".badge-list-row");
@@ -513,22 +525,22 @@ function createStyleDiv(cache) {
       "Transparency of the selected edges (1 = opaque, 0 = invisible). Composes with the edge color's own alpha."),
     "Edge Opacity", E.OPACITY, {min: 0, max: 1, step: 0.05});
 
-    propSubhead(edgeDiv, "Label");
-    createLabelControls(propRow(edgeDiv, "Text"), "Edge Label");
-    createNumericalSlider(propRow(edgeDiv, "Size", "Font size of the selected edges' labels."),
+    const label = propFold(edgeDiv, "Label", {open: true, summary: labelSummary});
+    createLabelControls(propRow(label, "Text"), "Edge Label");
+    createNumericalSlider(propRow(label, "Size", "Font size of the selected edges' labels."),
       "Edge Label Font Size", E.LABEL.FONT_SIZE, {min: 10, max: 30, step: 1});
-    createCategoricalControls(propRow(edgeDiv, "Position", "Where along the edge the label sits."),
+    createCategoricalControls(propRow(label, "Position", "Where along the edge the label sits."),
       "Edge Label Placement", E.LABEL.PLACEMENT, D.STYLES.EDGE_LABEL_PLACEMENTS);
-    createSegmentedControls(propRow(edgeDiv, "Style"), "Edge Label Font Style", "normal", FONT_STYLE_OPTIONS);
-    createBooleanControls(propRow(edgeDiv, "Rotate", "Turn the label to follow the edge's direction."),
+    createSegmentedControls(propRow(label, "Style"), "Edge Label Font Style", "normal", FONT_STYLE_OPTIONS);
+    createBooleanControls(propRow(label, "Rotate", "Turn the label to follow the edge's direction."),
       "Edge Label Auto Rotate", undefined, "Follow edge");
-    createNumericalSlider(propRow(edgeDiv, "Offset X", "Label offset along the X-axis."),
+    createNumericalSlider(propRow(label, "Offset X", "Label offset along the X-axis."),
       "Edge Label Offset X", E.LABEL.OFFSET_X, {min: -100, max: 100, step: 1}, undefined, false);
-    createNumericalSlider(propRow(edgeDiv, "Offset Y", "Label offset along the Y-axis."),
+    createNumericalSlider(propRow(label, "Offset Y", "Label offset along the Y-axis."),
       "Edge Label Offset Y", E.LABEL.OFFSET_Y, {min: -100, max: 100, step: 1}, undefined, false);
-    createColorControls(propRow(edgeDiv, "Color", "Text color of the selected edges' labels."),
+    createColorControls(propRow(label, "Color", "Text color of the selected edges' labels."),
       "Edge Label Font Color", E.LABEL.FOREGROUND_COLOR, D.STYLES.EDGE_LABEL_COLORS);
-    createColorControls(propRow(edgeDiv, "Background", "Background color behind the selected edges' labels."),
+    createColorControls(propRow(label, "Background", "Background color behind the selected edges' labels."),
       "Edge Label Background Color", E.LABEL.BACKGROUND_COLOR, D.STYLES.EDGE_LABEL_BACKGROUND_COLORS);
 
     const typeHint =
@@ -537,42 +549,42 @@ function createStyleDiv(cache) {
       ["start", "Start", E.ARROWS.START_SIZE, E.ARROWS.START_TYPE, E.ARROWS.START_BORDER_SIZE],
       ["end", "End", E.ARROWS.END_SIZE, E.ARROWS.END_TYPE, E.ARROWS.END_BORDER_SIZE],
     ]) {
-      propSubhead(edgeDiv, `${Key} arrow`);
-      createBooleanControls(propRow(edgeDiv, "Show", `Draw a marker at the ${end} of the selected edges.`),
+      const arrow = propFold(edgeDiv, `${Key} arrow`, {summary: switchedSummary("Show", ["Shape", "Size"])});
+      createBooleanControls(propRow(arrow, "Show", `Draw a marker at the ${end} of the selected edges.`),
         `Edge ${Key} Arrow`, undefined, `${Key} arrow`);
-      createCategoricalControls(propRow(edgeDiv, "Shape", typeHint), `Edge ${Key} Arrow Type`, type,
+      createCategoricalControls(propRow(arrow, "Shape", typeHint), `Edge ${Key} Arrow Type`, type,
         D.STYLES.EDGE_ARROW_TYPES);
-      createNumericalSlider(propRow(edgeDiv, "Size", `Size of the ${end} marker.`), `Edge ${Key} Arrow Size`, size,
+      createNumericalSlider(propRow(arrow, "Size", `Size of the ${end} marker.`), `Edge ${Key} Arrow Size`, size,
         {min: 4, max: 40, step: 1});
-      createColorControls(propRow(edgeDiv, "Color", `Fill color of the ${end} marker. Unset inherits the edge color.`),
+      createColorControls(propRow(arrow, "Color", `Fill color of the ${end} marker. Unset inherits the edge color.`),
         `Edge ${Key} Arrow Color`, E.COLOR, D.STYLES.EDGE_ARROW_COLORS);
-      createColorControls(propRow(edgeDiv, "Border", `Outline color of the ${end} marker. None for no border.`),
+      createColorControls(propRow(arrow, "Border", `Outline color of the ${end} marker. None for no border.`),
         `Edge ${Key} Arrow Border Color`, E.HALO.COLOR, D.STYLES.EDGE_ARROW_BORDER_COLORS);
-      createNumericalSlider(propRow(edgeDiv, "Border width",
+      createNumericalSlider(propRow(arrow, "Border width",
         `Thickness of the ${end} marker border in px. 0 = auto (scales with the arrow).`),
       `Edge ${Key} Arrow Border Size`, borderSize, {min: 0, max: 20, step: 1});
     }
 
-    propSubhead(edgeDiv, "Halo");
-    createBooleanControls(propRow(edgeDiv, "Show", "Draw a halo around the selected edges."),
+    const halo = propFold(edgeDiv, "Halo", {summary: switchedSummary("Show", ["Width"])});
+    createBooleanControls(propRow(halo, "Show", "Draw a halo around the selected edges."),
       "Edge Halo", undefined, "Halo");
-    createColorControls(propRow(edgeDiv, "Color"), "Edge Halo Color", E.HALO.COLOR, D.STYLES.EDGE_COLORS);
-    createNumericalSlider(propRow(edgeDiv, "Width"), "Edge Halo Width", E.HALO.WIDTH, {min: 1, max: 30, step: 1});
+    createColorControls(propRow(halo, "Color"), "Edge Halo Color", E.HALO.COLOR, D.STYLES.EDGE_COLORS);
+    createNumericalSlider(propRow(halo, "Width"), "Edge Halo Width", E.HALO.WIDTH, {min: 1, max: 30, step: 1});
 
-    propSubhead(edgeDiv, "Flow");
-    createBooleanControls(propRow(edgeDiv, "Show",
+    const flow = propFold(edgeDiv, "Flow", {summary: switchedSummary("Show", ["Type", "Speed"])});
+    createBooleanControls(propRow(flow, "Show",
       "Animate a directional flow along the selected edges (source → target)."), "Edge Flow", undefined, "Flow");
-    createCategoricalControls(propRow(edgeDiv, "Type",
+    createCategoricalControls(propRow(flow, "Type",
       "dash = marching dashes, pulse = travelling dots, comet = fading tails, chevron = travelling arrows."),
     "Edge Flow Type", E.FLOW.TYPE, D.STYLES.EDGE_FLOW_TYPES);
-    createNumericalSlider(propRow(edgeDiv, "Speed", "Speed multiplier for the flow animation."),
+    createNumericalSlider(propRow(flow, "Speed", "Speed multiplier for the flow animation."),
       "Edge Flow Speed", E.FLOW.SPEED, {min: 0.2, max: 5, step: 0.2});
     // Unset (FLOW.COLOR null) derives a lighter shade of the edge color.
-    createColorControls(propRow(edgeDiv, "Color", "Color of the flow overlay. Unset derives it from the edge color."),
+    createColorControls(propRow(flow, "Color", "Color of the flow overlay. Unset derives it from the edge color."),
       "Edge Flow Color", E.FLOW.COLOR, D.STYLES.EDGE_COLORS);
-    createNumericalSlider(propRow(edgeDiv, "Opacity", "Opacity of the flow overlay."),
+    createNumericalSlider(propRow(flow, "Opacity", "Opacity of the flow overlay."),
       "Edge Flow Opacity", E.FLOW.OPACITY, {min: 0.1, max: 1, step: 0.05});
-    createNumericalSlider(propRow(edgeDiv, "Density",
+    createNumericalSlider(propRow(flow, "Density",
       "Pattern spacing multiplier — higher spreads the dashes/dots further apart."),
     "Edge Flow Density", E.FLOW.DENSITY, {min: 0.5, max: 3, step: 0.25});
   }
@@ -728,8 +740,12 @@ function createStyleDiv(cache) {
     rowAvoidance.appendChild(avoidanceSwitch);
 
     // Label (toggle + text input)
-    propSubhead(panel, "Label");
-    const rowLabel = propRow(panel, "Text", "Show the group's name on its outline.");
+    // "off", or what is drawn and where: "“Cluster 0”, bottom".
+    const labelFold = propFold(panel, "Label", {key: "Group.Label", summary: (body) =>
+      body.querySelector('.prop-row[data-name="Label text"] input[type="checkbox"]')?.checked
+        ? ["Label text", "Label position"].map((name) => rowValue(body, name)).filter(Boolean).join(", ")
+        : "off"});
+    const rowLabel = propRow(labelFold, "Text", "Show the group's name on its outline.");
     const enableTextSwitch = createSwitch(async () => {
       await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label`, enableTextSwitch.isChecked());
     }, undefined, bs.label);
@@ -749,7 +765,7 @@ function createStyleDiv(cache) {
     rowLabel.appendChild(labelInput);
 
     // Label Background (toggle + color)
-    const rowLabelBg = propRow(panel, "Background");
+    const rowLabelBg = propRow(labelFold, "Background");
     rowLabelBg.parentElement.classList.add(optionalCSSClass);
     const enableBackgroundSwitch = createSwitch(async () => {
       await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Background`, enableBackgroundSwitch.isChecked());
@@ -763,18 +779,18 @@ function createStyleDiv(cache) {
       bs.labelBackgroundFill || bs.fill, [], false);
 
     // Label Fill Color
-    const rowLabelFill = propRow(panel, "Color");
+    const rowLabelFill = propRow(labelFold, "Color");
     rowLabelFill.parentElement.classList.add(optionalCSSClass);
     createColorControls(rowLabelFill, `Bubble Set ${group} Label Fill Color`, bs.labelFill, [], false);
 
     // Label Font Size
-    const rowFontSize = propRow(panel, "Size");
+    const rowFontSize = propRow(labelFold, "Size");
     rowFontSize.parentElement.classList.add(optionalCSSClass);
     createNumericalSlider(rowFontSize, `Bubble Set ${group} Label Font Size`, bs.labelFontSize,
       {min: 6, max: 36, step: 1}, `Define the label font size for "${name}".`, false);
 
     // Label Placement
-    const rowPlacement = propRow(panel, "Position");
+    const rowPlacement = propRow(labelFold, "Position");
     rowPlacement.parentElement.classList.add(optionalCSSClass);
     const placementDropdown = document.createElement("select");
     placementDropdown.className = "prop-select";
@@ -792,7 +808,7 @@ function createStyleDiv(cache) {
     };
     rowPlacement.appendChild(placementDropdown);
 
-    const rowFontStyle = propRow(panel, "Style");
+    const rowFontStyle = propRow(labelFold, "Style");
     rowFontStyle.parentElement.classList.add(optionalCSSClass);
     // The same segmented B / I control as the selection's label style. A group
     // row is not a selection style, so its pressed state is kept here.
@@ -812,7 +828,7 @@ function createStyleDiv(cache) {
     pressFontStyle(bs.labelFontStyle ?? "normal");
 
     // Label Close To Path
-    const rowClosePath = propRow(panel, "Hug outline", "Keep the label close to the outline's path.");
+    const rowClosePath = propRow(labelFold, "Hug outline", "Keep the label close to the outline's path.");
     rowClosePath.parentElement.classList.add(optionalCSSClass);
     const closeToPathSwitch = createSwitch(async () => {
       await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Close To Path`, closeToPathSwitch.isChecked());
@@ -821,7 +837,7 @@ function createStyleDiv(cache) {
     rowClosePath.appendChild(closeToPathSwitch);
 
     // Label Auto Rotate
-    const rowAutoRotate = propRow(panel, "Rotate", "Turn the label to follow the outline.");
+    const rowAutoRotate = propRow(labelFold, "Rotate", "Turn the label to follow the outline.");
     rowAutoRotate.parentElement.classList.add(optionalCSSClass);
     const autoRotateSwitch = createSwitch(async () => {
       await cache.bs.updateBubbleSetStyle(`Bubble Set ${group} Label Auto Rotate`, autoRotateSwitch.isChecked());
@@ -830,20 +846,20 @@ function createStyleDiv(cache) {
     rowAutoRotate.appendChild(autoRotateSwitch);
 
     // Label Offset X
-    const rowOffsetX = propRow(panel, "Offset X");
+    const rowOffsetX = propRow(labelFold, "Offset X");
     rowOffsetX.parentElement.classList.add(optionalCSSClass);
     createNumericalSlider(rowOffsetX, `Bubble Set ${group} Label Offset X`, bs.labelOffsetX,
       {min: -50, max: 50, step: 1}, `Define the label X offset for "${name}".`, false);
 
     // Label Offset Y
-    const rowOffsetY = propRow(panel, "Offset Y");
+    const rowOffsetY = propRow(labelFold, "Offset Y");
     rowOffsetY.parentElement.classList.add(optionalCSSClass);
     createNumericalSlider(rowOffsetY, `Bubble Set ${group} Label Offset Y`, bs.labelOffsetY,
       {min: -50, max: 50, step: 1}, `Define the label Y offset for "${name}".`, false);
 
     // Dragging the label on the canvas moves it in graph space; this puts it
     // back on its outline (the offsets above stay as they are).
-    const rowResetPosition = propRow(panel, "Dragged",
+    const rowResetPosition = propRow(labelFold, "Dragged",
       "Drag the label on the canvas to place it; the Offset X/Y sliders above nudge it without dragging.",
       undefined, optionalCSSClass);
     const resetPosition = createButton("Reset",
@@ -851,6 +867,8 @@ function createStyleDiv(cache) {
       async () => await cache.bs.setLabelShift(group, 0, 0), `bubbleLabelShiftReset-${group}`);
     resetPosition.setAttribute("aria-label", `Reset the dragged label position of "${name}"`);
     rowResetPosition.appendChild(resetPosition);
+
+    labelFold.parentElement.updateSummary();
 
     // createSwitch knows nothing of its row: name any checkbox left unnamed
     // after its row, section and sub-group included ("Cluster 0 label rotate").
