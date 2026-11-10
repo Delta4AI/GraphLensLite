@@ -56,26 +56,34 @@ function parseTip(text) {
 }
 
 /**
- * Install the global tooltip layer. Call once at boot.
- * @param {Document} doc
+ * The one tooltip box and the hover state behind it: which element it belongs
+ * to, which titled elements are stripped to hold the native tooltip off, the
+ * pending show, and when the last tip hid (for the warm window).
  */
-function initUiTooltips(doc = document) {
-  const tip = doc.createElement('div');
-  tip.id = 'uiTip';
-  tip.className = 'ui-tip';
-  tip.setAttribute('role', 'tooltip');
-  doc.body.appendChild(tip);
+class TooltipLayer {
+  constructor(doc) {
+    this.doc = doc;
+    this.win = doc.defaultView ?? globalThis;
+    this.tip = doc.createElement('div');
+    this.tip.id = 'uiTip';
+    this.tip.className = 'ui-tip';
+    this.tip.setAttribute('role', 'tooltip');
+    doc.body.appendChild(this.tip);
+    this.anchor = null; // element the visible/pending tooltip belongs to
+    // The anchor plus any titled ancestors: the native tooltip falls back to the
+    // nearest ancestor title (e.g. the OR/AND segment inside the titled join
+    // group), so the whole chain must be stashed.
+    this.strippedEls = [];
+    this.timer = 0;
+    this.lastHideAt = -Infinity;
+  }
 
-  let anchor = null; // element the visible/pending tooltip belongs to
-  // The anchor plus any titled ancestors: the native tooltip falls back to the
-  // nearest ancestor title (e.g. the OR/AND segment inside the titled join
-  // group), so the whole chain must be stashed.
-  let strippedEls = [];
-  let timer = 0;
-  let lastHideAt = -Infinity;
-  const now = () => (doc.defaultView ?? globalThis).performance.now();
+  now() {
+    return this.win.performance.now();
+  }
 
-  function render(text) {
+  render(text) {
+    const { doc, tip } = this;
     const { lead, body, shortcut } = parseTip(text);
     tip.replaceChildren();
     if (lead) {
@@ -92,14 +100,14 @@ function initUiTooltips(doc = document) {
     }
   }
 
-  function position(el) {
+  position(el) {
+    const { tip, win } = this;
     // A modal <dialog> sits in the top layer above any z-index; render the
     // tooltip inside it so tips on dialog content stay visible.
-    const host = el.closest('dialog[open]') ?? doc.body;
+    const host = el.closest('dialog[open]') ?? this.doc.body;
     if (tip.parentNode !== host) host.appendChild(tip);
 
     const r = el.getBoundingClientRect();
-    const win = doc.defaultView ?? globalThis;
     tip.style.left = '0px';
     tip.style.top = '0px';
     tip.classList.add('show');
@@ -112,51 +120,51 @@ function initUiTooltips(doc = document) {
     tip.style.top = `${Math.max(VIEWPORT_MARGIN_PX, top)}px`;
   }
 
-  function show(el, text) {
+  show(el, text) {
     // The delayed show can outlive its anchor — panels rebuild their DOM on
     // filter changes; a detached rect would park the tip at the origin.
-    if (!el.isConnected) return hide();
-    render(text);
-    position(el);
+    if (!el.isConnected) return this.hide();
+    this.render(text);
+    this.position(el);
   }
 
   /** Suppress the native tooltip by moving title → data-tip while hovered,
    * on the element and every titled ancestor. */
-  function strip(el) {
+  strip(el) {
     for (let n = el; n; n = n.parentElement) {
       if (!n.hasAttribute('title')) continue;
       n.dataset.tip = n.getAttribute('title');
       n.removeAttribute('title');
-      strippedEls.push(n);
+      this.strippedEls.push(n);
     }
   }
 
-  function restore() {
-    for (const n of strippedEls) {
+  restore() {
+    for (const n of this.strippedEls) {
       // A writer may have set a fresh title mid-hover — never clobber it.
       if (!n.hasAttribute('title') && n.dataset.tip !== undefined) {
         n.setAttribute('title', n.dataset.tip);
       }
       delete n.dataset.tip;
     }
-    strippedEls = [];
+    this.strippedEls = [];
   }
 
   /** Hide the box but keep the anchor stripped — used on click, where the
    * pointer usually still rests on the element. */
-  function dismiss() {
-    clearTimeout(timer);
-    timer = 0;
-    if (tip.classList.contains('show')) {
-      tip.classList.remove('show');
-      lastHideAt = now();
+  dismiss() {
+    clearTimeout(this.timer);
+    this.timer = 0;
+    if (this.tip.classList.contains('show')) {
+      this.tip.classList.remove('show');
+      this.lastHideAt = this.now();
     }
   }
 
-  function hide() {
-    dismiss();
-    restore();
-    anchor = null;
+  hide() {
+    this.dismiss();
+    this.restore();
+    this.anchor = null;
   }
 
   /**
@@ -165,50 +173,39 @@ function initUiTooltips(doc = document) {
    * means it is never an event target either — hover-persistence (WCAG 1.4.13)
    * has to be tested against its box.
    */
-  function overTip(e) {
-    if (!tip.classList.contains('show')) return false;
-    const r = tip.getBoundingClientRect();
+  overTip(e) {
+    if (!this.tip.classList.contains('show')) return false;
+    const r = this.tip.getBoundingClientRect();
     return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
   }
 
-  function engage(el, { viaFocus = false } = {}) {
-    if (el === anchor) {
+  engage(el, { viaFocus = false } = {}) {
+    if (el === this.anchor) {
       // Focus showed the tip without stripping; a later hover still must
       // suppress the native tooltip.
-      if (!viaFocus) strip(el);
+      if (!viaFocus) this.strip(el);
       return;
     }
-    hide();
+    this.hide();
     const text = el.getAttribute('title') ?? el.dataset.tip;
     if (!text) return;
-    anchor = el;
-    if (!viaFocus) strip(el); // native tooltips only ever appear on hover
-    if (viaFocus || now() - lastHideAt < WARM_WINDOW_MS) {
-      show(el, text);
+    this.anchor = el;
+    if (!viaFocus) this.strip(el); // native tooltips only ever appear on hover
+    if (viaFocus || this.now() - this.lastHideAt < WARM_WINDOW_MS) {
+      this.show(el, text);
     } else {
-      timer = setTimeout(() => show(el, text), SHOW_DELAY_MS);
+      this.timer = setTimeout(() => this.show(el, text), SHOW_DELAY_MS);
     }
   }
+}
 
-  doc.addEventListener('pointerover', (e) => {
-    if (overTip(e)) return; // hovering the tip keeps it open (WCAG 1.4.13)
-    const el = e.target.closest?.('[title], [data-tip]');
-    if (el) engage(el);
-    else if (anchor && !anchor.contains(e.target)) hide();
-  });
-  doc.addEventListener('pointerout', (e) => {
-    if (anchor && !e.relatedTarget) hide(); // pointer left the window
-  });
-  doc.addEventListener('focusin', (e) => {
-    const el = e.target.closest?.('[title], [data-tip]');
-    if (el && el.matches(':focus-visible')) engage(el, { viaFocus: true });
-  });
-  doc.addEventListener('focusout', hide);
-  doc.addEventListener('pointerdown', dismiss);
-  // Titled `.disabled` controls keep their pointer events so the hover above
-  // can reach them (see style.css) — which also makes them clickable again.
-  // One capture-phase guard swallows those clicks for every class-disabled
-  // control at once; the alternative was a check in every handler.
+/**
+ * Titled `.disabled` controls keep their pointer events so the tooltip hover
+ * can reach them (see style.css) — which also makes them clickable again. One
+ * capture-phase guard swallows those clicks for every class-disabled control
+ * at once; the alternative was a check in every handler.
+ */
+function guardDisabledClicks(doc) {
   doc.addEventListener(
     'click',
     (e) => {
@@ -224,6 +221,32 @@ function initUiTooltips(doc = document) {
     },
     true
   );
+}
+
+/**
+ * Install the global tooltip layer. Call once at boot.
+ * @param {Document} doc
+ */
+function initUiTooltips(doc = document) {
+  const layer = new TooltipLayer(doc);
+  const hide = () => layer.hide();
+
+  doc.addEventListener('pointerover', (e) => {
+    if (layer.overTip(e)) return; // hovering the tip keeps it open (WCAG 1.4.13)
+    const el = e.target.closest?.('[title], [data-tip]');
+    if (el) layer.engage(el);
+    else if (layer.anchor && !layer.anchor.contains(e.target)) hide();
+  });
+  doc.addEventListener('pointerout', (e) => {
+    if (layer.anchor && !e.relatedTarget) hide(); // pointer left the window
+  });
+  doc.addEventListener('focusin', (e) => {
+    const el = e.target.closest?.('[title], [data-tip]');
+    if (el && el.matches(':focus-visible')) layer.engage(el, { viaFocus: true });
+  });
+  doc.addEventListener('focusout', hide);
+  doc.addEventListener('pointerdown', () => layer.dismiss());
+  guardDisabledClicks(doc);
   doc.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') hide();
   });
@@ -233,10 +256,11 @@ function initUiTooltips(doc = document) {
   // filter counts). A rewrite on the hovered chain would resurrect the native
   // tooltip — re-strip it. Our own strip/restore mutations no-op here: after
   // strip there is no title attribute left, after restore anchor is null.
-  new (doc.defaultView ?? globalThis).MutationObserver((mutations) => {
+  new layer.win.MutationObserver((mutations) => {
+    const { anchor } = layer;
     if (!anchor) return;
     for (const m of mutations) {
-      if (m.target === anchor || m.target.contains?.(anchor)) strip(anchor);
+      if (m.target === anchor || m.target.contains?.(anchor)) layer.strip(anchor);
     }
   }).observe(doc.documentElement, {
     attributes: true,
