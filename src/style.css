@@ -897,7 +897,7 @@ body {
 
 .layer-row .layer-row-action {
     margin-left: auto;
-    height: 22px;
+    height: 24px;
     padding: 0 8px;
     font-size: 11px;
     font-weight: 400;
@@ -1332,15 +1332,10 @@ body {
 }
 
 .insp-groups {
+    display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-}
-
-.insp-groups {
-    display: flex;
-    /* Matches .insp-note's, so the prose above and the tab bar below sit on one
-       rhythm instead of the tools touching the tabs. */
     margin-bottom: 8px;
 }
 
@@ -1958,18 +1953,14 @@ h5 {
     display: none;
 }
 
-/* The dark bar lives on the WRAPPER, not the header button, so a layer row's
-   switch sits inside it beside the title rather than out on the panel
-   background — the switch's contrast is designed against this bar. */
+/* The header row lives on the WRAPPER, not the header button, so a layer row's
+   switch sits inside it beside the title. */
 .card-collapse-bar {
     display: flex;
     align-items: center;
     gap: 7px;
     box-sizing: border-box;
-    padding: 0 8px;
-    background: var(--brand-border);
-    color: #fff;
-    border-radius: 4px;
+    color: var(--text);
 }
 
 .card-collapse-header {
@@ -1983,18 +1974,12 @@ h5 {
     padding: 4px 0;
     cursor: pointer;
     font: inherit;
-    font-weight: bold;
+    font-weight: 600;
     font-size: 13px;
 }
 
-/* Hover tints the whole bar, as it did when the header WAS the bar — reaching
-   up rather than colouring a block that stops short of the switch.
-
-   The brand accent in BOTH themes, not --accent-text: that token flips to
-   #e0635b in dark, where the bar's white bold title drops to 3.3:1. Fixed, it
-   is 5.2:1 — the same trade the layer switch makes below. */
 .card-collapse-bar:has(.card-collapse-header:hover) {
-    background: #C33D35;
+    color: var(--accent-text);
 }
 
 /* Pushes the count and the chevron to the right edge of the bar. */
@@ -2026,17 +2011,9 @@ h5 {
     margin: 0;
     padding: 0 2px;
     box-sizing: border-box;
-    border-radius: 0;
     border-bottom: 1px solid var(--border-soft);
-    background: none;
-    color: var(--text);
     font-weight: 600;
     font-size: 13px;
-}
-
-.card-labeled.layer-card > .card-collapse-bar:has(.card-collapse-header:hover) {
-    background: none;
-    color: var(--accent-text);
 }
 
 .card-labeled.layer-card {
@@ -2158,9 +2135,6 @@ h5 {
 
 .layer-switch[aria-checked="true"]::after {
     background: #fff;
-}
-
-.layer-switch[aria-checked="true"]::after {
     transform: translateX(12px);
 }
 
@@ -2223,16 +2197,7 @@ h5 {
 }
 
 .appearance-card > .card-collapse-bar {
-    background: none;
-    color: var(--text);
-    padding: 0;
     border-bottom: 1px solid var(--border);
-    border-radius: 0;
-}
-
-.appearance-card > .card-collapse-bar:has(.card-collapse-header:hover) {
-    background: none;
-    color: var(--accent-text);
 }
 
 /* Inspector heading levels: section (.insp-section-title, accent eyebrow) >
@@ -2247,7 +2212,8 @@ h5 {
     flex: 0 1 auto;
 }
 
-.appearance-card .layer-count {
+.appearance-card .layer-count,
+.flat-card-count {
     flex: 1 1 auto;
     text-align: left;
     font-size: 11px;
@@ -2256,7 +2222,6 @@ h5 {
     font-family: var(--font-mono, ui-monospace, monospace);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
-    opacity: 1;
 }
 
 /* Act on Selection / Arrange Selection / Select Elements: the same flat
@@ -2304,13 +2269,8 @@ h5 {
     font-weight: 600;
 }
 
-.flat-card-head .layer-count {
-    font-size: 11px;
-    font-weight: 400;
-    color: var(--text-muted);
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-variant-numeric: tabular-nums;
-    opacity: 1;
+#inspectorActMount > .flat-card {
+    padding-bottom: 0;
 }
 
 /* Arrange Selection continues the card above it. */
@@ -2404,9 +2364,9 @@ h5 {
     display: none;
 }
 
-/* "In selection" hangs under Fill color: no label of its own on screen (the
-   label stays for the palette and screen readers), the strip in the control
-   column. */
+/* "In selection" hangs under Fill color: no label of its own (the element
+   stays as the palette's row name and holds the label column), the strip in
+   the control column. Each segment names itself for screen readers. */
 .prop-row-selection-colors > .prop-label {
     visibility: hidden;
 }
@@ -2795,7 +2755,7 @@ h5 {
     display: block;
     height: 12px;
     border-radius: 2px;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 18%, transparent);
 }
 
 .prop-chip > span {
@@ -3018,7 +2978,7 @@ h5 {
 
 .filter-hist > i {
     flex: 1 1 0;
-    background: var(--surface-3);
+    background: var(--border);
     border-radius: 1px 1px 0 0;
 }
 
@@ -3230,7 +3190,7 @@ h5 {
 
 /* The chosen mode's options, to the right of the switch. */
 .filter-mode-options {
-    flex: 1 1 120px;
+    flex: 1 1 160px;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -4268,8 +4228,9 @@ div[slider] > input[type=range]::-ms-tooltip {
     cursor: pointer;
 }
 
+/* --surface-3, not --row-hover: muted counts on the dark --row-hover fall to 4.47:1. */
 .group-row:hover {
-    background: var(--row-hover);
+    background: var(--surface-3);
 }
 
 .group-row.active {
@@ -4333,7 +4294,7 @@ div[slider] > input[type=range]::-ms-tooltip {
     background: transparent;
     color: var(--text-strong);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     text-overflow: ellipsis;
 }
 
@@ -4365,7 +4326,7 @@ div[slider] > input[type=range]::-ms-tooltip {
     width: 28px;
     height: 4px;
     border-radius: 2px;
-    background: var(--surface-3);
+    background: var(--border-soft);
     overflow: hidden;
 }
 
@@ -4430,7 +4391,7 @@ div[slider] > input[type=range]::-ms-tooltip {
 .group-row .group-style-panel {
     margin: 4px 0 6px 24px;
     padding-left: 8px;
-    border-left: 2px solid var(--row-color, var(--border));
+    border-left: 2px solid color-mix(in srgb, var(--row-color, var(--border)) 60%, var(--text-muted));
 }
 
 /* --- the shared group menu ---------------------------------------------- */
@@ -4519,18 +4480,21 @@ div[slider] > input[type=range]::-ms-tooltip {
     overflow: hidden;
 }
 
+/* Dropped: a hollow outline (3:1+ in both themes), so narrowing greys values
+   out instead of making them vanish. */
 .filter-cat-bar > i {
     flex-basis: 0;
     min-width: 1px;
-    background: var(--surface-3);
+    box-shadow: inset 0 0 0 1px var(--text-faint);
 }
 
 .filter-cat-bar > i.kept {
     background: color-mix(in srgb, var(--brand-text) 70%, transparent);
+    box-shadow: none;
 }
 
 .filter-cat-bar > i.kept:nth-child(even) {
-    background: color-mix(in srgb, var(--brand-text) 45%, transparent);
+    background: color-mix(in srgb, var(--brand-text) 50%, transparent);
 }
 
 .filter-cat-total,

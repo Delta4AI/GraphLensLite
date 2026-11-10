@@ -669,7 +669,6 @@ class UIManager {
     return { sets, nodes: covered.size };
   }
 
-
   /** @param {'groups'|'heatmap'|'notes'|'minimap'} name */
   toggleOverlay(name) {
     const spec = UIManager.OVERLAYS[name];

@@ -113,13 +113,14 @@ picture is also a reading of the graph, in the slate neutrals, with the accent
 kept for state.
 
 - Numeric filters draw the column's distribution over the track; bars the
-  filter keeps are tinted, the rest grey.
+  filter keeps are tinted slate, the rest a quieter grey.
 - Category filters show each value's share of the graph inside the closed
-  field, kept values slate and dropped ones grey. No colour per value: the app
+  field, kept values filled slate and dropped ones a hollow outline. No colour per value: the app
   has none, and inventing one would suggest an encoding that is not there.
 - Counts sit where they explain something: the filter census beside the
   Node/Edge switch, "N filters" at the end of a filter group's rule, a group's
-  share of all nodes as a bar beside its count, "4 groups · 500 nodes" on the
+  size against the largest group as a bar beside its count (its share of the
+  graph in the tooltip), "4 groups · 500 nodes" on the
   Groups layer.
 
 ## Top bar

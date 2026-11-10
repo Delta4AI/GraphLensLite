@@ -419,7 +419,7 @@ class GraphBubbleSetManager {
       bubbleStyle.label ? elem.classList.remove("disabled") : elem.classList.add("disabled");
     }
 
-    // Membership changed, so the layer row's "N sets" is stale.
+    // Membership changed, so the layer row's "N groups · M nodes" is stale.
     this.cache.ui?.syncOverlays?.();
   }
 

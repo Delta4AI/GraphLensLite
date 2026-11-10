@@ -167,6 +167,21 @@ describe('folded sub-groups (Label, Badges)', () => {
     expect(fold('Badges').querySelector('.prop-fold-summary').textContent).toBe('· none');
   });
 
+  it('says "off" for a switched-off sub-group, and what it draws once on', () => {
+    const cache = mount([node('a')]);
+    const edge = { id: 'a::b', source: 'a', target: 'b', style: {} };
+    cache.edgeRef.set(edge.id, edge);
+    cache.selectedEdges = [edge.id];
+    const halo = () => [...document.querySelectorAll('[data-label="Edge Configuration"] .prop-fold')]
+      .find((f) => f.querySelector('.prop-fold-head span:nth-child(2)').textContent === 'Halo');
+    cache.ui.refreshStyleControls();
+    expect(halo().querySelector('.prop-fold-summary').textContent).toBe('· off');
+    edge.style.halo = true;
+    edge.style.haloLineWidth = 7;
+    cache.ui.refreshStyleControls();
+    expect(halo().querySelector('.prop-fold-summary').textContent).toBe('· 7');
+  });
+
   it('remembers a fold the viewer opened, across a rebuild', () => {
     localStorage.clear();
     mount([node('a')]);

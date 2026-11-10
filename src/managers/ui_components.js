@@ -128,8 +128,8 @@ class DropdownChecklist {
     for (const seg of this.shareBar?.children ?? []) seg.classList.toggle('kept', kept.has(seg.dataset.value));
   }
 
-  /** How many elements carry each value, over the whole graph. Counted on open:
-   * values change with the data editor and the list is opened rarely. */
+  /** How many elements carry each value, over the whole graph. Counted for the
+   * share bar when the field is built (every load and data edit) and again on open. */
   #countValues() {
     const counts = new Map();
     let carriers = 0;
