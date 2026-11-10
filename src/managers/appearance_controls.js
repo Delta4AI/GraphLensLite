@@ -347,12 +347,15 @@ function createAppearanceControls(cache) {
     refreshStyleControls();
   }
 
-  /** Map by data: a labelled button at the end of a numeric or colour row. */
+  /**
+   * Map by data: the row's cell in the card's Map column (the column header
+   * labels it; the button's own name says "map by data").
+   */
   function createMapButton(parent, property, title, sentinel) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "insp-btn prop-map-btn";
-    btn.textContent = "Map…";
+    btn.className = "prop-map-btn";
+    btn.textContent = "◇";
     btn.title = title;
     btn.dataset.property = property;
     nameControl(parent, btn, property, "— map by data");
@@ -360,7 +363,9 @@ function createAppearanceControls(cache) {
       if (sentinel === "set_numeric_scale") cache.numericPicker.currentProperty = property;
       Promise.resolve(handleStyleChangeEvent(property, sentinel)).catch(reportButtonFailure);
     };
-    parent.appendChild(btn);
+    // The row's third column when built into a propRow; inline otherwise.
+    const row = parent.parentElement?.classList.contains("prop-row") ? parent.parentElement : parent;
+    row.appendChild(btn);
     return btn;
   }
 
@@ -711,8 +716,9 @@ function createAppearanceControls(cache) {
 
   /**
    * The "In selection" row (after Figma's Selection colors): while a colour is
-   * mixed, list each distinct colour with how many elements carry it; picking
-   * a new colour for one recolours just those elements.
+   * mixed, one strip of the selection's colours, each segment as wide as its
+   * share and labelled with its count; picking a new colour for a segment
+   * recolours just those elements.
    */
   function createSelectionColorsRow(parentCard, property, noun) {
     const MAX_CHIPS = 8;
@@ -724,7 +730,7 @@ function createAppearanceControls(cache) {
     row.hidden = true;
 
     const chips = document.createElement("div");
-    chips.className = "prop-chips";
+    chips.className = "prop-share";
     let expanded = false;
     const more = document.createElement("button");
     more.type = "button";
@@ -765,6 +771,8 @@ function createAppearanceControls(cache) {
         const chip = document.createElement("button");
         chip.type = "button";
         chip.className = "prop-chip";
+        // Width by share; CSS keeps every segment a 24px target.
+        chip.style.flexGrow = String(bucket.ids.length);
         const dot = document.createElement("i");
         dot.style.background = safePaint(bucket.color, "transparent");
         const count = document.createElement("span");
