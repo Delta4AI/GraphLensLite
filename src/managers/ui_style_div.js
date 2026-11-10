@@ -274,16 +274,20 @@ function createStyleDiv(cache) {
     head.className = "flat-card-head";
     head.textContent = "Selection";
     const count = document.createElement("span");
-    count.className = "layer-count";
+    count.className = "flat-card-count";
     count.id = "actSelectionCount";
     head.appendChild(count);
     actDiv.appendChild(head);
 
     // ui.js wires its menu (buildAddToGroupButton) after this card is mounted.
-    const addToGroup = propButton(propRow(actDiv, "Group"), "＋ Add to group ⌄",
-      "Add or remove the selected nodes in a bubble group. Groups are listed under Overlays › Groups, " +
-      "where you can rename, recolour and restyle them.", () => {}, "addToGroupBtn");
-    addToGroup.onclick = null; // the RailMenu owns the click
+    const addToGroup = document.createElement("button");
+    addToGroup.type = "button";
+    addToGroup.id = "addToGroupBtn";
+    addToGroup.className = "insp-btn";
+    addToGroup.textContent = "＋ Add to group ⌄";
+    addToGroup.title = "Add or remove the selected nodes in a bubble group. Groups are listed under " +
+      "Overlays › Groups, where you can rename, recolour and restyle them.";
+    propRow(actDiv, "Group").appendChild(addToGroup);
 
     // The ids are what ui.js gates on (toggleDisabledElements), so they keep
     // the full names; the visible text is the short form, and the accessible
@@ -489,13 +493,13 @@ function createStyleDiv(cache) {
   }
 
   /**
-   * For a sub-group behind its own on/off row: "off", or what the other rows
+   * For a sub-group behind its own Show row: "off", or what the other rows
    * hold ("triangle, 10"). Row names are the fold's ("Start arrow show").
    */
-  function switchedSummary(toggleRow, rows) {
+  function switchedSummary(rows) {
     return (body) => {
       const group = body.dataset.propGroup;
-      const shown = rowValue(body, `${group} ${toggleRow.toLowerCase()}`);
+      const shown = rowValue(body, `${group} show`);
       if (shown !== "on") return shown;
       return rows.map((r) => rowValue(body, `${group} ${r.toLowerCase()}`)).filter(Boolean).join(", ");
     };
@@ -549,7 +553,7 @@ function createStyleDiv(cache) {
       ["start", "Start", E.ARROWS.START_SIZE, E.ARROWS.START_TYPE, E.ARROWS.START_BORDER_SIZE],
       ["end", "End", E.ARROWS.END_SIZE, E.ARROWS.END_TYPE, E.ARROWS.END_BORDER_SIZE],
     ]) {
-      const arrow = propFold(edgeDiv, `${Key} arrow`, {summary: switchedSummary("Show", ["Shape", "Size"])});
+      const arrow = propFold(edgeDiv, `${Key} arrow`, {summary: switchedSummary(["Shape", "Size"])});
       createBooleanControls(propRow(arrow, "Show", `Draw a marker at the ${end} of the selected edges.`),
         `Edge ${Key} Arrow`, undefined, `${Key} arrow`);
       createCategoricalControls(propRow(arrow, "Shape", typeHint), `Edge ${Key} Arrow Type`, type,
@@ -565,13 +569,13 @@ function createStyleDiv(cache) {
       `Edge ${Key} Arrow Border Size`, borderSize, {min: 0, max: 20, step: 1});
     }
 
-    const halo = propFold(edgeDiv, "Halo", {summary: switchedSummary("Show", ["Width"])});
+    const halo = propFold(edgeDiv, "Halo", {summary: switchedSummary(["Width"])});
     createBooleanControls(propRow(halo, "Show", "Draw a halo around the selected edges."),
       "Edge Halo", undefined, "Halo");
     createColorControls(propRow(halo, "Color"), "Edge Halo Color", E.HALO.COLOR, D.STYLES.EDGE_COLORS);
     createNumericalSlider(propRow(halo, "Width"), "Edge Halo Width", E.HALO.WIDTH, {min: 1, max: 30, step: 1});
 
-    const flow = propFold(edgeDiv, "Flow", {summary: switchedSummary("Show", ["Type", "Speed"])});
+    const flow = propFold(edgeDiv, "Flow", {summary: switchedSummary(["Type", "Speed"])});
     createBooleanControls(propRow(flow, "Show",
       "Animate a directional flow along the selected edges (source → target)."), "Edge Flow", undefined, "Flow");
     createCategoricalControls(propRow(flow, "Type",
@@ -692,7 +696,6 @@ function createStyleDiv(cache) {
     // carries its name, colour and count.
     const name = bs.labelText || group;
     panel.dataset.propSection = name;
-    delete panel.dataset.propGroup; // the pane is rebuilt per group
 
     // Fill Color
     const rowFillColor = propRow(panel, "Fill color");

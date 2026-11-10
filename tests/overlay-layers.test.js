@@ -167,7 +167,7 @@ describe('UIManager overlay layer stack', () => {
     expect(sw('Notes').title).toBe('Show or hide every text note');
   });
 
-  it('counts a group with no members as nothing to draw, like the "N sets" label', () => {
+  it('counts a group with no members as nothing to draw, like the "N groups" label', () => {
     // The two must not disagree: "" sets beside an enabled switch would read as
     // a broken count rather than an empty layer.
     const [ui, cache] = makeUI();

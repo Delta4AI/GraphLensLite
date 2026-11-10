@@ -306,8 +306,11 @@ function createAppearanceControls(cache) {
     setCount("styleEdgeCount", edges.length);
     const plural = (n, noun) => `${n} ${noun}${n === 1 ? "" : "s"}`;
     for (const fold of document.querySelectorAll(".prop-fold")) fold.updateSummary?.();
-    setCount("actSelectionCount", nodes.length + edges.length
-      ? `${plural(nodes.length, "node")} · ${plural(edges.length, "edge")}` : "");
+    const actCount = document.getElementById("actSelectionCount");
+    if (actCount) {
+      actCount.textContent = nodes.length + edges.length
+        ? `${plural(nodes.length, "node")} · ${plural(edges.length, "edge")}` : "";
+    }
   }
 
   /** gcm.updateNodes or updateEdges, by the property's target. */
@@ -354,9 +357,7 @@ function createAppearanceControls(cache) {
       if (sentinel === "set_numeric_scale") cache.numericPicker.currentProperty = property;
       Promise.resolve(handleStyleChangeEvent(property, sentinel)).catch(reportButtonFailure);
     };
-    // The row's third column when built into a propRow; inline otherwise.
-    const row = parent.parentElement?.classList.contains("prop-row") ? parent.parentElement : parent;
-    row.appendChild(btn);
+    parent.parentElement.appendChild(btn); // the row's third column
     return btn;
   }
 

@@ -46,7 +46,7 @@ function groupDot(color) {
 const attached = new WeakMap();
 
 export function attachGroupMenu(anchor, cache, getOpts) {
-  // buildUI re-wires the static Selection-panel button on every graph load and
+  // buildUI re-wires the Selection panel's Add-to-group button (rebuilt with its card) on every graph load and
   // data edit. Each attach used to add another click listener to the same
   // button, so one click opened one menu per load.
   attached.get(anchor)?.destroy();
