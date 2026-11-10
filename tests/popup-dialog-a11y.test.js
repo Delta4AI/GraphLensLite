@@ -115,6 +115,18 @@ describe('Popup dialog semantics', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('still closes the modal when onClose throws, and runs onClose once', () => {
+    const onClose = vi.fn(() => {
+      throw new Error('caller bug');
+    });
+    const popup = new Popup('<p>body</p>', { title: 'Settings', onClose });
+
+    expect(() => popup.close()).toThrow('caller bug');
+    expect(dialogs()).toHaveLength(0); // the page behind is not left inert
+    popup.close();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it('leaves the document once closed', () => {
     const onClose = vi.fn();
     const popup = new Popup('<p>body</p>', { title: 'Settings', onClose });

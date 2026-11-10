@@ -412,18 +412,22 @@ class Popup {
   }
 
   close() {
+    if (this._closed) return; // an onClose that closes again must not re-run itself
+    this._closed = true;
     if (this._resizeHandler) {
       window.removeEventListener('resize', this._resizeHandler);
       this._resizeHandler = null;
     }
-    if (this.options.onClose) {
-      this.options.onClose();
+    try {
+      this.options.onClose?.();
+    } finally {
+      // Even when onClose throws: a modal left open keeps the whole page inert.
+      this.popup.close();
+      this.popup.remove();
+      // Only if it is still in the document — the popup may have replaced the
+      // very control that opened it.
+      if (this._invoker?.isConnected) this._invoker.focus?.();
     }
-    this.popup.close();
-    this.popup.remove();
-    // Only if it is still in the document — the popup may have replaced the very
-    // control that opened it.
-    if (this._invoker?.isConnected) this._invoker.focus?.();
   }
 }
 
