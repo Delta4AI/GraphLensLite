@@ -156,3 +156,24 @@ describe('heatmap card names', () => {
     expect(card.querySelector('input[type="range"]').getAttribute('aria-label')).toMatch(/^Heatmap /);
   });
 });
+
+describe('folded sub-groups (Label, Badges)', () => {
+  const fold = (name) => [...document.querySelectorAll('[data-label="Node Configuration"] .prop-fold')]
+    .find((f) => f.querySelector('.prop-fold-head span:nth-child(2)').textContent === name);
+
+  it('sums up what the selection carries on the folded line', () => {
+    mount([node('a', { labelFontSize: 14, labelPlacement: 'top' }), node('b', { labelFontSize: 14, labelPlacement: 'top' })]);
+    expect(fold('Label').querySelector('.prop-fold-summary').textContent).toBe('· Label, top, 14');
+    expect(fold('Badges').querySelector('.prop-fold-summary').textContent).toBe('· none');
+  });
+
+  it('remembers a fold the viewer opened, across a rebuild', () => {
+    localStorage.clear();
+    mount([node('a')]);
+    expect(fold('Badges').classList.contains('collapsed')).toBe(true);
+    fold('Badges').querySelector('.prop-fold-head').click();
+    mount([node('a')]);
+    expect(fold('Badges').classList.contains('collapsed')).toBe(false);
+    expect(fold('Badges').querySelector('.prop-fold-head').getAttribute('aria-expanded')).toBe('true');
+  });
+});

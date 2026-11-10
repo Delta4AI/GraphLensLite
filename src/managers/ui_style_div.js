@@ -10,6 +10,8 @@ import {
   createColorPicker,
   propRow,
   propSubhead,
+  propFold,
+  rowValue,
   nameControl,
 } from "./appearance_controls.js";
 
@@ -213,6 +215,7 @@ function createNodeBadgeControls(cache, parent, listParent) {
       row.append(swatch, slot, text, count, edit, remove);
       list.appendChild(row);
     }
+    listParent.closest(".prop-fold")?.updateSummary?.();
   }
 
   const refresh = () => {
@@ -265,29 +268,53 @@ function createStyleDiv(cache) {
   // the inspector's selection context next to the thing it operates on.
   function createActOnSelectionCard() {
     const actDiv = createCard("Act on Selection", undefined, "flat-card");
+    actDiv.classList.add("has-head");
+    // The card's own header: "Selection" and what it holds. data-label stays
+    // the lookup key (CARD_MOUNTS, the palette breadcrumb, the tests).
+    const head = document.createElement("div");
+    head.className = "flat-card-head";
+    head.textContent = "Selection";
+    const count = document.createElement("span");
+    count.className = "layer-count";
+    count.id = "actSelectionCount";
+    head.appendChild(count);
+    actDiv.appendChild(head);
+
+    // ui.js wires its menu (buildAddToGroupButton) after this card is mounted.
+    const addToGroup = propButton(propRow(actDiv, "Group"), "＋ Add to group ⌄",
+      "Add or remove the selected nodes in a bubble group. Groups are listed under Overlays › Groups, " +
+      "where you can rename, recolour and restyle them.", () => {}, "addToGroupBtn");
+    addToGroup.onclick = null; // the RailMenu owns the click
 
     // The ids are what ui.js gates on (toggleDisabledElements), so they keep
-    // the full names while the row label carries the noun.
-    const edges = propRow(actDiv, "Edges");
-    propButton(edges, "Expand", "Add all edges connected to the currently selected nodes to the selection",
-      async () => await cache.sm.toggleSelectionByNeighbors("expand-edges"), "Expand Edges");
-    propButton(edges, "Reduce", "Remove edges that do not connect two selected nodes",
-      async () => await cache.sm.toggleSelectionByNeighbors("reduce-edges"), "Reduce Edges");
-
-    const neighbors = propRow(actDiv, "Neighbors");
-    propButton(neighbors, "Expand",
-      "Add all directly connected neighbor nodes (and their edges) to the current selection",
-      async () => await cache.sm.toggleSelectionByNeighbors("expand-neighbors"), "Expand Neighbors");
-    propButton(neighbors, "Reduce",
-      "Remove the outermost layer of selected neighbor nodes (and their edges) from the selection",
-      async () => await cache.sm.toggleSelectionByNeighbors("reduce-neighbors"), "Reduce Neighbors");
-
-    propButton(propRow(actDiv, "Path"), "Shortest path",
-      "Add the shortest path connecting the two selected nodes — its nodes and the edges between them — to the selection.\nComputed on the visible graph, so it honours active filters.\nRequires exactly two selected nodes.",
-      async () => await cache.sm.selectShortestPathBetweenSelected(), "Shortest Path");
-    for (const btn of actDiv.querySelectorAll("button")) {
-      btn.setAttribute("aria-label", btn.id.replace(/ (\w)/, (_, c) => ` ${c.toLowerCase()}`));
+    // the full names; the visible text is the short form, and the accessible
+    // name starts with it (WCAG 2.5.3) before saying the verb in full.
+    const grow = propRow(actDiv, "Grow", "Grow or shrink the selection by one hop.");
+    for (const [text, verb, title, mode, id] of [
+      ["Edges ＋", "expand edges", "Add all edges connected to the currently selected nodes to the selection",
+        "expand-edges", "Expand Edges"],
+      ["−", "reduce edges", "Remove edges that do not connect two selected nodes", "reduce-edges", "Reduce Edges"],
+      ["Neighbors ＋", "expand neighbors",
+        "Add all directly connected neighbor nodes (and their edges) to the current selection",
+        "expand-neighbors", "Expand Neighbors"],
+      ["−", "reduce neighbors",
+        "Remove the outermost layer of selected neighbor nodes (and their edges) from the selection",
+        "reduce-neighbors", "Reduce Neighbors"],
+    ]) {
+      propButton(grow, text, title, async () => await cache.sm.toggleSelectionByNeighbors(mode), id)
+        .setAttribute("aria-label", `${text}: ${verb}`);
     }
+
+    const path = propRow(actDiv, "Path");
+    propButton(path, "Shortest path",
+      "Add the shortest path connecting the two selected nodes — its nodes and the edges between them — to the selection.\nComputed on the visible graph, so it honours active filters.\nRequires exactly two selected nodes.",
+      async () => await cache.sm.selectShortestPathBetweenSelected(), "Shortest Path")
+      .setAttribute("aria-label", "Shortest path");
+    // Shown by CSS while the button is disabled: the reason, inline.
+    const needs = document.createElement("span");
+    needs.className = "prop-hint";
+    needs.textContent = "needs exactly 2 nodes";
+    path.appendChild(needs);
   }
 
   function createSelectCard() {
@@ -376,8 +403,11 @@ function createStyleDiv(cache) {
     }
   }
 
+  // Drawn as the lower rows of the Act on Selection card (no header of its
+  // own), but a card of its own: it needs two nodes, and ui.js disables it whole.
   function createArrangeNodesCard() {
     const arrDiv = createCard("Arrange Selection", undefined, "flat-card");
+    arrDiv.classList.add("flat-card-cont");
     const arrange = (mode) => async () => await cache.lm.layoutSelectedNodes(mode);
 
     const spacing = propRow(arrDiv, "Spacing");
@@ -431,27 +461,40 @@ function createStyleDiv(cache) {
     createNumericalSlider(propRow(nodeDiv, "Opacity", opacityHint), "Node Opacity", D.NODE.OPACITY,
       {min: 0, max: 1, step: 0.05});
 
-    propSubhead(nodeDiv, "Label");
-    createLabelControls(propRow(nodeDiv, "Text"), "Node Label", true);
-    createNumericalSlider(propRow(nodeDiv, "Size", "Font size of the selected nodes' labels."),
+    const label = propFold(nodeDiv, "Label", {open: true, summary: labelSummary});
+    createLabelControls(propRow(label, "Text"), "Node Label", true);
+    createNumericalSlider(propRow(label, "Size", "Font size of the selected nodes' labels."),
       "Node Label Font Size", D.NODE.LABEL.FONT_SIZE, {min: 10, max: 30, step: 1});
-    createCategoricalControls(propRow(nodeDiv, "Position", "Where the label sits relative to the node."),
+    createCategoricalControls(propRow(label, "Position", "Where the label sits relative to the node."),
       "Node Label Placement", D.NODE.LABEL.PLACEMENT, D.STYLES.NODE_LABEL_PLACEMENTS);
-    createSegmentedControls(propRow(nodeDiv, "Style"), "Node Label Font Style", "normal", FONT_STYLE_OPTIONS);
-    createColorControls(propRow(nodeDiv, "Color", "Text color of the selected nodes' labels."),
+    createSegmentedControls(propRow(label, "Style"), "Node Label Font Style", "normal", FONT_STYLE_OPTIONS);
+    createColorControls(propRow(label, "Color", "Text color of the selected nodes' labels."),
       "Node Label Font Color", D.NODE.LABEL.FOREGROUND_COLOR, D.STYLES.NODE_LABEL_COLORS);
-    createColorControls(propRow(nodeDiv, "Background", "Background color behind the selected nodes' labels."),
+    createColorControls(propRow(label, "Background", "Background color behind the selected nodes' labels."),
       "Node Label Background Color", D.NODE.LABEL.BACKGROUND_COLOR, D.STYLES.NODE_LABEL_BACKGROUND_COLORS);
 
-    propSubhead(nodeDiv, "Badges");
+    const badges = propFold(nodeDiv, "Badges", {summary: badgeSummary});
     // selection.js refreshes it on every selection change.
     cache.ui.refreshBadgeControls = createNodeBadgeControls(cache,
-      propRow(nodeDiv, "Add", "Set a badge on the selected nodes, one per spot on the node's edge."), nodeDiv).refresh;
-    const badgeSize = propRow(nodeDiv, "Size", "Font size (and pill size) of the selected nodes' badges.");
+      propRow(badges, "Add", "Set a badge on the selected nodes, one per spot on the node's edge."), badges).refresh;
+    const badgeSize = propRow(badges, "Size", "Font size (and pill size) of the selected nodes' badges.");
     createNumericalSlider(badgeSize, "Node Badge Font Size", D.NODE.BADGE.FONT_SIZE, {min: 4, max: 32, step: 1});
-    createBooleanControls(propRow(nodeDiv, "Scale",
+    createBooleanControls(propRow(badges, "Scale",
       "Scale badges proportionally with each node's size (relative to the default node size)."),
     "Node Badge Scale With Node", undefined, "With node size");
+  }
+
+  /** "Label, bottom, 12": where the text comes from, where it sits, how big. */
+  function labelSummary(body) {
+    return ["Label text", "Label position", "Label size"].map((name) => rowValue(body, name)).filter(Boolean).join(", ");
+  }
+
+  /** "none", the one spot in use ("top right"), or "3 badges". */
+  function badgeSummary(body) {
+    const rows = body.querySelectorAll(".badge-list-row");
+    if (rows.length === 0) return "none";
+    if (rows.length === 1) return rows[0].querySelector(".badge-list-slot")?.textContent ?? "1 badge";
+    return `${rows.length} badges`;
   }
 
   function createEdgeConfigCard() {

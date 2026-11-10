@@ -114,6 +114,90 @@ function propSubhead(parent, text) {
   parent.dataset.propGroup = text;
 }
 
+const FOLD_STORAGE_PREFIX = "gll.fold.";
+let propFoldSeq = 0;
+
+/**
+ * A sub-group that folds to one line: a disclosure heading with a summary of
+ * what the rows hold ("Label · Label, bottom, 12"), over a body the rows are
+ * built into. Open or closed is remembered per viewer, by `key`.
+ * @param {{open?: boolean, key?: string, summary?: (body: HTMLElement) => string}} [opts]
+ *   `open` is the default before the viewer has chosen; `summary` is re-read on
+ *   every selection refresh and after any edit inside the body.
+ * @returns {HTMLDivElement} the body to build rows into
+ */
+function propFold(parent, text, {open = false, key = `${parent.dataset?.propSection ?? ""}.${text}`, summary} = {}) {
+  const fold = document.createElement("div");
+  fold.className = "prop-fold";
+  const head = document.createElement("button");
+  head.type = "button";
+  head.className = "prop-subhead prop-fold-head";
+  const chevron = document.createElement("span");
+  chevron.className = "prop-fold-chevron";
+  chevron.setAttribute("aria-hidden", "true");
+  const title = document.createElement("span");
+  title.textContent = text;
+  const sum = document.createElement("span");
+  sum.className = "prop-fold-summary";
+  head.append(chevron, title, sum);
+  const body = document.createElement("div");
+  body.className = "prop-fold-body";
+  body.id = `propFold${++propFoldSeq}`;
+  head.setAttribute("aria-controls", body.id);
+  if (parent.dataset?.propSection) body.dataset.propSection = parent.dataset.propSection;
+  body.dataset.propGroup = text;
+  fold.append(head, body);
+  parent.appendChild(fold);
+
+  const storageKey = FOLD_STORAGE_PREFIX + key;
+  let stored = null;
+  try { stored = localStorage.getItem(storageKey); } catch { /* storage blocked: use the default */ }
+  fold.setOpen = (isOpen, remember = false) => {
+    fold.classList.toggle("collapsed", !isOpen);
+    head.setAttribute("aria-expanded", String(isOpen));
+    chevron.textContent = isOpen ? "▾" : "▸";
+    if (!remember) return;
+    try { localStorage.setItem(storageKey, isOpen ? "1" : "0"); } catch { /* per-viewer nicety only */ }
+  };
+  fold.setOpen(stored === null ? open : stored === "1");
+  head.addEventListener("click", () => fold.setOpen(fold.classList.contains("collapsed"), true));
+
+  fold.updateSummary = () => {
+    const text = summary?.(body) ?? "";
+    sum.textContent = text ? `· ${text}` : "";
+  };
+  // An edit inside lands in its control first; read it once the handler ran.
+  const later = () => setTimeout(fold.updateSummary, 0);
+  body.addEventListener("change", later);
+  body.addEventListener("click", later);
+  return body;
+}
+
+/**
+ * What a row shows, in words, for a fold's summary: the pressed segment, the
+ * chosen option, the number, the text, on/off, or "Mixed".
+ * @param {HTMLElement} root  a fold body
+ * @param {string} name  the row's data-name ("Label size")
+ */
+function rowValue(root, name) {
+  const ctl = root.querySelector(`.prop-row[data-name="${name}"] > .prop-ctl`);
+  if (!ctl) return "";
+  if (ctl.querySelector(".prop-mixed:not([hidden])")) return "Mixed";
+  const pressed = ctl.querySelector('.prop-seg > button[aria-pressed="true"]');
+  if (pressed) return pressed.textContent;
+  const text = ctl.querySelector(".prop-text");
+  if (text?.value) return `“${text.value}”`;
+  const select = ctl.querySelector("select");
+  if (select) return select.selectedOptions[0]?.textContent ?? "";
+  const number = ctl.querySelector(".style-input-sm");
+  if (number) return number.value || (number.placeholder === "—" ? "" : number.placeholder);
+  const box = ctl.querySelector('input[type="checkbox"]');
+  if (box) return box.indeterminate ? "Mixed" : box.checked ? "on" : "off";
+  const hex = ctl.querySelector(".color-hex");
+  if (hex) return hex.value || hex.placeholder;
+  return "";
+}
+
 /**
  * Give `control` an accessible name: the row label when built into a
  * propRow (with `suffix` appended for secondary controls, e.g. "hex"),
@@ -229,6 +313,10 @@ function createAppearanceControls(cache) {
     };
     setCount("styleNodeCount", nodes.length);
     setCount("styleEdgeCount", edges.length);
+    const plural = (n, noun) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+    for (const fold of document.querySelectorAll(".prop-fold")) fold.updateSummary?.();
+    setCount("actSelectionCount", nodes.length + edges.length
+      ? `${plural(nodes.length, "node")} · ${plural(edges.length, "edge")}` : "");
   }
 
   /** gcm.updateNodes or updateEdges, by the property's target. */
@@ -798,5 +886,7 @@ export {
   createColorPicker,
   propRow,
   propSubhead,
+  propFold,
+  rowValue,
   nameControl,
 };

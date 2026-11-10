@@ -120,9 +120,13 @@ function command(el, trail, extra = {}) {
 function sectionOf(el, panel) {
   let node = el;
   while (node && node.parentElement !== panel) node = node.parentElement;
-  let prev = node?.previousElementSibling;
-  while (prev && !prev.matches('h4.insp-section-title')) prev = prev.previousElementSibling;
-  return prev ? clean(prev.textContent) : '';
+  // A section title is an h4 of the panel, or one inside an .insp-section-head
+  // that also holds the section's own action (Appearance › Reset style), which
+  // is why the search starts at the control's own panel child.
+  const titleOf = (n) => (n.matches('h4.insp-section-title') ? n : n.querySelector(':scope > h4.insp-section-title'));
+  let prev = node;
+  while (prev && !titleOf(prev)) prev = prev.previousElementSibling;
+  return prev ? clean(titleOf(prev).textContent) : '';
 }
 
 function breadcrumb(...parts) {
@@ -342,7 +346,8 @@ export function reveal(cache, cmd) {
   // position in the header).
   for (let node = el.parentElement; node; node = node.parentElement) {
     if (!node.classList?.contains('collapsed')) continue;
-    if (node.dataset?.label) cache.ui?.expandStylingCard(node.dataset.label);
+    if (node.classList.contains('prop-fold')) node.setOpen?.(true, true);
+    else if (node.dataset?.label) cache.ui?.expandStylingCard(node.dataset.label);
     else cache.ui?.setFilterGroupCollapsed(node, false);
   }
 
