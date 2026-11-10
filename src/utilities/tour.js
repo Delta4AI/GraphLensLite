@@ -404,7 +404,7 @@ class GuidedTour {
     }
 
     const nextBtn = document.createElement('button');
-    nextBtn.className = 'p-button tour-btn-next';
+    nextBtn.className = 'p-button p-button-primary tour-btn-next';
     nextBtn.textContent = isLast ? 'Finish ✓' : 'Next →';
     nextBtn.addEventListener('click', () => {
       this.currentStep++;
