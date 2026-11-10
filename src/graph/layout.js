@@ -236,166 +236,197 @@ class GraphLayoutManager {
     if (result.mode === 'clone') {
       await this.#cloneSelectedLayout(result.name);
       this.cache.ui.info(`Cloned view: ${result.name}`);
-    } else {
-      // Warn before kicking off a super-linear layout (dagre/mds) on a large
-      // graph: even off the main thread it can run for minutes, and the overlay
-      // blocks the UI for the whole time. Bail out cleanly if the user declines,
-      // before any workspace state is created.
-      const nodeCount = this.cache.graphData?.order ?? this.cache.nodeRef.size;
-      if (
-        this.cache.DEFAULTS.EXPENSIVE_LAYOUTS.includes(result.templateType) &&
-        nodeCount > this.cache.DEFAULTS.LAYOUT_NODE_WARNING_THRESHOLD
-      ) {
-        const proceed = await Popup.confirm(
-          `The "${result.templateType}" layout is computationally intensive and may ` +
-            `take several minutes on ${nodeCount.toLocaleString()} nodes. The UI stays ` +
-            `blocked until it finishes. Continue?`
-        );
-        if (!proceed) {
-          this.cache.ui.info('Creating workspace canceled');
-          return;
-        }
-      }
-
-      // Create the layout structure first
-      this.cache.data.layouts[result.name] = {
-        internals: null,
-        layoutType: result.templateType, // remember origin type for re-layout default
-        positions: new Map(), // Will be filled after layout
-        filters: structuredClone(this.cache.data.filterDefaults), // Reset to defaults
-        isCustom: true, // All layouts are custom (position-based)
-        query: undefined, // No query
-        hideDisconnectedNodes: false,
-        // Start with default styles
-        nodeStyles: new Map(),
-        edgeStyles: new Map(),
-        // A new workspace starts with NO groups. Four always-present empty
-        // groups were the main reason the feature read as decoration; the
-        // Groups panel now shows an empty state that says what a group is.
-        bubbleSetStyle: {},
-      };
-
-      // Initialize empty bubble group props (no groups selected). Keyed off the
-      // NEW layout's own bubbleSetStyle — traverseBubbleSets() would describe
-      // the workspace being left behind.
-      for (let group of Object.keys(
-        this.cache.data.layouts[result.name].bubbleSetStyle ?? {}
-      )) {
-        this.cache.data.layouts[result.name][`${group}Props`] = new Set();
-        this.cache.data.layouts[result.name][`${group}ManualMembers`] = new Set();
-      }
-
-      // Switch to the new layout
-      this.cache.uiComponents.buildDropdownOptions();
-      document.getElementById('selectView').value = result.name;
-      this.cache.data.selectedLayout = result.name;
-
-      await this.cache.ui.showLoading(
-        'Creating Workspace',
-        `Applying ${result.templateType} layout`
-      );
-      // Pin the overlay up across the whole creation so the inner render's
-      // #postRefresh hideLoading() can't drop it while the layout (possibly an
-      // expensive off-thread worker), bubble-sync and hide-disconnected are
-      // still running. Released right before the position tween, and in finally.
-      this.cache.ui.holdLoading();
-
-      // The try starts immediately after the hold: any failure below —
-      // selection clears, the filter pass, the layout worker rejecting —
-      // must release the hold, drop the overlay and clear
-      // pendingLayoutTransition, or the leaked hold blocks every
-      // hideLoading() until reload.
-      try {
-        // Clear the filter lock since this is a fresh template with no query
-        this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;
-
-        // Clear selection FIRST before doing anything else
-        await this.cache.sm.toggleSelectionForAllNodes(false);
-        await this.cache.sm.toggleSelectionForAllEdges(false);
-
-        // Update UI to show the new layout's filters and query
-        this.cache.ui.buildFilterUI();
-        this.cache.qm.updateQueryTextArea();
-        this.cache.ui.updateFilterLockState();
-        this.cache.ui.clearActivePropsCacheOnLayoutChange();
-
-        // Process filters to determine which nodes should be visible
-        await this.cache.gcm.preRenderEvent();
-
-        // Snapshot the on-screen (outgoing-workspace) positions so the new
-        // template layout animates IN from them instead of snapping — same
-        // effect as switching between existing workspaces. graphData is y-up
-        // graphology, which is exactly what runLayoutTransition tweens toward.
-        const fromPositions = new Map();
-        this.cache.graphData?.forEachNode((id, attrs) => {
-          if (Number.isFinite(attrs.x) && Number.isFinite(attrs.y)) {
-            fromPositions.set(id, { x: attrs.x, y: attrs.y });
-          }
-        });
-
-        // Apply the layout algorithm once
-        await this.cache.graph.setLayout({
-          type: result.templateType,
-          ...this.cache.DEFAULTS.LAYOUT_INTERNALS[result.templateType],
-        });
-        await this.cache.graph.layout();
-
-        // Persist the positions so they're stored permanently
-        await this.cache.lm.persistNodePositions();
-
-        // Restore the outgoing positions and hand the move to the animated
-        // transition: render paints them in place (pendingLayoutTransition skips
-        // the snap), then runLayoutTransition tweens to the persisted target.
-        const animateNewWorkspace = fromPositions.size > 0;
-        if (animateNewWorkspace) {
-          for (const [id, p] of fromPositions) {
-            if (this.cache.graphData.hasNode(id)) {
-              this.cache.graphData.mergeNodeAttributes(id, { x: p.x, y: p.y });
-            }
-          }
-          this.cache.graph.pendingLayoutTransition = true;
-        }
-
-        // Render with the full pipeline
-        this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED = false;
-        await this.cache.gcm.decideToRenderOrDraw(true);
-
-        // Reset hide disconnected state for new workspace
-        await this.cache.gcm.applyHideDisconnectedState();
-
-        // Ensure bubble groups are properly cleared and synced for this new view
-        this.cache.bubbleSetChanged = true;
-        await this.cache.bs.updateBubbleSetIfChanged();
-
-        // Update metrics and bubble group status
-        await this.cache.metrics.updateMetricUI();
-        this.cache.bs.renderGroupList();
-        this.cache.bs.refreshBubbleStyleElements();
-
-        // Graph mutations done — drop the overlay so the tween animates clear.
-        this.cache.ui.releaseLoading();
-        await this.cache.ui.hideLoading();
-
-        // Tween the new layout in from the outgoing positions, once the overlay
-        // has cleared (no-op when there was nothing on screen to animate from).
-        if (animateNewWorkspace) {
-          await this.cache.graph.runLayoutTransition(
-            this.cache.data.layouts[result.name].positions
-          );
-        }
-
-        this.cache.ui.info(`Created Workspace: ${result.name} (${result.templateType})`);
-        // A new workspace starts its own history, and this — fully settled —
-        // is its origin (the render above may have marked a half-synced one).
-        this.cache.history?.reset({ origin: 'replace' });
-      } finally {
-        // Defensive: release the hold + drop the overlay on any failure so a
-        // half-created workspace never strands a blocked UI; clear the tween flag.
-        this.cache.ui.releaseLoading();
-        await this.cache.ui.hideLoading();
-        if (this.cache.graph) this.cache.graph.pendingLayoutTransition = false;
-      }
+      return;
     }
+
+    // Bail out cleanly if the user declines, before any workspace state is created.
+    const warning = this.#expensiveLayoutWarning(result.templateType);
+    if (warning && !(await Popup.confirm(warning))) {
+      this.cache.ui.info('Creating workspace canceled');
+      return;
+    }
+
+    this.#registerTemplateLayout(result.name, result.templateType);
+    await this.#applyTemplateLayout(result.name, result.templateType);
+  }
+
+  /**
+   * The confirm text for a super-linear layout (dagre/mds) on a large graph, or
+   * null when no warning is due: even off the main thread it can run for
+   * minutes, and the overlay blocks the UI for the whole time.
+   */
+  #expensiveLayoutWarning(templateType) {
+    const nodeCount = this.cache.graphData?.order ?? this.cache.nodeRef.size;
+    if (
+      this.cache.DEFAULTS.EXPENSIVE_LAYOUTS.includes(templateType) &&
+      nodeCount > this.cache.DEFAULTS.LAYOUT_NODE_WARNING_THRESHOLD
+    ) {
+      return (
+        `The "${templateType}" layout is computationally intensive and may ` +
+        `take several minutes on ${nodeCount.toLocaleString()} nodes. The UI stays ` +
+        `blocked until it finishes. Continue?`
+      );
+    }
+    return null;
+  }
+
+  /** Create a fresh position-less workspace `name` and select it (nothing rendered yet). */
+  #registerTemplateLayout(name, templateType) {
+    // Create the layout structure first
+    this.cache.data.layouts[name] = {
+      internals: null,
+      layoutType: templateType, // remember origin type for re-layout default
+      positions: new Map(), // Will be filled after layout
+      filters: structuredClone(this.cache.data.filterDefaults), // Reset to defaults
+      isCustom: true, // All layouts are custom (position-based)
+      query: undefined, // No query
+      hideDisconnectedNodes: false,
+      // Start with default styles
+      nodeStyles: new Map(),
+      edgeStyles: new Map(),
+      // A new workspace starts with NO groups. Four always-present empty
+      // groups were the main reason the feature read as decoration; the
+      // Groups panel now shows an empty state that says what a group is.
+      bubbleSetStyle: {},
+    };
+
+    // Initialize empty bubble group props (no groups selected). Keyed off the
+    // NEW layout's own bubbleSetStyle — traverseBubbleSets() would describe
+    // the workspace being left behind.
+    for (let group of Object.keys(this.cache.data.layouts[name].bubbleSetStyle ?? {})) {
+      this.cache.data.layouts[name][`${group}Props`] = new Set();
+      this.cache.data.layouts[name][`${group}ManualMembers`] = new Set();
+    }
+
+    // Switch to the new layout
+    this.cache.uiComponents.buildDropdownOptions();
+    document.getElementById('selectView').value = name;
+    this.cache.data.selectedLayout = name;
+  }
+
+  /**
+   * Lay out and render the just-registered workspace `name` behind the loading
+   * overlay, then tween it in from the outgoing positions.
+   */
+  async #applyTemplateLayout(name, templateType) {
+    await this.cache.ui.showLoading('Creating Workspace', `Applying ${templateType} layout`);
+    // Pin the overlay up across the whole creation so the inner render's
+    // #postRefresh hideLoading() can't drop it while the layout (possibly an
+    // expensive off-thread worker), bubble-sync and hide-disconnected are
+    // still running. Released right before the position tween, and in finally.
+    this.cache.ui.holdLoading();
+
+    // The try starts immediately after the hold: any failure below —
+    // selection clears, the filter pass, the layout worker rejecting —
+    // must release the hold, drop the overlay and clear
+    // pendingLayoutTransition, or the leaked hold blocks every
+    // hideLoading() until reload.
+    try {
+      await this.#resetViewForNewWorkspace();
+      const animateNewWorkspace = await this.#runTemplateLayout(templateType);
+      await this.#syncNewWorkspace();
+
+      // Graph mutations done — drop the overlay so the tween animates clear.
+      this.cache.ui.releaseLoading();
+      await this.cache.ui.hideLoading();
+
+      // Tween the new layout in from the outgoing positions, once the overlay
+      // has cleared (no-op when there was nothing on screen to animate from).
+      if (animateNewWorkspace) {
+        await this.cache.graph.runLayoutTransition(this.cache.data.layouts[name].positions);
+      }
+
+      this.cache.ui.info(`Created Workspace: ${name} (${templateType})`);
+      // A new workspace starts its own history, and this — fully settled —
+      // is its origin (the render above may have marked a half-synced one).
+      this.cache.history?.reset({ origin: 'replace' });
+    } finally {
+      // Defensive: release the hold + drop the overlay on any failure so a
+      // half-created workspace never strands a blocked UI; clear the tween flag.
+      this.cache.ui.releaseLoading();
+      await this.cache.ui.hideLoading();
+      if (this.cache.graph) this.cache.graph.pendingLayoutTransition = false;
+    }
+  }
+
+  /** Clear selection and the query lock, show the fresh workspace's filters, and run the filter pass. */
+  async #resetViewForNewWorkspace() {
+    // Clear the filter lock since this is a fresh template with no query
+    this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;
+
+    // Clear selection FIRST before doing anything else
+    await this.cache.sm.toggleSelectionForAllNodes(false);
+    await this.cache.sm.toggleSelectionForAllEdges(false);
+
+    // Update UI to show the new layout's filters and query
+    this.cache.ui.buildFilterUI();
+    this.cache.qm.updateQueryTextArea();
+    this.cache.ui.updateFilterLockState();
+    this.cache.ui.clearActivePropsCacheOnLayoutChange();
+
+    // Process filters to determine which nodes should be visible
+    await this.cache.gcm.preRenderEvent();
+  }
+
+  /**
+   * Run `templateType` once and persist the result as the selected workspace's
+   * positions, leaving the nodes at their on-screen (outgoing) positions.
+   * Returns whether there is anything to tween from.
+   */
+  async #runTemplateLayout(templateType) {
+    // Snapshot the on-screen (outgoing-workspace) positions so the new
+    // template layout animates IN from them instead of snapping — same
+    // effect as switching between existing workspaces. graphData is y-up
+    // graphology, which is exactly what runLayoutTransition tweens toward.
+    const fromPositions = new Map();
+    this.cache.graphData?.forEachNode((id, attrs) => {
+      if (Number.isFinite(attrs.x) && Number.isFinite(attrs.y)) {
+        fromPositions.set(id, { x: attrs.x, y: attrs.y });
+      }
+    });
+
+    // Apply the layout algorithm once
+    await this.cache.graph.setLayout({
+      type: templateType,
+      ...this.cache.DEFAULTS.LAYOUT_INTERNALS[templateType],
+    });
+    await this.cache.graph.layout();
+
+    // Persist the positions so they're stored permanently
+    await this.cache.lm.persistNodePositions();
+
+    // Restore the outgoing positions and hand the move to the animated
+    // transition: render paints them in place (pendingLayoutTransition skips
+    // the snap), then runLayoutTransition tweens to the persisted target.
+    const animateNewWorkspace = fromPositions.size > 0;
+    if (animateNewWorkspace) {
+      for (const [id, p] of fromPositions) {
+        if (this.cache.graphData.hasNode(id)) {
+          this.cache.graphData.mergeNodeAttributes(id, { x: p.x, y: p.y });
+        }
+      }
+      this.cache.graph.pendingLayoutTransition = true;
+    }
+    return animateNewWorkspace;
+  }
+
+  /** Render the new workspace through the full pipeline and bring its groups and metrics in line. */
+  async #syncNewWorkspace() {
+    // Render with the full pipeline
+    this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_COMPLETED = false;
+    await this.cache.gcm.decideToRenderOrDraw(true);
+
+    // Reset hide disconnected state for new workspace
+    await this.cache.gcm.applyHideDisconnectedState();
+
+    // Ensure bubble groups are properly cleared and synced for this new view
+    this.cache.bubbleSetChanged = true;
+    await this.cache.bs.updateBubbleSetIfChanged();
+
+    // Update metrics and bubble group status
+    await this.cache.metrics.updateMetricUI();
+    this.cache.bs.renderGroupList();
+    this.cache.bs.refreshBubbleStyleElements();
   }
 
   /**
