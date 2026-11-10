@@ -3,30 +3,34 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Popup } from '../src/utilities/popup.js';
 
 // ==========================================================================
-// Popup as a dialog. The static helpers (confirm/prompt/alert) always focused
-// their own button, but a plain `new Popup(...)` announced itself as one more
-// div: no role, no way to dismiss from the keyboard, and focus left wherever it
-// happened to be. Popups nest — a flow inside one opens a confirm on top — so
-// Escape has to take the topmost only.
+// Popup as a dialog: a native modal <dialog>. The platform supplies the role,
+// the focus trap, the inert page behind and Escape-to-topmost (as a `cancel`
+// event) — checked in a real browser; jsdom has no showModal (see
+// tests/setup/dialog-shim.js). What this file pins is Popup's side of the
+// contract: labelling, focus in and back, and that a `cancel` runs onClose
+// instead of merely hiding the dialog. Popups nest — a flow inside one opens a
+// confirm on top — and the browser sends `cancel` to the topmost only.
 // ==========================================================================
 
 const dialogs = () => [...document.querySelectorAll('.p-custom')];
+// What the browser does on Escape: a cancelable `cancel` on the topmost modal.
 const escape = () =>
-  document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-const tab = (init = {}) =>
-  document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, ...init }));
+  dialogs().at(-1)?.dispatchEvent(new window.Event('cancel', { cancelable: true }));
 
 beforeEach(() => {
   document.body.innerHTML = '';
 });
 
 describe('Popup dialog semantics', () => {
-  it('is a labelled modal dialog', () => {
+  it('is a labelled, open modal dialog', () => {
+    const showModal = vi.spyOn(HTMLDialogElement.prototype, 'showModal');
     const popup = new Popup('<p>body</p>', { title: 'Settings' });
     const el = dialogs()[0];
 
-    expect(el.getAttribute('role')).toBe('dialog');
-    expect(el.getAttribute('aria-modal')).toBe('true');
+    expect(el.tagName).toBe('DIALOG');
+    expect(showModal).toHaveBeenCalledOnce();
+    expect(el.open).toBe(true);
+    showModal.mockRestore();
     const labelId = el.getAttribute('aria-labelledby');
     expect(document.getElementById(labelId).textContent).toBe('Settings');
     popup.close();
@@ -87,46 +91,37 @@ describe('Popup dialog semantics', () => {
     expect(dialogs()).toHaveLength(0);
   });
 
-  it('keeps Tab inside the dialog, in both directions', () => {
-    // aria-modal="true" promises focus is trapped; a plain div traps nothing,
-    // so Tab walked into the page behind — still there, still clickable.
-    const content = document.createElement('div');
-    content.innerHTML = '<button id="a">A</button><button id="b">B</button>';
-    const popup = new Popup(content, { title: 'Settings', showFullscreenButton: false });
-    const [first, ...rest] = [...popup.popup.querySelectorAll('button')];
-    const last = rest.at(-1);
+  it('keeps the browser from merely hiding the dialog on Escape', () => {
+    new Popup('<p>body</p>', { title: 'Settings' });
+    const cancel = new window.Event('cancel', { cancelable: true });
 
-    last.focus();
-    tab();
-    expect(document.activeElement).toBe(first);
+    dialogs()[0].dispatchEvent(cancel);
 
-    tab({ shiftKey: true });
-    expect(document.activeElement).toBe(last);
-
-    popup.close();
+    expect(cancel.defaultPrevented).toBe(true);
+    expect(dialogs()).toHaveLength(0);
   });
 
-  it('leaves Tab to the topmost dialog only', () => {
-    const outer = new Popup('<p>outer</p>', { title: 'Outer' });
-    const inner = new Popup('<p>inner</p>', { title: 'Inner' });
+  it('closes on a backdrop click, not on a click inside', () => {
+    const onClose = vi.fn();
+    const popup = new Popup('<p>body</p>', { title: 'Settings', onClose });
+    const el = popup.popup;
+    el.getBoundingClientRect = () => ({ left: 100, top: 100, right: 300, bottom: 200 });
+    const clickAt = (x, y) =>
+      el.dispatchEvent(new window.MouseEvent('click', { clientX: x, clientY: y, bubbles: true }));
 
-    outer.popup.querySelector('button').focus();
-    tab();
-
-    // The inner dialog owns Tab, so focus lands in it and not on outer's next.
-    expect(inner.popup.contains(document.activeElement)).toBe(true);
-    inner.close();
-    outer.close();
+    clickAt(150, 150); // the dialog's own border/padding
+    expect(onClose).not.toHaveBeenCalled();
+    clickAt(20, 20); // the ::backdrop
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('stops listening for Escape once closed', () => {
+  it('leaves the document once closed', () => {
     const onClose = vi.fn();
     const popup = new Popup('<p>body</p>', { title: 'Settings', onClose });
     popup.close();
 
-    escape();
-
-    expect(onClose).toHaveBeenCalledOnce(); // not twice
+    expect(dialogs()).toHaveLength(0);
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   // Cancel, not OK: several callers discard the loaded graph or a workspace, so

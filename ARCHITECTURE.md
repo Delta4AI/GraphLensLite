@@ -152,7 +152,7 @@ Business logic and UI:
 
 - `static.js` — validation, colour math, deep-merge helpers
 - `popup.js` / `popover_position.js` / `checklist_popup.js` / `fetch_popup.js` —
-  modal, popover positioning (anchor clamping plus the dropdown flip-up maths),
+  modal (a native `<dialog>` opened with `showModal()`), popover positioning (anchor clamping plus the dropdown flip-up maths),
   checklist dialogs, and the shared lifecycle of a "fetch into the graph" dialog
   (abort on dismiss, spinner, inline-or-toast errors, submit locked across the
   gates) that both Neo4j popups run on

@@ -95,11 +95,31 @@ const KEYBOARD_SHORTCUTS = [
 // log-only, or a multi-statement Neo4j expand would fire a stack of toasts.
 const TOAST_MS = { red: 9000, 'dark-orange': 7000 };
 const TOAST_DEFAULT_MS = 4500;
+const TOAST_TOP_PX = 12;
 const MAX_TOASTS = 4;
 // The log is a ring: readRecentActions only ever reads the last 20 lines, and an
 // unbounded strip grows for the whole session.
 const LOG_MAX_LINES = 200;
 
+
+/**
+ * The toast stack is a manual popover so it can sit above a modal <dialog>,
+ * which the top layer puts above every z-index. Re-showing moves it to the top
+ * of the top layer, needed only when a modal opened after it. Placed over the
+ * stage, where it sat as an ordinary element. Inside a modal the page behind is
+ * inert, so a toast's buttons wait until the dialog closes.
+ */
+function raiseToastHost(host) {
+  if (!host.showPopover) return; // no Popover API: stays an ordinary element
+  const stage = host.parentElement.getBoundingClientRect();
+  host.style.left = `${stage.left + stage.width / 2}px`;
+  host.style.top = `${stage.top + TOAST_TOP_PX}px`;
+  if (host.matches(':popover-open')) {
+    if (!document.querySelector('dialog:modal')) return;
+    host.hidePopover();
+  }
+  host.showPopover();
+}
 class UIManager {
   constructor(cache, debugEnabled = false) {
     this.cache = cache;
@@ -396,6 +416,7 @@ class UIManager {
       victim.remove();
     }
     setTimeout(() => toast.remove(), TOAST_MS[colorClass] ?? TOAST_DEFAULT_MS);
+    raiseToastHost(host);
 
     return toast;
   }

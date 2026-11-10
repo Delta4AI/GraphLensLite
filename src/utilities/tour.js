@@ -661,9 +661,7 @@ class GuidedTour {
     }
 
     this.popup = new Popup(content, popupOpts);
-    if (this.popup.overlay) {
-      this.popup.overlay.style.background = 'transparent';
-    }
+    this.popup.popup.classList.add('p-clear-backdrop');
     if (rect && inSheet) this.placeAbove(this.popup.popup, document.getElementById('inspector').getBoundingClientRect().top);
     else if (rect && step.position === 'above') this.placeAbove(this.popup.popup, rect.top);
   }

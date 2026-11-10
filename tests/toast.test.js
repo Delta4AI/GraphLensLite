@@ -42,6 +42,33 @@ describe("UIManager toasts", () => {
     vi.useRealTimers();
   });
 
+  // The top layer outranks every z-index, so a toast fired while a modal
+  // popup is open would sit under its backdrop unless the stack is re-shown
+  // (moved to the top of the top layer) — but only then: hiding a live region
+  // for nothing would risk a screen reader missing the message.
+  it("raises the toast stack above a modal opened after it, and only then", () => {
+    const host = document.getElementById("toasts");
+    let open = false;
+    host.showPopover = vi.fn(() => { open = true; });
+    host.hidePopover = vi.fn(() => { open = false; });
+    host.matches = (sel) => (sel === ":popover-open" ? open : false);
+    let modalOpen = false;
+    const realQuery = document.querySelector.bind(document);
+    vi.spyOn(document, "querySelector").mockImplementation((sel) =>
+      sel === "dialog:modal" ? (modalOpen ? {} : null) : realQuery(sel));
+
+    ui.success("first");
+    ui.success("second");
+    expect(host.showPopover).toHaveBeenCalledOnce();
+    expect(host.hidePopover).not.toHaveBeenCalled();
+
+    modalOpen = true;
+    ui.success("third");
+    expect(host.hidePopover).toHaveBeenCalledOnce();
+    expect(host.showPopover).toHaveBeenCalledTimes(2);
+    vi.restoreAllMocks();
+  });
+
   it("shows the message as a toast AND keeps it in the log", () => {
     ui.success("Loaded 120 nodes");
 
