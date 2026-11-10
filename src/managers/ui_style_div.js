@@ -1076,6 +1076,14 @@ function createStyleDiv(cache) {
   // `overlay`), which is what keeps on/off and parameters in one place.
   makeCollapsible("Node Configuration", false, {title: "Nodes", countId: "styleNodeCount"});
   makeCollapsible("Edge Configuration", true, {title: "Edges", countId: "styleEdgeCount"});
+  for (const label of ["Node Configuration", "Edge Configuration"]) {
+    // Heads the column the rows' map buttons sit in.
+    const head = document.createElement("div");
+    head.className = "prop-map-head";
+    head.setAttribute("aria-hidden", "true");
+    head.textContent = "Map";
+    root.querySelector(`[data-label="${label}"] > .card-collapse-bar`).after(head);
+  }
   makeCollapsible("Bubble Sets", true, {
     title: "Groups",
     overlay: "groups",

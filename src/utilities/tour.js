@@ -237,7 +237,7 @@ const TOUR_STEPS = [
            Each control shows the current value, or <em>Mixed</em> when they differ.
            <br>• <strong>Nodes</strong> — shape, size, colour, border, label, badges, pie charts
            <br>• <strong>Edges</strong> — type, width, colour, arrows, halos, animated flow
-           <br>• <strong>Map…</strong> — drive a style from your data or a metric, e.g. size by PageRank
+           <br>• <strong>◇</strong> in the <strong>Map</strong> column — drive a style from your data or a metric, e.g. size by PageRank
            <br>• <strong>⟳ Reset style</strong> — back to the defaults
            <br><br>
            Styles belong to the workspace.`,
@@ -264,7 +264,7 @@ const TOUR_STEPS = [
            <strong>eigenvector</strong> or <strong>PageRank</strong> for the visible nodes.
            <br><br>
            You get a ranked list you can add to the selection, plus graph-wide numbers. Computed
-           metrics also appear under <strong>Map…</strong> in Appearance. <strong>🛈</strong> explains each one.`,
+           metrics also appear under <strong>◇ Map</strong> in Appearance. <strong>🛈</strong> explains each one.`,
     targets: [{ selector: '#workbench' }, { selector: '#metricsToggleBtn' }],
     position: 'above',
     action: 'openMetricsPanel',
