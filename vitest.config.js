@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 // Tests pick their own environment via per-file `// @vitest-environment jsdom`
 // directives, so no global `environment` is set here — only coverage config.
@@ -6,6 +6,8 @@ export default defineConfig({
   test: {
     // Stubs the <dialog> methods jsdom lacks (a no-op outside jsdom).
     setupFiles: ['tests/setup/dialog-shim.js'],
+    // Agent and harness worktrees under .claude/ carry a full copy of tests/.
+    exclude: [...configDefaults.exclude, '.claude/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'html'],
