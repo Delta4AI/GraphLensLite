@@ -160,6 +160,12 @@ const CAPSULE_ARC_SAGITTA_MAX_R = 6;
 // of the group's mean member radius.
 const DISC_PAD_MIN_RATIO = 0.05;
 const LINK_HALF_WIDTH_MIN_RATIO = 0.15;
+// Unreached pockets (see unreachedPockets): the reach mask is widened by
+// one marching cell: the traced contour can sit up to a cell past the field
+// itself, and the cut must never open area the field filled. Pockets under
+// POCKET_MIN_AREA_CELLS cells stay filled — a speck-sized hole reads as noise.
+const POCKET_MASK_MARGIN_CELLS = 1;
+const POCKET_MIN_AREA_CELLS = 16;
 
 /**
  * Axis-aligned square around a node's viewport position.
@@ -250,8 +256,11 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
   const nodeFieldVisible = nodeR1px >= pixelGroupPx;
   const edgeFieldVisible = edgeR1px >= pixelGroupPx;
   let outline = [];
+  let pockets = [];
   if (nodeFieldVisible || edgeFieldVisible) {
-    const path = bubblesets.createOutline(memberRects, effectiveAvoidRects, [], {
+    // createOutline() minus its wrapper: the instance keeps the routed
+    // virtual edges, which the pocket cut below needs.
+    const bubbles = new bubblesets.BubbleSets({
       virtualEdges: edgeFieldVisible,
       nodeR0: nodeR0px,
       nodeR1: nodeR1px,
@@ -261,6 +270,9 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
       pixelGroup: pixelGroupPx,
       nonMemberInfluenceFactor: avoidance > 0 ? NON_MEMBER_INFLUENCE_FACTOR : 0,
     });
+    bubbles.pushMember(...memberRects);
+    bubbles.pushNonMember(...effectiveAvoidRects);
+    const path = bubbles.compute();
     // Adaptive stride (see OUTLINE_SAMPLE_STEP note): control spacing ≈ 2×
     // the thinnest TRACEABLE feature — nothing below a grid cell can appear,
     // so the stride never drops below one cell's worth of spacing.
@@ -294,11 +306,124 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
       if (repaired.length >= 3) outline = repaired;
     }
     outline = conditionFieldRing(outline, pixelGroupPx);
+    if (hasEnclosedZeroCell(bubbles.potentialArea)) pockets = unreachedPockets(
+      outline,
+      memberRects,
+      bubbles.virtualEdges.map((edge) => edge.obj),
+      nodeFieldVisible ? nodeR1px : 0,
+      edgeFieldVisible ? edgeR1px : 0,
+      pixelGroupPx
+    );
   }
   outline = ensureMembersEnclosed(outline, memberRects, nodeR0px, linkRPx);
   // Hole breathing room = the padding radius (per-node proportional floor
   // applied inside): carved non-members get the same visual gap members do.
-  return carveAvoidHoles(outline, memberRects, effectiveAvoidRects, nodeR0px, nodeR0px);
+  const carved = carveAvoidHoles(outline, memberRects, effectiveAvoidRects, nodeR0px, nodeR0px);
+  if (pockets.length === 0) return carved;
+  return subtractHoleDiscs(carved, memberRects, pockets) ?? carved;
+}
+
+/**
+ * Cheap gate for unreachedPockets (whose mask union is the costly part): a
+ * pocket needs a grid cell with zero field that the grid border cannot reach
+ * through non-positive cells. O(cells) flood fill over the library's final
+ * field grid (row-major Float32Array), whose border always lies beyond every
+ * influence radius.
+ *
+ * @param {{width: number, height: number, area: Float32Array}} grid
+ * @returns {boolean}
+ */
+function hasEnclosedZeroCell({ width, height, area: field }) {
+  const seen = new Uint8Array(width * height);
+  const stack = new Int32Array(width * height);
+  let top = 0;
+  const visit = (k) => {
+    if (seen[k] || field[k] > 0) return;
+    seen[k] = 1;
+    stack[top++] = k;
+  };
+  for (let i = 0; i < width; i++) {
+    visit(i);
+    visit(i + (height - 1) * width);
+  }
+  for (let j = 0; j < height; j++) {
+    visit(j * width);
+    visit(width - 1 + j * width);
+  }
+  while (top > 0) {
+    const k = stack[--top];
+    const i = k % width;
+    if (i > 0) visit(k - 1);
+    if (i < width - 1) visit(k + 1);
+    if (k >= width) visit(k - width);
+    if (k < (height - 1) * width) visit(k + width);
+  }
+  for (let k = 0; k < field.length; k++) {
+    if (!seen[k] && field[k] === 0) return true;
+  }
+  return false;
+}
+
+/**
+ * Hull area the energy field never reached. The field is exactly zero
+ * farther than nodeR1 from every member and edgeR1 from every virtual edge,
+ * yet marching squares traces ONE outer contour: corridors that cross in the
+ * plane (or a ring of members) enclose a region it cannot leave open, so it
+ * paints solid. The reach mask is the union of those zones plus a margin;
+ * the holes of (field ring ∩ mask) are the pockets. Their boundary sits on
+ * the mask, so a pocket's rim is somewhat wider than the field's own iso-line —
+ * the conservative side: no area the field filled is ever opened.
+ *
+ * @param {Array<{x: number, y: number}>} ring  conditioned field ring
+ * @param {Array<{x, y, width, height}>} memberRects
+ * @param {Array<{x1: number, y1: number, x2: number, y2: number}>} edges
+ *   routed virtual edges
+ * @param {number} nodeR1px  member field reach (0 = node field off)
+ * @param {number} edgeR1px  corridor field reach (0 = edge field off)
+ * @param {number} cellPx  marching cell size
+ * @returns {Array<Array<Array<[number, number]>>>} clip-ready pocket polygons
+ */
+function unreachedPockets(ring, memberRects, edges, nodeR1px, edgeR1px, cellPx) {
+  if (ring.length < 3) return [];
+  const margin = POCKET_MASK_MARGIN_CELLS * cellPx;
+  const mask = memberRects.map((rect) => [
+    discRing(
+      rect.x + rect.width / 2,
+      rect.y + rect.height / 2,
+      Math.hypot(rect.width, rect.height) / 2 + nodeR1px + margin
+    ),
+  ]);
+  if (edgeR1px > 0) {
+    const r = edgeR1px + margin;
+    for (const { x1, y1, x2, y2 } of edges) {
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      if (len < 1e-9) continue;
+      // Straight stadium = slab + end discs (capsuleRing arcs, so it would
+      // under-cover the straight segment the field actually follows).
+      const nx = (-(y2 - y1) / len) * r;
+      const ny = ((x2 - x1) / len) * r;
+      mask.push(
+        [[[x1 + nx, y1 + ny], [x2 + nx, y2 + ny], [x2 - nx, y2 - ny], [x1 - nx, y1 - ny], [x1 + nx, y1 + ny]]],
+        [discRing(x1, y1, r)],
+        [discRing(x2, y2, r)]
+      );
+    }
+  }
+  let reached;
+  try {
+    reached = polygonClipping.intersection(
+      [toClipRing(ring)],
+      polygonClipping.union(...mask)
+    );
+  } catch (e) {
+    console.warn("bubble pocket cut failed:", e.message);
+    return [];
+  }
+  const minArea = POCKET_MIN_AREA_CELLS * cellPx * cellPx;
+  return reached
+    .flatMap((poly) => poly.slice(1))
+    .filter((hole) => Math.abs(ringSignedArea(hole)) >= minArea)
+    .map((hole) => [hole]);
 }
 
 /**
