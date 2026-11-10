@@ -110,7 +110,7 @@ let propFoldSeq = 0;
 
 /**
  * A sub-group that folds to one line: a disclosure heading with a summary of
- * what the rows hold ("Label · Label, bottom, 12"), over a body the rows are
+ * what the rows hold ("Label · from label, bottom, 12"), over a body the rows are
  * built into. Open or closed is remembered per viewer, by `key`.
  * @param {{open?: boolean, key?: string, summary?: (body: HTMLElement) => string}} [opts]
  *   `open` is the default before the viewer has chosen; `summary` is re-read on

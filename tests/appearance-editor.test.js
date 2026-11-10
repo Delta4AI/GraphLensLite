@@ -163,7 +163,7 @@ describe('folded sub-groups (Label, Badges)', () => {
 
   it('sums up what the selection carries on the folded line', () => {
     mount([node('a', { labelFontSize: 14, labelPlacement: 'top' }), node('b', { labelFontSize: 14, labelPlacement: 'top' })]);
-    expect(fold('Label').querySelector('.prop-fold-summary').textContent).toBe('· Label, top, 14');
+    expect(fold('Label').querySelector('.prop-fold-summary').textContent).toBe('· from label, top, 14');
     expect(fold('Badges').querySelector('.prop-fold-summary').textContent).toBe('· none');
   });
 

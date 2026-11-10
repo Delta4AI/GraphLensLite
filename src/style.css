@@ -2305,6 +2305,10 @@ h5 {
     padding: 1px 6px;
 }
 
+.insp-btn.insp-btn-quiet[aria-disabled="true"] {
+    border-color: transparent;
+}
+
 .insp-btn.insp-btn-quiet:hover {
     border-color: var(--accent-text);
     color: var(--accent-text);
@@ -2516,7 +2520,7 @@ h5 {
 }
 
 /* A row whose every control is unavailable dims its label with them. */
-.prop-row:not(:has(.prop-ctl > :not(.disabled))) > .prop-label {
+.prop-row:not(:has(.prop-ctl > :not(.disabled, .prop-hint))) > .prop-label {
     opacity: 0.5;
 }
 
@@ -2956,6 +2960,11 @@ h5 {
 /* The handles move down with the track (the value-box rules above never reach them). */
 .has-hist > div[slider] > input[type=range] {
     top: 18px;
+}
+
+/* Typing a threshold widens its box less here, so the bars stay readable. */
+.filter-range-row.has-hist > input:focus {
+    max-width: 11ch;
 }
 
 /* The row's name and ⋯ stay level with the track, not with the bars. */

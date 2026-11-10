@@ -30,7 +30,7 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
   look like a button.
 - Sub-groups inside a section fold (`propFold`: "Label", "Badges", "Start
   arrow"; level 3 below): a disclosure heading with a hairline above it and a
-  one-line summary of what the rows hold ("Label · Label, bottom, 12",
+  one-line summary of what the rows hold ("Label · from label, bottom, 12",
   "Badges · none", "Halo · off"). Open or closed is remembered per viewer. The
   command palette names a row by its sub-group ("Label size") so repeated
   labels stay distinct, and opens the fold to reveal it.
