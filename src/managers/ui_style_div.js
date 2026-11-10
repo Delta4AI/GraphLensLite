@@ -487,9 +487,12 @@ function createStyleDiv(cache) {
     "Node Badge Scale With Node", undefined, "With node size");
   }
 
-  /** "Label, bottom, 12": where the text comes from, where it sits, how big. */
+  /** "from label, bottom, 12": where the text comes from, where it sits, how big. */
   function labelSummary(body) {
-    return ["Label text", "Label position", "Label size"].map((name) => rowValue(body, name)).filter(Boolean).join(", ");
+    // The "Label" source would read as the heading repeated.
+    const source = rowValue(body, "Label text");
+    return [source === "Label" ? "from label" : source, rowValue(body, "Label position"), rowValue(body, "Label size")]
+      .filter(Boolean).join(", ");
   }
 
   /**
