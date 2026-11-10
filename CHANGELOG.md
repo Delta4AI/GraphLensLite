@@ -39,6 +39,7 @@ Saved files load unchanged. One behaviour changes on purpose — **with the filt
 * **Reset to filters (formerly Sync) re-applies the filter panel.** After a hand-written query had filtered the graph, Sync unlocked the panel and rewrote the query but left the graph showing the query's result.
 * **The data editor keeps every edit it accepts.** Keys typed on a read-only cell no longer fire app shortcuts (D closed the editor, S and P exported, Ctrl+Z undid a graph change). Numeric node ids work in the add forms, where "5" was not found and a new edge to node 5 vanished on Apply. A new edge whose node is then deleted blocks Apply instead of disappearing, an edited edge whose node is deleted shows that it goes with it, and restoring a deleted row keeps its staged edits.
 * **The assistant's answers are readable in dark mode.** Its answer bubbles and query list kept a near-black text colour on the dark surface.
+* **Bubble groups leave the space between crossing corridors open.** Where three or more of a group's connecting corridors enclosed an empty area, the bubble filled it solid — on the tour network about a third of a group's area. That area is now a hole, as it looks.
 
 ### Security
 
