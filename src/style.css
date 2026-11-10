@@ -3005,7 +3005,8 @@ h5 {
     display: contents;
 }
 
-.keyboard-sheet kbd {
+.keyboard-sheet kbd,
+.tour-keys kbd {
     justify-self: center;
     min-width: 26px;
     padding: 1px 6px;
@@ -5728,10 +5729,18 @@ div[slider] > input[type=range]::-ms-tooltip {
 }
 
 .tour-body {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-strong);
     flex: 1;
     padding: 14px 16px;
+}
+
+.tour-keys {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 5px 10px;
+    align-items: center;
+    margin: 10px 0;
 }
 
 .tour-phone-note {

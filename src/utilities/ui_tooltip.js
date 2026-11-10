@@ -23,7 +23,7 @@ const ANCHOR_GAP_PX = 7;
 const VIEWPORT_MARGIN_PX = 8;
 
 // Trailing keyboard-shortcut suffix, e.g. "(F)", "(?)", "(Ctrl+K)", "(⇧F)".
-const SHORTCUT_RE = /^(.*?)\s*\((\?|[A-Za-z]|(?:Ctrl|Alt|Shift|⇧|⌘)\+?\S{1,3})\)$/;
+const SHORTCUT_RE = /^(.*?)\s*\((\?|[A-Za-z]|(?:Ctrl|Cmd|Alt|Shift|⇧|⌘)\+?\S{1,3})\)$/;
 
 /**
  * Split a trailing keyboard accelerator off a title. ONE parser for the whole
