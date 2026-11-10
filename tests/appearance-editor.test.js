@@ -64,6 +64,23 @@ describe('appearance editor ← selection', () => {
     await vi.waitFor(() => expect(cache.gcm.updateNodes).toHaveBeenCalledWith({ style: { size: 25 } }, []));
   });
 
+  it("offers pie charts in Fill's map-by-data menu, after colour by data", async () => {
+    const cache = mount([node('a')]);
+    cache.picker = {};
+    const swatch = document.querySelector('.prop-map-swatch[data-property="Node Fill Color"]');
+    const item = (text) => [...document.querySelectorAll('.rail-menu.open .rail-menu-item')]
+      .find((el) => el.textContent.includes(text));
+    swatch.click();
+    expect([...document.querySelectorAll('.rail-menu.open .rail-menu-label')].map((el) => el.textContent))
+      .toEqual(['Colour by data…', 'Pie chart…', 'Clear pie']);
+    item('Pie chart…').click();
+    await vi.waitFor(() => expect(cache.gcm.updateNodes).toHaveBeenCalledWith({}, ['set_pie_chart']));
+    swatch.click();
+    item('Colour by data…').click();
+    await vi.waitFor(() => expect(cache.gcm.updateNodes).toHaveBeenCalledWith(
+      { style: { fill: 'set_continuous_color_scale' } }, ['set_continuous_color_scale']));
+  });
+
   it('keeps Map by data on the size row, sending the numeric-scale command', async () => {
     const cache = mount([node('a')]);
     cache.numericPicker = {};
