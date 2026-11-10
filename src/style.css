@@ -30,6 +30,11 @@
     --brand-border: #403C53;
     --accent-text: #C33D35;
     --accent-ring: rgba(195, 61, 53, 0.35);
+    /* Card heads in the Selection tab (Act on selection, Nodes, Edges). */
+    --insp-bar: #403C53;
+    --insp-bar-hover: #4d4864;
+    --insp-bar-text: #ffffff;
+    --insp-bar-muted: rgba(255, 255, 255, 0.72);
     --success-text: #015C0C;
     --danger-text: #8a2d2d;
     /* Data editor: a cell, row or deletion staged but not yet applied. */
@@ -50,6 +55,8 @@
        PURELY LOCAL stacking (a slider thumb over its track, a caret over a
        textarea) keeps its own small integers — those are relative to their own
        stacking context and mean nothing on this scale. */
+    /* The inspector's label column: rows, lookups and anything aligned to them. */
+    --prop-label-w: 76px;
     --z-minimap: 500;
     --z-workbench: 600;
     --z-resize-bar: 700;
@@ -84,6 +91,10 @@
     --brand-border: #6b6486;
     --accent-text: #e0635b;
     --accent-ring: rgba(224, 99, 91, 0.45);
+    --insp-bar: #423c5c;
+    --insp-bar-hover: #4d4769;
+    --insp-bar-text: #f1eff8;
+    --insp-bar-muted: rgba(241, 239, 248, 0.7);
     --success-text: #58c06a;
     --danger-text: #d98a84;
     --edited-wash: #3a3020;
@@ -1283,7 +1294,10 @@ body {
 }
 
 .insp-section-title {
-    margin: 18px 0 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 18px 0 6px 0;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -1927,7 +1941,7 @@ h5 {
     /* The input column has a floor: the card is otherwise only as wide as
        its button row, which left room for a couple of IDs. */
     /* The label column matches .prop-row's, so lookups align with the rows above. */
-    grid-template-columns: 84px minmax(240px, 1fr) auto auto;
+    grid-template-columns: var(--prop-label-w) minmax(240px, 1fr) auto auto;
     align-items: center;
     gap: 4px 8px;
     margin-top: 4px;
@@ -2196,16 +2210,36 @@ h5 {
     margin-top: 10px;
 }
 
-.appearance-card > .card-collapse-bar {
-    border-bottom: 1px solid var(--border);
+/* Inspector heading levels: section (.insp-section-title, accent eyebrow over
+   a rule) > card (a brand-slate bar: this and .flat-card-head) > sub-group
+   (.prop-fold-head, a soft wash). */
+.appearance-card > .card-collapse-bar,
+.flat-card-head {
+    min-height: 26px;
+    box-sizing: border-box;
+    margin-bottom: 4px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: var(--insp-bar);
+    color: var(--insp-bar-text);
 }
 
-/* Inspector heading levels: section (.insp-section-title, accent eyebrow) >
-   card (this and .flat-card::before, 13px semibold) > sub-group (.prop-subhead). */
+.appearance-card > .card-collapse-bar:has(.card-collapse-header:hover) {
+    background: var(--insp-bar-hover);
+    color: var(--insp-bar-text);
+}
+
 .appearance-card .card-collapse-header {
-    padding: 5px 0 4px;
+    padding: 4px 0;
     font-size: 13px;
     font-weight: 600;
+}
+
+/* The page's accent ring would vanish on the slate; the bar's text colour does not. */
+.appearance-card .card-collapse-header:focus-visible {
+    outline: 2px solid var(--insp-bar-text);
+    outline-offset: -2px;
+    border-radius: 6px;
 }
 
 .appearance-card .card-collapse-title {
@@ -2218,7 +2252,7 @@ h5 {
     text-align: left;
     font-size: 11px;
     font-weight: 400;
-    color: var(--text-muted);
+    color: var(--insp-bar-muted);
     font-family: var(--font-mono, ui-monospace, monospace);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
@@ -2259,12 +2293,8 @@ h5 {
 
 .flat-card-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 6px;
-    padding: 5px 0 4px;
-    margin-bottom: 2px;
-    border-bottom: 1px solid var(--border);
-    color: var(--text);
     font-size: 13px;
     font-weight: 600;
 }
@@ -2280,7 +2310,7 @@ h5 {
 
 /* Neo4j's Expand, under the Grow row, in the control column. */
 .sel-neo4j-row {
-    padding-left: 92px;
+    padding-left: calc(var(--prop-label-w) + 8px);
 }
 
 /* A section eyebrow that carries the section's own action at its end. */
@@ -2289,11 +2319,20 @@ h5 {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    margin: 18px 0 4px;
+    margin: 18px 0 6px;
 }
 
 .insp-section-head > .insp-section-title {
+    flex: 1 1 auto;
     margin: 0;
+}
+
+/* The eyebrow's rule runs to the panel edge (or to the section's own action). */
+.insp-section-title::after {
+    content: "";
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--border);
 }
 
 /* A secondary action that should not compete with the rows: no border until
@@ -2331,12 +2370,10 @@ h5 {
     align-items: baseline;
     gap: 6px;
     width: 100%;
-    background: none;
-    border-left: none;
-    border-right: none;
-    border-bottom: none;
-    padding-inline: 0;
-    padding-bottom: 2px;
+    background: var(--surface-3);
+    border: none;
+    border-radius: 6px;
+    padding: 4px 6px;
     font: inherit;
     font-size: 12px;
     font-weight: 600;
@@ -2346,6 +2383,7 @@ h5 {
 }
 
 .prop-fold-head:hover {
+    background: var(--row-hover);
     color: var(--accent-text);
 }
 
@@ -2375,48 +2413,120 @@ h5 {
     visibility: hidden;
 }
 
-/* Appearance cards: a third, 24px column holds each row's map-by-data button,
-   headed "Map" once at the top of the card. */
-.appearance-card .prop-row {
-    grid-template-columns: 84px minmax(0, 1fr) 24px;
+/* Map by data's glyph: four rising bars, a scale. */
+:root {
+    --map-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 10'%3E%3Cpath d='M0 7h2.4v3H0zM3.2 5h2.4v5H3.2zM6.4 2.6h2.4V10H6.4zM9.6 0H12v10H9.6z'/%3E%3C/svg%3E");
 }
 
-.prop-map-head {
-    display: grid;
-    grid-template-columns: 84px minmax(0, 1fr) 24px;
-    column-gap: 8px;
-    margin-bottom: -4px;
-    text-align: center;
-    font-size: 9.5px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
+/* Map by data sits inside the control it drives. A number field carries a ramp
+   glyph in its trailing edge; the field keeps its own border and the glyph its
+   24px hit target, overlapping the field's padding. */
+.prop-num-map {
+    position: relative;
+    display: inline-flex;
+    flex: none;
 }
 
-.prop-map-head::before {
-    content: "";
-    grid-column: 1 / 3;
+.prop-ctl .prop-num-map > .style-input-sm {
+    width: 66px;
+    padding-right: 24px;
 }
 
+/* A full 24px target (WCAG 2.5.8); its 1px padding keeps the hover wash
+   inside the field's border. */
 .prop-map-btn {
-    grid-column: 3;
+    position: absolute;
+    top: 0;
+    right: 0;
     width: 24px;
     height: 24px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: 6px;
+    padding: 1px;
+    border: none;
+    border-radius: 0 6px 6px 0;
     background: none;
-    color: var(--text-muted);
-    font: inherit;
-    font-size: 13px;
-    line-height: 22px;
-    text-align: center;
+    background-clip: content-box;
+    color: var(--text-faint);
     cursor: pointer;
 }
 
-.prop-map-btn:hover {
-    border-color: var(--accent-text);
+/* Four rising bars, painted in the text colour so it follows the theme. */
+.prop-map-btn::before {
+    content: "";
+    position: absolute;
+    inset: 7px 6px;
+    background: currentColor;
+    -webkit-mask: var(--map-glyph) center / contain no-repeat;
+    mask: var(--map-glyph) center / contain no-repeat;
+}
+
+/* Forced colours drop backgrounds, and the glyph is one. */
+@media (forced-colors: active) {
+    .prop-map-btn::before,
+    .prop-map-swatch::before {
+        forced-color-adjust: none;
+        background: ButtonText;
+    }
+}
+
+/* On touch there is no tooltip, and a tap on the field's right end must edit
+   the number: the button steps out beside the field as a 24px target. */
+@media (hover: none) {
+    .prop-num-map {
+        gap: 4px;
+    }
+
+    .prop-ctl .prop-num-map > .style-input-sm {
+        width: 52px;
+        padding-right: 4px;
+    }
+
+    .prop-map-btn {
+        position: relative;
+        top: 0;
+        right: 0;
+        width: 24px;
+        height: 24px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text-muted);
+    }
+}
+
+.prop-map-btn:hover,
+.prop-map-btn:focus-visible {
     color: var(--accent-text);
+    background-color: var(--surface-2);
+}
+
+/* A colour palette ends in its by-data swatch: the same rising bars as a
+   number field's, over a left-to-right scale built from none of the preset
+   colours, so it reads as "drive by data" and not as one more preset. */
+.prop-map-swatch {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    box-sizing: border-box;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: linear-gradient(90deg, #3b528b, #21918c 55%, #5ec962);
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.prop-map-swatch::before {
+    content: "";
+    position: absolute;
+    inset: 4px 3px;
+    background: currentColor;
+    -webkit-mask: var(--map-glyph) center / contain no-repeat;
+    mask: var(--map-glyph) center / contain no-repeat;
+}
+
+.prop-map-swatch:hover,
+.prop-map-swatch[aria-expanded="true"] {
+    border-color: var(--accent-text);
+    box-shadow: 0 0 0 1px var(--accent-text);
 }
 
 /* Overlay cards (Groups pane, heatmap) keep their bar but share the rows. */
@@ -2427,7 +2537,7 @@ h5 {
 
 .prop-row {
     display: grid;
-    grid-template-columns: 84px minmax(0, 1fr);
+    grid-template-columns: var(--prop-label-w) minmax(0, 1fr);
     column-gap: 8px;
     /* Top-aligned so a row whose controls wrap keeps its label on line one. */
     align-items: start;
@@ -2457,9 +2567,7 @@ h5 {
 }
 
 .prop-subhead {
-    margin: 8px 0 2px;
-    padding-top: 6px;
-    border-top: 1px solid var(--border-soft);
+    margin: 6px 0 2px;
     font-size: 12px;
     font-weight: 600;
     color: var(--text-strong);
@@ -2513,12 +2621,6 @@ h5 {
     box-shadow: 0 0 0 1px var(--danger-text);
 }
 
-/* Forces what follows onto its own line (the palette under a colour well). */
-.prop-break {
-    flex-basis: 100%;
-    height: 0;
-}
-
 /* A row whose every control is unavailable dims its label with them. */
 .prop-row:not(:has(.prop-ctl > :not(.disabled, .prop-hint))) > .prop-label {
     opacity: 0.5;
@@ -2554,7 +2656,7 @@ h5 {
 }
 
 .prop-ctl .color-hex {
-    width: 80px;
+    width: 64px;
     padding: 0 6px;
     font-family: var(--font-mono, ui-monospace, monospace);
 }
@@ -2646,7 +2748,7 @@ h5 {
 .color-well {
     position: relative;
     flex: none;
-    width: 28px;
+    width: 24px;
     height: 24px;
     box-sizing: border-box;
     border: 1px solid var(--border-soft);
@@ -2798,7 +2900,7 @@ h5 {
 }
 
 .appearance-card .badge-list {
-    margin: 2px 0 4px 92px;
+    margin: 2px 0 4px calc(var(--prop-label-w) + 8px);
 }
 
 .bubble-set-config-card-header::before {

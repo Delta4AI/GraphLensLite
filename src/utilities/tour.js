@@ -235,9 +235,9 @@ const TOUR_STEPS = [
     title: 'Inspector — Appearance 🎨',
     text: `<strong>Appearance</strong> styles the selected elements only (<strong>Y</strong> jumps here).
            Each control shows the current value, or <em>Mixed</em> when they differ.
-           <br>• <strong>Nodes</strong> — shape, size, colour, border, label, badges, pie charts
+           <br>• <strong>Nodes</strong> — shape, size, colour, border, label, badges
            <br>• <strong>Edges</strong> — type, width, colour, arrows, halos, animated flow
-           <br>• <strong>◇</strong> in the <strong>Map</strong> column — drive a style from your data or a metric, e.g. size by PageRank
+           <br>• <strong>Map by data</strong> — the bars inside a number field, or the last swatch of a palette, drive a style from your data or a metric (size by PageRank, pie charts on Fill)
            <br>• <strong>⟳ Reset style</strong> — back to the defaults
            <br><br>
            Styles belong to the workspace.`,
@@ -264,7 +264,7 @@ const TOUR_STEPS = [
            <strong>eigenvector</strong> or <strong>PageRank</strong> for the visible nodes.
            <br><br>
            You get a ranked list you can add to the selection, plus graph-wide numbers. Computed
-           metrics also appear under <strong>◇ Map</strong> in Appearance. <strong>🛈</strong> explains each one.`,
+           metrics also appear under <strong>Map by data</strong> in Appearance. <strong>🛈</strong> explains each one.`,
     targets: [{ selector: '#workbench' }, { selector: '#metricsToggleBtn' }],
     position: 'above',
     action: 'openMetricsPanel',
