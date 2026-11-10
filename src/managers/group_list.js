@@ -178,7 +178,7 @@ function buildGroupRow(bs, group, layout) {
     buildChevron(bs, group, name, expanded),
     buildSwatch(bs, group, name, style),
     buildNameInput(bs, group, name),
-    buildCount(count),
+    buildCount(count, bs.cache.nodeRef?.size ?? 0),
     buildToggle(bs, group),
     buildRowMenuButton(bs, group, name)
   );
@@ -233,10 +233,22 @@ function buildNameInput(bs, group, name) {
   return input;
 }
 
-function buildCount(count) {
+/** "125 nodes" behind a bar of the group's share of the whole graph. */
+function buildCount(count, total) {
   const el = document.createElement('span');
   el.className = 'group-count';
-  el.textContent = `${count} node${count === 1 ? '' : 's'}`;
+  const bar = document.createElement('i');
+  bar.className = 'group-count-bar';
+  bar.setAttribute('aria-hidden', 'true');
+  const fill = document.createElement('b');
+  fill.style.width = `${total ? Math.min(100, (count / total) * 100) : 0}%`;
+  bar.appendChild(fill);
+  // The noun is for screen readers; on screen the bar says what the number is.
+  const noun = document.createElement('span');
+  noun.className = 'visually-hidden';
+  noun.textContent = ` node${count === 1 ? '' : 's'}`;
+  el.append(bar, String(count), noun);
+  if (total) el.title = `${count} of ${total} nodes (${Math.round((count / total) * 100)}%)`;
   return el;
 }
 

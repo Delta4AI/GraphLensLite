@@ -897,9 +897,10 @@ body {
 
 .layer-row .layer-row-action {
     margin-left: auto;
-    height: 20px;
+    height: 22px;
     padding: 0 8px;
     font-size: 11px;
+    font-weight: 400;
 }
 
 .layer-row .layer-row-action.active {
@@ -2013,47 +2014,95 @@ h5 {
    switch; Notes and the minimap have no parameters, so they are bare rows.
    Both shapes share the bar geometry so the four read as one stack.
    -------------------------------------------------------------------------- */
-/* A row with no parameters: the same bar as a card's, minus the disclosure. */
-.layer-row {
+/* A row with no parameters: the same line as a card's header, minus the
+   disclosure. Every layer is switch | glyph | name | end, over a hairline, so
+   the five read as one stack. */
+.layer-row,
+.card-labeled.layer-card > .card-collapse-bar {
     display: flex;
     align-items: center;
     gap: 7px;
-    margin: 8px 0 0;
-    padding: 4px 8px;
+    min-height: 32px;
+    margin: 0;
+    padding: 0 2px;
     box-sizing: border-box;
-    border-radius: 4px;
-    background: var(--brand-border);
-    color: #fff;
-    font-weight: bold;
+    border-radius: 0;
+    border-bottom: 1px solid var(--border-soft);
+    background: none;
+    color: var(--text);
+    font-weight: 600;
     font-size: 13px;
 }
 
-/* A COLLAPSED layer card is nothing but its bar, so all four rows read as one
-   stack; expanded, the card frame comes back to group the parameters under it. */
+.card-labeled.layer-card > .card-collapse-bar:has(.card-collapse-header:hover) {
+    background: none;
+    color: var(--accent-text);
+}
+
 .card-labeled.layer-card {
     padding: 0;
+    margin-top: 0;
     border: none;
     background: none;
     box-shadow: none;
 }
 
-.card-labeled.layer-card:not(.collapsed) {
-    border: 1px solid var(--brand-border);
-    background-color: var(--card-wash);
-    padding-bottom: 6px;
-}
-
-/* The card cannot carry the inset itself: the bar is its header and has to stay
-   full-bleed, so everything BELOW the bar is inset instead. Without this the
-   prose and the tab bar sit flush against the card border. */
+/* Everything under an open layer hangs off its name, past the switch and glyph. */
 .card-labeled.layer-card > :not(.card-collapse-bar) {
-    margin-left: 6px;
-    margin-right: 6px;
+    margin-left: 30px;
 }
 
-/* Breathing room under the bar, which the contents would otherwise touch. */
 .card-labeled.layer-card > .card-collapse-bar + * {
     margin-top: 6px;
+}
+
+.card-labeled.layer-card:not(.collapsed) {
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+/* What the layer draws, in miniature. */
+.layer-glyph {
+    flex: none;
+    position: relative;
+    width: 26px;
+    height: 18px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    background: var(--bg);
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+}
+
+.layer-glyph > svg {
+    display: block;
+}
+
+.layer-glyph-groups {
+    background:
+        radial-gradient(ellipse 7px 5.5px at 9px 8px, color-mix(in srgb, var(--brand-text) 40%, transparent) 95%, transparent 100%),
+        radial-gradient(ellipse 7px 5.5px at 16px 8px, color-mix(in srgb, var(--accent-text) 40%, transparent) 95%, transparent 100%),
+        var(--bg);
+}
+
+.layer-glyph-heatmap {
+    background: radial-gradient(circle at 40% 55%, #C33D35 0, #EFB0AA 30%, transparent 70%), var(--bg);
+}
+
+.layer-glyph-notes {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.layer-glyph-minimap::after {
+    content: "";
+    position: absolute;
+    inset: 3px 6px;
+    border: 1px solid var(--accent-text);
+    border-radius: 1px;
 }
 
 .layer-title {
@@ -2061,31 +2110,27 @@ h5 {
     text-align: left;
 }
 
-/* Counts are secondary to the name they follow, and sit on the same dark bar
-   as the title — a plain white at lower weight rather than a muted grey.
-   0.9, not 0.8: at 0.8 this lands on 4.22:1 over the dark theme's lighter bar,
-   and 11px prose owes 4.5. */
+/* Counts are secondary to the name they follow. */
 .layer-count {
     font-weight: normal;
     font-size: 11px;
-    opacity: 0.9;
+    color: var(--text-muted);
 }
 
-/* A track with a knob, sized off the 13px bar text so it never dominates the
+/* A track with a knob, sized off the 13px row text so it never dominates the
    row. role=switch, so aria-checked is the state and CSS follows it.
    The KNOB POSITION is the state signal, not the fill — colour alone would
-   fail 1.4.1, and no green both contrasts 3:1 with the white knob and 3:1
-   with the bar behind it. The border carries the 3:1 component boundary
-   instead (0.7 alpha: 0.55 lands on 2.88:1 over the dark theme's bar). */
+   fail 1.4.1. The --text-faint border carries the 3:1 component boundary
+   against the panel in both themes. */
 .layer-switch {
     flex: 0 0 auto;
     position: relative;
     width: 26px;
     height: 14px;
     padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    border: 1px solid var(--text-faint);
     border-radius: 7px;
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--surface-3);
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
 }
@@ -2098,7 +2143,7 @@ h5 {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--text-muted);
     transition: transform 0.15s ease;
 }
 
@@ -2108,7 +2153,11 @@ h5 {
    else, and the knob position — not the fill — is what states the switch. */
 .layer-switch[aria-checked="true"] {
     background: #C33D35;
-    border-color: rgba(255, 255, 255, 0.9);
+    border-color: #C33D35;
+}
+
+.layer-switch[aria-checked="true"]::after {
+    background: #fff;
 }
 
 .layer-switch[aria-checked="true"]::after {
@@ -2116,7 +2165,7 @@ h5 {
 }
 
 .layer-switch:hover:not(:disabled):not(.disabled) {
-    border-color: #fff;
+    border-color: var(--text-strong);
 }
 
 /* Dead by CLASS as well as by attribute: syncOverlays uses the class so the
@@ -2128,7 +2177,7 @@ h5 {
 }
 
 .layer-switch:focus-visible {
-    outline: 2px solid #fff;
+    outline: 2px solid var(--accent-text);
     outline-offset: 1px;
 }
 
@@ -4213,27 +4262,22 @@ div[slider] > input[type=range]::-ms-tooltip {
    read as an undifferentiated block, and the open one has a settings pane
    inside it that has to be visibly part of THAT group. */
 .group-row {
-    padding: 6px;
-    border: 1px solid var(--border-soft);
-    border-radius: 7px;
+    padding: 2px 4px;
+    border-radius: 6px;
     background: transparent;
     cursor: pointer;
 }
 
 .group-row:hover {
-    border-color: var(--border-strong);
+    background: var(--row-hover);
 }
 
-/* The open row carries its own settings, so it reads as a container rather
-   than a highlighted line. Its edge takes the GROUP's colour (set inline), not
-   the accent: a red frame beside the group's own swatch reads as an error, and
-   this ties the open panel to the bubble it belongs to. */
 .group-row.active {
-    background: var(--surface-2);
-    border-color: var(--border-strong);
-    border-left: 3px solid var(--row-color, var(--border-strong));
-    padding-left: 4px;
     cursor: default;
+}
+
+.group-row.active:hover {
+    background: none;
 }
 
 .group-row-head {
@@ -4306,9 +4350,29 @@ div[slider] > input[type=range]::-ms-tooltip {
 
 .group-count {
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-size: 11px;
+    font-variant-numeric: tabular-nums;
     color: var(--text-muted);
     white-space: nowrap;
+}
+
+/* The group's share of every node in the graph. */
+.group-count-bar {
+    position: relative;
+    width: 28px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface-3);
+    overflow: hidden;
+}
+
+.group-count-bar > b {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: color-mix(in srgb, var(--brand-text) 60%, transparent);
 }
 
 .group-row-toggle {
@@ -4360,11 +4424,13 @@ div[slider] > input[type=range]::-ms-tooltip {
     display: none;
 }
 
-/* Inside the open row, so it needs its own edge against the row's fill. */
+/* The open group's settings hang under it, behind a rule in the GROUP's colour
+   (set inline), not the accent: a red edge beside the group's own swatch reads
+   as an error, and this ties the settings to the bubble they belong to. */
 .group-row .group-style-panel {
-    margin-top: 6px;
-    padding-top: 6px;
-    border-top: 1px dashed var(--border-soft);
+    margin: 4px 0 6px 24px;
+    padding-left: 8px;
+    border-left: 2px solid var(--row-color, var(--border));
 }
 
 /* --- the shared group menu ---------------------------------------------- */

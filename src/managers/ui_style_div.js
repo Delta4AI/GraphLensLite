@@ -585,14 +585,6 @@ function createStyleDiv(cache) {
   function createBubbleSetConfigCard() {
     const bubbleDiv = createCard("Bubble Sets", undefined, "bubble-set-config-card-header");
 
-    // What a group IS comes before the buttons that make one.
-    const note = document.createElement("p");
-    note.className = "insp-note";
-    note.textContent =
-      "Coloured bubbles drawn around nodes you group together. A group can be fed " +
-      "by a filter (it then follows that filter) or by a selection, or both.";
-    bubbleDiv.appendChild(note);
-
     // Creation verbs sit ABOVE the list: they answer "how do I get one", which
     // is the question the empty state asks and the question a user returning to
     // add another asks. "Clear all" is destructive and goes below, on its own —
@@ -878,7 +870,7 @@ function createStyleDiv(cache) {
   // a switch for the layer beside the disclosure for its parameters, so the
   // one row owns both. The disclosure gets its own accessible name ("…
   // settings") because the switch already answers to the plain one.
-  function makeCollapsible(label, startCollapsed = false, {title = label, overlay, countId} = {}) {
+  function makeCollapsible(label, startCollapsed = false, {title = label, overlay, countId, hint} = {}) {
     const card = root.querySelector(`[data-label="${label}"]`);
     if (!card) return;
     card.classList.add("card-collapsible");
@@ -899,7 +891,11 @@ function createStyleDiv(cache) {
       // draw, and back in when it does, so it has to exist to be restored.
       sw.title = `Show or hide ${title.toLowerCase()} on the graph`;
       sw.addEventListener("click", () => cache.ui.toggleOverlay(overlay));
-      bar.appendChild(sw);
+      // A small picture of what the layer draws (CSS paints it).
+      const glyph = document.createElement("span");
+      glyph.className = `layer-glyph layer-glyph-${overlay}`;
+      glyph.setAttribute("aria-hidden", "true");
+      bar.append(sw, glyph);
     }
 
     const header = document.createElement("button");
@@ -907,6 +903,7 @@ function createStyleDiv(cache) {
     header.className = "card-collapse-header";
     header.setAttribute("aria-expanded", startCollapsed ? "false" : "true");
     if (overlay) header.setAttribute("aria-label", `${title} settings`);
+    if (hint) header.title = hint;
 
     const titleSpan = document.createElement("span");
     titleSpan.className = "card-collapse-title";
@@ -1088,6 +1085,8 @@ function createStyleDiv(cache) {
     title: "Groups",
     overlay: "groups",
     countId: "overlayCountGroups",
+    hint: "Coloured bubbles drawn around nodes you group together. A group can be fed " +
+      "by a filter (it then follows that filter) or by a selection, or both.",
   });
   makeCollapsible("Density Heatmap", true, {
     title: "Density heatmap",
