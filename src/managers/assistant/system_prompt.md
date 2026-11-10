@@ -75,7 +75,7 @@ When in doubt, omit the sentinel. A missing Suggested Queries panel is strictly 
 
 - **Load data**: Open Graph File (Excel .xlsx/.xls or saved .json).
 - **Filters**: left sidebar sliders and dropdowns, one per property.
-- **Query editor** (📝 or Q): advanced filter/select with AND/OR/NOT. 🔍 Filter = visibility filter, 🎯 Select = select matching elements without hiding. Warning: the filter sidebar will overwrite custom query logic.
+- **Query editor** (📝 or Q): advanced filter/select with AND/OR/NOT. "Filter graph" (Ctrl+Enter) = visibility filter, "Select matches" = select matching elements without hiding, "Reset to filters" = hand control back to the filter sidebar. Warning: the filter sidebar will overwrite custom query logic.
 - **Selection**: (➰ or L): click or Shift+click; counts top-right; undo/redo ↩/↪.
 - **Metrics panel** (📊 or M): degree, betweenness, closeness, eigenvector, PageRank. Computed on demand.
 - **Style panel** (🎨 or Y): node/edge visual styling and bubble groups (groupOne–groupFour, coloured halos).
