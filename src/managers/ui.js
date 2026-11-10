@@ -902,6 +902,10 @@ class UIManager {
       widget?.appendListeners();
     }
 
+    for (const sub of div.querySelectorAll('.filter-subgroup')) {
+      const n = sub.querySelectorAll('.filter-row').length;
+      sub.querySelector('.filter-group-count').textContent = `${n} filter${n === 1 ? '' : 's'}`;
+    }
     this.buildFilterScopeToggle(div);
     this.updateFilterLockState();
 
@@ -979,10 +983,14 @@ class UIManager {
     const subHeader = document.createElement('h5');
     subHeader.textContent = subSection;
     subHeader.className = 'm-0 inline';
+    // "3 filters" at the end of the rule; buildFilterUI fills it in.
+    const count = document.createElement('span');
+    count.className = 'filter-group-count';
     subHeaderDiv.append(
       this.cache.uiComponents.createSectionCheckbox(section, subSection),
       subHeader,
-      this.cache.uiComponents.createSectionResetButton(section, subSection)
+      this.cache.uiComponents.createSectionResetButton(section, subSection),
+      count
     );
     const subBody = document.createElement('div');
     subBody.className = 'filter-subgroup-body';
@@ -1111,7 +1119,11 @@ class UIManager {
         // above it: in the narrow panel that row is stripped down to the
         // right-aligned triad, so the pair costs one row instead of two.
         if (active && wraps.length > 1) {
-          wrap.querySelector(':scope > .header-card').prepend(bar);
+          const head = wrap.querySelector(':scope > .header-card');
+          head.prepend(bar);
+          // The census says what the switch's counts add up to, so it shares the row.
+          const census = container.querySelector('#filterConstraintCount');
+          if (census) bar.after(census);
         }
       }
       for (const btn of bar.children) {
@@ -1337,14 +1349,10 @@ class UIManager {
     let text;
     if (andMode) {
       el.title = NARROW_DOWN_CENSUS_TITLE;
-      text = constraining
-        ? `${constraining} of ${total} filters constrain the graph`
-        : 'No filter constrains the graph — every filter is still at its loaded range';
+      text = constraining ? `${constraining} of ${total} filters constrain` : 'No filter constrains yet';
     } else {
       el.title = BUILD_UP_CENSUS_TITLE;
-      text = constraining
-        ? `${constraining} of ${total} filters contribute to the graph`
-        : 'No filter contributes to the graph';
+      text = constraining ? `${constraining} of ${total} filters contribute` : 'No filter contributes';
     }
     // A live region: rewriting the same words would announce them again.
     if (el.textContent !== text) el.textContent = text;

@@ -1074,7 +1074,8 @@ body {
 .filter-links {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    min-width: 0;
 }
 
 .filter-links-select {
@@ -1098,8 +1099,7 @@ body {
 
 .filter-links-label {
     font-size: 11px;
-    font-weight: 600;
-    color: var(--text-strong);
+    color: var(--text-muted);
 }
 
 /* A group label can be grabbed and dragged (interactions.js). */
@@ -1787,6 +1787,20 @@ h5 {
     margin-bottom: 8px;
 }
 
+/* The census rides beside the switch whose counts it adds up. */
+#filterContainer .filter-section > .header-card > .filter-scope:has(+ .filter-constraint-count) {
+    margin-right: 0;
+}
+
+#filterContainer .filter-section > .header-card > .filter-constraint-count {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* A running search spans both sections, so the segment steps aside and every
    section with a match comes back. */
 #filterContainer.filters-searching .filter-scope {
@@ -1856,6 +1870,17 @@ h5 {
     flex: 1;
     height: 1px;
     background: var(--border-soft);
+}
+
+/* "3 filters", after the rule. */
+.filter-group-count {
+    order: 1;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
 }
 
 .sub-header-card h5 {
@@ -2905,6 +2930,53 @@ h5 {
     gap: 3px;
 }
 
+/* A slider with a distribution: the track drops under 16px of bars, the
+   value boxes stay level with the track. */
+.filter-range-row.has-hist {
+    align-items: flex-end;
+}
+
+.filter-range-row.has-hist > div[slider] {
+    height: 40px;
+}
+
+.filter-range-row.has-hist > div[slider] > div {
+    top: 20px;
+}
+
+/* The handles move down with the track (the value-box rules above never reach them). */
+.has-hist > div[slider] > input[type=range] {
+    top: 18px;
+}
+
+/* The row's name and ⋯ stay level with the track, not with the bars. */
+.filter-row:has(.has-hist) > :is(.filter-row-col1, .filter-row-col3) {
+    padding-top: 16px;
+}
+
+.filter-hist {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 16px;
+    height: 16px;
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    border-bottom: 1px solid var(--border);
+    pointer-events: none;
+}
+
+.filter-hist > i {
+    flex: 1 1 0;
+    background: var(--surface-3);
+    border-radius: 1px 1px 0 0;
+}
+
+.filter-hist > i.kept {
+    background: color-mix(in srgb, var(--brand-text) 55%, transparent);
+}
+
 /* The exact-value boxes sit at the two ends of the track, on the slider's own
    line — one row instead of slider-over-boxes, and no second copy of the same
    two numbers in position:fixed bubbles. They are sized to the column's
@@ -3049,17 +3121,22 @@ h5 {
     font-style: italic;
 }
 
+/* The mode and its option on one line: the switch, then Links (build up) or
+   Complete cases (narrow down); the elements-without-properties box wraps
+   under them when the graph has any. */
 .filter-toolbar-join {
     flex-basis: 100%;
-    padding: 3px;
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
 }
 
 /* The mode is a setting, not a call to action: a neutral track whose chosen
    half is lifted, so it does not compete with the red scope and inspector
-   pills around it. Full width, halves equal. */
+   pills around it. */
 .filter-mode-switch.filter-join-toggle {
+    flex: none;
     display: flex;
     padding: 2px;
     gap: 2px;
@@ -3102,12 +3179,13 @@ h5 {
     color: var(--accent-text);
 }
 
-/* The chosen mode's options, inside the same card. */
+/* The chosen mode's options, to the right of the switch. */
 .filter-mode-options {
+    flex: 1 1 120px;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 5px;
-    padding: 6px 5px 3px;
 }
 
 .filter-strict-checkbox {
@@ -4356,11 +4434,37 @@ div[slider] > input[type=range]::-ms-tooltip {
 }
 
 .filter-cat-summary {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Each value's share of the graph inside the closed field: kept in slate,
+   dropped in grey. Not interactive; the list does the choosing. */
+.filter-cat-bar {
+    flex: 1 1 40px;
+    min-width: 24px;
+    display: flex;
+    gap: 1px;
+    height: 6px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.filter-cat-bar > i {
+    flex-basis: 0;
+    min-width: 1px;
+    background: var(--surface-3);
+}
+
+.filter-cat-bar > i.kept {
+    background: color-mix(in srgb, var(--brand-text) 70%, transparent);
+}
+
+.filter-cat-bar > i.kept:nth-child(even) {
+    background: color-mix(in srgb, var(--brand-text) 45%, transparent);
 }
 
 .filter-cat-total,
