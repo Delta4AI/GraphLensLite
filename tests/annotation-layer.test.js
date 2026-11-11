@@ -25,10 +25,16 @@ function makeSigma(ratio = 1) {
       delete handlers[event];
     },
     // Linear stand-in for sigma's projection: graph y-up → screen y-down.
-    graphToViewport: (p) => ({ x: CX + (p.x * K) / ratio, y: CY - (p.y * K) / ratio }),
-    viewportToGraph: (p) => ({ x: ((p.x - CX) * ratio) / K, y: ((CY - p.y) * ratio) / K }),
-    // Mutable so tests can move the camera; the layer fingerprints this state
-    // to decide whether a rendered frame needs a re-anchor at all.
+    // The ratio sigma last rendered with: like the real one, the projection
+    // follows the camera only once a frame is rendered (see `frame` below).
+    renderedRatio: ratio,
+    graphToViewport(p) {
+      return { x: CX + (p.x * K) / this.renderedRatio, y: CY - (p.y * K) / this.renderedRatio };
+    },
+    viewportToGraph(p) {
+      return { x: ((p.x - CX) * this.renderedRatio) / K, y: ((CY - p.y) * this.renderedRatio) / K };
+    },
+    // Mutable so tests can move the camera.
     camera: { x: 0, y: 0, ratio, angle: 0 },
     getCamera() {
       return { getState: () => this.camera };
@@ -674,6 +680,7 @@ describe('per-frame sync gate', () => {
 
   /** Drive one rendered frame and let the layer's rAF callback run. */
   async function frame(sigma) {
+    sigma.renderedRatio = sigma.camera.ratio;
     sigma.handlers.afterRender();
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
   }
@@ -711,6 +718,21 @@ describe('per-frame sync gate', () => {
     await frame(sigma);
 
     expect(noteEls(container)[0].style.transform).not.toBe(before);
+  });
+
+  it('re-anchors once sigma renders a zoom the layer already synced against', async () => {
+    const { sigma, container } = makeLayer({ annotations: [ann()] });
+    await frame(sigma);
+
+    // The camera state changes first; a sync landing before sigma's render
+    // still projects the old view.
+    sigma.camera = { ...sigma.camera, ratio: 2 };
+    sigma.handlers.afterRender();
+    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+
+    await frame(sigma); // sigma renders: the projection catches up
+    // graphToViewport({1, -2}) at ratio 2 → (450, 400); scale 1/ratio = 0.5.
+    expect(noteEls(container)[0].style.transform).toBe('translate(450px, 400px) scale(0.5)');
   });
 
   it('notices a workspace whose notes were swapped out', async () => {

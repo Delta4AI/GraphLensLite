@@ -149,6 +149,22 @@ describe('heatmap paint', () => {
     expect(adapter._layerCanvas._ctx._calls.drawImage).toBe(composites + 1);
   });
 
+  it('re-composites once sigma renders a zoom the layer already painted against', () => {
+    const { layer, adapter } = makeLayer();
+    redraw(layer);
+
+    // Sigma rebuilds its projection only in render(): the camera state changes
+    // first, and a paint landing in between still projects the old view.
+    adapter.sigma.getCamera = () => ({ getState: () => ({ ...adapter._camera, ratio: 0.5 }) });
+    redraw(layer);
+    const composites = adapter._layerCanvas._ctx._calls.drawImage;
+
+    adapter._camera.ratio = 0.5; // sigma renders: the projection catches up
+    redraw(layer);
+
+    expect(adapter._layerCanvas._ctx._calls.drawImage).toBe(composites + 1);
+  });
+
   it('re-splats when a node moves', () => {
     const { layer } = makeLayer();
     redraw(layer);
