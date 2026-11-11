@@ -134,7 +134,7 @@ function shapeTextureURI({ shape, fill, stroke = null, lineWidth = 0, size = 10,
 
   const { ACCENT_COLOR, DIM_COLOR, NODE_HALO_WIDTH, HALO_OPACITY } = DEFAULTS.STATE;
   const hasHalo = state === "selected" || state === "highlight";
-  // Old G6 state spec: highlight = accent fill + halo, no border;
+  // State spec: highlight = accent fill + halo, no border;
   // selected = own fill + accent halo; dim = dim fill, border kept.
   const effFill = state === "highlight" ? ACCENT_COLOR : state === "dim" ? DIM_COLOR : safeFill;
   const effStroke = state === "highlight" ? null : safeStroke;

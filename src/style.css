@@ -953,10 +953,10 @@ body {
     display: none;
 }
 
-/* Metrics and the assistant were column-shaped panels; in the workbench they
-   own the full width. Metrics stays a flex container all the way down so its
-   ranked list can claim the leftover height instead of sitting in a short box
-   under an expanse of empty pane. */
+/* In the workbench, metrics and the assistant own the full width. Metrics
+   stays a flex container all the way down so its ranked list can claim the
+   leftover height instead of sitting in a short box under an expanse of empty
+   pane. */
 #metricsContainer.wb-pane {
     flex: 1;
     min-height: 0;
@@ -1153,8 +1153,7 @@ body {
     color: var(--text-muted);
 }
 
-/* Owned minimap (src/graph/minimap.js) — kept at the position the old G6
-   minimap was CSS-forced to (bottom-right, despite its "bottom-left" config) */
+/* Owned minimap (src/graph/minimap.js), bottom-right of the stage */
 #innerGraphContainer .gll-minimap {
     position: absolute;
     /* Lifts clear of the workbench, which overlays the bottom of the stage.
@@ -1859,10 +1858,9 @@ h5 {
     padding: 2px 0;
 }
 
-/* Sub-groups used to be a second solid pill under the section's solid pill, so
-   the two levels read as two KINDS of thing rather than level 1 and level 2 —
-   and the container ended up louder than the properties it holds. A small-caps
-   label and a hairline carry the same grouping for none of the weight. */
+/* Sub-groups get a small-caps label and a hairline, not a second solid pill
+   under the section's: two pills read as two KINDS of thing rather than level 1
+   and level 2, and the container would be louder than the properties it holds. */
 .sub-header-card {
     display: flex;
     align-items: center;
@@ -4471,7 +4469,7 @@ div[slider] > input[type=range]::-ms-tooltip {
     border-color: var(--danger-text);
 }
 
-/* The line the old UI never showed: a group can be fed by a live filter AND a
+/* The group's source line: a group can be fed by a live filter AND a
    hand-picked node set at the same time. Two parts, so "follows a filter" and
    "someone put these here" do not run together into one cryptic string. */
 .group-row-source {
@@ -7059,10 +7057,10 @@ div[slider] > input[type=range]::-ms-tooltip {
 #assistantEmptyState {
     display: none;
     flex: 1;
-    /* The workbench is short and wide where the old dock was tall and narrow:
-       without min-height/overflow these centred chips grow the pane and push
-       the input row out of sight. `safe center` keeps the top reachable once
-       the content is taller than the space. */
+    /* The workbench is short and wide: without min-height/overflow these
+       centred chips grow the pane and push the input row out of sight.
+       `safe center` keeps the top reachable once the content is taller than
+       the space. */
     min-height: 0;
     overflow-y: auto;
     flex-direction: column;

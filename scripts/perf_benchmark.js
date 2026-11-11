@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* global window, document, requestAnimationFrame */ // browser globals run inside page.evaluate() callbacks
-// Renderer performance benchmark (MIGRATION.md Phase 0 acceptance gates) and
+// Renderer performance benchmark (acceptance gates, see GATES below) and
 // size x styling sweep (bench/render/README.md).
 //
 // Gate mode (default): boots the app in headless chromium against the
@@ -87,7 +87,7 @@ const REALTIME_FPS_FLOOR = 30;
 // rasterizer (no usable GPU), so the GPU-bound gates can't be assessed.
 const SOFTWARE_RENDERER_RE = /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/i;
 
-// Acceptance gates from MIGRATION.md ("Acceptance criteria").
+// Acceptance gates for the renderer at the benchmark fixture size.
 const GATES = [
   { key: 'loadMs', label: 'Load (data → rendered)', unit: 'ms', limit: 2000, op: '<=' },
   {
@@ -220,7 +220,7 @@ async function containerCenter(page) {
  * Install a persistent in-page rAF counter (window.__fps). Real input events
  * are driven from Node via CDP so the harness measures the renderer's real
  * event path regardless of how it binds listeners (synthetic DOM WheelEvents
- * bypassed G6's binding entirely — verified empirically pre-migration), while
+ * can bypass a renderer's own listener binding entirely), while
  * frame counting stays in-page.
  */
 async function installFrameCounter(page) {
@@ -338,7 +338,7 @@ async function detectRenderer(page) {
  * First-interaction stall: time from the first wheel event after load until
  * the next animation frame completes. t0/t1 are both taken from the in-page
  * clock; the wheel itself is real CDP input. The two CDP round-trips add a few
- * ms — negligible against the 500 ms gate (and the ~11 s G6 baseline).
+ * ms — negligible against the 500 ms gate.
  */
 async function measureFirstInteractionStall(page) {
   const { cx, cy } = await containerCenter(page);
@@ -352,10 +352,10 @@ async function measureFirstInteractionStall(page) {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve(performance.now())));
       })
   );
-  // No zoom-changed sanity check here: G6 swallows the very first wheel tick
-  // (zoom stays constant, verified empirically) while still running its
-  // lazy-init work — which is exactly the stall this measures. Zoom behavior
-  // is asserted in measureWheelZoomFps instead.
+  // No zoom-changed sanity check here: a renderer may swallow the very first
+  // wheel tick (zoom stays constant) while still running its lazy-init work —
+  // which is exactly the stall this measures. Zoom behavior is asserted in
+  // measureWheelZoomFps instead.
   return { stallMs: t1 - t0 };
 }
 
@@ -427,9 +427,8 @@ async function measureDragPanFps(page) {
  * 500-node select via the app's selection manager (cache.sm.selectNodes ->
  * cache.graph.getElementState/setElementState round-trips).
  *
- * NOTE(sigma-migration): this call site changes with the Sigma.js port —
- * selection becomes app-level Sets + sigma.refresh() (MIGRATION.md Phase 1/3).
- * Keep the entry point isolated here so only this function needs updating.
+ * Kept isolated here so a change to the selection API only touches this
+ * function.
  */
 async function measureSelectOnce(page) {
   return page.evaluate(async (count) => {

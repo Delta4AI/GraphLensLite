@@ -323,11 +323,9 @@ class IOManager {
             if (filterValue.categories && Array.isArray(filterValue.categories)) {
               filterValue.categories = new Set(filterValue.categories);
             }
-            // Per-filter `${group}Members/IDs/MembersHidden/IDsHidden` sets used to be
-            // revived here. Group membership lives on the LAYOUT
-            // (`${group}Props` / `${group}ManualMembers`, above); those four were
-            // either never read or mirrored `${group}Props`. Files that still carry
-            // them are simply ignored.
+            // Older files may carry per-filter `${group}Members/IDs/MembersHidden/IDsHidden`
+            // sets; they are ignored. Group membership lives on the LAYOUT
+            // (`${group}Props` / `${group}ManualMembers`, above).
           }
 
           layout.filters = filtersMap;
@@ -1315,8 +1313,8 @@ class IOManager {
   parseLayouts(jsonLayouts) {
     const parsedLayouts = {};
     // Notes past MAX_ANNOTATIONS (and malformed records) are dropped at the
-    // trust boundary. Silently, until now — while the same feature warns when
-    // it trims a single note's text.
+    // trust boundary and counted, so the user is told — as when a single
+    // note's text is trimmed.
     let droppedNotes = 0;
     // Settings this version does not know get their default; collected so
     // the user hears which, instead of the workspace quietly looking different.
@@ -1588,9 +1586,8 @@ class IOManager {
     // not keep naming the old file.
     let labelIsStale = false;
     try {
-      // Parse before destroying anything. The old order tore the graph down
-      // first, so a malformed file left an empty stage with nothing to go
-      // back to. Every failure path inside loadFile reports its own reason.
+      // Parse before destroying anything, so a malformed file leaves the
+      // current graph in place. Every failure path inside loadFile reports its own reason.
       const fileData = await this.cache.io.loadFile(event);
       if (!fileData) return;
 

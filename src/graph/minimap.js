@@ -3,9 +3,7 @@
  * dots over a graph-space bounding-box fit, the current viewport as a
  * rectangle, click/drag pans the camera. No edges, no labels.
  *
- * Position: bottom-right — the G6 plugin was configured "bottom-left" but
- * style.css always overrode it to bottom-right, so that is the shipped
- * position this port preserves (CSS class .gll-minimap).
+ * Position: bottom-right (CSS class .gll-minimap).
  */
 import { FrameCoalescer } from './overlay_frame.js';
 

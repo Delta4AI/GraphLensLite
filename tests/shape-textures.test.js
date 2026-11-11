@@ -8,7 +8,7 @@ import {
 import { DEFAULTS } from "../src/config.js";
 
 // ==========================================================================
-// SVG texture generation for non-circular node shapes (Phase 2, risk #1).
+// SVG texture generation for non-circular node shapes.
 // Pure string work — node-safe by contract.
 // ==========================================================================
 

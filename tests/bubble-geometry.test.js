@@ -11,7 +11,7 @@ import { smoothClosedPath, sampleSmoothedRing } from "../src/graph/bubble_smooth
 import { pointInPolygon } from "../src/graph/lasso_geometry.js";
 
 // ==========================================================================
-// Bubble-set geometry (sigma migration Phase 4) — pure outline math between
+// Bubble-set geometry — pure outline math between
 // the bubble groups and bubblesets-js. Node-safe: no DOM/canvas/sigma.
 // ==========================================================================
 

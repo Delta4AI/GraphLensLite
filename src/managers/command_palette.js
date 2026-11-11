@@ -80,8 +80,8 @@ function visibleWithin(el, root) {
 function actionables(root) {
   const kept = [];
   // querySelectorAll is document order, so a container always precedes its
-  // descendants: checking only the last kept element skips them all, where the
-  // old `found.some(other => other.contains(el))` was a full O(n²) sweep.
+  // descendants: checking only the last kept element skips them all, where
+  // `found.some(other => other.contains(el))` would be a full O(n²) sweep.
   for (const el of root.querySelectorAll('.rail-menu-item, button')) {
     if (kept.length > 0 && kept[kept.length - 1].contains(el)) continue;
     if (!visibleWithin(el, root)) continue;
@@ -267,11 +267,11 @@ export function collectCommands(cache) {
 }
 
 /**
- * Nodes and edges by ID or label, from the same maps the old Focus card used.
+ * Nodes and edges by ID or label, from the cache's ID-or-label lookup maps.
  * Query-driven rather than indexed up front — a 6 000-node graph has no
  * business being copied into a list on every ⌘K.
  *
- * ponytail: linear scan per keystroke, bounded only by MAX_ELEMENTS hits.
+ * shortcut: linear scan per keystroke, bounded only by MAX_ELEMENTS hits.
  * Measured at 6k nodes + 12k edges: 1.1 ms for the worst case (a query that
  * matches nothing, so no early exit) and 0.003 ms once it fills the slate —
  * well inside a frame, so no debounce and no scan budget. Revisit above
@@ -513,8 +513,7 @@ class CommandPalette {
     else {
       // A workbench toolbar control (＋ Node, ⤒ Import, ✔ Apply) acts on its
       // own pane, so running it with the pane hidden lands the effect where the
-      // user cannot see it. `cmd.tab` used to be honoured on the reveal path
-      // only.
+      // user cannot see it, so show that pane first.
       if (cmd.tab) this.cache.workbench?.show(cmd.tab);
       cmd.el.click();
     }

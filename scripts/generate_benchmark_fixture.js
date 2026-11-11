@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Generates deterministic benchmark fixtures for the renderer perf harness
-// (MIGRATION.md Phase 0). Default: 6000 nodes / 9000 edges in 8 clusters, ~85%
+// (scripts/perf_benchmark.js). Default: 6000 nodes / 9000 edges in 8 clusters, ~85%
 // of the edges intra-cluster. Same PRNG seed -> byte-identical output, so the
 // file is never committed — regenerate via `npm run perf:fixture`.
 //

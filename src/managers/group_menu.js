@@ -3,11 +3,9 @@
  *
  * Two places assign membership and they mean different things: a filter row
  * assigns a PROPERTY (membership resolves live through the filter), the
- * Selection panel assigns NODES (a snapshot). Both used to be a 2×2 quadrant
- * pie — the same glyph for two different verbs, unlabelled, and structurally
- * limited to four groups. One checklist of named groups replaces both: it says
- * which groups exist, which ones this thing is already in, and scales to any
- * number.
+ * Selection panel assigns NODES (a snapshot). Both use one checklist of named
+ * groups: it says which groups exist, which ones this thing is already in, and
+ * scales to any number.
  *
  * Built on RailMenu, which already owns anchoring, outside-pointerdown, Escape
  * and the ✓ state — this module is only the group-specific rows.
@@ -47,8 +45,8 @@ const attached = new WeakMap();
 
 export function attachGroupMenu(anchor, cache, getOpts) {
   // buildUI re-wires the Selection panel's Add-to-group button (rebuilt with its card) on every graph load and
-  // data edit. Each attach used to add another click listener to the same
-  // button, so one click opened one menu per load.
+  // data edit. Destroy the previous menu first, or each attach adds another
+  // click listener to the same button and one click opens one menu per load.
   attached.get(anchor)?.destroy();
   const menu = new RailMenu(anchor, (el) => build(el, menu, cache, getOpts()));
   attached.set(anchor, menu);
@@ -58,7 +56,7 @@ export function attachGroupMenu(anchor, cache, getOpts) {
 /**
  * The callbacks reach into the model and can reject (a group operation redraws
  * and persists). Fired bare, a rejection is an unhandled promise the user never
- * hears about — the quadrant handlers this menu replaced reported it.
+ * hears about, so report it.
  */
 function run(action, cache) {
   Promise.resolve(action?.()).catch((err) =>

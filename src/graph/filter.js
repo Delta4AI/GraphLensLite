@@ -145,7 +145,7 @@ class GraphFilterManager {
 
     this.cache.visibleElementsChanged = false;
     // Current visibility comes from the graphology `hidden` attrs, surfaced
-    // as style.visibility by the renderer facade (sigma migration, Phase 1).
+    // as style.visibility by the renderer facade (SigmaAdapter).
     const { nodes, edges } = await this.cache.graph.getData();
     const visible = new Set();
     const hidden = new Set();

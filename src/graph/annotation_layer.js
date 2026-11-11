@@ -99,7 +99,7 @@ class AnnotationLayer {
       return;
     }
     // Frames rendered while hidden are skipped, so a camera that moved in the
-    // meantime left the notes anchored to their old spots. Nothing re-renders
+    // meantime leaves the notes anchored to their old spots. Nothing re-renders
     // on unhide by itself — re-anchor them here.
     if (this.#stale()) this.sync();
   }

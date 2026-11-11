@@ -699,11 +699,8 @@ class InvertibleRangeSlider {
     slider.title = `Set the thresholds for the numeric property: ${StaticUtilities.formatPropsAsTree(this.propID)}\n---\n  - Move handles to set min/max (≥ min ∧ ≤ max).\n  - Swap handles to invert (≤ min ∨ ≥ max).\n  - Double-click to reset.`;
 
     // The exact-value boxes sit at the two ends of the track, on the slider's
-    // own line. They used to be a second row under it, while a pair of
-    // position:fixed bubbles showed the SAME two numbers on hover — one value,
-    // drawn twice, one of the copies needing hover/scroll/resize listeners to
-    // stay pinned. Merging them halves the row height (~40px to ~22px) and
-    // deletes the whole fixed-positioning apparatus.
+    // own line, so each value is drawn once, the row stays ~22px tall, and no
+    // position:fixed hover bubble needs scroll/resize listeners to stay pinned.
     const row = document.createElement('div');
     row.className = 'filter-range-row';
     this.inputStart = this.createSliderInput(
@@ -1048,9 +1045,9 @@ class UIComponentManager {
    * checklist, replacing a 2×2 quadrant pie that could only ever address four
    * groups and never said which four.
    *
-   * ponytail: at 18px in `filter-row-col3` the dot shows ONE colour plus a ring
+   * shortcut: at 18px in `filter-row-col3` the dot shows ONE colour plus a ring
    * meaning "and others" — N colours are not legible at this size, and a conic
-   * pie would just rebuild the wedges this replaced. Exact membership is in the
+   * pie would only produce unreadable wedges. Exact membership is in the
    * tooltip and the menu. Give it more room and it could show a colour stack.
    *
    * @param {string} propID

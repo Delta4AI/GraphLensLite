@@ -2,11 +2,10 @@
  * The modal scaffolding a "fetch something into the graph" dialog needs, shared
  * by the Neo4j import and join-query popups (openNeo4jPopup, openNeo4jJoinPopup).
  *
- * The two used to hand-roll ~55 identical lines each — the
- * settled/dataFetched/controller trio, dismiss, the same four Popup options, the
- * onClose abort, the spinner painter, the detached-error re-route and the
- * lock/controller/finally dance around the fetch. They drifted accordingly:
- * every fix to that scaffolding this release had to be made twice.
+ * Both need the same scaffolding — the settled/dataFetched/controller trio,
+ * dismiss, the same four Popup options, the onClose abort, the spinner painter,
+ * the detached-error re-route and the lock/controller/finally dance around the
+ * fetch — so it lives here once instead of drifting between two copies.
  *
  * The dialog owns its form, its ids and its fetch; this owns the lifecycle.
  */

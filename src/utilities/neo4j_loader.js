@@ -108,7 +108,7 @@ function clearNeo4jSession() {
  * stamps the data-source label, so that one seam detects "another source
  * replaced the graph" without any lifecycle events — but it is read from the
  * machine-readable `data-source` the setter writes, not from the words on
- * screen, which used to mean rewording the label silently killed expand/join.
+ * screen, so rewording the label cannot silently break expand/join.
  */
 function neo4jSessionActive() {
   const label = document.getElementById('dataSourceLabel');
@@ -340,8 +340,8 @@ async function executeNeo4jImport(cache, config, deps = {}) {
     const { nodes, relationships } = graph;
 
     const exclusions = await checklist(collectPropertyKeys(nodes, relationships));
-    // Only now is the connection form done with: cancelling the checklist used
-    // to leave the user with a closed popup and a password to retype.
+    // Only now is the connection form done with: cancelling the checklist must
+    // not leave the user with a closed popup and a password to retype.
     if (!exclusions) return false;
     // Asked here, before the connection form closes and not only inside
     // applyGraph: a refusal there would still get the Neo4j label stamped over
@@ -354,7 +354,7 @@ async function executeNeo4jImport(cache, config, deps = {}) {
       rendered = await apply(cache, toAppFormat(nodes, relationships, exclusions));
     } finally {
       // applyGraph stamps its own "Live (API)" label before it starts, so a
-      // failed apply used to leave THAT describing a Neo4j graph — and by then
+      // failed apply would leave THAT describing a Neo4j graph — and by then
       // the old graph is already destroyed. Stamp either way; the expand/join
       // buttons stay hidden because no session was started.
       cache.ui.setDataSourceLabel(`Neo4j: ${config.database}`, NEO4J_DATA_SOURCE);

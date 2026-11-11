@@ -3,7 +3,7 @@ import { drawNodeLabel, drawEdgeLabel, placementVector } from "../src/graph/labe
 import { DEFAULTS } from "../src/config.js";
 
 // ==========================================================================
-// Canvas label renderers (Phase 2 label parity). Pure functions of
+// Canvas label renderers. Pure functions of
 // (context, data, settings) — exercised with a recording stub context.
 // ==========================================================================
 

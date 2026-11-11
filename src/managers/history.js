@@ -23,7 +23,7 @@
 import { hotkeyLabel } from './command_palette.js';
 
 // A layout carries a per-element style map, so a snapshot grows with the graph.
-// ponytail: depth is capped crudely by node count; make it size-aware only if
+// shortcut: depth is capped crudely by node count; make it size-aware only if
 // a real workspace shows memory pressure.
 const MAX_DEPTH = 20;
 const MAX_DEPTH_LARGE = 5;

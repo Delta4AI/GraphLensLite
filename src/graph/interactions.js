@@ -10,7 +10,7 @@ import DOMPurify from "../lib/purify.esm.mjs";
 import { hoverNeighborhood } from "./graph_model.js";
 import { idsInsidePolygon } from "./lasso_geometry.js";
 
-// Lasso visuals from the old G6 lasso-select behavior style.
+// Lasso stroke and fill (brand red).
 const LASSO_STROKE = "#C33D35";
 const LASSO_FILL = "rgba(195, 61, 53, 0.3)";
 const TOOLTIP_OFFSET_PX = 12;
@@ -617,7 +617,7 @@ class InteractionManager {
   }
 
   /**
-   * Ported from the old G6 tooltip plugin: show the expand button only when
+   * Show the expand button only when
    * the content actually clips, measured one frame after layout.
    */
   #syncExpandButton(el) {

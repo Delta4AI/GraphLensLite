@@ -414,8 +414,8 @@ class GuidedTour {
 
     footer.appendChild(leftGroup);
 
-    // The only way out used to be the popup's × titled "Close popup", on a
-    // 14-step tour that replaced the user's graph with sample data to start.
+    // An explicit exit on every step but the last: the tour swaps the user's
+    // graph for sample data, so the popup's generic × is not enough.
     if (!isLast) {
       const skipBtn = document.createElement('button');
       skipBtn.className = 'p-button p-button-secondary tour-btn-skip';
@@ -659,8 +659,7 @@ class GuidedTour {
   async executeAction(action) {
     switch (action) {
       // Workbench tabs never close each other, so every "open X" step is one
-      // call — the old close-the-other-editor dances are gone with the
-      // exclusive bottom-bar slot.
+      // call.
       case 'openMetricsPanel': {
         this.cache.workbench?.show('metrics');
         await this.sleep(350);

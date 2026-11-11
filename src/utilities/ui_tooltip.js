@@ -203,7 +203,7 @@ class TooltipLayer {
  * Titled `.disabled` controls keep their pointer events so the tooltip hover
  * can reach them (see style.css) — which also makes them clickable again. One
  * capture-phase guard swallows those clicks for every class-disabled control
- * at once; the alternative was a check in every handler.
+ * at once, instead of a check in every handler.
  */
 function guardDisabledClicks(doc) {
   doc.addEventListener(

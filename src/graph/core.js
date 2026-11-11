@@ -156,7 +156,7 @@ class GraphCoreManager {
           labelColor: { color: nodeLabelColorForTheme(theme) },
           // Same for edge labels: label_renderers falls back here whenever
           // the per-edge labelColor is the baked #000000 default (in light
-          // mode this resolves to #000 — identical to the old baked render).
+          // mode this resolves to #000).
           edgeLabelColor: { color: nodeLabelColorForTheme(theme) },
         },
       });
@@ -195,7 +195,7 @@ class GraphCoreManager {
   /**
    * One-time post-first-render routine (hotkeys, global listeners, plugin
    * stubs, initial filter pass, initial layout persistence). Called
-   * sequentially by SigmaAdapter.render() — formerly G6's AFTER_RENDER event.
+   * sequentially by SigmaAdapter.render().
    */
   async initialAfterRenderEvent() {
     if (this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_RUNNING) return;
@@ -439,8 +439,7 @@ class GraphCoreManager {
   }
 
   // Centre and scale the viewport so the given set of nodes fills it with
-  // padding. Direct camera fit — the old G6 zoom-at-non-1 translate
-  // workaround (antvis/G6#6373) is gone with the sigma renderer.
+  // padding, by setting the sigma camera directly.
   async fitViewToNodes(nodeIDs) {
     const ids = [...nodeIDs];
     if (ids.length === 0) {

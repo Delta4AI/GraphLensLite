@@ -331,7 +331,7 @@ class AssistantManager {
       return
     }
     input.value = ''
-    // A cancelled budget modal (or a send that never started) used to eat the
+    // A cancelled budget modal (or a send that never started) must not eat the
     // typed question. Put it back — unless the user has typed something else
     // in the meantime.
     const sent = await this.send(text)
