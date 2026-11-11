@@ -30,7 +30,7 @@
     "os": "Fedora Linux 44 (KDE Plasma Desktop Edition) (linux 7.2.15-200.fc44.x86_64)",
     "node": "v22.22.2",
     "browser": "chromium 148.0.7778.96 (headless)",
-    "browserExecutable": "/home/glory/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome",
+    "browserExecutable": "~/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome",
     "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon 890M Graphics (RADV STRIX1) (0x0000150E)), radv)",
     "webgl2": true,
     "glVendor": "Google Inc. (AMD)",

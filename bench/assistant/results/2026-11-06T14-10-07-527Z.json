@@ -1,7 +1,7 @@
 {
   "meta": {
     "timestamp": "2026-11-06T14-10-07-527Z",
-    "endpoint": "http://exploration-big.taild29f4c.ts.net:11434",
+    "endpoint": "http://<workstation>:11434",
     "models": [
       {
         "name": "qwen3.5:9b",
@@ -70,7 +70,7 @@
     "items": 52,
     "gold": "bench/assistant/gold.json",
     "gitCommit": "c931484",
-    "hardware": "exploration-big workstation, NVIDIA RTX A4000 16 GB (models fully in VRAM), Ollama 0.40.11, reached over Tailscale; GPU and CPU under concurrent load from other jobs, so latencies are not representative",
+    "hardware": "workstation, NVIDIA RTX A4000 16 GB (models fully in VRAM), Ollama 0.40.11, reached over Tailscale; GPU and CPU under concurrent load from other jobs, so latencies are not representative",
     "runner": "Linux 7.2.15-200.fc44.x86_64, node v22.22.2",
     "failedModels": {
       "qwen3.5:4b": "Ollama call failed for \"qwen3.5:4b\": UND_ERR_HEADERS_TIMEOUT",

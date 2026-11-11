@@ -21,7 +21,7 @@ node bench/assistant/run.mjs --check-gold
 
 # Live run
 node bench/assistant/run.mjs \
-  --endpoint http://192.168.0.23:11434 \
+  --endpoint http://localhost:11434 \
   --models qwen3:8b,llama3.1:8b,gemma3:12b \
   --repeats 3 \
   --hardware "RTX 4090 24 GB, Ollama 0.x.y"

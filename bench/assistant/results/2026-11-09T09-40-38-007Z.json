@@ -55,7 +55,7 @@
     "items": 52,
     "gold": "bench/assistant/gold.json",
     "gitCommit": "d0d9de8",
-    "hardware": "exploration-big workstation, NVIDIA RTX A4000 16 GB, Ollama 0.40.11",
+    "hardware": "workstation, NVIDIA RTX A4000 16 GB, Ollama 0.40.11",
     "runner": "Linux 6.12.113+deb13-amd64, node v22.23.4",
     "failedModels": {
       "gemma4:12b": "Ollama call failed for \"gemma4:12b\": HTTP 500: {\"error\":\"prediction aborted, token repeat limit reached\"}"
