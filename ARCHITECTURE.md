@@ -30,7 +30,7 @@ Sigma directly.
 The rendering and graph-operation core. Key modules:
 
 - `graph_model.js` — graphology population, sigma reducers, edge-type selection
-- `sigma_adapter.js` — the only Sigma importer; transitional graph-shaped facade
+- `sigma_adapter.js` — the only Sigma importer; the graph-shaped facade the managers call
 - `core.js` — `GraphCoreManager`: render/draw cycles, event locks, behaviour wiring
 - `interactions.js` — drag, zoom, lasso, click, hover handlers
 - `style.js` — per-element style resolution with defaults, per-layout persistence

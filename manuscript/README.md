@@ -3,8 +3,8 @@
 LaTeX source for the Graph Lens Lite journal paper, targeting the OUP
 `oup-authoring-template` class (Nucleic Acids Research by default).
 
-The folder is flat: one driver (`main.tex`) plus the prose split into small
-`\input` files so each piece can be edited on its own.
+One driver (`main.tex`) plus the prose split into small `\input` files so each
+piece can be edited on its own.
 
 - `main.tex` — driver: preamble, frontmatter macros, `\input`s the body
 - `body.tex` — the body, Introduction through Conflict of interest
@@ -12,7 +12,11 @@ The folder is flat: one driver (`main.tex`) plus the prose split into small
 - `keywords.tex` — keyword list, fed to `\keywords{}`
 - `reference.bib` — bibliography database
 - `oup-plain.bst` — numbered citation style
-- `Fig/` — figures
+- `biorxiv.tex` — second driver for the preprint (see below)
+- `supplement/` — supplementary grammar note and benchmark tables
+- `Fig/` — figures; `graphical-abstract.html` — source of the graphical abstract
+- `2026-06-26_ADPKD_model_GLL-input_GLL-paper-version.xlsx` — the ADPKD model
+  used in the paper and the assistant benchmark
 
 The body is in IMRaD order (Introduction → Materials and Methods → Results →
 Discussion); headings are unnumbered under the OUP class (`unnumsec`).

@@ -117,7 +117,7 @@ to the console (development convenience only — it changes on restart).
 
 All three `/api/graph` and `/api/events` calls accept an optional `?session=<id>`
 query param that isolates a caller's graph and live stream from others. Omitting
-it uses the shared `"default"` session (the original single-graph behaviour). See
+it uses the shared `"default"` session (one graph for every caller). See
 [API.md §2.1](API.md) for the id format and handoff pattern.
 
 Reads (`GET /api/graph`, `/api/events`) are intentionally open — they are the
@@ -135,6 +135,9 @@ viewer's delivery channel, exactly like serving the HTML. Only **writes**
 - Browser cross-origin `POST`s are rejected (`403` on any `Origin` header) as a
   CSRF defence. Push from server-side or CLI clients, not from browser
   JavaScript on another origin.
+- When bound to a specific host, requests whose `Host` header names another
+  host are rejected (`403`) as a DNS-rebinding defence; a loopback bind accepts
+  `127.0.0.1`, `localhost` and `::1`. Binding `0.0.0.0` turns this check off.
 - The ingest endpoint hardens untrusted input: incoming JSON has `__proto__`,
   `constructor`, and `prototype` keys stripped at every level (prototype-
   pollution defence) before processing.
