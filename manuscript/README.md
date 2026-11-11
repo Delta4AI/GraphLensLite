@@ -21,10 +21,6 @@ Discussion); headings are unnumbered under the OUP class (`unnumsec`).
 
 Look for these markers when reviewing the draft:
 
-- `% AI-DRAFTED -- REVIEW` — prose drafted by an AI assistant during the
-  manuscript restructure. Treat as a starting point; revise in your own voice
-  before submission. Anything not marked is user-original prose preserved
-  verbatim from the prior draft.
 - `% TODO` — structural placeholder. The heading exists, the body is empty,
   the comment block lists the angles to consider.
 - `% TODO(authors)` / `% CONFIRM(authors)` — a fact or wording only the
