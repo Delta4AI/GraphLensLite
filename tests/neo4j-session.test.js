@@ -886,7 +886,7 @@ describe('openNeo4jJoinPopup', () => {
     document.getElementById('neo4j-join-fetch-btn').click();
     await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
 
-    document.querySelector('.p-icon').click(); // the × the audit found still live
+    document.querySelector('.p-icon').click(); // the popup's ×, still live during the fetch
     releaseCount();
 
     expect(await promise).toBe(false);

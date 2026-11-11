@@ -77,7 +77,7 @@ export function updateBudgetMeter({systemChars, historyChars, historyCount, grap
   )
   el.classList.add(tierClass(b.ratio))
 
-  // Tooltip: a single affordance line. The full breakdown now lives in the
+  // Tooltip: a single affordance line. The full breakdown lives in the
   // click-to-open details modal (budget_details_modal.js) so long tooltip
   // dumps don't clutter the surface.
   el.title = b.overBudget

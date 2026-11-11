@@ -364,8 +364,8 @@ const EXCEL_EDGE_PROPERTIES = [
   },
   {
     column: 'Start Arrow Type',
-    // New marker vocabulary + legacy G6 names (alias-mapped at render time
-    // by graph_model.edgeMarkerCode) so old workbooks keep importing.
+    // Marker vocabulary + G6-era names (alias-mapped at render time by
+    // graph_model.edgeMarkerCode) so old workbooks keep importing.
     type: 'oneOf:arrow|rect|diamond|circle|tee|triangle|vee|triangleRect|simple|square',
     apply: (e, v) => {
       e.style.startArrowType = v;

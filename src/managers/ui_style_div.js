@@ -597,11 +597,10 @@ function createStyleDiv(cache) {
     "Edge Flow Density", E.FLOW.DENSITY, {min: 0.5, max: 3, step: 0.25});
   }
 
-  // The Groups overlay card. The four fixed style tabs are gone: a workspace
-  // holds any number of groups, so the card is a LIST (bubble_sets.renderGroupList
-  // paints it) over one settings pane that is rebuilt for whichever row is
-  // selected. Building a pane per group would be N x ~20 rows of DOM for a
-  // surface that only ever shows one.
+  // The Groups overlay card. A workspace holds any number of groups, so the
+  // card is a LIST (bubble_sets.renderGroupList paints it) over one settings
+  // pane that is rebuilt for whichever row is selected. Building a pane per
+  // group would be N x ~20 rows of DOM for a surface that only ever shows one.
   function createBubbleSetConfigCard() {
     const bubbleDiv = createCard("Bubble Sets", undefined, "bubble-set-config-card-header");
 

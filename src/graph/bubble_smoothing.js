@@ -36,7 +36,7 @@ const SMOOTH_MAX_CONTROL_RATIO = 0.35;
 // this damping, 6 at p=2, 1 at p=3 and 0 at p=4. Fat blobs are untouched —
 // their turn angles are gentle, and the painted area moves by under 3.5%.
 //
-// ponytail: a heuristic with a documented ceiling. The exact fix is to clamp
+// shortcut: a heuristic with a documented ceiling. The exact fix is to clamp
 // by each vertex's distance to the nearest non-adjacent part of the ring,
 // but that is O(n²) and this runs on every painted frame, not just on refit
 // — 66 ms per frame on the 6k-point ring a 120-member group produces.

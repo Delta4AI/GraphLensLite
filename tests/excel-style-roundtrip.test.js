@@ -6,7 +6,7 @@ import { GraphStyleManager } from "../src/graph/style.js";
 import { nodeAttributesFromStyle, edgeAttributesFromStyle } from "../src/graph/graph_model.js";
 
 // ==========================================================================
-// Excel style round-trip (MIGRATION.md risk #4): a node/edge styled through
+// Excel style round-trip: a node/edge styled through
 // the style pipeline must export to the Excel column set and re-import to an
 // identical nodeRef style AND identical sigma attributes via the graph_model
 // mapping. Uses the REAL GraphStyleManager and io.js column definitions.

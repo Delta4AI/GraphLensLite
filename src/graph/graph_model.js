@@ -11,7 +11,7 @@ import { DEFAULTS } from "../config.js";
 import { shapeTextureURI, isTextureOnlyShape, HALO_EXTRA_PX } from "./shape_textures.js";
 import { pieAttributesFromSlices } from "./pie_slices.js";
 
-// Element interaction-state colors (former G6 state spec) live in config so
+// Element interaction-state colors live in config so
 // the styling UI and the reducers share one source.
 const STATE_ACCENT_COLOR = DEFAULTS.STATE.ACCENT_COLOR;
 const STATE_DIM_COLOR = DEFAULTS.STATE.DIM_COLOR;
@@ -21,10 +21,10 @@ const STATE_DIM_COLOR = DEFAULTS.STATE.DIM_COLOR;
 const TRANSPARENT = "#00000000";
 
 /**
- * The model boundary owns the y-axis convention flip: the app model (G6
- * heritage: nodeRef styles, persisted positions, Excel/JSON files) is
- * y-down, sigma/graphology is y-up. Negate exactly once when crossing in
- * either direction so legacy files keep their orientation and save→load
+ * The model boundary owns the y-axis convention flip: the app model
+ * (nodeRef styles, persisted positions, Excel/JSON files) is y-down,
+ * sigma/graphology is y-up. Negate exactly once when crossing in either
+ * direction so existing files keep their orientation and save→load
  * round-trips are stable.
  */
 function flipY(y) {
@@ -169,7 +169,7 @@ function nodeProgramAttributes(style = {}, type) {
     // Bordered circle: the node-border program draws border + fill as GLSL
     // rings (crisp at all zooms, no texture atlas churn). The border ring is
     // a fraction of the radius so it scales with zoom exactly like the baked
-    // textures (and G6) did. State halos still go through the texture path —
+    // textures do. State halos still go through the texture path —
     // applyNodeState reads fillColor ?? color / borderColor / borderSize,
     // all coherent here.
     attrs.type = "borderCircle";
@@ -218,8 +218,8 @@ function labelStyleAttributes(style) {
  * (edge_programs.js), which selects the SDF in its fragment shader:
  *   arrow (directional triangle), rect, diamond, circle,
  *   tee (⊣ inhibition bar, pharmacology-style).
- * Legacy G6 arrow-type names map onto the nearest new marker so old files
- * keep rendering; the original string still round-trips via the edge style.
+ * G6-era arrow-type names in older files map onto the nearest marker so
+ * those files keep rendering; the original string still round-trips via the edge style.
  */
 const EDGE_MARKERS = { arrow: 1, rect: 2, diamond: 3, circle: 4, tee: 5 };
 const LEGACY_MARKER_ALIASES = {
@@ -518,7 +518,7 @@ function buildGraphologyGraph(cache) {
 }
 
 /**
- * State treatment for a node, per the old G6 state spec:
+ * State treatment for a node:
  *   selected  → own fill, accent halo ring, raised zIndex
  *   highlight → accent fill, accent halo ring
  *   dim       → dim fill
@@ -568,9 +568,9 @@ function applyNodeState(data, state) {
  * two endpoints.
  *
  * Traversal respects the current filter state: a hidden edge is not a path to
- * a neighbor, and a hidden neighbor is not a member. Without that, hovering a
- * node lit up nodes it no longer has a visible edge to — the highlight claimed
- * a connection the filtered graph does not show.
+ * a neighbor, and a hidden neighbor is not a member. Otherwise hovering a node
+ * would light up nodes it has no visible edge to, claiming a connection the
+ * filtered graph does not show.
  *
  * @param {import("../lib/graphology.bundle.mjs").Graph} graph
  * @param {string} id  node or edge key
@@ -617,9 +617,8 @@ function hoverStateFor(id, hoverIds) {
  * all keep their normal treatment. Read live off the cache each reducer call:
  * the layer's setters trigger sigma.refresh.
  *
- * This replaced a boolean that swapped `color` for an opaque grey, which did
- * not fade anything — an opaque grey node occludes the field exactly as much
- * as an opaque red one did.
+ * Swapping `color` for an opaque grey would not fade anything: an opaque grey
+ * node occludes the field exactly as much as an opaque red one.
  *
  * @returns {number} fade strength in [0, 1]; 0 means "leave the graph alone"
  */
@@ -695,7 +694,7 @@ function applyNodeFade(data, opacity) {
 
 /**
  * Sigma nodeReducer factory. Reads the graphology `hidden` attribute, the
- * app-level element-states Map (selected/highlight/dim, formerly G6 states)
+ * app-level element-states Map (selected/highlight/dim)
  * and the hover layer (see hoverStateFor).
  *
  * @param {object} cache

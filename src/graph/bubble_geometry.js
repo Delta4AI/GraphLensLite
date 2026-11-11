@@ -100,7 +100,7 @@ const NON_MEMBER_INFLUENCE_FACTOR = -0.8;
 // even-odd fill). A member-clearance-squeezed hole falls back to the largest
 // radius that still respects the clearance (body-hugging carve) — no silent
 // swallowing — down to this floor, below which a carve no longer reads.
-// ponytail: documented ceiling — a non-member fused into a member's
+// shortcut: documented ceiling — a non-member fused into a member's
 // clearance zone (holeR < 0.35 × its radius) stays covered; doing better
 // needs an outline algorithm with organic field-carved holes.
 const HOLE_MIN_RADIUS_RATIO = 0.35;
@@ -223,8 +223,8 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
     Math.min(GEOMETRY_MULTIPLIER_MAX, Math.max(GEOMETRY_MULTIPLIER_MIN, Number(v) || 1));
   const pad = clampMult(opts.padding ?? 1);
   const cor = clampMult(opts.corridor ?? 1);
-  // Avoidance is boolean (see NON_MEMBER_INFLUENCE_FACTOR): any legacy saved
-  // value > 0 means ON; NaN/missing fall back to ON.
+  // Avoidance is boolean (see NON_MEMBER_INFLUENCE_FACTOR): any saved numeric
+  // value > 0 (older files store a strength) means ON; NaN/missing fall back to ON.
   const avoidRaw = Number(opts.avoidance ?? 1);
   const avoidance = Number.isFinite(avoidRaw) && avoidRaw <= 0 ? 0 : 1;
   const unit = meanMemberRadius(memberRects);
@@ -237,8 +237,8 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
   // thinner than a marching cell simply registers nothing, and the enclosure
   // guarantee rebuilds the hull geometrically (per-node discs + capsule
   // corridors), which IS the barely-encapsulating, finger-like minimum the
-  // knobs promise. The old floors fattened minimum knobs to ~half a node
-  // radius on dense graphs where the ratio-1 node radius is small.
+  // knobs promise. A floor would fatten minimum knobs to ~half a node radius
+  // on dense graphs where the ratio-1 node radius is small.
   const nodeR0px = FIELD_NODE_R0_RATIO * unit * pad;
   const nodeR1px = FIELD_NODE_R1_RATIO * unit * pad;
   const edgeR0px = FIELD_EDGE_R0_RATIO * unit * cor;
@@ -1021,10 +1021,10 @@ function shiftedLabelAnchor(anchor, opts = {}) {
 
 /**
  * Resolve a group label to pure geometry: where the text goes, whether it is
- * rotated onto the path, and the background box behind it. Both sinks then only
- * PAINT — bubble_layer #drawLabel and export_svg bubbleLabelPrimitives used to
- * re-implement the standoff maths, the rotation predicate and the background
- * rect line for line.
+ * rotated onto the path, and the background box behind it. Both sinks
+ * (bubble_layer #drawLabel and export_svg bubbleLabelPrimitives) then only
+ * PAINT, so the standoff maths, the rotation predicate and the background rect
+ * live in one place.
  *
  * The `label` on/off gate stays with the callers: the live layer reads it from
  * manager-merged opts, the export resolves it through opts ?? defaults.

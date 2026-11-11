@@ -9,8 +9,8 @@
  * label can never obscure the group name (a primary read). All four bubble
  * groups paint in a single pass. GraphBubbleSetManager keeps talking to per-group
  * "plugin instances" — those are thin handles into this layer's group state
- * (see getGroupHandle), so the manager's member/filter/style logic survives
- * the G6 → sigma port unchanged.
+ * (see getGroupHandle), so the manager's member/filter/style logic does not
+ * depend on the renderer.
  *
  * Outlines are fitted by bubblesets-js at the ratio-1 reference scale
  * (bubble_geometry.js) and cached in GRAPH space, so they are zoom-invariant —
@@ -41,8 +41,8 @@ const LABEL_LAYER_NAME = 'bubbleSetsLabels';
 // --- refit deferral (drag responsiveness) ----------------------------------
 // Fitting an outline is bubblesets' marching-squares pass over an influence
 // field; on a dense graph with avoidance on it costs far more than a frame.
-// #paint runs on every sigma afterRender, so dragging a member used to re-fit
-// 60×/second and the whole canvas crawled.
+// #paint runs on every sigma afterRender, so re-fitting on every frame while
+// a member is dragged would run 60×/second and the whole canvas would crawl.
 //
 // A fit whose last run stayed inside this budget keeps re-fitting live — small
 // graphs are unaffected and the hull tracks the node exactly as before.
@@ -112,8 +112,8 @@ class BubbleSetLayer {
   }
 
   /**
-   * Per-group handle with the old G6 plugin-instance call surface the
-   * manager expects: a `members` Map plus async update()/drawBubbleSets().
+   * Per-group handle with the call surface the manager expects: a
+   * `members` Map plus async update()/drawBubbleSets().
    *
    * @param {string} group  bubble group key (e.g. "groupOne")
    */
@@ -440,9 +440,9 @@ class BubbleSetLayer {
   /**
    * Paint the groups' bodies/outlines onto an export context at `scale`
    * device px per CSS px. Geometry is in CSS px (same numbers the screen
-   * uses), so the transform re-renders it crisp at the export resolution —
-   * this replaces the old bitmap stretch of the on-screen canvas, which
-   * blurred hulls at 2×+ exports.
+   * uses), so the transform re-renders it crisp at the export resolution;
+   * stretching the on-screen canvas bitmap instead would blur hulls at 2×+
+   * exports.
    *
    * @param {CanvasRenderingContext2D} ctx
    * @param {ReturnType<BubbleSetLayer["exportOutlines"]>} groups
@@ -702,10 +702,10 @@ class BubbleSetLayer {
   }
 
   /**
-   * Group label at the outline extreme picked by labelPlacement (the old G6
-   * plugin's surface): labelCloseToPath: false pushes it off the path along
-   * the outward normal; labelAutoRotate aligns on-path labels with the
-   * outline tangent. labelOffsetX/Y stay additive in screen space.
+   * Group label at the outline extreme picked by labelPlacement (option names
+   * follow G6's bubble-sets plugin): labelCloseToPath: false pushes it off the
+   * path along the outward normal; labelAutoRotate aligns on-path labels with
+   * the outline tangent. labelOffsetX/Y stay additive in screen space.
    */
   #drawLabel(ctx, anchor, opts, defaults) {
     // Geometry from resolveBubbleLabel (bubble_geometry.js), so this and the SVG

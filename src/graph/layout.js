@@ -66,7 +66,7 @@ class GraphLayoutManager {
       // view's when animating, so the tween starts from what's on screen).
       await this.applyLayoutStyles(currentLayout, animatePositions);
 
-      // All layouts are now position-based, no need to re-apply layout algorithms
+      // All layouts are position-based, no need to re-apply layout algorithms
       this.cache.ui.buildFilterUI();
 
       // Update filter lock state based on whether this layout has a custom query
@@ -215,7 +215,7 @@ class GraphLayoutManager {
       await this.cache.graph.updateEdgeData(edgeUpdates);
     }
 
-    // Bubble set styles are automatically used since all references now use the current layout
+    // Bubble set styles apply automatically since all references use the current layout
   }
 
   async addLayout() {
@@ -284,9 +284,8 @@ class GraphLayoutManager {
       // Start with default styles
       nodeStyles: new Map(),
       edgeStyles: new Map(),
-      // A new workspace starts with NO groups. Four always-present empty
-      // groups were the main reason the feature read as decoration; the
-      // Groups panel now shows an empty state that says what a group is.
+      // A new workspace starts with NO groups; the Groups panel shows an
+      // empty state that says what a group is.
       bubbleSetStyle: {},
     };
 
@@ -653,7 +652,7 @@ class GraphLayoutManager {
     // Push the freshly mutated positions to the graph BEFORE anything reads it
     // back. getNodeData() (used by persistNodePositions) re-syncs nodeRef.style
     // from graphology, so persisting first would clobber these positions with
-    // the pre-layout ones — that bug made every Arrange button a silent no-op.
+    // the pre-layout ones and every Arrange button would be a silent no-op.
     // `sel` holds the same node refs the layout fns just mutated.
     if (sel.length > 0) {
       await this.cache.graph.updateNodeData(
@@ -844,9 +843,8 @@ class GraphLayoutManager {
       // Per-view styles
       nodeStyles: new Map(),
       edgeStyles: new Map(),
-      // A new workspace starts with NO groups. Four always-present empty
-        // groups were the main reason the feature read as decoration; the
-        // Groups panel now shows an empty state that says what a group is.
+      // A new workspace starts with NO groups; the Groups panel shows an
+        // empty state that says what a group is.
         bubbleSetStyle: {},
       annotations: [],
     };

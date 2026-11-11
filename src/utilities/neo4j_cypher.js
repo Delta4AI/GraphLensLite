@@ -75,9 +75,9 @@ async function runCypher(config, statements, opts = {}) {
     });
   } catch (err) {
     // Tagged HERE, where the transport is the only thing that can have failed.
-    // connectionHint used to infer this from the JS type, and the callers' try
-    // blocks wrap the whole import — so an ordinary TypeError in the merge path
-    // was reported to the user as a network problem.
+    // Inferring it from the JS type in connectionHint would not work: the
+    // callers' try blocks wrap the whole import, so an ordinary TypeError in
+    // the merge path would be reported to the user as a network problem.
     if (err) err.transport = true;
     throw err;
   }

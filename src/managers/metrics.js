@@ -111,10 +111,8 @@ class NetworkMetrics {
 
     // Nothing changed and we already have this metric: skip the algorithms,
     // but still paint if what is on screen belongs to a different metric.
-    // Conflating "don't recompute" with "don't render" is what used to strand
-    // the panel on the previously selected metric — switching to a fresh one
-    // worked (no cache entry, so the full path ran) while switching *back*
-    // never did.
+    // Conflating "don't recompute" with "don't render" would strand the panel
+    // on the previous metric whenever the user switches *back* to a cached one.
     const cached = this.metricValueCache.get(this.selected);
     if (!this.cache.visibleElementsChanged && cached?.values?.size) {
       if (this.renderedMetric !== this.selected) this.#renderMetric(this.selected, cached);
@@ -200,7 +198,7 @@ class NetworkMetrics {
       label: this.m[metricId]?.label || metricId,
       valueLabel: METRIC_VALUE_LABELS[metricId] || "Value",
       // A subgraph too small to score is a result, not a missing one. Dropping
-      // it here used to leave the panel showing the previous subgraph's numbers
+      // it here would leave the panel showing the previous subgraph's numbers
       // under the new metric's name.
       values: metricResult.nodeValues ?? new Map(),
       scores: metricResult.scores || [],
@@ -264,9 +262,8 @@ class NetworkMetrics {
   }
 
   /**
-   * Drop every node's metric line. A plain Map clear: this used to be an
-   * innerHTML parse-and-serialize of every cached tooltip, so a return visit to
-   * an already-computed metric cost 2N HTML round trips.
+   * Drop every node's metric line. A plain Map clear, so a return visit to an
+   * already-computed metric costs no HTML parsing.
    */
   resetNodeToolTipMetricTexts() {
     this.nodeMetricText.clear();
@@ -309,9 +306,7 @@ class NetworkMetrics {
   /**
    * The metrics surface. Laid out for the workbench's frame — wide and short —
    * as two columns: the ranked node list (which wants every pixel of height it
-   * can get) beside the graph-level summary. In the old narrow sidebar these
-   * were stacked, which is why the list was capped at 120px and the summary
-   * was always below the fold.
+   * can get) beside the graph-level summary.
    */
   buildMetricUI() {
     const container = document.createElement('div');
@@ -401,7 +396,7 @@ class NetworkMetrics {
       opt => opt.value
     );
     // The two buttons are always live, so with nothing highlighted in the
-    // ranking list the click used to be a silent no-op.
+    // ranking list the click would otherwise be a silent no-op.
     if (!ids.length) {
       this.cache.ui?.info?.('Highlight nodes in the ranking list first.');
       return;
@@ -409,7 +404,8 @@ class NetworkMetrics {
     if (ids.length) {
       const nodeData = await this.cache.graph.getNodeData(ids);
       await this.cache.sm.updateSelectedState(nodeData, add);
-      // workaround since selected nodes where missing after adding them through network metrics
+      // updateSelectedState only restyles; cache.selectedNodes is refreshed
+      // only after the next draw, so update it here directly.
       if (add) {
         this.cache.selectedNodes = [...new Set([...this.cache.selectedNodes, ...ids])];
       } else {

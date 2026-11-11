@@ -79,8 +79,8 @@ function buildExpandPreflight(elementIds) {
       'MATCH (n)-[r]-(m) ' +
       "RETURN type(r) AS relType, coalesce(labels(m)[-1], '') AS neighborLabel, " +
       // DISTINCT: an undirected match sees a relationship once per endpoint,
-      // so anything internal to the selection was counted twice (self-loops
-      // likewise), and the checklist over-reported it.
+      // so without it anything internal to the selection is counted twice
+      // (self-loops likewise) and the checklist over-reports it.
       'count(DISTINCT r) AS cnt ORDER BY cnt DESC',
     parameters: { ids: elementIds },
     resultDataContents: ['row'],
@@ -212,7 +212,7 @@ async function appendStitch(session, nodes, relationships, opts) {
 
 /**
  * Stitching is an enhancement, not the payload: the fetch has already
- * succeeded by the time it runs, and an unplannable USING JOIN hint used to
+ * succeeded by the time it runs, and an unplannable USING JOIN hint must not
  * throw the whole expand or join away with it. Degrade to the unstitched
  * merge and say what is missing.
  */
@@ -363,7 +363,7 @@ async function mergeAndApply(cache, newNodes, newRels, deps = {}) {
   // graph and then snaps back — the arrangement must land exactly where the
   // seeding put it, in one paint.
   if (positions.size > 0) {
-    // ponytail: a workspace the user literally named "custom" (the Excel
+    // shortcut: a workspace the user literally named "custom" (the Excel
     // sentinel, DEFAULTS.CUSTOM_LAYOUT_NAME) still triggers that force pass.
     const layoutName = cache.data?.selectedLayout || 'Default';
     seeded.selectedLayout = layoutName;
@@ -493,7 +493,7 @@ async function expandNeo4jSelection(cache, deps = {}) {
   if (!session) return false;
   // The button is class-disabled, and `.disabled[title]` keeps pointer events so
   // its tooltip can explain itself — so a click on the greyed control DOES reach
-  // here, and used to return in silence. Said once, here, for every route in
+  // here and must not return in silence. Said once, here, for every route in
   // (button, command palette, keyboard).
   if (selected.length === 0) {
     cache.ui.info('Select nodes first — Expand fetches the neighbors of the selection.');

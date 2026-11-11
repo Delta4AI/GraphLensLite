@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { pointInPolygon, polygonBBox, idsInsidePolygon } from "../src/graph/lasso_geometry.js";
 
 // ==========================================================================
-// Lasso geometry (sigma migration Phase 3) — pure point-in-polygon math for
+// Lasso geometry — pure point-in-polygon math for
 // the freehand lasso overlay. Node-safe: no DOM/canvas.
 // ==========================================================================
 

@@ -58,8 +58,8 @@ const DEFAULTS = {
       ENABLED: false, TYPE: "dash", SPEED: 1, COLOR: null, OPACITY: 1, DENSITY: 1,
     }
   },
-  // Element interaction-state spec (former G6 node/edge state config in
-  // core.js). Single source for the styling UI and the sigma reducers.
+  // Element interaction-state spec. Single source for the styling UI and the
+  // sigma reducers.
   STATE: {
     ACCENT_COLOR: "#C33D35",   // selected/highlight halo + highlight fill
     DIM_COLOR: "#E4E3EA",      // dim fill
@@ -277,8 +277,8 @@ const DEFAULTS = {
     // EDGE_LABEL_AUTOROTATE: {enable: true, disable: false},
     // EDGE_ARROW_SIZES: {sm: 8, md: 10, lg: 14},
     // End-marker vocabulary (graph_model.EDGE_MARKERS): direction shapes +
-    // "tee" (⊣ inhibition bar). Legacy G6 names (triangle/vee/...) still load
-    // via aliases but are no longer offered in the UI.
+    // "tee" (⊣ inhibition bar). G6-era names in older files (triangle/vee/...)
+    // still load via aliases but are not offered in the UI.
     EDGE_ARROW_TYPES: ["arrow", "rect", "diamond", "circle", "tee"],
     // Flow overlay vocabulary (graph_model.FLOW_MODES): marching dashes,
     // travelling dots, fading comet tails and travelling chevron arrows, all
@@ -345,11 +345,10 @@ const CFG = {
 //    10 members × 50 000 avoid →  1 646 ms     300 ×  5 700 → 20 345 ms
 //
 // ≈ 6 µs per (member × avoid) pair, within ~2-3× across that whole range.
-// This used to be gated on TOTAL NODE COUNT (> 1000 → avoidance silently off),
-// which is the wrong variable: a 5-member group on a 10 000-node graph costs a
-// quarter of a second and was refused, while a 300-member group is the only
-// shape that ever needed refusing. Groups now estimate their own cost and ask
-// only when it exceeds this budget — the user is allowed to wait.
+// Total node count is the wrong variable to gate on: a 5-member group on a
+// 10 000-node graph costs a quarter of a second, while only a group of
+// hundreds of members needs a confirmation. Each group estimates its own cost
+// and asks only when it exceeds this budget — the user is allowed to wait.
 // Camera pan/zoom reuses cached outlines and is unaffected (bubble_layer.js).
   AVOID_FIT_CONFIRM_MS: 500,
 

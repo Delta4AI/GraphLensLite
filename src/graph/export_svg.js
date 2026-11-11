@@ -728,8 +728,8 @@ function usesNoteShadow(primitives) {
  */
 function annotationPrimitives({ ann, x, y, k }, measureText) {
   // Every rectangle and origin comes from annotationLayout, the same source the
-  // canvas repaint measures with — the border inset, the corner shrink and the
-  // line origins used to exist twice.
+  // canvas repaint measures with, so the border inset, the corner shrink and the
+  // line origins have a single definition.
   const layout = annotationLayout(ann, measureText);
   const { fillBox, strokeBox } = layout;
   const children = [];

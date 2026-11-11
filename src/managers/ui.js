@@ -415,8 +415,8 @@ class UIManager {
     toast.appendChild(dismiss);
 
     host.appendChild(toast);
-    // Evict the oldest NON-error first: four routine info toasts used to push a
-    // red one off screen, and the error is the only one the user has to read.
+    // Evict the oldest NON-error first, so routine info toasts never push a
+    // red one off screen; and the error is the only one the user has to read.
     // Errors still go when they are all there is.
     while (host.childElementCount > MAX_TOASTS) {
       const victim =
@@ -476,9 +476,7 @@ class UIManager {
   }
 
   /**
-   * Trace line, gated on the constructor's `debugEnabled` — production leaves it
-   * false, so 19 call sites used to spam the browser console for nobody while
-   * only the in-app log respected the flag.
+   * Trace line, gated on the constructor's `debugEnabled` (false in production).
    */
   debug(message) {
     if (!this.debugEnabled) return;
@@ -631,10 +629,9 @@ class UIManager {
    * a row needs no per-layer code — see the rows in graph_lens_lite.html and
    * the two switch-bearing cards in ui_style_div.js.
    *
-   * This table is the whole of "what is an overlay". It replaced the rail's ◐
-   * menu, which held the on/off switches while the parameters lived here — a
-   * split down a mechanism seam that left the parameter card greyed with no
-   * affordance pointing at its switch.
+   * This table is the whole of "what is an overlay". The on/off switches sit
+   * with the parameters, so a greyed parameter card always has its switch in
+   * view.
    */
   static OVERLAYS = {
     groups: {
@@ -1064,7 +1061,7 @@ class UIManager {
     reason.title =
       'This column holds both numbers and text, so neither a range slider nor a ' +
       'category list fits it. Clean the column to a single type to filter by it.';
-    // ponytail: a "jump to the offending rows" link into the data table needs
+    // shortcut: a "jump to the offending rows" link into the data table needs
     // search/filter support the data editor does not have yet; add it here once
     // the editor can focus a row subset.
     return reason;
@@ -1674,8 +1671,8 @@ class UIManager {
   /**
    * Fold or unfold one filter group. The class and the chevron glyph are two
    * halves of one state, so the palette's "reveal" (command_palette.js) unfolds
-   * through here rather than re-deriving the pair — and it no longer has to
-   * assume the chevron's position in the header.
+   * through here rather than re-deriving the pair, and need not assume the
+   * chevron's position in the header.
    *
    * @param {HTMLElement} wrapper the .filter-group element
    * @param {boolean} collapsed
@@ -1791,7 +1788,7 @@ class UIManager {
       }
 
       // The CSS dims these and blocks the mouse; disabling also takes them out
-      // of the Tab order, where a toggle used to be silently reverted.
+      // of the Tab order, where a toggle would be silently reverted.
       for (const control of container.querySelectorAll(UIManager.LOCKABLE_FILTER_CONTROLS)) {
         control.disabled = isLocked;
       }

@@ -4,7 +4,7 @@ import { applyNoverlap, executeLayout, settlePinnedForce } from "../src/graph/la
 import { DEFAULTS } from "../src/config.js";
 
 // ==========================================================================
-// Layout algorithms (sigma migration Phase 5) — node-safe layout execution
+// Layout algorithms — node-safe layout execution
 // for the app's full layout vocabulary (LAYOUT_INTERNALS): graphology
 // circular/circlepack/random/forceAtlas2, geometric grid, and headless
 // @antv/layout v2 for radial/concentric/mds. Specs are the real config entries.

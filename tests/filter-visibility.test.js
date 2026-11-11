@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { GraphFilterManager } from "../src/graph/filter.js";
 
 // ==========================================================================
-// updateElementVisibility (sigma migration Phase 1) — diffs requested
+// updateElementVisibility — diffs requested
 // show/hide ids against the renderer's current visibility (style.visibility,
 // backed by graphology `hidden` attrs) and only pushes actual changes.
 // ==========================================================================

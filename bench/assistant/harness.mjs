@@ -273,7 +273,7 @@ export async function prepareGold(gold) {
 // OllamaClient calls the global fetch and discards the response metadata, so
 // the harness swaps in a recording fetch around each item to capture raw
 // output, token counts and server timings without touching the client.
-// ponytail: global swap, safe only because items run strictly sequentially.
+// shortcut: global swap, safe only because items run strictly sequentially.
 const DEGENERATE_GENERATION = /token repeat limit reached/
 
 async function withRecordedCalls(fetchImpl, fn) {

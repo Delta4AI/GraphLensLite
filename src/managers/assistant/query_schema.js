@@ -6,8 +6,7 @@
 // renderer turns the AST into a guaranteed-valid query string.
 //
 // Scope rule (implemented as a connector-level lint — NOT a query-level
-// constraint, because GLL itself is more permissive than the old system
-// prompt suggested):
+// constraint, because GLL's query language itself accepts these forms):
 //   - Every leaf has a scope derived from its field prefix (Node filters::…
 //     or Edge filters::…).
 //   - `AND` and `NOT` between disjoint scopes are guaranteed-empty per GLL's
