@@ -20,12 +20,14 @@ dnf install libxcrypt-compat wine   # only needed for cross-platform builds
 | `npm run bundle:serve` | Dev server with watch + sourcemaps (recommended for development) |
 | `npm run serve` | Static http-server on :8000 |
 | `npm run serve:api` | Standalone HTTP ingest service with live SSE viewer (see [SERVICE.md](SERVICE.md)) |
-| `npm start` | Electron app (injects version automatically; the first run after a fresh `npm install` downloads the ~110 MB Electron runtime, since Electron 43 no longer fetches it at install time) |
+| `npm start` | Electron app (injects version automatically; the first run after a fresh `npm install` downloads the ~110 MB Electron runtime, which Electron 43 does not fetch at install time) |
 | `npm run bundle` | One-off bundle (no minify) |
 | `npm run bundle:prod` | Production bundle (minified) |
 | `npm test` | Run the vitest unit test suite |
 | `npm run test:watch` | vitest in watch mode |
-| `npm run vendor-libs` | Copy `marked` / `dompurify` into `src/lib/` and regenerate `src/managers/assistant/system_prompt.js` from its `.md` source |
+| `npm run lint` | ESLint over `src`, `server`, `scripts`, `tests` |
+| `npm run perf` / `npm run perf:sweep` | Renderer benchmark gates / size × styling sweep (see [bench/render/README.md](bench/render/README.md)) |
+| `npm run vendor-libs` | Copy `marked` / `dompurify` and bundle the sigma, graphology and layout-worker libraries into `src/lib/`; regenerate the assistant prompt modules from their `.md` sources |
 | `npm run dist-linux` | Build Linux packages (AppImage, deb, snap) |
 | `npm run dist-windows` | Build Windows packages (nsis, portable) |
 | `npm run dist-mac` | Build macOS packages (dmg, zip) |
@@ -110,11 +112,12 @@ Tests live in `tests/` as `*.test.js`. Assistant-specific tests (`tests/assistan
 
 ## Commits
 
-- Lowercase start, under 30 words, imperative mood
+- [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope>): <summary>`,
+  summary in imperative mood, lowercase, under 72 characters
 - One logical change per commit
 - Examples from the log:
-  - `fix query editor cursor jumping, bracket processing, caret flicker and overlay alignment`
-  - `add guided tour with sample dataset and step-by-step UI walkthrough`
+  - `fix(dialog): validate the workspace name without window.alert`
+  - `refactor(notes): measure the note box once, paint it twice`
 
 ## Pull Requests
 

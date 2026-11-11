@@ -3,12 +3,12 @@
 </p>
 
 <h3 align="center">
-   Visualise and navigate property graphs through a sleek, ultra-lightweight interface.<br>
+   Visualise and navigate property graphs in a lightweight interface.<br>
    Works in any modern browser, with native Electron desktops for Windows, macOS, and Linux.
 </h3>
 
 <p align="center">
-  <a href="https://delta4ai.github.io/GraphLensLite/">🔗 Live Demo</a> · <a href="https://github.com/Delta4AI/GraphLensLite/releases/latest">📦 Latest Release</a>
+  <a href="https://delta4ai.github.io/GraphLensLite/">Live Demo</a> · <a href="https://github.com/Delta4AI/GraphLensLite/releases/latest">Latest Release</a>
 </p>
 
 ## Quickstart
@@ -98,7 +98,7 @@ Open `http://127.0.0.1:7637/` and the pushed graph appears; further pushes updat
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before filing issues or submitting pull requests. See [ARCHITECTURE.md](ARCHITECTURE.md) for a map of the codebase.
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before filing issues or submitting pull requests. See [ARCHITECTURE.md](ARCHITECTURE.md) for a map of the codebase.
 
 ## License
 

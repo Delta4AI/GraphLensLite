@@ -14,9 +14,9 @@ in the app, export it, and copy the result.
 
 ---
 
-## Rules for a robust payload
+## Rules for a reliable payload
 
-Read these first — they are the whole game.
+Read these first.
 
 1. **Only `nodes` and `edges` are required.** Everything else is optional; GLL
    reconstructs headers, filters, and layout from the node/edge data when absent.
@@ -76,7 +76,7 @@ Content-Type: application/json
 | `200`  | `{ "success": true, "session": "<id>", "nodes": N, "edges": M, "subscribers": K }` |
 | `400`  | Body is not valid JSON, **or** the `session` id is malformed (see §2.1).            |
 | `401`  | Missing or invalid bearer token.                                                   |
-| `403`  | Request carried an `Origin` header (browser CSRF defence).                         |
+| `403`  | Request carried an `Origin` header (browser CSRF defence), or a `Host` not allowed. |
 | `413`  | Body exceeds the max body size (25 MB default).                                    |
 | `422`  | JSON is valid but missing `nodes`/`edges` arrays.                                  |
 
@@ -100,7 +100,7 @@ GET  /api/events?session=<id>     # SSE stream scoped to that session
   original single-graph behaviour. Existing callers need no changes.
 - **The producer owns the id.** Generate one (e.g. `crypto.randomUUID()`),
   POST with it, then open the viewer at `/?session=<id>` so the viewer
-  subscribes to the matching stream. (Same handoff shape as OntoloViz.)
+  subscribes to the matching stream.
 - **Bounded:** the server holds at most a fixed number of sessions
   (`MAX_SESSIONS`, 64) and evicts least-recently-used ones — preferring sessions
   with no connected viewer. The global live-viewer cap (100) spans all sessions.
@@ -122,8 +122,11 @@ GET  /api/events?session=<id>     # SSE stream scoped to that session
 }
 ```
 
-There is **no `version` field** — it is neither written nor checked. A `stash`
-key, if sent, is ignored.
+An optional top-level `version` string names the GLL version that wrote the
+file; **Export → JSON** stamps it, and a payload may omit it. A version newer
+than the viewer's shows a warning on load. Without one, saved filter state
+(§10) is read the way versions before 1.18.0 read it. A `stash` key, if sent,
+is ignored.
 
 ---
 
@@ -197,7 +200,7 @@ An edge is an object. `source` and `target` are required and must match node
 | `id`          | string | `"<source>::<target>"` | Explicit edge id. Auto-generated if omitted.              |
 | `label`       | string | —                      | Display text along the edge.                              |
 | `description` | string | —                      | Tooltip text.                                             |
-| `type`        | string | `"line"`               | `line` (straight); also `cubic`, `quadratic`, `polyline`. **Note:** since the Sigma renderer, `polyline` renders as a curve (same as `cubic`/`quadratic`). |
+| `type`        | string | `"line"`               | `line` (straight); also `cubic`, `quadratic`, `polyline`. **Note:** `polyline` renders as a curve (same as `cubic`/`quadratic`). |
 | `style`       | object | —                      | Visual styling — see below.                               |
 | `D4Data`      | object | —                      | Data attributes that define filters — see §6.             |
 
@@ -207,9 +210,9 @@ An edge is an object. `source` and `target` are required and must match node
 | ---------------- | ------- | ------------- | ---------------------------------------------------- |
 | `stroke`         | hex     | `"#403C5390"` | Line colour (last 2 hex digits = alpha).             |
 | `lineWidth`      | number  | `0.75`        | Line thickness (px).                                 |
-| `lineDash`       | number  | `0`           | Dash length. **Note:** kept in the data model and round-trips through export, but the Sigma renderer draws all edges solid (dashes are not rendered in v1). |
+| `lineDash`       | number  | `0`           | Dash length. **Note:** kept in the data model and round-trips through export, but the renderer draws all edges solid. |
 | `startArrow`     | boolean | `false`       | End marker at the source end.                        |
-| `startArrowType` | string  | `"arrow"`     | `arrow`/`rect`/`diamond`/`circle`/`tee` (⊣ inhibition bar). Legacy G6 names still load and round-trip unchanged (`triangle`/`vee`/`simple` → arrow, `triangleRect`/`square` → rect). |
+| `startArrowType` | string  | `"arrow"`     | `arrow`/`rect`/`diamond`/`circle`/`tee` (⊣ inhibition bar). Older names still load and round-trip unchanged (`triangle`/`vee`/`simple` → arrow, `triangleRect`/`square` → rect). |
 | `startArrowSize` | number  | `8`           | Source marker length (graph px). Unset/0 → sized proportionally to the line width. |
 | `startArrowColor`       | hex    | `null` | Source marker fill. `null` → inherits the edge stroke colour. |
 | `startArrowBorderColor` | hex    | `null` | Source marker border colour. `null` → no border (transparent). |
@@ -325,15 +328,18 @@ Internally these become the filter keys `Node filters::Metrics::Score`,
 
 ## 7. Bubble groups
 
-Bubble groups draw a coloured, labelled outline around a set of nodes. There are
-exactly **four** named groups: `groupOne`, `groupTwo`, `groupThree`, `groupFour`.
+Bubble groups draw a coloured, labelled outline around a set of nodes. A view
+holds any number of groups, each under a key you choose (the app itself mints
+`g1`, `g2`, …); the examples below use `groupOne`. The view's groups are the
+keys of `bubbleSetStyle`, or, when that is absent, the keys implied by the
+`…ManualMembers` / `…Props` fields.
 
 Group data lives **inside a layout entry** under `layouts`, but you only need the
 group fields — none of the advanced state from §10. Each group has two
 independent membership mechanisms, combined at render time:
 
-- **Manual** — `group<N>ManualMembers`: an array of node `id`s, always included.
-- **Property-based** — `group<N>Props`: an array of filter keys
+- **Manual** — `<group>ManualMembers`: an array of node `id`s, always included.
+- **Property-based** — `<group>Props`: an array of filter keys
   (`section::subGroup::property`, §6); every visible node carrying a matching
   property is included dynamically, tracking filter changes.
 
@@ -453,14 +459,15 @@ best obtained from an **Export → JSON** rather than written by hand.
     // bubble groups (the safe part — see §7)
     "bubbleSetStyle": { /* per-group visual style */ },
     "groupOneManualMembers": [], "groupOneProps": []
-    /* …Two / …Three / …Four likewise */
+    /* one pair per group key in bubbleSetStyle */
   }
 },
 "selectedLayout": "Default"
 ```
 
 GLL supports several layout algorithms — `force` (default), `circular`,
-`radial`, `concentric`, `grid`, `mds`, and `custom` (explicit positions). To
+`circlepack`, `radial`, `concentric`, `grid`, `random`, `mds`, `dagre`, and
+`custom` (explicit positions). To
 ship a non-default algorithm, set it up in the desktop app and **Export → JSON**;
 the `internals` block it produces is the reliable way to express it.
 
@@ -625,7 +632,7 @@ await fetch("http://127.0.0.1:7637/api/graph", {
 | Colours, sizes, shapes, arrows      | `node.style` / `edge.style`                                                | ✅           |
 | Filters (sliders & dropdowns)       | `D4Data` under `"Node filters"` / `"Edge filters"` (§6)                    | ✅           |
 | A guaranteed set of filter controls | `nodeDataHeaders` / `edgeDataHeaders` (§6)                                  | ✅           |
-| Bubble outlines around node sets    | `layouts.<name>.group<N>ManualMembers` / `…Props` + `bubbleSetStyle` (§7)  | ✅           |
+| Bubble outlines around node sets    | `layouts.<name>.<group>ManualMembers` / `…Props` + `bubbleSetStyle` (§7)   | ✅           |
 | To show only a subset of nodes      | Send only those nodes (per-node hide isn't reliable via the API, §4)       | ✅           |
 | Hide disconnected / dangling nodes  | `layouts.<name>.hideDisconnectedNodes: true` (§9)                          | ✅ optional  |
 | Fixed positions                     | `node.style.x` + `node.style.y` — or omit and auto-layout (§8)             | ✅ optional  |
