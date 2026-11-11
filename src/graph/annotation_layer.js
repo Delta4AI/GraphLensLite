@@ -32,6 +32,7 @@ import {
 } from './annotation_geometry.js';
 import { openAnnotationPopover } from './annotation_popover.js';
 import { FrameCoalescer } from './overlay_frame.js';
+import { viewKey } from './overlay_keys.js';
 
 // A press that travels less than this many screen px is a click (open the
 // style popover), not a drag.
@@ -79,7 +80,7 @@ class AnnotationLayer {
 
     this.renderHandler = () => this.scheduleSync();
     adapter.sigma.on('afterRender', this.renderHandler);
-    // Camera + note-set fingerprint of the last reconcile, so the per-frame
+    // Projection + note-set fingerprint of the last reconcile, so the per-frame
     // hook can tell "nothing moved" from "re-anchor everything" (see #stale).
     this.syncStamp = null;
   }
@@ -213,16 +214,15 @@ class AnnotationLayer {
    * signature string per note (note text runs to 2000 chars) and rewrite every
    * transform for nothing.
    *
-   * The fingerprint covers the camera and the note-set identity. Content edits
+   * The fingerprint covers sigma's projection and the note-set identity. Content edits
    * mutate a note in place and call sync() directly, so they never need to be
    * detected here; a restored workspace (undo) swaps the array, which does show
    * up as a new reference.
    */
   #stale() {
     if (!this.visible) return false;
-    const camera = this.adapter.sigma.getCamera().getState();
     const anns = this.annotations();
-    const stamp = `${camera.x}|${camera.y}|${camera.ratio}|${camera.angle}|${anns.length}`;
+    const stamp = `${viewKey(this.adapter.sigma)}|${anns.length}`;
     if (stamp === this.syncStamp && anns === this.lastAnns) return false;
     this.syncStamp = stamp;
     this.lastAnns = anns;

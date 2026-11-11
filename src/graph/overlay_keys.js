@@ -63,4 +63,21 @@ function geometryKey(opts = {}) {
   return GEOMETRY_KEY_FIELDS.map((field) => JSON.stringify(opts[field] ?? null)).join("|");
 }
 
-export { idsKey, positionsChecksum, geometryKey };
+/**
+ * Key over the graph→viewport map sigma projects with right now. The paint
+ * skips key on this rather than on the camera's state: sigma rebuilds the map
+ * only inside render(), so between a camera change and that render the state
+ * already reads new while graphToViewport still projects the old view. A paint
+ * landing in that gap keyed on the state would be skipped after the render and
+ * stay one view behind.
+ *
+ * @param {{graphToViewport: (p: {x: number, y: number}) => {x: number, y: number}}} sigma
+ * @returns {string}
+ */
+function viewKey(sigma) {
+  const origin = sigma.graphToViewport({ x: 0, y: 0 });
+  const unit = sigma.graphToViewport({ x: 1, y: 1 });
+  return `${origin.x},${origin.y},${unit.x},${unit.y}`;
+}
+
+export { idsKey, positionsChecksum, geometryKey, viewKey };

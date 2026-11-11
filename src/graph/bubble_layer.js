@@ -31,7 +31,7 @@ import {
   shiftedLabelAnchor,
   OUTLINE_STROKE_WIDTH,
 } from './bubble_geometry.js';
-import { idsKey, positionsChecksum, geometryKey } from './overlay_keys.js';
+import { idsKey, positionsChecksum, geometryKey, viewKey } from './overlay_keys.js';
 import { smoothClosedPath } from './bubble_smoothing.js';
 import { prepareOverlayCanvas } from './dpr_watch.js';
 import { FrameCoalescer } from './overlay_frame.js';
@@ -301,8 +301,6 @@ class BubbleSetLayer {
     const sigma = this.adapter.sigma;
     const { width, height } = sigma.getDimensions();
     const dpr = sigma.pixelRatio ?? window.devicePixelRatio ?? 1;
-    const camera = sigma.getCamera().getState();
-
     // Outlines are fitted in GRAPH space (zoom-invariant), so the camera never
     // forces a re-fit — #syncGroupOutline only re-fits when a group's identity
     // (members, positions, style) changes. Any camera move just reprojects the
@@ -335,8 +333,7 @@ class BubbleSetLayer {
     // Skip repainting when neither the outlines nor the view changed (sigma
     // re-renders on hover etc. without clearing custom layers).
     const signature =
-      `${width}x${height}x${dpr}|${camera.x},${camera.y},${camera.ratio},${camera.angle}` +
-      `|${shown.map(([g]) => g).join(',')}`;
+      `${width}x${height}x${dpr}|${viewKey(sigma)}|${shown.map(([g]) => g).join(',')}`;
     if (!outlinesChanged && signature === this.lastPaintSignature) return;
     this.lastPaintSignature = signature;
 

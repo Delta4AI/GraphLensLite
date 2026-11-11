@@ -36,7 +36,7 @@
  */
 import { DEFAULTS } from '../config.js';
 import { currentTheme } from '../utilities/theme.js';
-import { positionsChecksum } from './overlay_keys.js';
+import { positionsChecksum, viewKey } from './overlay_keys.js';
 import { prepareOverlayCanvas } from './dpr_watch.js';
 import { FrameCoalescer } from './overlay_frame.js';
 import {
@@ -217,7 +217,6 @@ class HeatmapLayer {
     }
     this.cleared = false;
 
-    const camera = sigma.getCamera().getState();
     const theme = currentTheme(document);
 
     // Heatmap identity is viewport-INDEPENDENT — pan/zoom must not re-splat.
@@ -237,8 +236,7 @@ class HeatmapLayer {
     // re-renders on hover etc. without clearing custom layers). opacity is
     // composite-only: part of the signature, not the heat key.
     const signature =
-      `${width}x${height}x${dpr}|${camera.x},${camera.y},${camera.ratio},${camera.angle}` +
-      `|h:${heatKey}|o:${s.opacity}`;
+      `${width}x${height}x${dpr}|${viewKey(sigma)}|h:${heatKey}|o:${s.opacity}`;
     if (signature === this.lastPaintSignature) return;
     this.lastPaintSignature = signature;
 
