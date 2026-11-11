@@ -148,6 +148,7 @@ warm-up was run, so the slowest calls include loading the model.
 \begin{table}[h]
 \centering
 \small
+\setlength{\tabcolsep}{3pt}
 \caption[Assistant accuracy]{Accuracy of generated queries against the gold set (52 questions
 $\times$ 3 runs per model). Exact: the selection equals the gold selection.
 Jaccard: mean overlap of selected and gold node and edge IDs (0 when no query
@@ -156,7 +157,8 @@ ran. Schema-valid: the first raw reply conformed to the JSON schema. No query:
 no valid query was returned (correct only for impossible questions).
 Latency: median and interquartile range in seconds. Parameter counts as
 reported by Ollama. Result files: \path{bench/assistant/results/2026-11-07T17-37-48-576Z.json}
-(\texttt{qwen3.5:9b}) and \path{2026-11-09T09-40-38-007Z.json} (the others).}
+(\texttt{qwen3.5:9b}), \path{2026-11-09T19-13-48-931Z.json} (\texttt{gemma4:12b},
+\texttt{llama3.1:8b}) and \path{2026-11-09T09-40-38-007Z.json} (the others).}
 \label{tab:assistant}
 \begin{tabular}{lrrrrrrrl}
 \toprule
@@ -165,8 +167,8 @@ Model & Params & $n$ & Exact (\%) & Jaccard & Repair (\%) & Schema-valid (\%) & 
 \texttt{qwen3.5:9b} & 9.7B & 156 & 88.5 & 0.907 & 0.0 & 100.0 & 11.5 & 25.0 (17.6--39.5) \\
 \texttt{qwen3.5:4b} & 4.7B & 156 & 75.6 & 0.806 & 1.9 & 98.1 & 13.5 & 17.9 (10.5--21.1) \\
 \texttt{mimo-v2.6} & 9.0B & 156 & 75.0 & 0.781 & 5.8 & 96.2 & 17.3 & 11.7 (8.3--29.1) \\
-% TODO(bench): add gemma4:12b and llama3.1:8b after the rerun with the
-% repeat-limit fix (harness scores Ollama's "token repeat limit reached" as no query).
+\texttt{gemma4:12b} & 11.9B & 156 & 69.2 & 0.692 & 0.0 & 67.3 & 34.6 & 74.7 (42.5--1381.9) \\
+\texttt{llama3.1:8b} & 8.0B & 156 & 51.9 & 0.608 & 1.9 & 100.0 & 0.0 & 3.7 (2.7--6.4) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -185,6 +187,8 @@ Model & Numeric & Categorical & Two-clause & Nested & Paraphrase & Impossible \\
 \texttt{qwen3.5:9b} & 100.0 & 100.0 & 90.0 & 62.5 & 81.8 & 100.0 \\
 \texttt{qwen3.5:4b} & 88.9 & 88.9 & 73.3 & 50.0 & 72.7 & 80.0 \\
 \texttt{mimo-v2.6} & 88.9 & 100.0 & 80.0 & 12.5 & 81.8 & 80.0 \\
+\texttt{gemma4:12b} & 77.8 & 100.0 & 70.0 & 37.5 & 54.5 & 80.0 \\
+\texttt{llama3.1:8b} & 88.9 & 81.5 & 36.7 & 12.5 & 63.6 & 0.0 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -203,5 +207,16 @@ returned empty (\texttt{qwen3.5:4b}: 3, \texttt{mimo-v2.6}: 6 of 156) count as
 no query. Most failures of \texttt{mimo-v2.6} on nested questions were no
 query at all (12 of 21), whereas the Qwen models mostly returned a valid but
 different selection.
+\texttt{gemma4:12b} returned identical results in all three repeats, but 45
+of its 156 replies were empty after 15 to 35 minutes of generation (7,483 to
+22,120 output tokens), six of them after Ollama aborted the reply for
+repeating tokens and the retry also looped; these count as no query and
+account for all its failures on nested questions (15 of 15) and its long
+upper latency quartile. Three of its 12 exact answers to impossible questions
+were such empty replies rather than an explicit empty query list.
+\texttt{llama3.1:8b} always returned a valid query, including for every
+impossible question, so it never declined; its failures (75 of 156) were all
+valid queries with a different selection, and the outcome of two questions
+varied between repeats.
 
 \end{document}
