@@ -15,6 +15,7 @@ piece can be edited on its own.
 - `biorxiv.tex` — second driver for the preprint (see below)
 - `supplement/` — supplementary grammar note and benchmark tables
 - `Fig/` — figures; `graphical-abstract.html` — source of the graphical abstract
+- `main-figure/` — scripts that rebuild `Fig/main-figure.png` from the running app (see its README)
 - `2026-06-26_ADPKD_model_GLL-input_GLL-paper-version.xlsx` — the ADPKD model
   used in the paper and the assistant benchmark
 
