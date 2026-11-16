@@ -3011,10 +3011,10 @@ h5 {
 .filter-subgroup-body {
     display: grid;
     /* Col2 keeps a readable floor for sliders/dropdowns/inputs; col1 gives up
-       width instead (long property names wrap via .checkboxLabel). 176px fits a
+       width instead (long property names wrap via .checkboxLabel). 150px fits a
        range row whose boxes hold a signed 3-decimal value ("-2.993"): two
        non-shrinking boxes, two gaps and the 40px minimum track. */
-    grid-template-columns: minmax(0, auto) minmax(176px, 1fr) auto;
+    grid-template-columns: minmax(0, auto) minmax(150px, 1fr) auto;
     column-gap: 8px;
     row-gap: 6px;
     align-items: start;
@@ -3051,17 +3051,19 @@ h5 {
     align-items: flex-end;
 }
 
+/* 34px = 16px of bars, a 2px gap, then the 8px track centred on the 24px
+   boxes (box centre 22 = track top 18 + 4). */
 .filter-range-row.has-hist > div[slider] {
-    height: 40px;
+    height: 34px;
 }
 
 .filter-range-row.has-hist > div[slider] > div {
-    top: 20px;
+    top: 18px;
 }
 
 /* The handles move down with the track (the value-box rules above never reach them). */
-.has-hist > div[slider] > input[type=range] {
-    top: 18px;
+.filter-range-row.has-hist > div[slider] > input[type=range] {
+    top: 16px;
 }
 
 /* Typing a threshold widens its box less here, so the bars stay readable. */
@@ -3071,7 +3073,7 @@ h5 {
 
 /* The row's name and ⋯ stay level with the track, not with the bars. */
 .filter-row:has(.has-hist) > :is(.filter-row-col1, .filter-row-col3) {
-    padding-top: 16px;
+    padding-top: 10px;
 }
 
 .filter-hist {
@@ -3119,7 +3121,16 @@ h5 {
     margin: 0;
 }
 
-/* Width comes from the `size` attribute, fixed per slider to the widest value
+/* Track (8px) and handles centred on the 24px boxes beside them. */
+.filter-range-row > div[slider] > div {
+    top: 8px;
+}
+
+.filter-range-row > div[slider] > input[type=range] {
+    top: 6px;
+}
+
+/* Width is set inline in ch, fixed per slider to the widest value
    its column can show — resizing to the CURRENT value made the track (a flex
    sibling) shift mid-drag and the thumb jump under the cursor. The cap keeps a
    pathological column from eating the row; the exact value is one click away

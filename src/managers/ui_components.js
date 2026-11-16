@@ -493,6 +493,14 @@ class BooleanToggle {
   }
 }
 
+// Digits are exactly 1ch under tabular-nums ("." and "-" are narrower), so a
+// char count fits the value; 10px is the box's padding + border. The native
+// `size` attribute sizes by the font's average glyph plus slack — ~50% wider.
+const BOX_CHROME_PX = 10;
+function setBoxWidth(input, chars) {
+  input.style.width = `calc(${chars}ch + ${BOX_CHROME_PX}px)`;
+}
+
 class InvertibleRangeSlider {
   constructor(propID, cache) {
     this.propID = propID;
@@ -517,13 +525,11 @@ class InvertibleRangeSlider {
     // near 0 on float columns, where "0" ↔ "0.050" oscillated every frame.
     // The endpoints bound every in-range value's formatted length: the sign
     // comes from min, integer digits from the larger magnitude, and decimals
-    // are fixed-width. +2 because `size` counts average character widths
-    // without the field's border and padding, so an exact count clips the
-    // last glyph.
+    // are fixed-width.
     this.boxSize = Math.max(
       3,
-      String(this.formatThreshold(this.sliderMin)).length + 2,
-      String(this.formatThreshold(this.sliderMax)).length + 2
+      String(this.formatThreshold(this.sliderMin)).length,
+      String(this.formatThreshold(this.sliderMax)).length
     );
     this.initializeIds();
     this.inputStart = null;
@@ -602,7 +608,7 @@ class InvertibleRangeSlider {
   createSliderInput(id, initialValue, relatedSliderId, readExact) {
     const input = document.createElement('input');
     input.id = id;
-    input.size = this.boxSize;
+    setBoxWidth(input, this.boxSize);
     input.value = this.formatThreshold(initialValue);
     // A column of raw floats ("-51.82279968") is what made this row need a
     // line of its own. Rounded at rest, exact the moment you go to edit it —
@@ -614,7 +620,7 @@ class InvertibleRangeSlider {
     input.addEventListener('focus', () => {
       const exact = String(readExact());
       input.value = exact;
-      input.size = Math.max(this.boxSize, exact.length + 1);
+      setBoxWidth(input, Math.max(this.boxSize, exact.length));
       input.select();
     });
     // Enter and blur apply the same way: a typed number that stays on screen
@@ -651,7 +657,7 @@ class InvertibleRangeSlider {
     input.addEventListener('blur', () => {
       applyTyped();
       input.value = this.formatThreshold(readExact());
-      input.size = this.boxSize;
+      setBoxWidth(input, this.boxSize);
     });
     input.addEventListener('keydown', (ev) => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {

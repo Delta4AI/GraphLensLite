@@ -46,7 +46,7 @@ Saved files load unchanged. One behaviour changes on purpose — **with the filt
 * **Dialogs are native modal dialogs.** While one is open, the page behind can no longer be reached by a screen reader, Tab stays inside it, and Escape closes the topmost one, all from the browser rather than hand-written handling. Messages that arrive while a dialog is open now show above it instead of under its shade; their buttons respond once it closes.
 * **Bubble groups, the heatmap and notes stay on their nodes after the view jumps.** When the camera moved in one step, as in the fit right after loading, these overlays could be drawn for the view before the jump and stay there until the next zoom or pan — bubbles then reached well past their members.
 * **Bubble groups leave the space between crossing corridors open.** Where three or more of a group's connecting corridors enclosed an empty area, the bubble filled it solid — on the tour network about a third of a group's area. That area is now a hole, as it looks.
-* **Numeric filter boxes show their whole value.** In a narrow filter panel the threshold boxes shrank under their text and cut values off (*-2.99* for -2.993); they now keep their width and the slider track gives way.
+* **Numeric filter boxes show their whole value.** In a narrow filter panel the threshold boxes shrank under their text and cut values off (*-2.99* for -2.993); they now keep their width and the slider track gives way. The boxes are sized to their digits rather than to the browser's generous default, so the track keeps most of the row, and the slider sits level with its boxes, with a numeric filter's distribution row 6 px shorter.
 
 ### Security
 
