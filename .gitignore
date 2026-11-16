@@ -91,3 +91,6 @@ manuscript/**
 !manuscript/main-figure/*
 manuscript/main-figure/out/
 
+
+# Local Claude Code settings and worktrees
+.claude/

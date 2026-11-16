@@ -8,8 +8,8 @@ node manuscript/main-figure/capture.mjs   # ~3 min: stages the app, writes out/*
 node manuscript/main-figure/render.mjs    # lays out compose.html, writes ../Fig/main-figure.png
 ```
 
-Both run the repo's Electron (full Chromium with WebGL2) offscreen. Inside the
-Claude Code sandbox they need the sandbox lifted (dbus/display sockets).
+Both run the repo's Electron (full Chromium with WebGL2) offscreen, so they need
+a display and a dbus session (they fail in a headless sandbox without them).
 
 - `capture.mjs` loads the ADPKD model, filters it through the query editor to the
   Wnt signaling pathway plus context (ADPKD literature evidence, tolvaptan

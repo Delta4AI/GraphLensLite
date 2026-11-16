@@ -456,6 +456,21 @@ best obtained from an **Export → JSON** rather than written by hand.
     "edgeStyles":{ /* edgeId → { type, style } per-view overrides */ },
     "query":     "...",                // saved query — see warning
 
+    // how filter rows combine (all optional; defaults shown)
+    "filterJoinMode": "OR",            // "OR" = build up (ticked rows add elements), "AND" = narrow down
+    "filterStrict": false,             // AND only: true = complete cases (an element must carry every filtered property)
+    "filterLinks": "all",              // build up only: which links show — "all", "ticked" (both ends shown), "none"
+    "includePropertyless": true,       // build up only: show elements that carry no filter property at all
+
+    // text notes on the canvas (≤ 500; malformed records are dropped on load)
+    "annotations": [
+      { "id": "n1", "text": "Wnt pathway", "x": 120, "y": -40,
+        "fontSize": 14, "fontStyle": "normal",  // normal | bold | italic | bold italic
+        "fontColor": "#1f2937",
+        "borderColor": "#94a3b8", "borderWidth": 1, "borderRadius": 4,
+        "bgColor": null, "shadow": false }
+    ],
+
     // bubble groups (the safe part — see §7)
     "bubbleSetStyle": { /* per-group visual style */ },
     "groupOneManualMembers": [], "groupOneProps": []
@@ -483,6 +498,11 @@ an `active` flag plus slider thresholds or selected categories.
 - Reproduce the exact object shape from an **Export → JSON**; don't invent it.
 - If you only want the data to *be* filterable, you don't need this at all — ship
   `D4Data` (§6) and users filter interactively.
+- Since 1.18.0 a build-up (`"filterJoinMode": "OR"`) workspace with **no row
+  ticked shows nothing**. A workspace in that state from a file whose top-level
+  `version` is older than 1.18.0 (or missing) opens with every usable row ticked
+  instead, so it shows the full graph it showed when saved. A file stamped
+  1.18.0 or later is taken as written.
 
 ### Saved query (`query`)
 
