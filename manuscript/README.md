@@ -90,6 +90,10 @@ latexmk -pdf main
 
 Output: `main.pdf`
 
+Redline for co-authors: `scripts/manuscript_redline.sh [out-dir]` diffs
+`main` (the last published version) against HEAD and writes
+`GLL-manuscript-redline-main-vs-<sha>.pdf`.
+
 Uses the OUP `oup-authoring-template` class (`webpdf,contemporary,numbered`,
 numbered citations via `oup-plain.bst`). Set `\journaltitle` (and `\appnotes`)
 to the target venue at submission time.
