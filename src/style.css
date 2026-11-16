@@ -1175,7 +1175,7 @@ body {
  **************************/
 #inspector {
     flex: none;
-    width: 356px;
+    width: 400px;
     min-width: 300px;
     box-sizing: border-box;
     background-color: var(--surface);

@@ -63,7 +63,7 @@ export function syncGroupRows(bs) {
 /**
  * Which filters feed a group's property-derived membership, named the way the
  * filter panel names them MINUS the section — every entry would otherwise
- * start "Node filters ›", which is noise in a 356 px column.
+ * start "Node filters ›", which is noise in a 400 px column.
  */
 function groupFilterNames(bs, group) {
   const props = layoutOf(bs)?.[`${group}Props`] ?? new Set();

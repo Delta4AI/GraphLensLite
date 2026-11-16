@@ -83,7 +83,7 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
   chart is a fill driven by data. The app keeps no record of a mapping, so
   neither shows an on state.
 - A colour row is one line: well, hex field, palette, by-data swatch. When the
-  palette does not fit (a row with a None swatch at the default 356px), it
+  palette does not fit (a row with a None swatch in a narrow panel), it
   wraps to the next line as one block.
 - A "select all in this group" control is one tri-state checkbox (ticked,
   mixed, empty), not separate enable/disable buttons.
