@@ -988,12 +988,13 @@ class UIComponentManager {
   }
 
   buildDropdownOptions() {
-    let selectViewDropdown = document.getElementById('selectView');
-    let selectViewOptions = Object.keys(this.cache.data.layouts).map((key) => {
-      let selected = this.cache.data.selectedLayout === key ? 'selected' : '';
-      return `<option value="${key}" ${selected}>${key}</option>`;
-    });
-    selectViewDropdown.innerHTML = selectViewOptions.join('');
+    // Workspace names come from loaded files: build options as text, never markup.
+    document.getElementById('selectView').replaceChildren(
+      ...Object.keys(this.cache.data.layouts).map((key) => {
+        const selected = this.cache.data.selectedLayout === key;
+        return new Option(key, key, selected, selected);
+      })
+    );
   }
 
   /**

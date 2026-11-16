@@ -203,6 +203,8 @@ class QueryAST {
 // How long an error message waits for the typing to pause before it is
 // rewritten (and announced) again.
 const STATUS_SETTLE_MS = 800;
+const PARKED_LT = '';
+const PARKED_GT = '';
 
 class QueryManager {
   #validationTimer = 0;
@@ -217,6 +219,12 @@ class QueryManager {
     this.cache.query.valid = true;
 
     const space = `<span class='q-space' data-encoded> </span>`;
+
+    // Query text comes from files, the API and the clipboard. Park its angle
+    // brackets in private-use code points so no step below can mistake typed
+    // markup for an encoded span; they come back as entities at the end.
+    asciiStr = asciiStr.replace(/</g, PARKED_LT).replace(/>/g, PARKED_GT);
+    const unpark = (s) => s.replaceAll(PARKED_LT, '<').replaceAll(PARKED_GT, '>');
 
     // ------------------------------------------------------------------
     // 1. Check for empty query
@@ -247,6 +255,9 @@ class QueryManager {
     asciiStr = asciiStr.replace(
       /(Node filters|Edge filters)::([^:]+)::([^:]+)(?=\s(?:IN|BETWEEN|LOWER\sTHAN|IS\sMISSING|IS\sFOREIGN|IS\sTRUE|IS\sFALSE|\)))/g,
       (match, mainGroup, subGroup, prop) => {
+        mainGroup = unpark(mainGroup);
+        subGroup = unpark(subGroup);
+        prop = unpark(prop);
         const mgok = mainGroup in this.cache.uniquePropHierarchy;
         const sgok = mgok && subGroup in this.cache.uniquePropHierarchy[mainGroup];
         const pok = sgok && this.cache.uniquePropHierarchy[mainGroup][subGroup].has(prop);
@@ -302,7 +313,8 @@ class QueryManager {
     asciiStr = asciiStr.replace(/IN\s*\[((?:\\.|[^\]\\])*)]/g, (_match, list) => {
       const encodedCategories = StaticUtilities.splitQueryList(list)
         .map(
-          (cat) => `<span class='q-string' data-encoded>${StaticUtilities.escapeHtml(cat)}</span>`
+          (cat) =>
+            `<span class='q-string' data-encoded>${StaticUtilities.escapeHtml(unpark(cat))}</span>`
         )
         .join(`<span class='q-comma' data-encoded>,</span>`);
 
@@ -462,7 +474,9 @@ class QueryManager {
         this.cache.query.valid = false;
         return chunk.replace(/\S+/g, (txt) => `<span class="q-error-unrecognized">${txt}</span>`);
       })
-      .join('');
+      .join('')
+      .replaceAll(PARKED_LT, '&lt;')
+      .replaceAll(PARKED_GT, '&gt;');
 
     // Both buttons keep their tooltip while dead — that is the only place the
     // reason can go, and "Apply the query to filter the graph" on a greyed
