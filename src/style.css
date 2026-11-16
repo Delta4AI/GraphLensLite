@@ -3011,8 +3011,10 @@ h5 {
 .filter-subgroup-body {
     display: grid;
     /* Col2 keeps a readable floor for sliders/dropdowns/inputs; col1 gives up
-       width instead (long property names wrap via .checkboxLabel). */
-    grid-template-columns: minmax(0, auto) minmax(150px, 1fr) auto;
+       width instead (long property names wrap via .checkboxLabel). 176px fits a
+       range row whose boxes hold a signed 3-decimal value ("-2.993"): two
+       non-shrinking boxes, two gaps and the 40px minimum track. */
+    grid-template-columns: minmax(0, auto) minmax(176px, 1fr) auto;
     column-gap: 8px;
     row-gap: 6px;
     align-items: start;
@@ -3122,13 +3124,15 @@ h5 {
    sibling) shift mid-drag and the thumb jump under the cursor. The cap keeps a
    pathological column from eating the row; the exact value is one click away
    regardless. */
+/* The boxes don't shrink: a shrunk box cuts its value off at narrow panel
+   widths, so the track gives way instead. */
 /* Child combinator, not a descendant one: the row also contains the slider's
    two <input type=range> handles, one level down inside div[slider]. They were
    picking up `max-width: 10ch` here, which cut their 117px track to 58px — so
    both native thumbs sat in the left half while the visual thumbs were painted
    across the full width, and the right thumb had no hit area under it. */
 .filter-range-row > input {
-    flex: 0 1 auto;
+    flex: 0 0 auto;
     width: auto;
     max-width: 10ch;
     min-width: 0;
