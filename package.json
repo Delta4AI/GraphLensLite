@@ -58,6 +58,10 @@
       "src/**/*",
       "static/**/*"
     ],
+    "extraFiles": [
+      "LICENSE",
+      "THIRD_PARTY_NOTICES"
+    ],
     "win": {
       "target": [
         "nsis",
@@ -83,13 +87,13 @@
   },
   "overrides": {
     "uuid": "^11.1.1",
-    "undici": "^7.29.0"
+    "undici": "^7.30.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@vitest/coverage-v8": "^4.1.9",
-    "electron": "^43.3.0",
-    "electron-builder": "^26.0.12",
+    "@vitest/coverage-v8": "^4.1.12",
+    "electron": "^43.8.10",
+    "electron-builder": "^26.18.1",
     "esbuild": "^0.25.11",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
@@ -99,8 +103,8 @@
     "jsdom": "^29.0.2",
     "playwright": "^1.60.0",
     "prettier": "^3.8.4",
-    "undici": "^7.29.0",
-    "vitest": "^4.0.18"
+    "undici": "^7.30.2",
+    "vitest": "^4.1.12"
   },
   "dependencies": {
     "@antv/layout": "^2.0.0",
@@ -111,7 +115,7 @@
     "@sigma/node-piechart": "3.0.1",
     "@sigma/node-square": "^3.0.0",
     "bubblesets-js": "^3.0.1",
-    "dompurify": "^3.4.10",
+    "dompurify": "^3.4.18",
     "graphology": "^0.26.0",
     "graphology-communities-louvain": "^2.0.2",
     "graphology-layout": "^0.6.1",

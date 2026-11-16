@@ -19,7 +19,7 @@ const PACKAGES = [
   '@sigma/edge-curve', '@sigma/export-image', '@sigma/node-border', '@sigma/node-image',
   '@sigma/node-piechart', '@sigma/node-square', '@types/trusted-types', '@yomguithereal/helpers',
   'bubblesets-js', 'comlink', 'd3-binarytree', 'd3-dispatch', 'd3-force', 'd3-force-3d',
-  'd3-octree', 'd3-quadtree', 'd3-timer', 'dompurify', 'events', 'exceljs', 'fast-deep-equal',
+  'd3-octree', 'd3-quadtree', 'd3-timer', 'dagre', 'dompurify', 'events', 'exceljs', 'fast-deep-equal',
   'file-saver', 'gl-matrix', 'graphlib', 'graphology', 'graphology-communities-louvain',
   'graphology-indices', 'graphology-layout', 'graphology-layout-forceatlas2',
   'graphology-layout-noverlap', 'graphology-metrics', 'graphology-shortest-path',
