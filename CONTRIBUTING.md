@@ -94,7 +94,7 @@ Screenshots are saved to `static/screenshots/`.
 
 ## Testing
 
-Unit tests run under [vitest](https://vitest.dev/). A few use jsdom — opt in per-file with `// @vitest-environment jsdom` at the top.
+Unit tests run under [vitest](https://vitest.dev/). A few use jsdom — opt in per-file with `// @vitest-environment jsdom` at the top. jsdom has no `CSS.escape`, drops CSS `max()` from inline styles, ignores the `contentEditable` property (use `setAttribute`), and rejects `readFileSync(new URL(..., import.meta.url))`; read fixtures by a repo-root path as `tests/landing-webgl-gating.test.js` does.
 
 ```bash
 npm test            # run the full suite once
@@ -102,6 +102,17 @@ npm run test:watch  # re-run on file changes
 ```
 
 Tests live in `tests/` as `*.test.js`. Assistant-specific tests (`tests/assistant-*.test.js`) cover settings/endpoint validation, the context snapshot, markdown rendering + sanitization, and the query-warning linter. Ingest-service tests (`tests/api-*.test.js`) cover config resolution, the graph store, request handling/routing, payload validation, and the browser client.
+
+### End-to-end (Electron)
+
+`tests/*.e2e.test.js` drive the real app in the repo's Electron (full Chromium with WebGL2), rendered offscreen by `tests/e2e/electron_main.cjs`. `npm test` counts them as skipped, so run them before calling a UI change done:
+
+```bash
+GLL_E2E=1 npx vitest run --dir tests e2e                         # with a GPU
+GLL_E2E=1 GLL_E2E_SWIFTSHADER=1 npx vitest run --dir tests e2e   # software WebGL: CI, sandboxes, no GPU
+```
+
+For a one-off live check or screenshot, start from `tests/e2e/electron_main.cjs` (offscreen window, ready check in any e2e test) or `manuscript/main-figure/harness.mjs` (crisp captures with canvases, see its README) rather than a new harness. A hidden non-offscreen window stalls animation frames and crashes on the second capture.
 
 ## Code Style
 
