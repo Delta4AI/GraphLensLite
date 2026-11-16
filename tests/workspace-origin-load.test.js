@@ -48,6 +48,21 @@ describe('workspace origin on load', () => {
     expect(cache.history.hasOrigin('Default')).toBe(true);
   });
 
+  it('a re-render of the same graph (re-layout, Reset style) keeps the undo stack', async () => {
+    const cache = makeCache();
+    const gcm = coreFor(cache);
+    await gcm.initialAfterRenderEvent();
+    cache.data.layouts.Default.filters.get('p').active = false;
+    cache.history.commit('Move nodes');
+    await gcm.initialAfterRenderEvent();
+    expect(cache.history.undoLabel).toBe('Move nodes');
+    expect(cache.history.unsaved).toBe(true);
+
+    cache.graph = { render: async () => {}, destroy: async () => {} }; // a new graph is a fresh start
+    await gcm.initialAfterRenderEvent();
+    expect(cache.history.canUndo).toBe(false);
+  });
+
   it('tearing the graph down forgets every origin', async () => {
     const cache = makeCache();
     const gcm = coreFor(cache);

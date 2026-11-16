@@ -30,6 +30,8 @@ class GraphCoreManager {
     this.cache = cache;
     // In-flight createGraphInstance() memo — see the re-entrancy note there.
     this.graphInitPromise = null;
+    // The graph instance whose first render reset the undo history.
+    this.settledGraph = null;
   }
 
   *traverseD4Data(nodeOrEdge) {
@@ -251,10 +253,15 @@ class GraphCoreManager {
 
       await this.applyHideDisconnectedState();
 
-      // The graph is now settled: this is the state undo winds back to, and
-      // the one "Reset to as loaded" restores.
-      this.cache.history?.reset({ origin: 'mark' });
-      this.cache.history?.markSaved(); // as loaded = nothing to lose yet
+      // A new graph is now settled: this is the state undo winds back to, and
+      // the one "Reset to as loaded" restores. Re-layout and Reset style re-run
+      // this pipeline on the same graph and commit their own undo step after
+      // it, so resetting for them would wipe the stack they are about to join.
+      if (this.settledGraph !== this.cache.graph) {
+        this.settledGraph = this.cache.graph;
+        this.cache.history?.reset({ origin: 'mark' });
+        this.cache.history?.markSaved(); // as loaded = nothing to lose yet
+      }
     } catch (errorMsg) {
       this.cache.ui.error(`Error in initial AFTER_RENDER: ${errorMsg}`);
       this.cache.ui.error('Graph setup failed. Please check your input data.');
