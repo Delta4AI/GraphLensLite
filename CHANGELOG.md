@@ -46,10 +46,13 @@ Saved files load unchanged. One behaviour changes on purpose — **with the filt
 * **Dialogs are native modal dialogs.** While one is open, the page behind can no longer be reached by a screen reader, Tab stays inside it, and Escape closes the topmost one, all from the browser rather than hand-written handling. Messages that arrive while a dialog is open now show above it instead of under its shade; their buttons respond once it closes.
 * **Bubble groups, the heatmap and notes stay on their nodes after the view jumps.** When the camera moved in one step, as in the fit right after loading, these overlays could be drawn for the view before the jump and stay there until the next zoom or pan — bubbles then reached well past their members.
 * **Bubble groups leave the space between crossing corridors open.** Where three or more of a group's connecting corridors enclosed an empty area, the bubble filled it solid — on the tour network about a third of a group's area. That area is now a hole, as it looks.
+* **Numeric filter boxes show their whole value.** In a narrow filter panel the threshold boxes shrank under their text and cut values off (*-2.99* for -2.993); they now keep their width and the slider track gives way.
 
 ### Security
 
 * **A JSON file can no longer write onto JavaScript's object prototype through the data editor.** A data column named `__proto__` (or `constructor` / `prototype`) — refused by the Excel importer but not by the JSON and API loaders — let a value typed into that column and applied land on every object in the page. Such columns are now dropped on load, and *Apply* skips any that get through.
+* **A workspace file can no longer run script through its query or workspace names.** Both reached the page as HTML, so a crafted file could execute code when opened. They are now always shown as text.
+* **Dependencies patched:** DOMPurify 3.4.18, Electron 43.8.10 and the build toolchain, closing every advisory `npm audit` reports for the shipped app. The desktop builds now ship `LICENSE` and `THIRD_PARTY_NOTICES`, which also lists dagre now.
 
 ### Accessibility
 
@@ -69,6 +72,7 @@ Saved files load unchanged. One behaviour changes on purpose — **with the filt
 
 * **No more freeze on the first mouse move over a large graph.** Graphs with more than 25,000 edges are now drawn without edge hover and edge click, which made the first interaction after loading hang for 0.6 s at 75,000 edges and 1.8 s at 250,000 (Radeon 890M); frame rates are unchanged. A status line says so when it applies; edges stay selectable with a query or the selection panel.
 * **Changing a group's colour or label no longer re-fits its outline.** Every style field counted as part of the outline's shape, so recolouring a group or editing its label re-ran the full outline fit. Only padding, corridor and avoidance change the shape now; everything else just repaints.
+* **Animated edge flow no longer reprocesses the whole graph every frame.** Each frame re-indexed every node and edge and rebuilt the GPU buffers — about 30 ms of CPU per frame at 10,000 nodes — although only the animation clock changes; frames are now a plain redraw.
 
 ## 1.17.1 — 2026-08-12
 
