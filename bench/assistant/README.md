@@ -33,8 +33,8 @@ node bench/assistant/run.mjs \
 | `--models` | every model in `/api/tags` | comma-separated model names |
 | `--repeats` | `1` | runs per item, used to measure variance |
 | `--num-ctx` | `16384` | Ollama `num_ctx`. The app's default. Raise it if `promptEvalCount` sits near this value, because that means the prompt was truncated |
-| `--limit` | all | run only the first N items (for smoke tests) |
-| `--hardware` | — | free text describing the Ollama host, stored in the results |
+| `--limit` | all | run only the first N items. Smoke-run each new model with `--limit 3` before a full sweep and check the per-item time: a model returning empty structured output took about 12 min per item |
+| `--hardware` | — | free text describing the Ollama host, stored in the results and cited in Table S2. Take the version from `ollama --version` on that host, not from an earlier run |
 | `--gold` | `gold.json` | gold-set file |
 | `--out` | `results/` | output directory |
 
