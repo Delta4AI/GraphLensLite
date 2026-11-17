@@ -1578,11 +1578,13 @@ h5 {
     color: var(--brand-text);
 }
 
-/* Auto-generated AND-join fillers (IS MISSING non-strict, IS FOREIGN strict):
-   muted + italic so they read as machine-added glue rather than
-   hand-written constraints. */
+/* Auto-generated ∅-switch predicates (IS MISSING, IS FOREIGN, HAS VALUE,
+   HAS NO VALUE): muted + italic so they read as machine-added glue rather
+   than hand-written constraints. */
 .q-kw-ismissing,
-.q-kw-isforeign {
+.q-kw-isforeign,
+.q-kw-hasvalue,
+.q-kw-hasnovalue {
     color: var(--brand-text);
     opacity: 0.6;
     font-style: italic;

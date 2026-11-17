@@ -608,3 +608,28 @@ describe('QueryAST: edge cases', () => {
     expect(ast.testNode(makeNode({ g: { score: 10, type: 'gamma' } }))).toBe(false);
   });
 });
+
+// --------------------------------------------------------------------------
+// HAS VALUE / HAS NO VALUE (the ∅ switch's leaves): same element type only
+// --------------------------------------------------------------------------
+
+describe('QueryAST: HAS VALUE / HAS NO VALUE', () => {
+  const has = new QueryAST([[prop('g', 'score'), kw('HAS VALUE')]]);
+  const hasNo = new QueryAST([[prop('g', 'score'), kw('HAS NO VALUE')]]);
+
+  it('tells present values from absent, empty and NaN ones', () => {
+    for (const score of [0, 'x']) {
+      expect(has.testNode(makeNode({ g: { score } }))).toBe(true);
+      expect(hasNo.testNode(makeNode({ g: { score } }))).toBe(false);
+    }
+    for (const g of [{}, { score: '' }, { score: null }, { score: NaN }]) {
+      expect(has.testNode(makeNode({ g }))).toBe(false);
+      expect(hasNo.testNode(makeNode({ g }))).toBe(true);
+    }
+  });
+
+  it('is false for both on the other element type', () => {
+    expect(has.testEdge(makeEdge({ g: { score: 5 } }))).toBe(false);
+    expect(hasNo.testEdge(makeEdge({ g: {} }))).toBe(false);
+  });
+});

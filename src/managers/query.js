@@ -28,6 +28,60 @@ function isFilterNarrowed(fo, def) {
   );
 }
 
+// An element has no value for a property when the cell is absent, null, empty
+// or NaN. The one definition behind IS MISSING, HAS VALUE / HAS NO VALUE and
+// the ∅ switch's count, so the count says exactly what the switch acts on.
+// (Text in a numeric column needs no case here: it makes the filter unusable.)
+function hasNoValue(v) {
+  return v === undefined || v === null || v === '' || (typeof v === 'number' && Number.isNaN(v));
+}
+
+/**
+ * How many elements of each property's own type have no value for it — the
+ * ∅ switch's count. Elements without any property are left out: no filter
+ * ever judges them (they follow "Include … without properties").
+ * @param {Iterable<string>} propIDs
+ * @param {Iterable<object>} nodes
+ * @param {Iterable<object>} edges
+ * @param {string} edgeSection  CFG.EXCEL_EDGE_HEADER
+ * @returns {Map<string, number>}
+ */
+function countMissingValues(propIDs, nodes, edges, edgeSection) {
+  const carriers = (elements) => [...elements].filter((el) => el.features?.size > 0);
+  const nodeCarriers = carriers(nodes);
+  const edgeCarriers = carriers(edges);
+  const counts = new Map();
+  for (const propID of propIDs) {
+    const [main, sub, prop] = propID.split('::');
+    const pool = main === edgeSection ? edgeCarriers : nodeCarriers;
+    let missing = 0;
+    for (const el of pool) {
+      if (hasNoValue(el.D4Data?.[main]?.[sub]?.[prop])) missing += 1;
+    }
+    counts.set(propID, missing);
+  }
+  return counts;
+}
+
+/**
+ * Whether elements without a value pass this filter (the row's ∅ switch).
+ * `fo.missingPasses` holds the user's choice; unset means the mode's default:
+ * kept while narrowing down (a gap is unknown, not evidence), not added while
+ * building up (a gap matches nothing).
+ */
+function missingPasses(fo, joinMode) {
+  return typeof fo.missingPasses === 'boolean' ? fo.missingPasses : joinMode === 'AND';
+}
+
+/**
+ * Whether an active filter removes anything while narrowing down: it is
+ * narrowed, or it has gaps and its ∅ switch is off. The query derivation and
+ * the panel's census both ask this, so they cannot disagree.
+ */
+function constrainsNarrowDown(fo, def, gaps) {
+  return !!fo.active && (isFilterNarrowed(fo, def) || (gaps > 0 && !missingPasses(fo, 'AND')));
+}
+
 class QueryAST {
   constructor(instructions) {
     this.instructions = instructions;
@@ -112,7 +166,7 @@ class QueryAST {
     const propTok = tokens[0];
     const opTok = tokens[1]; // KW: "BETWEEN" | "LOWER THAN" | "IN [""] | "IS MISSING"
 
-    // --- IS MISSING: neutral filler used by the non-strict AND join. ----
+    // --- IS MISSING: AND filler for a row whose ∅ switch is on. -------
     // True when the property does not apply to this element type OR its
     // value is absent/empty. Wrapping each conjunct as "(cond) OR (prop IS
     // MISSING)" lets a conjunction skip elements that simply lack the
@@ -121,18 +175,25 @@ class QueryAST {
     // true here rather than falling through to false.
     if (opTok?.value === 'IS MISSING') {
       if (propTok.main !== requestedMainGroup) return true;
-      const v = this.#readValue(element, propTok);
-      return (
-        v === undefined || v === null || v === '' || (typeof v === 'number' && Number.isNaN(v))
-      );
+      return hasNoValue(this.#readValue(element, propTok));
     }
 
-    // --- IS FOREIGN: type-scope filler used by the strict AND join. ------
+    // --- HAS VALUE / HAS NO VALUE: the ∅ switch's own leaves. -------------
+    // Same-type only: an element of the other type neither has nor lacks a
+    // value for this property, so both are false there. HAS VALUE lets a
+    // filter at its full range still drop the gaps while narrowing down;
+    // HAS NO VALUE lets a build-up filter add them.
+    if (opTok?.value === 'HAS VALUE' || opTok?.value === 'HAS NO VALUE') {
+      if (propTok.main !== requestedMainGroup) return false;
+      return hasNoValue(this.#readValue(element, propTok)) === (opTok.value === 'HAS NO VALUE');
+    }
+
+    // --- IS FOREIGN: AND filler for a row whose ∅ switch is off. -------
     // True only when the property belongs to the other element type. Wrapping
     // each conjunct as "(cond) OR (prop IS FOREIGN)" judges a node on node
     // filters alone and an edge on edge filters alone, WITHOUT the
     // absent-value escape hatch that IS MISSING also grants — that one
-    // difference is exactly what "complete cases" means.
+    // difference is what switching ∅ off means.
     if (opTok?.value === 'IS FOREIGN') {
       return propTok.main !== requestedMainGroup;
     }
@@ -253,7 +314,7 @@ class QueryManager {
     /* 4. Encode Property names (main group::sub group::property)                */
     /* ------------------------------------------------------------------ */
     asciiStr = asciiStr.replace(
-      /(Node filters|Edge filters)::([^:]+)::([^:]+)(?=\s(?:IN|BETWEEN|LOWER\sTHAN|IS\sMISSING|IS\sFOREIGN|IS\sTRUE|IS\sFALSE|\)))/g,
+      /(Node filters|Edge filters)::([^:]+)::([^:]+)(?=\s(?:IN|BETWEEN|LOWER\sTHAN|IS\sMISSING|IS\sFOREIGN|IS\sTRUE|IS\sFALSE|HAS\sVALUE|HAS\sNO\sVALUE|\)))/g,
       (match, mainGroup, subGroup, prop) => {
         mainGroup = unpark(mainGroup);
         subGroup = unpark(subGroup);
@@ -325,7 +386,7 @@ class QueryManager {
       ].join('');
     });
 
-    /* 5-4 Missing-value predicate (non-strict AND filler): "IS MISSING" - */
+    /* 5-4 Missing-value predicate (AND filler, ∅ on): "IS MISSING" - */
     asciiStr = asciiStr.replace(
       /\bIS\s+MISSING\b/gi,
       // Single span with a literal inner space (not a nested q-space span,
@@ -333,10 +394,17 @@ class QueryManager {
       () => `<span class='q-kw-ismissing' data-encoded>IS MISSING</span>`
     );
 
-    /* 5-4b Type-scope predicate (strict AND filler): "IS FOREIGN" ------- */
+    /* 5-4b Type-scope predicate (AND filler, ∅ off): "IS FOREIGN" ------- */
     asciiStr = asciiStr.replace(
       /\bIS\s+FOREIGN\b/gi,
       () => `<span class='q-kw-isforeign' data-encoded>IS FOREIGN</span>`
+    );
+
+    /* 5-4c Value predicates (the ∅ switch): "HAS VALUE" / "HAS NO VALUE" - */
+    asciiStr = asciiStr.replace(/\bHAS\s+(NO\s+)?VALUE\b/gi, (_m, no) =>
+      no
+        ? `<span class='q-kw-hasnovalue' data-encoded>HAS NO VALUE</span>`
+        : `<span class='q-kw-hasvalue' data-encoded>HAS VALUE</span>`
     );
 
     /* 5-5 Boolean predicates: "IS TRUE" / "IS FALSE" -------------------- */
@@ -494,10 +562,6 @@ class QueryManager {
     return asciiStr;
   }
 
-  #isFilterNarrowed(propID, fo) {
-    return isFilterNarrowed(fo, this.cache.data.filterDefaults?.get(propID));
-  }
-
   updateQueryTextArea() {
     let queryStr = this.cache.data.layouts[this.cache.data.selectedLayout]['query'] || '';
 
@@ -525,41 +589,57 @@ class QueryManager {
           } else {
             cond = `${propID} BETWEEN ${fo.lowerThreshold} AND ${fo.upperThreshold}`;
           }
-          queryEntries.push({ propID, cond, narrowed: this.#isFilterNarrowed(propID, fo) });
+          const def = this.cache.data.filterDefaults?.get(propID);
+          const gaps = this.cache.missingValueCounts?.get(propID) ?? 0;
+          queryEntries.push({
+            propID,
+            cond,
+            narrowed: isFilterNarrowed(fo, def),
+            constrains: constrainsNarrowDown(fo, def, gaps),
+            gaps: gaps > 0,
+            passes: missingPasses(fo, joinMode),
+          });
         }
       }
 
       if (queryEntries.length) {
         if (joinMode === 'AND') {
-          // Only filters the user actually narrowed constrain an AND. A filter
-          // left at its default (all categories selected / slider at full range)
-          // means "don't care about this property"; counting it would exclude
-          // every element that trips any single un-narrowed filter (dirty
-          // numeric values, rounded slider bounds, etc.) and empty the graph.
-          const andEntries = queryEntries.filter((e) => e.narrowed);
-          if (!andEntries.length) {
-            queryStr = ''; // nothing narrowed → no constraint → full graph
-          } else {
-            // Each conjunct is OR-ed with an escape hatch, and the join's two
-            // modes differ only in which one:
-            //   non-strict  IS MISSING  — foreign OR absent value excuses it,
-            //                             so an element is judged only on the
-            //                             filters it actually carries.
-            //   strict      IS FOREIGN  — only the other element type excuses
-            //                             it, so a same-type absent value
-            //                             does exclude ("complete cases") but
-            //                             a type with no narrowed filter of
-            //                             its own stays unconstrained.
-            // The type-scope hatch is what keeps strict from wiping out a whole
-            // element type: without it, narrowing one node filter leaves edges
-            // judged against a node condition they can never satisfy.
-            const filler = layout.filterStrict === true ? 'IS FOREIGN' : 'IS MISSING';
-            queryStr = andEntries
-              .map(({ propID, cond }) => `((${cond}) OR (${propID} ${filler}))`)
-              .join(' AND ');
-          }
+          // Only filters that constrain count (constrainsNarrowDown): a filter
+          // left at its loaded values with its gaps kept means "don't care";
+          // counting it would exclude every element that trips any single
+          // un-narrowed filter (dirty numeric values, rounded slider bounds,
+          // etc.) and empty the graph.
+          //
+          // Each conjunct is OR-ed with an escape hatch, picked by the row's
+          // ∅ switch:
+          //   ∅ on   IS MISSING  — foreign OR absent value excuses it, so an
+          //                        element is judged only on the filters it
+          //                        actually carries.
+          //   ∅ off  IS FOREIGN  — only the other element type excuses it, so
+          //                        a same-type absent value does exclude, but
+          //                        a type with no filter of its own stays
+          //                        unconstrained.
+          // The type-scope hatch is what keeps ∅ off from wiping out a whole
+          // element type: without it, one node filter leaves edges judged
+          // against a node condition they can never satisfy.
+          // A filter at its loaded values with ∅ off removes only the gaps,
+          // so it asks HAS VALUE: a full-range BETWEEN would also drop dirty
+          // values and the extremes the slider rounds away.
+          queryStr = queryEntries
+            .filter((e) => e.constrains)
+            .map(({ propID, cond, narrowed, passes }) => {
+              const own = narrowed ? cond : `${propID} HAS VALUE`;
+              return `((${own}) OR (${propID} ${passes ? 'IS MISSING' : 'IS FOREIGN'}))`;
+            })
+            .join(' AND ');
         } else {
-          queryStr = `(${queryEntries.map((e) => e.cond).join(') OR (')})`;
+          // Build up: each ticked filter adds what it matches, plus, with its
+          // ∅ switch on, the elements of its type that have no value for it.
+          queryStr = queryEntries
+            .flatMap(({ propID, cond, gaps, passes }) =>
+              gaps && passes ? [`(${cond})`, `(${propID} HAS NO VALUE)`] : [`(${cond})`]
+            )
+            .join(' OR ');
         }
       }
     }
@@ -800,6 +880,8 @@ class QueryManager {
       'q-in-cat-bracket-open': () => ({ type: 'KW', value: 'IN [' }),
       'q-kw-ismissing': () => ({ type: 'KW', value: 'IS MISSING' }),
       'q-kw-isforeign': () => ({ type: 'KW', value: 'IS FOREIGN' }),
+      'q-kw-hasvalue': () => ({ type: 'KW', value: 'HAS VALUE' }),
+      'q-kw-hasnovalue': () => ({ type: 'KW', value: 'HAS NO VALUE' }),
       'q-kw-istrue': () => ({ type: 'KW', value: 'IS TRUE' }),
       'q-kw-isfalse': () => ({ type: 'KW', value: 'IS FALSE' }),
 
@@ -1083,7 +1165,8 @@ class QueryManager {
 <p><strong>Filtering panel:</strong></p>
 <ul>
   <li><strong>⋯ › 📝 Add to query</strong> on a filter row - Add that filter's current setting to the query</li>
-  <li>Under <strong>⚙ Details</strong>: an <strong>OR / AND</strong> toggle sets how active filters combine (OR = match any, AND = match all). AND counts only the filters you've narrowed. The <strong>Complete cases only</strong> option makes AND also hide elements missing any of those filters.</li>
+  <li>The <strong>＋ Build up (OR) / − Narrow down (AND)</strong> switch sets how ticked filters combine (OR = match any, AND = match all). Narrow down counts only the filters you've changed.</li>
+  <li>A row's <strong>∅</strong> switch decides whether elements <em>without a value</em> for that property pass it: kept or removed under Narrow down, added or not under Build up. The toolbar box sets it on every listed row at once.</li>
 </ul>
 
 <hr>
@@ -1127,8 +1210,9 @@ class QueryManager {
   <li><span class="q-kw-between">BETWEEN</span>&nbsp;<span class="q-number">0</span>&nbsp;<span class="q-kw-between-and">AND</span>&nbsp;<span class="q-number">1.3</span> - Keep numerical values in range (inclusive)</li>
   <li><span class="q-lower-than">LOWER THAN</span>&nbsp;<span class="q-number">0.2</span>&nbsp;<span class="q-or-greater-than">OR GREATER THAN</span>&nbsp;<span class="q-number">0.8</span> - Keep numerical values ≤ 0.2 or ≥ 0.8</li>
   <li><span class="q-in-cat-bracket-open">IN&nbsp;[</span><span class="q-string">foo</span><span class="q-comma">,</span>&nbsp;<span class="q-string">bar</span><span class="q-cat-bracket-close">]</span> - Keep specific categorical values</li>
-  <li><span class="q-kw-ismissing">IS MISSING</span> - True when the property is absent/empty or belongs to the other element type. Auto-added by the filter panel's AND join so a property an element lacks doesn't exclude it; rarely hand-written.</li>
-  <li><span class="q-kw-isforeign">IS FOREIGN</span> - True only when the property belongs to the other element type (a node property tested against an edge). Auto-added by the AND join's "complete cases only" mode, where an absent value must exclude but a foreign one must not; rarely hand-written.</li>
+  <li><span class="q-kw-ismissing">IS MISSING</span> - True when the property is absent/empty or belongs to the other element type. Auto-added by Narrow down for a row whose ∅ switch is on, so a property an element lacks doesn't exclude it; rarely hand-written.</li>
+  <li><span class="q-kw-isforeign">IS FOREIGN</span> - True only when the property belongs to the other element type (a node property tested against an edge). Auto-added by Narrow down for a row whose ∅ switch is off, where an absent value must exclude but a foreign one must not; rarely hand-written.</li>
+  <li><span class="q-kw-hasvalue">HAS VALUE</span> / <span class="q-kw-hasnovalue">HAS NO VALUE</span> - True when an element of the property's own type has (or lacks: absent/empty) a value for it; false for the other element type. Auto-added by a row's ∅ switch</li>
   <li><span class="q-kw-istrue">IS TRUE</span> / <span class="q-kw-isfalse">IS FALSE</span> - Boolean test; matches every encoding (true/TRUE/1 vs false/FALSE/0)</li>
 </ul>
 
@@ -1215,4 +1299,12 @@ class QueryManager {
   }
 }
 
-export { QueryManager, QueryAST, isFilterNarrowed };
+export {
+  QueryManager,
+  QueryAST,
+  isFilterNarrowed,
+  hasNoValue,
+  countMissingValues,
+  missingPasses,
+  constrainsNarrowDown,
+};

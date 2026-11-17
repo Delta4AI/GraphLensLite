@@ -34,7 +34,7 @@ function makeEdge(props = {}) {
 
 // QM whose layout derives the query from a filters Map, with recorded defaults
 // so "narrowed" detection works (used by updateQueryTextArea for AND).
-function makeDerivingQM(filters, defaults, mode, strict) {
+function makeDerivingQM(filters, defaults, mode, missingCounts = new Map()) {
   for (const id of ['queryUpdateBtn', 'querySelectBtn']) {
     const btn = document.createElement('button');
     btn.id = id;
@@ -47,10 +47,11 @@ function makeDerivingQM(filters, defaults, mode, strict) {
       overlay: document.createElement('div'),
     },
     uniquePropHierarchy: { 'Node filters': { g: new Set(['type', 'score']) } },
+    missingValueCounts: missingCounts,
     data: {
       selectedLayout: 'L',
       filterDefaults: defaults,
-      layouts: { L: { filters, filterJoinMode: mode, filterStrict: strict, query: '' } },
+      layouts: { L: { filters, filterJoinMode: mode, query: '' } },
     },
   };
   const qm = new QueryManager(cache);
@@ -127,7 +128,7 @@ describe('join mode: AND counts only narrowed filters', () => {
         },
       ],
     ]);
-    const qm = makeDerivingQM(filters, defaults(), 'AND', false);
+    const qm = makeDerivingQM(filters, defaults(), 'AND');
     qm.updateQueryTextArea();
     expect(qm.cache.query.text.textContent).toBe('');
   });
@@ -148,7 +149,7 @@ describe('join mode: AND counts only narrowed filters', () => {
         },
       ],
     ]);
-    const qm = makeDerivingQM(filters, defaults(), 'AND', false);
+    const qm = makeDerivingQM(filters, defaults(), 'AND');
     qm.updateQueryTextArea();
     const q = qm.cache.query.text.textContent;
     expect(q).toContain('Node filters::g::type IN [a]');
@@ -162,7 +163,7 @@ describe('join mode: AND counts only narrowed filters', () => {
         { active: true, isCategory: true, categories: new Set(['a', 'b']) },
       ],
     ]);
-    const qm = makeDerivingQM(filters, defaults(), 'OR', false);
+    const qm = makeDerivingQM(filters, defaults(), 'OR');
     qm.updateQueryTextArea();
     expect(qm.cache.query.text.textContent).toContain('Node filters::g::type IN [a,b]');
   });
@@ -197,11 +198,11 @@ describe('join mode: strict AND round-trip', () => {
   });
 });
 
-// A "complete cases" run where the user narrowed filters of ONE element type
+// A run with ∅ off (complete cases) where the user narrowed filters of ONE element type
 // only. The type with nothing narrowed carries no constraint, so it must stay
 // fully visible: judging it against the other type's conditions — which it can
 // never satisfy — used to wipe it off the canvas entirely.
-describe('join mode: strict AND with only one element type narrowed', () => {
+describe('join mode: ∅ off with only one element type narrowed', () => {
   const defaults = () =>
     new Map([
       ['Node filters::g::type', { isCategory: true, categories: new Set(['a', 'b']) }],
@@ -210,12 +211,18 @@ describe('join mode: strict AND with only one element type narrowed', () => {
 
   const filters = (nodeCats, edgeCats) =>
     new Map([
-      ['Node filters::g::type', { active: true, isCategory: true, categories: new Set(nodeCats) }],
-      ['Edge filters::g::kind', { active: true, isCategory: true, categories: new Set(edgeCats) }],
+      [
+        'Node filters::g::type',
+        { active: true, isCategory: true, categories: new Set(nodeCats), missingPasses: false },
+      ],
+      [
+        'Edge filters::g::kind',
+        { active: true, isCategory: true, categories: new Set(edgeCats), missingPasses: false },
+      ],
     ]);
 
   function astFor(nodeCats, edgeCats) {
-    const qm = makeDerivingQM(filters(nodeCats, edgeCats), defaults(), 'AND', true);
+    const qm = makeDerivingQM(filters(nodeCats, edgeCats), defaults(), 'AND');
     qm.cache.uniquePropHierarchy = {
       'Node filters': { g: new Set(['type']) },
       'Edge filters': { g: new Set(['kind']) },
@@ -249,5 +256,83 @@ describe('join mode: strict AND with only one element type narrowed', () => {
   it('still excludes a same-type element whose value is absent', () => {
     const ast = astFor(['a'], ['x', 'y']);
     expect(ast.testNode(makeNode({ g: {} }))).toBe(false);
+  });
+});
+
+// The row's ∅ switch ("do elements without a value pass this filter?") picks
+// the query each filter emits, in both modes.
+describe('join mode: per-filter ∅ switch emission', () => {
+  const SCORE = 'Node filters::g::score';
+  const defaults = () =>
+    new Map([
+      [SCORE, { isCategory: false, isInverted: false, lowerThreshold: 0, upperThreshold: 1 }],
+    ]);
+  const scoreFilter = (upper, missingPasses) =>
+    new Map([
+      [
+        SCORE,
+        {
+          active: true,
+          isCategory: false,
+          isInverted: false,
+          lowerThreshold: 0,
+          upperThreshold: upper,
+          missingPasses,
+        },
+      ],
+    ]);
+
+  function derive(upper, missingPasses, mode, gaps = 3) {
+    const qm = makeDerivingQM(
+      scoreFilter(upper, missingPasses),
+      defaults(),
+      mode,
+      new Map([[SCORE, gaps]])
+    );
+    qm.updateQueryTextArea();
+    const text = qm.cache.query.text.textContent;
+    if (!text) return { text }; // an empty box is "invalid" by design, and means no constraint
+    qm.cache.query.overlay.innerHTML = qm.encodeQuery(text);
+    expect(qm.cache.query.valid).toBe(true);
+    return { text, ast: new QueryAST(qm.decodeQuery()) };
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('narrow down, narrowed, ∅ on (default): keeps the gaps with IS MISSING', () => {
+    expect(derive(0.5, undefined, 'AND').text).toBe(
+      `((${SCORE} BETWEEN 0 AND 0.5) OR (${SCORE} IS MISSING))`
+    );
+  });
+
+  it('narrow down, narrowed, ∅ off: removes the gaps with IS FOREIGN', () => {
+    expect(derive(0.5, false, 'AND').text).toBe(
+      `((${SCORE} BETWEEN 0 AND 0.5) OR (${SCORE} IS FOREIGN))`
+    );
+  });
+
+  it('narrow down, at its loaded range, ∅ off: constrains with HAS VALUE', () => {
+    const { text, ast } = derive(1, false, 'AND');
+    expect(text).toBe(`((${SCORE} HAS VALUE) OR (${SCORE} IS FOREIGN))`);
+    expect(ast.testNode(makeNode({ g: { score: 7 } }))).toBe(true); // any value, even past the slider
+    expect(ast.testNode(makeNode({ g: {} }))).toBe(false);
+    expect(ast.testEdge(makeEdge({ g: { weight: 1 } }))).toBe(true); // other type untouched
+  });
+
+  it('narrow down, at its loaded range, ∅ off, no gaps: constrains nothing', () => {
+    expect(derive(1, false, 'AND', 0).text).toBe('');
+  });
+
+  it('build up, ∅ off (default): adds only matches', () => {
+    expect(derive(1, undefined, 'OR').text).toBe(`(${SCORE} BETWEEN 0 AND 1)`);
+  });
+
+  it('build up, ∅ on: also adds same-type elements with no value', () => {
+    const { text, ast } = derive(1, true, 'OR');
+    expect(text).toBe(`(${SCORE} BETWEEN 0 AND 1) OR (${SCORE} HAS NO VALUE)`);
+    expect(ast.testNode(makeNode({ g: {} }))).toBe(true);
+    expect(ast.testEdge(makeEdge({ g: {} }))).toBe(false);
   });
 });

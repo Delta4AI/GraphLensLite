@@ -9,7 +9,7 @@ import {GraphStyleManager} from "./graph/style.js";
 
 import {excelData, IOManager} from './managers/io.js';
 import {NetworkMetrics} from './managers/metrics.js';
-import {QueryManager} from './managers/query.js';
+import {QueryManager, countMissingValues} from './managers/query.js';
 import {UIManager} from './managers/ui.js';
 import {UIComponentManager} from './managers/ui_components.js';
 
@@ -198,6 +198,15 @@ class Cache {
 
     this.iterNodes();
     this.iterEdges();
+
+    // Per property, how many of its own type have no value for it: the ∅
+    // switch's count, and whether the row has a switch at all.
+    this.missingValueCounts = countMissingValues(
+      this.data.filterDefaults?.keys() ?? [],
+      this.nodeRef.values(),
+      this.edgeRef.values(),
+      this.CFG.EXCEL_EDGE_HEADER
+    );
 
     // NOTE: cache.graphData (the graphology model) is built exclusively by
     // gcm.createGraphInstance — a single owner keeps the renderer and the
