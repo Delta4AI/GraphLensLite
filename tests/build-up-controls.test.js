@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UIManager } from '../src/managers/ui.js';
 
 // ==========================================================================
-// The controls around build up: the Links choice (shown only while building
+// The controls around build up: the Edges choice (shown only while building
 // up), the switch for elements without properties (shown only when the graph
 // has some), dimmed edge rows while their ticks change nothing, and the card
 // that explains an empty stage and offers both ways out.
@@ -70,7 +70,7 @@ function rows(ids) {
 
 beforeEach(() => window.localStorage.clear());
 
-describe('Links toggle', () => {
+describe('Edges toggle', () => {
   it('sets the workspace links and re-renders', async () => {
     const { ui, cache, handleFilterEvent } = makeUI();
     const select = ui.createFilterLinksToggle().querySelector('select');

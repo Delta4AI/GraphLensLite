@@ -3312,6 +3312,17 @@ h5 {
     color: var(--accent-text);
 }
 
+/* The stored operator (OR / AND) after the mode's name: a quiet aside for
+   readers who know the query language. Muted, not faint: faint text on this
+   surface is under 4.5:1 at 10px. */
+.filter-join-op {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
 /* The chosen mode's options, to the right of the switch. */
 .filter-mode-options {
     flex: 1 1 160px;

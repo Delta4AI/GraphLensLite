@@ -35,7 +35,10 @@ describe('UIManager.createFilterJoinToggle', () => {
 
     expect(group.classList.contains('filter-join-toggle')).toBe(true);
     expect(group.getAttribute('role')).toBe('group');
-    expect([...segments].map((s) => s.textContent)).toEqual(['＋ Build up', '− Narrow down']);
+    expect([...segments].map((s) => s.textContent)).toEqual([
+      '＋ Build up OR',
+      '− Narrow down AND',
+    ]);
     expect([...segments].map((s) => s.dataset.mode)).toEqual(['OR', 'AND']);
     expect(segments[0].classList.contains('active')).toBe(true);
     expect(segments[1].classList.contains('active')).toBe(false);

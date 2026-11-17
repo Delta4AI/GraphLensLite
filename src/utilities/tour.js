@@ -183,8 +183,8 @@ const TOUR_STEPS = [
            a checklist for categories. Tick a row to use it.
            <br><br>
            The switch on top sets how ticked filters combine:
-           <br>• <strong>＋ Build up</strong> — start empty, each filter adds what it matches
-           <br>• <strong>− Narrow down</strong> — start full, keep what matches all of them
+           <br>• <strong>＋ Build up (OR)</strong> — start empty, each filter adds what it matches
+           <br>• <strong>− Narrow down (AND)</strong> — start full, keep what matches all of them
            <br><br>
            A row's <strong>⋯</strong> sends its matches to the selection, a group or the query.`,
     target: '#filterContainer',

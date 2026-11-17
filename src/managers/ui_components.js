@@ -1524,10 +1524,10 @@ class UIComponentManager {
     return `No effect — Still at its loaded range or values, so it removes nothing. Narrow it, or switch to Build up:${StaticUtilities.formatPropsAsTree(propID)}`;
   }
 
-  /** An edge row while building up with links set to "All between shown nodes"
-   * or "None": its tick changes nothing until links are edge-filter matches. */
+  /** An edge row while building up with Edges set to "All between shown nodes"
+   * or "None": its tick changes nothing until Edges is edge-filter matches. */
   getIdleEdgeRowTT(propID) {
-    return `No effect — Edge filters act only while Links is set to "Only edge-filter matches":${StaticUtilities.formatPropsAsTree(propID)}`;
+    return `No effect — Edge filters act only while Edges is set to "Only edge-filter matches":${StaticUtilities.formatPropsAsTree(propID)}`;
   }
 
   /** Add (or remove) every element this filter row currently matches to the selection. */

@@ -27,25 +27,29 @@ const NARROW_DOWN_CENSUS_TITLE =
   'ticking them changes nothing.';
 const BUILD_UP_CENSUS_TITLE =
   'Build up — The graph holds the elements matched by at least one ticked ' +
-  'filter. Edge filters count only while Links is set to edge-filter matches.';
+  'filter. Edge filters count only while Edges is set to edge-filter matches.';
 
-// What the join toggle's two modes are called on screen. Stored as OR/AND.
+// What the join toggle's two modes are called on screen. Stored as OR/AND,
+// which each segment also shows as a small operator after its name.
 const JOIN_MODE_LABELS = {
   OR: {
     glyph: '＋',
     label: 'Build up',
-    title: 'Build up — Start from an empty graph. Each ticked filter adds the elements it matches (OR).',
+    op: 'OR',
+    title:
+      'Build up (OR) — Start from an empty graph. Each ticked filter adds the elements it matches.',
   },
   AND: {
     glyph: '−',
     label: 'Narrow down',
+    op: 'AND',
     title:
-      'Narrow down — Start from the full graph. Each narrowed filter removes the elements ' +
-      'outside its range or values (AND).',
+      'Narrow down (AND) — Start from the full graph. Each filter you change removes what falls ' +
+      'outside it. Filters still at their loaded values remove nothing.',
   },
 };
 // The option text names the whole choice, so the closed dropdown reads as a
-// sentence: "Links  All between shown nodes".
+// sentence: "Edges  All between shown nodes".
 const FILTER_LINK_LABELS = [
   ['all', 'All between shown nodes'],
   ['ticked', 'Only edge-filter matches'],
@@ -934,7 +938,7 @@ class UIManager {
     const toolbar = document.createElement('div');
     toolbar.className = 'filter-toolbar';
     // Each mode reveals its own modifier to the RIGHT of the toggle, so
-    // switching never shifts the toggle: Complete cases narrows down, Links
+    // switching never shifts the toggle: Complete cases narrows down, Edges
     // builds up.
     // One card holds the mode and the options that belong to it, so an option
     // never reads as a peer of the mode it modifies.
@@ -1424,7 +1428,7 @@ class UIManager {
     group.className = 'filter-join-toggle';
     group.setAttribute('role', 'group');
     group.setAttribute('aria-label', ariaLabel);
-    const buttons = options.map(({ value, label, glyph, title, dataKey }) => {
+    const buttons = options.map(({ value, label, glyph, op, title, dataKey }) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'filter-join-segment';
@@ -1438,6 +1442,12 @@ class UIManager {
         btn.append(mark, label);
       } else {
         btn.textContent = label;
+      }
+      if (op) {
+        const opMark = document.createElement('span');
+        opMark.className = 'filter-join-op';
+        opMark.textContent = op;
+        btn.append(' ', opMark);
       }
       btn.addEventListener('click', async () => {
         if (this.#filtersLocked() || current() === value) return;
@@ -1505,7 +1515,7 @@ class UIManager {
   }
 
   /**
-   * Build up's links choice (visibility_rule.js): which links show between
+   * Build up's edges choice (visibility_rule.js): which edges show between
    * the nodes the ticked filters added. A dropdown, not a third row of pills:
    * it is an option of the mode above it, and its option text can say what
    * each choice means. Starts hidden; the join toggle reveals it under build up.
@@ -1515,12 +1525,12 @@ class UIManager {
     wrapper.className = 'filter-links';
     wrapper.hidden = true;
     wrapper.title =
-      'Links — Which edges show between the nodes the filters added. ' +
+      'Edges — Which edges show between the nodes the filters added. ' +
       '"Only edge-filter matches" also adds the end nodes of every matched edge.';
 
     const label = document.createElement('span');
     label.className = 'filter-links-label';
-    label.textContent = 'Links';
+    label.textContent = 'Edges';
 
     const select = document.createElement('select');
     select.className = 'filter-links-select';
@@ -1539,7 +1549,7 @@ class UIManager {
       await this.#applyFilterSetting(
         'filterLinks',
         value,
-        `Links between shown nodes: ${select.selectedOptions[0].text}`,
+        `Edges between shown nodes: ${select.selectedOptions[0].text}`,
         sync
       );
     });
