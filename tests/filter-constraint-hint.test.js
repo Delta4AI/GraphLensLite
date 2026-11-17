@@ -103,6 +103,16 @@ describe('filter constraint census', () => {
     expect(inertIds()).toEqual(['N::g::zone', 'N::g::score']);
   });
 
+  it('counts a filter at its loaded values whose ∅ switch removes the gaps', () => {
+    const { ui, cache } = makeUI({ mode: 'AND', ...THREE });
+    cache.data.layouts.L.filters.get('N::g::score').missingPasses = false;
+    cache.missingValueCounts = new Map([['N::g::score', 4]]);
+    ui.updateFilterConstraintHints();
+
+    expect(census().textContent).toBe('2 of 3 filters constrain');
+    expect(inertIds()).toEqual(['N::g::zone']);
+  });
+
   it('says so plainly when nothing is narrowed — the empty-query case', () => {
     const { ui } = makeUI({
       mode: 'AND',

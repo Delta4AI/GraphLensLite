@@ -494,7 +494,8 @@ window.addEventListener("DOMContentLoaded", () => {
   cache.rail = initRail(cache);
   cache.inspector = initInspector(cache);
   cache.workbench = initWorkbench(cache);
-  initFilterSearch();
+  // The toolbar ∅ box acts on the rows the search lists, so it follows each search.
+  initFilterSearch(() => cache.ui.syncMissingValueBox());
   cache.palette = initCommandPalette(cache);
   initUiTooltips(document);
   cache.ui.updateDarkModeButton();

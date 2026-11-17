@@ -1,6 +1,14 @@
 import { attachGroupMenu } from './group_menu.js';
 import { RailMenu, menuItem, menuSeparator } from './rail.js';
 import { StaticUtilities } from '../utilities/static.js';
+import { missingPasses } from './query.js';
+
+/** "37 nodes have" / "1 edge has": the start of every ∅ sentence. */
+function missingValueSubject(cache, propID, count) {
+  const isEdge = propID.startsWith(`${cache.CFG?.EXCEL_EDGE_HEADER}::`);
+  const noun = isEdge ? (count === 1 ? 'edge' : 'edges') : count === 1 ? 'node' : 'nodes';
+  return `${count} ${noun} ${count === 1 ? 'has' : 'have'}`;
+}
 
 class DropdownChecklist {
   /** A list this long gets a search field. */
@@ -239,6 +247,16 @@ class DropdownChecklist {
       group.appendChild(item);
     }
     el.appendChild(group);
+    // The values above never list the elements that have none; say where they went.
+    const missing = this.cache.missingValueCounts?.get(this.propID) ?? 0;
+    if (missing > 0) {
+      const foot = document.createElement('div');
+      foot.className = 'filter-cat-foot';
+      foot.textContent =
+        `${missingValueSubject(this.cache, this.propID, missing)} no ${prop}. ` +
+        'The ∅ switch on this row decides whether they pass.';
+      el.appendChild(foot);
+    }
     el.addEventListener('keydown', (ev) => this.#onListKey(ev, el));
     this.listEl = el;
     this.#syncBoxes();
@@ -1420,6 +1438,11 @@ class UIComponentManager {
   createRowActions(propID, prop, { groupable }) {
     const chip = groupable ? this.createGroupChip(propID) : document.createElement('span');
     if (!groupable) chip.className = 'filter-row-spacer';
+    // A spacer where there are no gaps, so every row's dot and ⋯ line up.
+    const gaps = this.cache.missingValueCounts?.get(propID) ?? 0;
+    const missingSwitch =
+      gaps > 0 ? this.createMissingSwitch(propID) : document.createElement('span');
+    if (!gaps) missingSwitch.className = 'filter-row-spacer';
 
     const more = document.createElement('button');
     more.type = 'button';
@@ -1469,7 +1492,82 @@ class UIComponentManager {
         })
       );
     });
-    return [chip, more];
+    return [missingSwitch, chip, more];
+  }
+
+  /**
+   * The row's ∅ switch: do elements without a value for this property pass
+   * this filter? A toggle button (aria-pressed = they pass), only on rows
+   * where some elements of the property's type lack it. Always shown, unlike
+   * the empty group dot: it is a setting, not a verb. paintMissingSwitch keeps
+   * it in step on every filter change.
+   */
+  createMissingSwitch(propID) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'filter-missing-switch';
+    btn.dataset.prop = propID;
+    btn.textContent = '∅';
+    btn.addEventListener('click', async () => {
+      // aria-disabled rather than disabled, so the tooltip still says why.
+      if (btn.getAttribute('aria-disabled') === 'true') return;
+      const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
+      const fo = layout.filters.get(propID);
+      const passes = !missingPasses(fo, layout.filterJoinMode);
+      const [, , prop] = StaticUtilities.decodePropHashId(propID);
+      await this.cache.ui.setMissingPasses(
+        [propID],
+        passes,
+        `Without a ${prop} value: ${passes ? 'passing' : 'not passing'}`
+      );
+    });
+    return btn;
+  }
+
+  /**
+   * Paint one ∅ switch from its filter: filled when the gaps pass, dashed and
+   * struck when they do not, an accent ring when that differs from the mode's
+   * default, and muted while it decides nothing (row unticked, or an edge row
+   * while build-up's Edges ignores edge filters).
+   * @param {HTMLButtonElement} btn
+   * @param {{fo: object, mode: 'OR'|'AND', idle: boolean}} state
+   */
+  paintMissingSwitch(btn, { fo, mode, idle }) {
+    const propID = btn.dataset.prop;
+    const [, , prop] = StaticUtilities.decodePropHashId(propID);
+    const count = this.cache.missingValueCounts?.get(propID) ?? 0;
+    const passes = missingPasses(fo, mode);
+    const narrowDown = mode === 'AND';
+    const inactive = !fo.active || idle;
+    btn.setAttribute('aria-pressed', String(passes));
+    btn.setAttribute('aria-disabled', String(inactive));
+    btn.classList.toggle(
+      'changed',
+      typeof fo.missingPasses === 'boolean' && fo.missingPasses !== narrowDown
+    );
+    const isEdge = propID.startsWith(`${this.cache.CFG?.EXCEL_EDGE_HEADER}::`);
+    const nouns = isEdge ? 'edges' : 'nodes';
+    btn.setAttribute('aria-label', `${nouns} without a ${prop} value pass this filter`);
+
+    const what = `${missingValueSubject(this.cache, propID, count)} no ${prop}.`;
+    // [state, what happens and what a click does], by mode and switch.
+    const outcomes = {
+      'AND:true': ['kept', 'They are judged on the other filters only. Click to remove them.'],
+      'AND:false': [
+        'removed',
+        'This filter removes them, even at its full range. Click to keep them.',
+      ],
+      'OR:true': ['added', 'This filter adds them to the graph. Click to stop adding them.'],
+      'OR:false': [
+        'not added',
+        `This filter adds only ${nouns} that match it. Click to add these too.`,
+      ],
+    };
+    const IDLE_EDGES = 'Edge filters act only while Edges is set to "Only edge-filter matches".';
+    let [state, rest] = outcomes[`${mode}:${passes}`];
+    if (!fo.active) [state, rest] = ['', 'Tick the filter to decide what happens to them.'];
+    else if (idle) [state, rest] = ['', IDLE_EDGES];
+    btn.title = `Without a value${state && `: ${state}`} — ${what} ${rest}`;
   }
 
   /** Append this filter's current setting to the query, and show the editor. */
@@ -1521,7 +1619,11 @@ class UIComponentManager {
   /** An active-but-unnarrowed filter while narrowing down: on, dimmed, and
    * constraining nothing. The normal "click to hide elements" reads as a lie there. */
   getInertCheckboxTT(propID) {
-    return `No effect — Still at its loaded range or values, so it removes nothing. Narrow it, or switch to Build up:${StaticUtilities.formatPropsAsTree(propID)}`;
+    const tree = StaticUtilities.formatPropsAsTree(propID);
+    if (this.cache.missingValueCounts?.get(propID) > 0) {
+      return `No effect — Still at its loaded range or values, and elements without a value are kept, so it removes nothing. Narrow it, switch off ∅, or switch to Build up:${tree}`;
+    }
+    return `No effect — Still at its loaded range or values, so it removes nothing. Narrow it, or switch to Build up:${tree}`;
   }
 
   /** An edge row while building up with Edges set to "All between shown nodes"

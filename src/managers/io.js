@@ -3,6 +3,7 @@ import { VERSION, bubbleGroupStyle, UNSAFE_OBJECT_KEYS } from '../config.js';
 import { sanitizeAnnotations, MAX_ANNOTATIONS } from '../graph/annotation_geometry.js';
 import { StaticUtilities } from '../utilities/static.js';
 import { FILTER_LINKS, visibilitySettings } from '../graph/visibility_rule.js';
+import { isFilterNarrowed } from './query.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
 import { excelData, EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES, decodeKey } from './excel_schema.js';
 import { ExcelTemplate } from './excel_template.js';
@@ -1048,6 +1049,7 @@ class IOManager {
           ...structuredClone(defaultFilter),
           active: loaded.active,
           categories: canonical,
+          ...(typeof loaded.missingPasses === 'boolean' && { missingPasses: loaded.missingPasses }),
         };
       }
       return structuredClone(defaultFilter); // numeric-era or empty → reset
@@ -1343,10 +1345,9 @@ class IOManager {
         filters: this.parseFiltersAsMap(layout.filters),
         isCustom: layout.isCustom || false,
         query: layout['query'] || undefined,
-        // Per-view filter-join settings; default for pre-1.15.4 files that
-        // predate them (OR / non-strict = the historical behavior).
+        // Per-view filter join; OR (build up) for pre-1.15.4 files that
+        // predate it.
         filterJoinMode: layout.filterJoinMode === 'AND' ? 'AND' : 'OR',
-        filterStrict: layout.filterStrict === true,
         // Build-up links and elements without properties (visibility_rule.js);
         // older files get today's look: every link, every element.
         ...visibilitySettings(layout),
@@ -1385,6 +1386,22 @@ class IOManager {
           return kept;
         })(),
       };
+
+      // Before 1.18.0 one "Complete cases only" box made every narrowed filter
+      // drop the elements without a value. That is now each row's ∅ switch, so
+      // a file saved with the box on opens with ∅ off on those filters. The
+      // box is still read here, but no longer written.
+      if (layout.filterStrict === true) {
+        const defaults = this.cache.data?.filterDefaults;
+        for (const [propID, fo] of parsedLayouts[key].filters) {
+          if (
+            typeof fo.missingPasses !== 'boolean' &&
+            isFilterNarrowed(fo, defaults?.get(propID))
+          ) {
+            fo.missingPasses = false;
+          }
+        }
+      }
 
       // Keyed off the layout BEING PARSED, not traverseBubbleSets(): that reads
       // data.layouts[data.selectedLayout], a different and not-yet-installed

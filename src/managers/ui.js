@@ -5,26 +5,20 @@ import { visibilityRule } from '../graph/visibility_rule.js';
 import { attachGroupMenu } from './group_menu.js';
 import { Popup } from '../utilities/popup.js';
 import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
-import { isFilterNarrowed } from './query.js';
+import { constrainsNarrowDown, missingPasses } from './query.js';
 import { hotkeyLabel, paletteAccelerator } from './command_palette.js';
 
 // Persisted preference: how multiple active filters combine — "OR" (match any)
-// or "AND" (match every, non-strict: a property an element lacks does not
-// exclude it). Stored globally as the default for new layouts.
+// or "AND" (match every; whether a property an element lacks excludes it is
+// each row's ∅ switch). Stored globally as the default for new layouts.
 const FILTER_JOIN_KEY = 'gll.filterJoinMode';
-
-// Persisted preference: strict ("complete cases only") vs non-strict AND. Only
-// meaningful while the join mode is AND. Off (default) = non-strict: an element
-// is judged only on the filters it has. On = hide elements missing any active
-// same-type filter.
-const FILTER_STRICT_KEY = 'gll.filterStrict';
 
 // Tooltips are "Name — description": the tooltip layer sets the name as a
 // bold first line (ui_tooltip.js parseTip).
 const NARROW_DOWN_CENSUS_TITLE =
   'Narrow down — A filter constrains the graph once its range or values differ ' +
-  'from those it loaded with. Filters still at their defaults are dimmed: ' +
-  'ticking them changes nothing.';
+  'from those it loaded with, or once its ∅ switch removes the elements without ' +
+  'a value. Filters that do neither are dimmed: ticking them changes nothing.';
 const BUILD_UP_CENSUS_TITLE =
   'Build up — The graph holds the elements matched by at least one ticked ' +
   'filter. Edge filters count only while Edges is set to edge-filter matches.';
@@ -931,26 +925,22 @@ class UIManager {
   /**
    * Panel-level control bar. Sits above every section so its controls read as
    * global, not scoped to the adjacent section: the build up / narrow down
-   * toggle with its per-mode modifier, the switch for elements without
-   * properties, the search box, the census.
+   * toggle with its options (Edges while building up, the ∅ box in both), the
+   * switch for elements without properties, the search box, the census.
    */
   #buildFilterToolbar() {
     const toolbar = document.createElement('div');
     toolbar.className = 'filter-toolbar';
-    // Each mode reveals its own modifier to the RIGHT of the toggle, so
-    // switching never shifts the toggle: Complete cases narrows down, Edges
-    // builds up.
-    // One card holds the mode and the options that belong to it, so an option
-    // never reads as a peer of the mode it modifies.
-    const strictCheckbox = this.createFilterStrictCheckbox();
+    // The mode's options sit to the RIGHT of the toggle, so switching never
+    // shifts the toggle. One card holds the mode and the options that belong
+    // to it, so an option never reads as a peer of the mode it modifies.
     const linksToggle = this.createFilterLinksToggle();
     const joinToggle = this.createFilterJoinToggle((mode) => {
-      strictCheckbox.hidden = mode !== 'AND';
       linksToggle.hidden = mode === 'AND';
     });
     const options = document.createElement('div');
     options.className = 'filter-mode-options';
-    options.append(linksToggle, strictCheckbox, this.createPropertylessCheckbox());
+    options.append(linksToggle, this.createMissingValueBox(), this.createPropertylessCheckbox());
     const joinCluster = document.createElement('div');
     joinCluster.className = 'filter-toolbar-join';
     joinCluster.append(joinToggle, options);
@@ -1137,6 +1127,8 @@ class UIManager {
         btn.setAttribute('aria-pressed', String(active));
       }
       this.filterScope = name;
+      // The ∅ box acts on the section on screen.
+      this.syncMissingValueBox(container);
     };
 
     for (const wrap of wraps) {
@@ -1214,12 +1206,15 @@ class UIManager {
       tally.total += 1;
       perSection.set(section, tally);
       // Under OR every active filter contributes a disjunct — unless it is an
-      // idle edge row; under AND it has to be narrowed as well. Same rule the
-      // query derivation and visibility_rule.js apply.
-      const idleEdgeRow = edgeRowsIdle && row.dataset.propId.startsWith(edgePrefix);
-      const counts =
-        !!fo.active &&
-        (andMode ? isFilterNarrowed(fo, defaults?.get(row.dataset.propId)) : !idleEdgeRow);
+      // idle edge row; under AND it has to constrain as well (narrowed, or
+      // its ∅ switch removes the gaps). Same rule the query derivation and
+      // visibility_rule.js apply.
+      const propID = row.dataset.propId;
+      const idleEdgeRow = edgeRowsIdle && propID.startsWith(edgePrefix);
+      const gaps = this.cache.missingValueCounts?.get(propID) ?? 0;
+      const counts = andMode
+        ? constrainsNarrowDown(fo, defaults?.get(propID), gaps)
+        : !!fo.active && !idleEdgeRow;
       if (counts) {
         constraining += 1;
         tally.constraining += 1;
@@ -1236,12 +1231,152 @@ class UIManager {
         else if (inert) tooltip = this.cache.uiComponents.getInertCheckboxTT(row.dataset.propId);
         wrapper.title = tooltip;
       }
+      const missingSwitch = row.querySelector('.filter-missing-switch');
+      if (missingSwitch) {
+        this.cache.uiComponents.paintMissingSwitch(missingSwitch, {
+          fo,
+          mode: andMode ? 'AND' : 'OR',
+          idle: idleEdgeRow,
+        });
+      }
     }
 
     this.renderFilterConstraintCount(andMode, constraining, total);
     UIManager.#renderScopeCounts(perSection, andMode);
     this.syncSectionCheckboxes(container, layout.filters);
+    this.syncMissingValueBox(container);
     this.renderBuildUpEmptyState(rule.nothingTicked, rule.includePropertyless);
+  }
+
+  /**
+   * The ∅ rows the toolbar box acts on: every row with gaps the panel lists
+   * right now — the search's hits, or the section on screen when no search
+   * runs.
+   * @returns {HTMLElement[]} their ∅ switches
+   */
+  #listedMissingSwitches(container) {
+    const searching = container.classList.contains('filters-searching');
+    return [
+      ...container.querySelectorAll('.filter-row:not([hidden]) .filter-missing-switch'),
+    ].filter(
+      (btn) =>
+        searching || btn.closest('.filter-section')?.classList.contains('filter-section-active')
+    );
+  }
+
+  /**
+   * Toolbar box that sets the ∅ switch on every listed row at once: "Keep …"
+   * while narrowing down, "Add …" while building up. A tri-state box like the
+   * section boxes (APG mixed checkbox): ticked when every listed row passes
+   * the gaps, mixed when some do; a click on mixed or empty makes them all
+   * pass, a click on ticked makes none.
+   */
+  createMissingValueBox() {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'filter-missing-box';
+    wrapper.hidden = true;
+    const label = document.createElement('label');
+    label.className = 'filter-strict-checkbox';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = 'filterMissingAll';
+    const text = document.createElement('span');
+    text.className = 'filter-missing-box-text';
+    label.append(input, text);
+    const status = document.createElement('span');
+    status.className = 'filter-missing-box-status';
+    wrapper.append(label, status);
+
+    input.addEventListener('change', async () => {
+      const container = document.getElementById('filterContainer');
+      const switches = container ? this.#listedMissingSwitches(container) : [];
+      // A mixed box is unchecked underneath, so the click lands on checked:
+      // mixed or empty makes all pass, only a fully ticked box makes none.
+      const passes = input.checked;
+      if (!switches.length || this.#filtersLocked()) {
+        this.syncMissingValueBox(container);
+        return;
+      }
+      await this.setMissingPasses(
+        switches.map((btn) => btn.dataset.prop),
+        passes,
+        `Without a value: ${passes ? 'passing' : 'not passing'} on ${switches.length} filter${switches.length === 1 ? '' : 's'}`
+      );
+    });
+    return wrapper;
+  }
+
+  /** The toolbar ∅ box's state, words and status line, from the listed rows. */
+  syncMissingValueBox(container = document.getElementById('filterContainer')) {
+    const wrapper = container?.querySelector('.filter-missing-box');
+    const layout = this.cache.data?.layouts?.[this.cache.data?.selectedLayout];
+    if (!wrapper || !layout?.filters) return;
+    const switches = this.#listedMissingSwitches(container);
+    wrapper.hidden = switches.length === 0;
+    if (wrapper.hidden) return;
+
+    const mode = layout.filterJoinMode === 'AND' ? 'AND' : 'OR';
+    const on = switches.filter((btn) =>
+      missingPasses(layout.filters.get(btn.dataset.prop), mode)
+    ).length;
+    const input = wrapper.querySelector('input');
+    input.checked = on === switches.length;
+    input.indeterminate = on > 0 && on < switches.length;
+
+    const edgePrefix = `${this.cache.CFG?.EXCEL_EDGE_HEADER}::`;
+    const edges = switches.filter((btn) => btn.dataset.prop.startsWith(edgePrefix)).length;
+    const nouns = edges === 0 ? 'nodes' : edges === switches.length ? 'edges' : 'elements';
+    const verb = mode === 'AND' ? 'Keep' : 'Add';
+    wrapper.querySelector('.filter-missing-box-text').textContent =
+      `${verb} ${nouns} without a value`;
+    const listed = container.classList.contains('filters-searching') ? 'listed filters' : 'filters';
+    const n = switches.length;
+    wrapper.querySelector('.filter-missing-box-status').textContent =
+      on === n
+        ? `On all ${n} ${listed} with gaps`
+        : on === 0
+          ? `On none of the ${n} ${listed} with gaps`
+          : `On ${on} of ${n} ${listed} with gaps`;
+    wrapper.title =
+      `${verb} ${nouns} without a value — Sets the ∅ switch on every ${listed.replace(/s$/, '')} ` +
+      `listed that has gaps (${n}). ` +
+      (mode === 'AND'
+        ? 'Unticked, each of them removes what it has no value for: complete cases.'
+        : 'Ticked, each ticked filter also adds what it has no value for.') +
+      ' Mixed: the filters differ; a click makes them all pass.';
+  }
+
+  /**
+   * Store whether elements without a value pass the given filters, and
+   * re-render. A choice equal to the mode's default is stored as unset, so
+   * what follows a mode switch is only a deliberate deviation. If the render
+   * fails, the old values go back and the user is told.
+   */
+  async setMissingPasses(propIDs, passes, description) {
+    if (this.#filtersLocked()) return;
+    const layout = this.#layout();
+    const modeDefault = layout.filterJoinMode === 'AND';
+    const previous = propIDs.map((id) => [id, layout.filters.get(id)?.missingPasses]);
+    const write = (fo, value) => {
+      if (typeof value === 'boolean') fo.missingPasses = value;
+      else delete fo.missingPasses;
+    };
+    for (const id of propIDs) {
+      const fo = layout.filters.get(id);
+      if (fo) write(fo, passes === modeDefault ? undefined : passes);
+    }
+    try {
+      await this.cache.fm.handleFilterEvent('Filtering', description);
+    } catch (err) {
+      for (const [id, value] of previous) {
+        const fo = layout.filters.get(id);
+        if (fo) write(fo, value);
+      }
+      this.cache.qm.updateQueryTextArea();
+      this.error(
+        `Could not apply "${description}": ${err?.message ?? err}. The setting is back as it was.`
+      );
+    }
   }
 
   /**
@@ -1598,59 +1733,6 @@ class UIManager {
 
     const text = document.createElement('span');
     text.textContent = `Include ${elements} without properties`;
-    wrapper.append(input, text);
-    return wrapper;
-  }
-
-  // Builds the "Complete cases only" checkbox — the strict modifier of the AND
-  // join. Off (default) is non-strict: an element is judged only on the filters
-  // it has. On hides elements missing any active same-type filter. The join
-  // toggle shows/hides this control (only meaningful under AND). Starts hidden;
-  // the join toggle's callback reveals it when AND is active.
-  createFilterStrictCheckbox() {
-    const layout = () => this.cache.data.layouts[this.cache.data.selectedLayout];
-
-    let stored = false;
-    try {
-      stored = window.localStorage.getItem(FILTER_STRICT_KEY) === '1';
-    } catch (err) {
-      this.debug(`Could not read filter-strict preference: ${err.message}`);
-    }
-    if (typeof layout().filterStrict !== 'boolean') {
-      layout().filterStrict = stored;
-    }
-
-    const wrapper = document.createElement('label');
-    wrapper.className = 'filter-strict-checkbox';
-    wrapper.hidden = true;
-    wrapper.title =
-      'Complete cases only — Also remove elements that lack a value for any ' +
-      'narrowed filter. Off: an element is judged only on the properties it has.';
-
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.checked = layout().filterStrict === true;
-
-    const text = document.createElement('span');
-    text.textContent = 'Complete cases only';
-
-    input.addEventListener('change', async () => {
-      if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
-        input.checked = layout().filterStrict === true;
-        return;
-      }
-      layout().filterStrict = input.checked;
-      try {
-        window.localStorage.setItem(FILTER_STRICT_KEY, input.checked ? '1' : '0');
-      } catch (err) {
-        this.debug(`Could not persist filter-strict preference: ${err.message}`);
-      }
-      await this.cache.fm.handleFilterEvent(
-        'Filtering',
-        `Complete cases only: ${input.checked ? 'on' : 'off'}`
-      );
-    });
-
     wrapper.append(input, text);
     return wrapper;
   }

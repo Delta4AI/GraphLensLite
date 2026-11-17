@@ -122,6 +122,16 @@ describe('BooleanToggle in the shared filter surfaces', () => {
     ]);
   });
 
+  it('section reset also returns the ∅ switch to the mode default', async () => {
+    const cache = boolCache();
+    new BooleanToggle(PROP, cache).appendTo(document.createElement('div'));
+    cache.data.layouts.L.filters.get(PROP).missingPasses = false;
+
+    await new GraphFilterManager(cache).resetFilters('Node filters', 'group');
+
+    expect('missingPasses' in cache.data.layouts.L.filters.get(PROP)).toBe(false);
+  });
+
   it('"Add to query" writes an IS TRUE / IS FALSE predicate, never "(undefined)"', async () => {
     const cache = boolCache();
     const toggle = new BooleanToggle(PROP, cache);

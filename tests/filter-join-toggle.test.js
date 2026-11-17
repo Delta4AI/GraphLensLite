@@ -125,72 +125,93 @@ describe('UIManager.createFilterJoinToggle', () => {
   });
 });
 
-describe('UIManager.createFilterStrictCheckbox', () => {
+// The toolbar box over the rows' ∅ switches ("do elements without a value
+// pass?"): a tri-state over the rows the panel lists right now.
+describe('UIManager.createMissingValueBox', () => {
   let ui, cache, handleFilterEvent;
 
+  /** Rows as buildFilterUI lays them out: a ∅ switch on each row with gaps. */
+  function panel({ searching = false, hidden = [] } = {}) {
+    document.body.innerHTML = `
+      <div id="filterContainer" class="${searching ? 'filters-searching' : ''}">
+        <div class="filter-section filter-section-active">
+          ${['a', 'b', 'c']
+            .map(
+              (p) => `<div class="filter-row" ${hidden.includes(p) ? 'hidden' : ''}>
+                <button class="filter-missing-switch" data-prop="N::g::${p}"></button></div>`
+            )
+            .join('')}
+        </div>
+        <div class="filter-section">
+          <div class="filter-row"><button class="filter-missing-switch" data-prop="E::g::w"></button></div>
+        </div>
+      </div>`;
+    const box = ui.createMissingValueBox();
+    document.getElementById('filterContainer').prepend(box);
+    ui.syncMissingValueBox();
+    return box;
+  }
+
   beforeEach(() => {
-    window.localStorage.clear();
     ({ ui, cache, handleFilterEvent } = makeUI());
+    cache.data.layouts.L.filterJoinMode = 'AND';
+    for (const p of ['N::g::a', 'N::g::b', 'N::g::c', 'E::g::w']) {
+      cache.data.layouts.L.filters.set(p, { active: true });
+    }
   });
 
-  it("renders a hidden 'Complete cases only' checkbox defaulting to off", () => {
-    const box = ui.createFilterStrictCheckbox();
-    const input = box.querySelector('input[type=checkbox]');
-
-    expect(box.classList.contains('filter-strict-checkbox')).toBe(true);
-    expect(box.hidden).toBe(true);
-    expect(box.textContent).toContain('Complete cases only');
-    expect(input.checked).toBe(false);
-    expect(cache.data.layouts.L.filterStrict).toBe(false);
-  });
-
-  it('restores the on state from localStorage', () => {
-    window.localStorage.setItem('gll.filterStrict', '1');
-
-    const box = ui.createFilterStrictCheckbox();
-
-    expect(box.querySelector('input').checked).toBe(true);
-    expect(cache.data.layouts.L.filterStrict).toBe(true);
-  });
-
-  it('persists and re-renders on change', async () => {
-    const box = ui.createFilterStrictCheckbox();
+  const click = async (box) => {
     const input = box.querySelector('input');
-
-    input.checked = true;
+    input.checked = !input.checked; // what a click does, mixed included
     input.dispatchEvent(new window.Event('change'));
     await Promise.resolve();
+  };
+  const passes = (p) => cache.data.layouts.L.filters.get(p).missingPasses;
 
-    expect(cache.data.layouts.L.filterStrict).toBe(true);
-    expect(window.localStorage.getItem('gll.filterStrict')).toBe('1');
+  it('is mixed when the listed rows differ, and a click makes them all pass', async () => {
+    cache.data.layouts.L.filters.get('N::g::b').missingPasses = false;
+    const box = panel();
+    const input = box.querySelector('input');
+    expect(input.indeterminate).toBe(true);
+    expect(box.textContent).toContain('Keep nodes without a value');
+    expect(box.textContent).toContain('On 2 of 3 filters with gaps');
+
+    await click(box);
+
+    // Passing is narrow down's default, so it is stored as unset.
+    expect(['N::g::a', 'N::g::b', 'N::g::c'].map(passes)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
     expect(handleFilterEvent).toHaveBeenCalledOnce();
   });
 
-  it('does nothing when filters are locked by a manual query', async () => {
-    const box = ui.createFilterStrictCheckbox();
-    const input = box.querySelector('input');
-    cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
+  it('turns all off from fully ticked, and only on the rows the search lists', async () => {
+    const box = panel({ searching: true, hidden: ['c'] });
+    expect(box.querySelector('input').checked).toBe(true);
 
-    input.checked = true;
-    input.dispatchEvent(new window.Event('change'));
-    await Promise.resolve();
+    await click(box);
 
-    expect(cache.data.layouts.L.filterStrict).toBe(false);
-    expect(input.checked).toBe(false); // reverted
-    expect(handleFilterEvent).not.toHaveBeenCalled();
+    expect(passes('N::g::a')).toBe(false);
+    expect(passes('N::g::b')).toBe(false);
+    expect(passes('N::g::c')).toBeUndefined(); // searched out
+    expect(passes('E::g::w')).toBe(false); // a search spans both sections
   });
 
-  it('is revealed by the join toggle only under AND', () => {
-    const box = ui.createFilterStrictCheckbox();
-    const group = ui.createFilterJoinToggle((mode) => {
-      box.hidden = mode !== 'AND';
-    });
-    const [orBtn, andBtn] = group.querySelectorAll('.filter-join-segment');
+  it('leaves the section that is not on screen alone', async () => {
+    const box = panel();
+    await click(box);
+    expect(passes('E::g::w')).toBeUndefined();
+  });
 
-    expect(box.hidden).toBe(true); // starts OR
-    andBtn.click();
-    expect(box.hidden).toBe(false);
-    orBtn.click();
-    expect(box.hidden).toBe(true);
+  it('does nothing while a hand-typed query drives the filters', async () => {
+    cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
+    ui.warning = vi.fn();
+    const box = panel();
+    await click(box);
+    expect(passes('N::g::a')).toBeUndefined();
+    expect(box.querySelector('input').checked).toBe(true);
+    expect(handleFilterEvent).not.toHaveBeenCalled();
   });
 });

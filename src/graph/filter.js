@@ -34,6 +34,10 @@ class GraphFilterManager {
     // A narrowed True/False segment constrains the graph under AND exactly
     // like a narrowed slider, so it has to widen back to Any here too.
     if (boolToggle) boolToggle.resetToAny();
+    // The ∅ switch back to the mode's default, or a reset row would still
+    // remove (or add) the elements without a value.
+    const filter = this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID);
+    if (filter) delete filter.missingPasses;
   }
 
   async handleFilterEvent(

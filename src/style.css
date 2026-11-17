@@ -4739,6 +4739,16 @@ div[slider] > input[type=range]::-ms-tooltip {
     padding: 0;
 }
 
+/* Where the elements without a value went: they are in no list above. */
+.filter-cat-foot {
+    margin-top: 4px;
+    padding: 5px 6px 1px;
+    border-top: 1px solid var(--border-soft);
+    font-size: 11px;
+    color: var(--text-muted);
+    max-width: 32ch;
+}
+
 .filter-cat-all {
     margin-bottom: 2px;
     padding-bottom: 2px;
@@ -4763,6 +4773,73 @@ div[slider] > input[type=range]::-ms-tooltip {
 .filter-row-spacer {
     width: 24px;
     flex: 0 0 24px;
+}
+
+/* The row's ∅ switch: do elements without a value pass this filter? Filled
+   when they do, dashed and struck when they do not, an accent ring when that
+   differs from the mode's default. Always visible: it is a setting. */
+.filter-missing-switch {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface-3);
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.filter-missing-switch[aria-pressed="false"] {
+    background: transparent;
+    border-style: dashed;
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+.filter-missing-switch.changed {
+    border-color: var(--accent-text);
+    box-shadow: 0 0 0 1px var(--accent-ring);
+}
+
+.filter-missing-switch:hover:not([aria-disabled="true"]) {
+    background: var(--row-hover);
+}
+
+.filter-missing-switch:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
+}
+
+/* Unticked row (or an idle build-up edge row): it decides nothing yet. */
+.filter-missing-switch[aria-disabled="true"] {
+    opacity: 0.4;
+    cursor: default;
+}
+
+#filterContainer.locked .filter-missing-switch {
+    pointer-events: none;
+    opacity: 0.4;
+}
+
+/* Toolbar box over every listed row's ∅ switch, with a status line under it. */
+.filter-missing-box {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.filter-missing-box[hidden] {
+    display: none;
+}
+
+.filter-missing-box-status {
+    padding-left: 24px;
+    font-size: 11px;
+    color: var(--text-muted);
 }
 
 .filter-row-more,
