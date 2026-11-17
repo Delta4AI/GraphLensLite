@@ -5,7 +5,7 @@ import { visibilityRule } from '../graph/visibility_rule.js';
 import { attachGroupMenu } from './group_menu.js';
 import { Popup } from '../utilities/popup.js';
 import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
-import { constrainsNarrowDown, missingPasses } from './query.js';
+import { constrainsNarrowDown, missingPasses, missingPassesByDefault } from './query.js';
 import { hotkeyLabel, paletteAccelerator } from './command_palette.js';
 
 // Persisted preference: how multiple active filters combine — "OR" (match any)
@@ -1276,7 +1276,7 @@ class UIManager {
     wrapper.className = 'filter-missing-box';
     wrapper.hidden = true;
     const label = document.createElement('label');
-    label.className = 'filter-strict-checkbox';
+    label.className = 'filter-option-checkbox';
     const input = document.createElement('input');
     input.type = 'checkbox';
     input.id = 'filterMissingAll';
@@ -1285,6 +1285,9 @@ class UIManager {
     label.append(input, text);
     const status = document.createElement('span');
     status.className = 'filter-missing-box-status';
+    status.id = 'filterMissingAllStatus';
+    // "mixed" alone does not say which rows differ; the status line does.
+    input.setAttribute('aria-describedby', status.id);
     wrapper.append(label, status);
 
     input.addEventListener('change', async () => {
@@ -1337,7 +1340,9 @@ class UIManager {
         : on === 0
           ? `On none of the ${n} ${listed} with gaps`
           : `On ${on} of ${n} ${listed} with gaps`;
-    wrapper.title =
+    // On the label, which holds the box, so its accessible description and
+    // the focus tooltip both find it.
+    wrapper.querySelector('label').title =
       `${verb} ${nouns} without a value — Sets the ∅ switch on every ${listed.replace(/s$/, '')} ` +
       `listed that has gaps (${n}). ` +
       (mode === 'AND'
@@ -1355,7 +1360,7 @@ class UIManager {
   async setMissingPasses(propIDs, passes, description) {
     if (this.#filtersLocked()) return;
     const layout = this.#layout();
-    const modeDefault = layout.filterJoinMode === 'AND';
+    const modeDefault = missingPassesByDefault(layout.filterJoinMode);
     const previous = propIDs.map((id) => [id, layout.filters.get(id)?.missingPasses]);
     const write = (fo, value) => {
       if (typeof value === 'boolean') fo.missingPasses = value;
@@ -1703,7 +1708,7 @@ class UIManager {
       if (element.features?.size === 0) count += 1;
     }
     const wrapper = document.createElement('label');
-    wrapper.className = 'filter-strict-checkbox filter-propertyless-checkbox';
+    wrapper.className = 'filter-option-checkbox filter-propertyless-checkbox';
     wrapper.hidden = count === 0;
     const elements = `${count} element${count === 1 ? '' : 's'}`;
     wrapper.title =

@@ -24,7 +24,7 @@ function makeCache(mode, filter) {
       [FULL, 0],
     ]),
     EVENT_LOCKS: { FILTERS_LOCKED_BY_MANUAL_QUERY: false },
-    ui: { setMissingPasses: vi.fn(async () => {}), error: vi.fn() },
+    ui: { setMissingPasses: vi.fn(async () => {}), error: vi.fn(), info: vi.fn() },
   };
   cache.uiComponents = new UIComponentManager(cache);
   return cache;
@@ -80,5 +80,6 @@ describe('filter row ∅ switch', () => {
     cache.uiComponents.paintMissingSwitch(btn, { fo: { active: false }, mode: 'AND', idle: false });
     btn.click();
     expect(cache.ui.setMissingPasses).toHaveBeenCalledOnce();
+    expect(cache.ui.info).toHaveBeenCalledWith(expect.stringContaining('Tick the filter'));
   });
 });

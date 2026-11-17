@@ -452,7 +452,7 @@ describe('QueryAST: non-strict AND join', () => {
 });
 
 // --------------------------------------------------------------------------
-// Strict AND join (type-grouped, as emitted with filterStrict on):
+// Strict AND join (type-grouped; the panel once emitted this for Complete cases only):
 //   ((score ...) AND (type ...)) OR ((weight ...))
 // AND within each element type, OR between the two type groups.
 // --------------------------------------------------------------------------

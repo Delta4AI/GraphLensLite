@@ -3221,7 +3221,7 @@ h5 {
 }
 
 /* Panel-level control bar above all filter sections: the OR/AND join control
-   plus its "Complete cases only" option. Sitting above every section makes
+   plus its options. Sitting above every section makes
    clear the join control is global, not scoped to the adjacent section. */
 .filter-toolbar {
     display: flex;
@@ -3256,8 +3256,8 @@ h5 {
     font-style: italic;
 }
 
-/* The mode and its option on one line: the switch, then Links (build up) or
-   Complete cases (narrow down); the elements-without-properties box wraps
+/* The mode and its option on one line: the switch, then Edges (build up) and
+   the ∅ box (both modes); the elements-without-properties box wraps
    under them when the graph has any. */
 .filter-toolbar-join {
     flex-basis: 100%;
@@ -3325,6 +3325,10 @@ h5 {
     color: var(--text-muted);
 }
 
+.filter-mode-switch .filter-join-segment:hover .filter-join-op {
+    color: var(--text-strong);
+}
+
 /* The chosen mode's options, to the right of the switch. */
 .filter-mode-options {
     flex: 1 1 160px;
@@ -3334,7 +3338,7 @@ h5 {
     gap: 5px;
 }
 
-.filter-strict-checkbox {
+.filter-option-checkbox {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -3344,7 +3348,7 @@ h5 {
     cursor: pointer;
 }
 
-.filter-strict-checkbox[hidden] {
+.filter-option-checkbox[hidden] {
     display: none;
 }
 
@@ -3557,7 +3561,7 @@ h5 {
 #filterContainer.locked .filter-range-row,
 #filterContainer.locked .header-card,
 #filterContainer.locked .sub-header-card,
-/* The join toggle and its "complete cases only" modifier are filter controls
+/* The join toggle and its options (Edges, the ∅ box) are filter controls
    too: their handlers already bail under the lock, so undimmed they looked live
    and did nothing. The search box stays live — searching the list is reading,
    not filtering. */
@@ -4759,7 +4763,7 @@ div[slider] > input[type=range]::-ms-tooltip {
 
 .filter-row-check,
 .filter-section-check,
-.filter-strict-checkbox input {
+.filter-option-checkbox input {
     width: 16px;
     height: 16px;
     margin: 4px;
@@ -4805,8 +4809,10 @@ div[slider] > input[type=range]::-ms-tooltip {
     box-shadow: 0 0 0 1px var(--accent-ring);
 }
 
+/* Strong text on hover: muted on the hover fill is under 4.5:1 in dark mode. */
 .filter-missing-switch:hover:not([aria-disabled="true"]) {
     background: var(--row-hover);
+    color: var(--text-strong);
 }
 
 .filter-missing-switch:focus-visible {

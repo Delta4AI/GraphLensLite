@@ -70,7 +70,14 @@ function countMissingValues(propIDs, nodes, edges, edgeSection) {
  * building up (a gap matches nothing).
  */
 function missingPasses(fo, joinMode) {
-  return typeof fo.missingPasses === 'boolean' ? fo.missingPasses : joinMode === 'AND';
+  return typeof fo.missingPasses === 'boolean'
+    ? fo.missingPasses
+    : missingPassesByDefault(joinMode);
+}
+
+/** The ∅ switch's default in a mode: on while narrowing down, off while building up. */
+function missingPassesByDefault(joinMode) {
+  return joinMode === 'AND';
 }
 
 /**
@@ -1212,7 +1219,7 @@ class QueryManager {
   <li><span class="q-in-cat-bracket-open">IN&nbsp;[</span><span class="q-string">foo</span><span class="q-comma">,</span>&nbsp;<span class="q-string">bar</span><span class="q-cat-bracket-close">]</span> - Keep specific categorical values</li>
   <li><span class="q-kw-ismissing">IS MISSING</span> - True when the property is absent/empty or belongs to the other element type. Auto-added by Narrow down for a row whose ∅ switch is on, so a property an element lacks doesn't exclude it; rarely hand-written.</li>
   <li><span class="q-kw-isforeign">IS FOREIGN</span> - True only when the property belongs to the other element type (a node property tested against an edge). Auto-added by Narrow down for a row whose ∅ switch is off, where an absent value must exclude but a foreign one must not; rarely hand-written.</li>
-  <li><span class="q-kw-hasvalue">HAS VALUE</span> / <span class="q-kw-hasnovalue">HAS NO VALUE</span> - True when an element of the property's own type has (or lacks: absent/empty) a value for it; false for the other element type. Auto-added by a row's ∅ switch</li>
+  <li><span class="q-kw-hasvalue">HAS VALUE</span> / <span class="q-kw-hasnovalue">HAS NO VALUE</span> - True when an element of the property's own type has (or lacks: absent/empty) a value for it; false for the other element type. Auto-added by a row's ∅ switch.</li>
   <li><span class="q-kw-istrue">IS TRUE</span> / <span class="q-kw-isfalse">IS FALSE</span> - Boolean test; matches every encoding (true/TRUE/1 vs false/FALSE/0)</li>
 </ul>
 
@@ -1306,5 +1313,6 @@ export {
   hasNoValue,
   countMissingValues,
   missingPasses,
+  missingPassesByDefault,
   constrainsNarrowDown,
 };

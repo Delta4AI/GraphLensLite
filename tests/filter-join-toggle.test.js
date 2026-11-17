@@ -100,7 +100,7 @@ describe('UIManager.createFilterJoinToggle', () => {
   it('looks as dead as it behaves under the lock', () => {
     // The handler above bails, but the control was left undimmed and fully
     // interactive — the toolbar was missing from the locked dimming rules, so
-    // OR/AND and "complete cases only" invited clicks that did nothing. jsdom
+    // the OR/AND switch and its options invited clicks that did nothing. jsdom
     // applies no stylesheet, hence the source assertion.
     const css = fs.readFileSync('src/style.css', 'utf8'); // vitest runs at the repo root
     expect(css).toContain('#filterContainer.locked .filter-toolbar-join');

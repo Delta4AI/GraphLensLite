@@ -24,9 +24,8 @@ describe('Duplicate workspace', () => {
     const { cache, lm } = managerWith({
       internals: { renderer: 'live handle' },
       positions: new Map([['n1', { style: { x: 1, y: 2 } }]]),
-      filters: new Map([['p', { active: false }]]),
+      filters: new Map([['p', { active: false, missingPasses: false }]]),
       filterJoinMode: 'AND',
-      filterStrict: true,
       annotations: [{ id: 'a1', text: 'note' }],
     });
     // jsdom's <select> only takes a value it has an option for.
@@ -38,7 +37,7 @@ describe('Duplicate workspace', () => {
     const copy = cache.data.layouts['Default (copy 2)'];
     expect(cache.data.selectedLayout).toBe('Default (copy 2)');
     expect(copy.filterJoinMode).toBe('AND');
-    expect(copy.filterStrict).toBe(true);
+    expect(copy.filters.get('p').missingPasses).toBe(false);
     expect(copy.annotations).toEqual([{ id: 'a1', text: 'note' }]);
     expect(copy.internals).toBeNull();
     expect(copy.nodeStyles.get('n1').style.size).toBe(30);

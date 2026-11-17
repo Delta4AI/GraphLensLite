@@ -1,7 +1,7 @@
 import { attachGroupMenu } from './group_menu.js';
 import { RailMenu, menuItem, menuSeparator } from './rail.js';
 import { StaticUtilities } from '../utilities/static.js';
-import { missingPasses } from './query.js';
+import { missingPasses, missingPassesByDefault } from './query.js';
 
 /** "37 nodes have" / "1 edge has": the start of every ∅ sentence. */
 function missingValueSubject(cache, propID, count) {
@@ -1509,8 +1509,12 @@ class UIComponentManager {
     btn.dataset.prop = propID;
     btn.textContent = '∅';
     btn.addEventListener('click', async () => {
-      // aria-disabled rather than disabled, so the tooltip still says why.
-      if (btn.getAttribute('aria-disabled') === 'true') return;
+      // aria-disabled rather than disabled, so the tooltip still says why; a
+      // click says it too, for touch screens that never show a tooltip.
+      if (btn.getAttribute('aria-disabled') === 'true') {
+        this.cache.ui.info(btn.title.split(' — ').slice(1).join(' — '));
+        return;
+      }
       const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
       const fo = layout.filters.get(propID);
       const passes = !missingPasses(fo, layout.filterJoinMode);
@@ -1537,17 +1541,16 @@ class UIComponentManager {
     const [, , prop] = StaticUtilities.decodePropHashId(propID);
     const count = this.cache.missingValueCounts?.get(propID) ?? 0;
     const passes = missingPasses(fo, mode);
-    const narrowDown = mode === 'AND';
     const inactive = !fo.active || idle;
     btn.setAttribute('aria-pressed', String(passes));
     btn.setAttribute('aria-disabled', String(inactive));
     btn.classList.toggle(
       'changed',
-      typeof fo.missingPasses === 'boolean' && fo.missingPasses !== narrowDown
+      typeof fo.missingPasses === 'boolean' && fo.missingPasses !== missingPassesByDefault(mode)
     );
     const isEdge = propID.startsWith(`${this.cache.CFG?.EXCEL_EDGE_HEADER}::`);
     const nouns = isEdge ? 'edges' : 'nodes';
-    btn.setAttribute('aria-label', `${nouns} without a ${prop} value pass this filter`);
+    btn.setAttribute('aria-label', `∅: ${nouns} without a ${prop} value pass this filter`);
 
     const what = `${missingValueSubject(this.cache, propID, count)} no ${prop}.`;
     // [state, what happens and what a click does], by mode and switch.
