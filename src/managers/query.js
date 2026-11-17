@@ -37,7 +37,7 @@ function hasNoValue(v) {
 }
 
 /**
- * How many elements of each property's own type have no value for it — the
+ * How many elements of each property's own type have no value for it: the
  * ∅ switch's count. Elements without any property are left out: no filter
  * ever judges them (they follow "Include … without properties").
  * @param {Iterable<string>} propIDs
@@ -612,10 +612,10 @@ class QueryManager {
           //
           // Each conjunct is OR-ed with an escape hatch, picked by the row's
           // ∅ switch:
-          //   ∅ on   IS MISSING  — foreign OR absent value excuses it, so an
+          //   ∅ on   IS MISSING: foreign OR absent value excuses it, so an
           //                        element is judged only on the filters it
           //                        actually carries.
-          //   ∅ off  IS FOREIGN  — only the other element type excuses it, so
+          //   ∅ off  IS FOREIGN: only the other element type excuses it, so
           //                        a same-type absent value does exclude, but
           //                        a type with no filter of its own stays
           //                        unconstrained.

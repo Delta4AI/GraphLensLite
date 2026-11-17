@@ -113,9 +113,10 @@ Business logic and UI:
   workspace's whole view state and restores it through `lm.changeLayout()`, so a
   feature that stores something new on the layout is undoable for free
 - `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, IS FOREIGN,
-  comparisons)
+  HAS VALUE, HAS NO VALUE, comparisons); also the ∅ switch's shared rules
+  (`missingPasses`, `constrainsNarrowDown`) the panel's census reuses
 - `ui_components.js` — filter UI (category checklists on `RailMenu`, invertible
-  range sliders, boolean segments), the per-row group dot and ⋯ actions menu,
+  range sliders, boolean segments), the per-row ∅ switch, group dot and ⋯ actions menu,
   the section tri-state checkboxes, tooltips
 - `group_menu.js` — the one group checklist, opened by both assign sites (a filter
   row assigns a property, the Selection panel assigns nodes); built on `RailMenu`

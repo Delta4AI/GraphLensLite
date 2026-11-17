@@ -37,7 +37,7 @@ function createMockCache() {
 
 const positions = { A: { style: { x: 0, y: 0 } } };
 
-describe('parseLayouts — filter join and the Complete cases migration', () => {
+describe('parseLayouts: filter join and the Complete cases migration', () => {
   let io;
   beforeEach(() => {
     io = new IOManager(createMockCache());

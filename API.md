@@ -458,8 +458,7 @@ best obtained from an **Export → JSON** rather than written by hand.
 
     // how filter rows combine (all optional; defaults shown)
     "filterJoinMode": "OR",            // "OR" = build up (ticked rows add elements), "AND" = narrow down
-    "filterStrict": false,             // AND only: true = complete cases (an element must carry every filtered property)
-    "filterLinks": "all",              // build up only: which links show — "all", "ticked" (both ends shown), "none"
+    "filterLinks": "all",              // build up only ("Edges"): which edges show: "all", "ticked" (both ends shown), "none"
     "includePropertyless": true,       // build up only: show elements that carry no filter property at all
 
     // text notes on the canvas (≤ 500; malformed records are dropped on load)
@@ -495,6 +494,12 @@ an `active` flag plus slider thresholds or selected categories.
   hides **nothing**; `active: false` simply means the filter is not applied.
   Toggling `active` alone has **no visible effect** — to actually hide nodes you
   must also set the threshold/category constraint, which is the verbose part.
+- An optional `missingPasses: true | false` is the row's ∅ switch: whether
+  elements without a value for the property pass the filter. Omitted means the
+  mode's default (kept under narrow down, not added under build up).
+- Files saved before 1.18.0 may carry a workspace-level `filterStrict: true`
+  ("Complete cases only"). It is still read (those workspaces open with
+  `missingPasses: false` on their narrowed filters), but no longer written.
 - Reproduce the exact object shape from an **Export → JSON**; don't invent it.
 - If you only want the data to *be* filterable, you don't need this at all — ship
   `D4Data` (§6) and users filter interactively.
@@ -515,11 +520,12 @@ an `active` flag plus slider thresholds or selected categories.
 > Grammar, for reference only: a property path `section::subGroup::property`
 > followed by exactly one condition — `BETWEEN <low> AND <high>`,
 > `LOWER THAN <a> OR GREATER THAN <b>` (always two-sided — there is **no**
-> standalone `LOWER THAN`), `IN [value1, value2]`, or the unary `IS MISSING`
-> (true when the property is absent/empty or belongs to the other element type;
-> emitted automatically by the filter panel's non-strict AND join) or
-> `IS FOREIGN` (true only when the property belongs to the other element type;
-> emitted by the AND join's "complete cases only" mode) — with
+> standalone `LOWER THAN`), `IN [value1, value2]`, or one of the unary
+> predicates the filter panel emits for a row's ∅ switch: `IS MISSING` (true
+> when the property is absent/empty or belongs to the other element type),
+> `IS FOREIGN` (true only when it belongs to the other element type),
+> `HAS VALUE` / `HAS NO VALUE` (true when an element of the property's own type
+> has / lacks a value; false for the other type), with
 > clauses combined by `AND` / `OR` / `NOT` and grouped in parentheses. There are
 > no `<`, `>`, or `=` operators.
 

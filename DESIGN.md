@@ -93,9 +93,17 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - A row with more than two actions puts them behind one visible **⋯** button
   at its end (`.filter-row-more`, `.group-row-more`), opening a `RailMenu` of
   labelled items. The button is always visible, not revealed on hover.
-- Inline next to it only what also shows state (the group dot on a filter
-  row). An inline control that is empty by default may hide until the row is
-  hovered or the control is focused, as long as it stays in the tab order.
+- Inline next to it only what also shows state (the ∅ switch and the group dot
+  on a filter row: `[∅] [◌] [⋯]`). An inline control that is empty by default
+  may hide until the row is hovered or the control is focused, as long as it
+  stays in the tab order. A setting never hides: the ∅ switch is always shown.
+- A per-row setting shows its state in the control itself: filled = on,
+  dashed (and struck) = off, an accent ring when it differs from the mode's
+  default, muted (`aria-disabled`, tooltip kept) while it decides nothing. A
+  row without the setting keeps the column with a 24px spacer. A toolbar
+  tri-state box sets it on every row the panel lists (search hits, or the
+  section on screen), with a status line under it ("On 2 of 6 filters with
+  gaps").
 - Popups (`RailMenu`) open from Enter, Space or ↓ on their trigger, move focus
   inside, and return it to the trigger on Escape.
 

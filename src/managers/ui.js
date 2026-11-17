@@ -1250,7 +1250,7 @@ class UIManager {
 
   /**
    * The ∅ rows the toolbar box acts on: every row with gaps the panel lists
-   * right now — the search's hits, or the section on screen when no search
+   * right now: the search's hits, or the section on screen when no search
    * runs.
    * @returns {HTMLElement[]} their ∅ switches
    */
