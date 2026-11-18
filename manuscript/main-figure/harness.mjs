@@ -11,7 +11,8 @@ export const WIDTH = 1600;
 export const HEIGHT = 920;
 export const SCALE = 3;
 
-export async function launch() {
+// scale: device pixels per CSS px in every capture.
+export async function launch({ scale = SCALE } = {}) {
   const app = await _electron.launch({
     executablePath: path.join(ROOT, 'node_modules/electron/dist/electron'),
     args: [path.join(HERE, 'electron_main.cjs')],
@@ -25,7 +26,7 @@ export async function launch() {
   await page.waitForFunction(() => !!window.cache?.io, null, { timeout: 30_000, polling: 100 });
   const cdp = await page.context().newCDPSession(page);
   const viewport = (width = WIDTH, height = HEIGHT) =>
-    cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: SCALE, mobile: false });
+    cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: scale, mobile: false });
   await viewport();
 
   const settle = () => page.waitForFunction(() => {
@@ -49,7 +50,7 @@ export async function launch() {
       await settle();
     },
     wait: (ms) => new Promise((r) => setTimeout(r, ms)),
-    // clip in CSS px; output is SCALE x larger.
+    // clip in CSS px; output is scale x larger.
     async shot(file, clip) {
       const opts = { format: 'png', ...(clip ? { clip: { ...clip, scale: 1 } } : {}) };
       const { data } = await cdp.send('Page.captureScreenshot', opts);
@@ -113,4 +114,17 @@ export async function thaw(page) {
     document.querySelectorAll('.fig-freeze').forEach((e) => e.remove());
     document.querySelectorAll('[data-fig-hidden]').forEach((c) => { c.style.visibility = ''; delete c.dataset.figHidden; });
   });
+}
+
+// Captures fn's screenshot without toasts, hover tooltips or focus rings, with
+// every canvas frozen into an image (see freeze).
+export async function snapshot(page, fn) {
+  await page.mouse.move(WIDTH - 2, 600);
+  await page.evaluate(() => {
+    document.querySelectorAll('#toasts > *').forEach((t) => t.remove());
+    document.activeElement?.blur();
+  });
+  await new Promise((r) => setTimeout(r, 300));
+  await freeze(page);
+  try { await fn(); } finally { await thaw(page); }
 }
