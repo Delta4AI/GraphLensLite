@@ -1,5 +1,5 @@
 /**
- * The inspector: the single context-driven 400 px column on the right, always
+ * The inspector: the single context-driven 432 px column on the right, always
  * present and never displaced — except at phone width, where it is a bottom
  * sheet opened from the rail's ▤ Panel button (openSheet / closeSheet). Three contexts — Filters, Overlays (groups,
  * density heatmap, notes, minimap) and Selection (act, arrange, appearance) —
