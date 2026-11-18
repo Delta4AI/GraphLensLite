@@ -1160,7 +1160,8 @@ body {
 #inspector {
     flex: none;
     /* 400px fits a slider between its value boxes plus a property name; the
-       other 32px are the filter rows' ∅ column (24px) and its gap. */
+       other 32px leave room for a row's ∅ marker (24px) and its gap. Narrower
+       than 387px, the filter rows stack (#filterContainer's @container rule). */
     width: 432px;
     min-width: 300px;
     box-sizing: border-box;
@@ -2990,6 +2991,8 @@ h5 {
 #filterContainer {
     position: relative;
     margin-right: 6px;
+    /* The rows stack in a narrow panel: see the @container rule below. */
+    container-type: inline-size;
 }
 
 /* The sub-group body is a 3-column grid [label | control | actions]; each row
@@ -3062,6 +3065,46 @@ h5 {
 /* The row's name and ⋯ stay level with the track, not with the bars. */
 .filter-row:has(.has-hist) > :is(.filter-row-col1, .filter-row-col3) {
     padding-top: 10px;
+}
+
+/* A narrow panel stacks each row: checkbox, name, markers and ⋯ on one line,
+   the control full width under it, so a name never shrinks to a letter or two.
+   The panel is 405px wide in the default 432px inspector (side by side) and
+   273px in the narrowest, 300px one (stacked): any inspector under 387px. */
+@container (max-width: 359px) {
+    .filter-subgroup-body {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .filter-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "name actions"
+            "control control";
+        column-gap: 8px;
+        row-gap: 2px;
+        align-items: center;
+    }
+
+    .filter-row-col1 {
+        grid-area: name;
+    }
+
+    .filter-row-col2 {
+        grid-area: control;
+    }
+
+    .filter-row-col3 {
+        grid-area: actions;
+    }
+
+    /* The name line sits above the bars now, not beside the track. */
+    .filter-row:has(.has-hist) > :is(.filter-row-col1, .filter-row-col3) {
+        padding-top: 0;
+    }
 }
 
 .filter-hist {

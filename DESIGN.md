@@ -176,6 +176,10 @@ kept for state.
 
 ## Narrow windows
 
+- A narrow filter panel (under 360px, a container query on `#filterContainer`:
+  any inspector under 387px) stacks each row: checkbox, name, markers and ⋯ on
+  one line, the control full width under it. Wider, the rows share one
+  label|control|actions grid per sub-group.
 - 761–860px: the full bar, tighter. ≤760px (phones): the graph takes the whole
   width; the bar keeps File, workspace, undo/redo, ▤ Panel and ⋯ More, and
   ⋯ More lists the rest by name (menus it reaches open under ⋯ More).

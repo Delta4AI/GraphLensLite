@@ -86,4 +86,41 @@ describe.skipIf(!E2E)('filter rows, end to end', () => {
       (n) => String(window.cache.nodeRef.get(n.id ?? n).featureValues.get(prop)) === name), [CLUSTER, valueName]))
       .toBe(false);
   }, 60_000); // a full Electron interaction runs ~4.7s, at vitest's 5s default
+
+  it('stacks each row in the narrowest inspector, side by side at the default width', async () => {
+    await page.click('#inspectorPillFilters');
+    const layout = () =>
+      page.evaluate((prop) => {
+        const row = document.querySelector(`.filter-row[data-prop-id="${prop}"]`);
+        const name = row.querySelector('.filter-row-col1').getBoundingClientRect();
+        const control = row.querySelector('.filter-row-col2').getBoundingClientRect();
+        return {
+          panel: document.getElementById('filterContainer').getBoundingClientRect().width,
+          display: getComputedStyle(row).display,
+          controlUnderName: control.top >= name.bottom - 1,
+          controlLeft: control.left,
+          nameLeft: name.left,
+        };
+      }, CLUSTER);
+    const inspector = (width) =>
+      page.evaluate((w) => {
+        document.getElementById('inspector').style.width = w;
+      }, width);
+
+    const wide = await layout();
+    expect(wide.panel).toBeGreaterThan(360);
+    expect(wide.display).toBe('contents');
+    expect(wide.controlUnderName).toBe(false);
+
+    await inspector('300px'); // the resize handle's minimum (gll.js INSPECTOR_MIN_WIDTH)
+    try {
+      await expect.poll(async () => (await layout()).display).toBe('grid');
+      const narrow = await layout();
+      expect(narrow.panel).toBeLessThan(360);
+      expect(narrow.controlUnderName).toBe(true);
+      expect(narrow.controlLeft).toBe(narrow.nameLeft);
+    } finally {
+      await inspector('');
+    }
+  }, 60_000);
 });
