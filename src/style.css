@@ -4899,7 +4899,9 @@ div[slider] > input[type=range]::-ms-tooltip {
     background: var(--surface-3);
     color: var(--text-strong);
     font: inherit;
-    font-size: 13px;
+    /* Even, like the count's 10px: a 13px ∅ centres on a half pixel in the 24px
+       button and renders 1px below the count. */
+    font-size: 12px;
     line-height: 1;
     cursor: pointer;
 }
