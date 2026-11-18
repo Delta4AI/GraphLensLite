@@ -1154,7 +1154,7 @@ class UIComponentManager {
   }
 
   /**
-   * Paint one chip from current membership: hairline when unassigned, the
+   * Paint one chip from current membership: hidden when unassigned, the
    * group's colour when in one, plus a ring when in several. The full list of
    * groups goes in the accessible name, which is where it stays legible.
    */
@@ -1167,6 +1167,8 @@ class UIComponentManager {
       if (this.#propsOf(group).has(propID)) inGroups.push(group);
     }
 
+    // Unassigned, the dot is not shown: ⋯ › Add to group… assigns it.
+    chip.hidden = inGroups.length === 0;
     chip.classList.toggle('assigned', inGroups.length > 0);
     chip.classList.toggle('multi', inGroups.length > 1);
     chip.style.removeProperty('--chip-color');
@@ -1445,18 +1447,15 @@ class UIComponentManager {
    * The row's verbs behind one labelled "⋯" button. Selection, grouping,
    * inversion and the query are five actions; inline they crowded the row end
    * into 8px targets (NN/g: more than two actions go in a menu beside the item).
-   * The group dot stays inline because it also shows state.
+   * Inline beside it only what is active: the ∅ marker while it differs from
+   * the mode's default, the group dot while assigned. Both are set from ⋯.
    *
    * @returns {HTMLElement[]} the row-end cells' contents
    */
   createRowActions(propID, prop, { groupable }) {
-    const chip = groupable ? this.createGroupChip(propID) : document.createElement('span');
-    if (!groupable) chip.className = 'filter-row-spacer';
-    // A spacer where there are no gaps, so every row's dot and ⋯ line up.
     const gaps = missingCount(this.cache, propID);
-    const missingSwitch =
-      gaps > 0 ? this.createMissingSwitch(propID) : document.createElement('span');
-    if (!gaps) missingSwitch.className = 'filter-row-spacer';
+    const missingSwitch = gaps > 0 ? this.createMissingSwitch(propID) : null;
+    const chip = groupable ? this.createGroupChip(propID) : null;
 
     const more = document.createElement('button');
     more.type = 'button';
@@ -1491,8 +1490,20 @@ class UIComponentManager {
           })
         );
       }
+      if (gaps > 0)
+        el.append(this.#missingMenuItem(propID, prop, gaps, { run, locked, lockedTitle }));
       if (groupable) {
-        el.append(menuItem({ icon: '◌', label: 'Add to group…', onClick: () => { menu.close(); chip.groupMenu.open(); } }));
+        // From ⋯, which is on screen: the dot is hidden until assigned.
+        el.append(
+          menuItem({
+            icon: '◌',
+            label: 'Add to group…',
+            onClick: () => {
+              menu.close();
+              chip.groupMenu.openFrom(more);
+            },
+          })
+        );
       }
       el.append(
         menuItem({ icon: '✎\uFE0E', label: 'Add to query', onClick: run(() => this.addToQuery(propID)) }),
@@ -1506,15 +1517,47 @@ class UIComponentManager {
         })
       );
     });
-    return [missingSwitch, chip, more];
+    return [missingSwitch, chip, more].filter(Boolean);
+  }
+
+  /**
+   * The ⋯ item that sets the row's ∅ choice, worded as what the click does
+   * in the current mode: "Remove / Keep the 37 nodes without padj" while
+   * narrowing down, "Add / Stop adding …" while building up.
+   */
+  #missingMenuItem(propID, prop, gaps, { run, locked, lockedTitle }) {
+    const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
+    const mode = layout.filterJoinMode === 'AND' ? 'AND' : 'OR';
+    const passes = missingPasses(layout.filters.get(propID), mode);
+    const verbs = {
+      'AND:true': 'Remove',
+      'AND:false': 'Keep',
+      'OR:true': 'Stop adding',
+      'OR:false': 'Add',
+    };
+    const label = `${verbs[`${mode}:${passes}`]} the ${gaps} ${elementNoun(this.cache, propID, gaps)} without ${prop}`;
+    return menuItem({
+      icon: '∅',
+      label,
+      disabled: locked,
+      title: locked ? lockedTitle : '',
+      onClick: run(() =>
+        this.cache.ui.setMissingPasses(
+          [propID],
+          !passes,
+          `Without a ${prop} value: ${passes ? 'not passing' : 'passing'}`
+        )
+      ),
+    });
   }
 
   /**
    * The row's ∅ switch: do elements without a value for this property pass
    * this filter? A toggle button (aria-pressed = they pass), only on rows
-   * where some elements of the property's type lack it. Always shown, unlike
-   * the empty group dot: it is a setting, not a verb. paintMissingSwitch keeps
-   * it in step on every filter change.
+   * where some elements of the property's type lack it, and shown only while
+   * it differs from the mode's default, so a click puts it back. The row's ⋯
+   * menu sets it. paintMissingSwitch keeps it in step on every filter change;
+   * it starts hidden until that first paint.
    */
   createMissingSwitch(propID) {
     const btn = document.createElement('button');
@@ -1522,6 +1565,7 @@ class UIComponentManager {
     btn.className = 'filter-missing-switch';
     btn.dataset.prop = propID;
     btn.textContent = '∅';
+    btn.hidden = true;
     btn.addEventListener('click', async () => {
       // aria-disabled rather than disabled, so the tooltip still says why; a
       // click says it too, for touch screens that never show a tooltip.
@@ -1543,10 +1587,10 @@ class UIComponentManager {
   }
 
   /**
-   * Paint one ∅ switch from its filter: filled when the gaps pass, dashed and
-   * struck when they do not, an accent ring when that differs from the mode's
-   * default, and muted while it decides nothing (row unticked, or an edge row
-   * while build-up's Edges ignores edge filters).
+   * Paint one ∅ switch from its filter: hidden at the mode's default, filled
+   * when the gaps pass, dashed and struck when they do not, and muted while it
+   * decides nothing (row unticked, or an edge row while build-up's Edges
+   * ignores edge filters).
    * @param {HTMLButtonElement} btn
    * @param {{fo: object, mode: 'OR'|'AND', idle: boolean}} state
    */
@@ -1556,12 +1600,9 @@ class UIComponentManager {
     const count = missingCount(this.cache, propID);
     const passes = missingPasses(fo, mode);
     const inactive = !fo.active || idle;
+    btn.hidden = passes === missingPassesByDefault(mode);
     btn.setAttribute('aria-pressed', String(passes));
     btn.setAttribute('aria-disabled', String(inactive));
-    btn.classList.toggle(
-      'changed',
-      typeof fo.missingPasses === 'boolean' && fo.missingPasses !== missingPassesByDefault(mode)
-    );
     const nouns = elementNoun(this.cache, propID);
     btn.setAttribute('aria-label', `∅: ${nouns} without a ${prop} value pass this filter`);
 

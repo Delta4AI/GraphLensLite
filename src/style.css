@@ -3204,6 +3204,8 @@ h5 {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
+    /* Only active markers show, so a row's ⋯ sits at the right edge. */
+    justify-content: flex-end;
 }
 
 /* Panel-level control bar above all filter sections: the OR/AND join control
@@ -4357,9 +4359,8 @@ div[slider] > input[type=range]::-ms-tooltip {
    others" — N colours are not legible at this size and a conic pie would
    rebuild the 2x2 quadrant wedges this replaced. The tooltip and the menu carry
    the exact membership. 14px painted inside a 24px target (WCAG 2.5.8): the
-   transparent border is the hit area. Unassigned, it is hidden until the row is
-   hovered or the dot itself is focused or open — still tabbable, so the
-   keyboard reaches it, and the row's "⋯" menu offers "Add to group…" too. */
+   transparent border is the hit area. Shown only once the filter is in a
+   group: the row's "⋯" menu offers "Add to group…". */
 .group-chip {
     width: 24px;
     height: 24px;
@@ -4373,25 +4374,10 @@ div[slider] > input[type=range]::-ms-tooltip {
     display: inline-flex;
     vertical-align: middle;
     box-sizing: border-box;
-    transition: opacity 0.12s ease;
 }
 
-.group-chip:not(.assigned) {
-    opacity: 0;
-}
-
-.filter-row:hover .group-chip,
-.group-chip:focus-visible,
-.group-chip[aria-expanded="true"] {
-    opacity: 1;
-}
-
-/* No hover to reveal it on touch: an invisible tap target beside ⋯ only
-   catches near misses. "Add to group…" in the ⋯ menu covers it. */
-@media (hover: none) {
-    .group-chip:not(.assigned) {
-        visibility: hidden;
-    }
+.group-chip[hidden] {
+    display: none;
 }
 
 .group-chip:focus-visible {
@@ -4849,14 +4835,9 @@ div[slider] > input[type=range]::-ms-tooltip {
     gap: 0;
 }
 
-.filter-row-spacer {
-    width: 24px;
-    flex: 0 0 24px;
-}
-
-/* The row's ∅ switch: do elements without a value pass this filter? Filled
-   when they do, dashed and struck when they do not, an accent ring when that
-   differs from the mode's default. Always visible: it is a setting. */
+/* The row's ∅ switch: do elements without a value pass this filter? Shown
+   only while that differs from the mode's default (⋯ sets it, a click on it
+   puts it back): filled when they pass, dashed and struck when they do not. */
 .filter-missing-switch {
     width: 24px;
     height: 24px;
@@ -4879,9 +4860,9 @@ div[slider] > input[type=range]::-ms-tooltip {
     text-decoration: line-through;
 }
 
-.filter-missing-switch.changed {
-    border-color: var(--accent-text);
-    box-shadow: 0 0 0 1px var(--accent-ring);
+/* At the mode's default there is nothing to show. */
+.filter-missing-switch[hidden] {
+    display: none;
 }
 
 /* Strong text on hover: muted on the hover fill is under 4.5:1 in dark mode. */
