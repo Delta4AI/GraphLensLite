@@ -8,6 +8,14 @@ cd GraphLensLite
 npm install
 ```
 
+CI and the container build run `npm ci` on Node 22 (npm 10), which rejects a
+lockfile that a newer npm wrote without optional peer dependencies. After
+changing dependencies on a newer Node, regenerate the lockfile with CI's npm:
+
+```bash
+npx npm@10 install --package-lock-only --ignore-scripts
+```
+
 Build dependencies (Fedora/RHEL):
 ```bash
 dnf install libxcrypt-compat wine   # only needed for cross-platform builds
