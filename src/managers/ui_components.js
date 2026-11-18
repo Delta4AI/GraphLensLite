@@ -1,6 +1,7 @@
 import { attachGroupMenu } from './group_menu.js';
 import { RailMenu, menuItem, menuSeparator } from './rail.js';
 import { StaticUtilities } from '../utilities/static.js';
+import { Popup } from '../utilities/popup.js';
 import { missingCount, missingPasses, missingPassesByDefault } from './query.js';
 
 /** What a property's filter judges: "node(s)" or "edge(s)", plural unless count is 1. */
@@ -1063,8 +1064,17 @@ class UIComponentManager {
       'aria-label',
       `Reset all filters: ${subSection ? `${section} › ${subSection}` : section}`
     );
+    // Filter changes are not in the undo history, so a whole-scope reset asks first.
     btn.onclick = async () => {
-      await this.cache.fm.resetFilters(section, subSection);
+      const prefix = StaticUtilities.propIDPrefix(section, subSection);
+      const n = [...this.cache.propIDs].filter((id) => id.startsWith(prefix)).length;
+      const scope = subSection ? `${section} › ${subSection}` : section;
+      const confirmed = await Popup.confirm(
+        `Reset the ${n} filter${n === 1 ? '' : 's'} in ${scope} to their loaded values? ` +
+          'This cannot be undone.',
+        'Reset filters'
+      );
+      if (confirmed === true) await this.cache.fm.resetFilters(section, subSection);
     };
     return btn;
   }
