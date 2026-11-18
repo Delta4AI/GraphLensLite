@@ -134,6 +134,14 @@ function announceInModal(text, colorClass, lifetimeMs) {
 }
 
 class UIManager {
+  /**
+   * Filters whose ∅ choice the user changed this session. Their ∅ button
+   * stays on screen even back at the mode's default, so it does not vanish
+   * under the click that put it there. Held by filter object, so it follows
+   * the workspace and is never saved.
+   */
+  #missingTouched = new WeakSet();
+
   constructor(cache, debugEnabled = false) {
     this.cache = cache;
     this.debugEnabled = debugEnabled;
@@ -1331,6 +1339,7 @@ class UIManager {
           fo,
           mode: andMode ? 'AND' : 'OR',
           idle: idleEdgeRow,
+          touched: this.#missingTouched.has(fo),
         });
       }
     }
@@ -1476,6 +1485,12 @@ class UIManager {
       ' Mixed: the filters differ; a click makes them all pass.';
   }
 
+  /** A filter's ∅ choice back to the mode's default and out of view (a reset). */
+  clearMissingChoice(fo) {
+    delete fo.missingPasses;
+    this.#missingTouched.delete(fo);
+  }
+
   /**
    * Store whether elements without a value pass the given filters, and
    * re-render. A choice equal to the mode's default is stored as unset, so
@@ -1493,7 +1508,9 @@ class UIManager {
     };
     for (const id of propIDs) {
       const fo = layout.filters.get(id);
-      if (fo) write(fo, passes === modeDefault ? undefined : passes);
+      if (!fo) continue;
+      write(fo, passes === modeDefault ? undefined : passes);
+      this.#missingTouched.add(fo);
     }
     try {
       await this.cache.fm.handleFilterEvent('Filtering', description);

@@ -4,6 +4,12 @@ import { StaticUtilities } from '../utilities/static.js';
 import { Popup } from '../utilities/popup.js';
 import { missingCount, missingPasses, missingPassesByDefault } from './query.js';
 
+// The count inside a ∅ button: "37", "1.2K", so the button stays about 24px wide.
+const MISSING_COUNT_FORMAT = new Intl.NumberFormat('en', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+
 /** What a property's filter judges: "node(s)" or "edge(s)", plural unless count is 1. */
 function elementNoun(cache, propID, count = 2) {
   const isEdge = propID.startsWith(`${cache.CFG?.EXCEL_EDGE_HEADER}::`);
@@ -1554,17 +1560,23 @@ class UIComponentManager {
   /**
    * The row's ∅ switch: do elements without a value for this property pass
    * this filter? A toggle button (aria-pressed = they pass), only on rows
-   * where some elements of the property's type lack it, and shown only while
-   * it differs from the mode's default, so a click puts it back. The row's ⋯
-   * menu sets it. paintMissingSwitch keeps it in step on every filter change;
-   * it starts hidden until that first paint.
+   * where some elements of the property's type lack it, holding ∅ and how
+   * many elements that is. Shown once the user has changed the choice (the
+   * row's ⋯ menu, the Options box, or a click here), from then on even back at
+   * the mode's default. paintMissingSwitch keeps it in step on every filter
+   * change; it starts hidden until that first paint.
    */
   createMissingSwitch(propID) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'filter-missing-switch';
     btn.dataset.prop = propID;
-    btn.textContent = '∅';
+    const glyph = document.createElement('span');
+    glyph.className = 'filter-missing-glyph';
+    glyph.textContent = '∅';
+    const count = document.createElement('span');
+    count.className = 'filter-missing-count';
+    btn.append(glyph, count);
     btn.hidden = true;
     btn.addEventListener('click', async () => {
       // aria-disabled rather than disabled, so the tooltip still says why; a
@@ -1587,24 +1599,29 @@ class UIComponentManager {
   }
 
   /**
-   * Paint one ∅ switch from its filter: hidden at the mode's default, filled
-   * when the gaps pass, dashed and struck when they do not, and muted while it
-   * decides nothing (row unticked, or an edge row while build-up's Edges
-   * ignores edge filters).
+   * Paint one ∅ switch from its filter: hidden until the choice was changed
+   * (`touched`) or while it is off the mode's default, filled when the gaps
+   * pass, dashed with a struck ∅ when they do not, and muted while it decides
+   * nothing (row unticked, or an edge row while build-up's Edges ignores edge
+   * filters).
    * @param {HTMLButtonElement} btn
-   * @param {{fo: object, mode: 'OR'|'AND', idle: boolean}} state
+   * @param {{fo: object, mode: 'OR'|'AND', idle: boolean, touched?: boolean}} state
    */
-  paintMissingSwitch(btn, { fo, mode, idle }) {
+  paintMissingSwitch(btn, { fo, mode, idle, touched = false }) {
     const propID = btn.dataset.prop;
     const [, , prop] = StaticUtilities.decodePropHashId(propID);
     const count = missingCount(this.cache, propID);
     const passes = missingPasses(fo, mode);
     const inactive = !fo.active || idle;
-    btn.hidden = passes === missingPassesByDefault(mode);
+    btn.hidden = !touched && passes === missingPassesByDefault(mode);
     btn.setAttribute('aria-pressed', String(passes));
     btn.setAttribute('aria-disabled', String(inactive));
-    const nouns = elementNoun(this.cache, propID);
-    btn.setAttribute('aria-label', `∅: ${nouns} without a ${prop} value pass this filter`);
+    btn.querySelector('.filter-missing-count').textContent = MISSING_COUNT_FORMAT.format(count);
+    const nouns = elementNoun(this.cache, propID, count);
+    btn.setAttribute(
+      'aria-label',
+      `∅: the ${count} ${nouns} without a ${prop} value ${count === 1 ? 'passes' : 'pass'} this filter`
+    );
 
     const what = `${missingValueSubject(this.cache, propID, count)} no ${prop}.`;
     // [state, what happens and what a click does], by mode and switch.

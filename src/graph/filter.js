@@ -35,9 +35,9 @@ class GraphFilterManager {
     // like a narrowed slider, so it has to widen back to Any here too.
     if (boolToggle) boolToggle.resetToAny();
     // The ∅ switch back to the mode's default, or a reset row would still
-    // remove (or add) the elements without a value.
+    // remove (or add) the elements without a value. Its button goes too.
     const filter = this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID);
-    if (filter) delete filter.missingPasses;
+    if (filter) this.cache.ui.clearMissingChoice(filter);
   }
 
   async handleFilterEvent(

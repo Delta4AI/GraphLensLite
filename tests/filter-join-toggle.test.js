@@ -218,3 +218,41 @@ describe('UIManager.createMissingValueBox', () => {
     expect(handleFilterEvent).not.toHaveBeenCalled();
   });
 });
+
+// A row's ∅ button, once changed, stays on screen even back at the default.
+describe('UIManager.setMissingPasses', () => {
+  it('keeps a changed ∅ on screen back at the default, until a reset', async () => {
+    const { ui, cache } = makeUI();
+    const fo = { active: true };
+    Object.assign(cache, {
+      CFG: { EXCEL_EDGE_HEADER: 'E' },
+      missingValueCounts: new Map([['N::g::a', 3]]),
+      uiComponents: {
+        getCheckboxTT: () => '',
+        getInertCheckboxTT: () => '',
+        getIdleEdgeRowTT: () => '',
+        paintMissingSwitch: vi.fn(),
+      },
+    });
+    cache.data.filterDefaults = new Map();
+    cache.data.layouts.L.filterJoinMode = 'AND';
+    cache.data.layouts.L.filters.set('N::g::a', fo);
+    document.body.innerHTML = `
+      <div id="outerGraphContainer"></div>
+      <div id="filterContainer"><div class="filter-section filter-section-active">
+        <div class="filter-row" data-prop-id="N::g::a">
+          <button class="filter-missing-switch" data-prop="N::g::a"></button></div>
+      </div></div>`;
+    const touched = () => {
+      ui.updateFilterConstraintHints();
+      return cache.uiComponents.paintMissingSwitch.mock.lastCall[1].touched;
+    };
+
+    expect(touched()).toBe(false);
+    await ui.setMissingPasses(['N::g::a'], true, 'kept'); // narrow down's default
+    expect(fo.missingPasses).toBeUndefined();
+    expect(touched()).toBe(true);
+    ui.clearMissingChoice(fo);
+    expect(touched()).toBe(false);
+  });
+});

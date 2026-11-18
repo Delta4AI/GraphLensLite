@@ -4881,16 +4881,21 @@ div[slider] > input[type=range]::-ms-tooltip {
     gap: 0;
 }
 
-/* The row's ∅ switch: do elements without a value pass this filter? Shown
-   only while that differs from the mode's default (⋯ sets it, a click on it
-   puts it back): filled when they pass, dashed and struck when they do not. */
+/* The row's ∅ switch: do elements without a value pass this filter? ∅ and
+   how many elements that is. Shown once the choice was changed (⋯ sets it
+   first), then for good: filled when they pass, dashed with a struck ∅ when
+   they do not. 24px tall like every control; the count widens it a little. */
 .filter-missing-switch {
-    width: 24px;
+    min-width: 24px;
     height: 24px;
-    flex: 0 0 24px;
-    padding: 0;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 0 4px;
     border: 1px solid var(--border);
-    border-radius: 50%;
+    border-radius: 6px;
     background: var(--surface-3);
     color: var(--text-strong);
     font: inherit;
@@ -4899,14 +4904,24 @@ div[slider] > input[type=range]::-ms-tooltip {
     cursor: pointer;
 }
 
+.filter-missing-count {
+    font-size: 10px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
 .filter-missing-switch[aria-pressed="false"] {
     background: transparent;
     border-style: dashed;
     color: var(--text-muted);
+}
+
+/* Only the glyph is struck: a struck count would read as "not 37". */
+.filter-missing-switch[aria-pressed="false"] .filter-missing-glyph {
     text-decoration: line-through;
 }
 
-/* At the mode's default there is nothing to show. */
+/* Until the choice is first changed there is nothing to show. */
 .filter-missing-switch[hidden] {
     display: none;
 }

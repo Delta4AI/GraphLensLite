@@ -94,17 +94,19 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - A row with more than two actions puts them behind one visible **⋯** button
   at its end (`.filter-row-more`, `.group-row-more`), opening a `RailMenu` of
   labelled items. The button is always visible, not revealed on hover.
-- Inline next to it only what is active: on a filter row, the ∅ switch while
-  it differs from the mode's default and the group dot while the filter is in
-  a group (`[∅] [◌] [⋯]`, each absent otherwise). Both are set from ⋯ (the
-  ∅ item is worded as what it does: "Remove the 37 nodes without padj"), and
-  a click on a shown ∅ puts it back to the default. Nothing appears on hover
-  and nothing animates its width: a hover reveal hides state and shifts the
-  row under the cursor.
+- Inline next to it only what is in use: on a filter row, the ∅ switch once
+  its choice was changed and the group dot while the filter is in a group
+  (`[∅37] [◌] [⋯]`, each absent otherwise). Both are first set from ⋯ (the
+  ∅ item is worded as what it does: "Remove the 37 nodes without padj"). A
+  changed ∅ then stays for the session, back at the default too, so the
+  button never vanishes under the click; a filter reset removes it. Nothing
+  appears on hover and nothing animates its width: a hover reveal hides state
+  and shifts the row under the cursor.
 - A per-row setting shows its state in the control itself: filled = on,
-  dashed (and struck) = off, muted (`aria-disabled`, tooltip kept) while it
-  decides nothing. The row end is right-aligned, so ⋯ lines up on every row
-  without spacers for absent markers. A tri-state
+  dashed (glyph struck) = off, muted (`aria-disabled`, tooltip kept) while it
+  decides nothing. A count it concerns sits inside it in small type ("∅37",
+  "∅1.2K"), keeping it 24px tall. The row end is right-aligned, so ⋯ lines up
+  on every row without spacers for absent markers. A tri-state
   box under Options sets it on every row the panel lists (search hits, or the
   section on screen), with a compact count beside it ("2 / 6"); the sentence
   ("On 2 of 6 filters with gaps") is its tooltip and description.

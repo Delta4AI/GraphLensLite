@@ -96,7 +96,13 @@ describe('BooleanToggle in the shared filter surfaces', () => {
     cache.propIDs = new Set([PROP]);
     cache.propIDToInvertibleRangeSliders = new Map();
     cache.propIDToDropdownChecklists = new Map();
-    cache.ui = { checkCheckbox: vi.fn(), showLoading: vi.fn(), hideLoading: vi.fn() };
+    cache.ui = {
+      checkCheckbox: vi.fn(),
+      showLoading: vi.fn(),
+      hideLoading: vi.fn(),
+      // UIManager.clearMissingChoice also forgets the row was changed.
+      clearMissingChoice: (fo) => delete fo.missingPasses,
+    };
     cache.bs = { cleanupManualGroupMembers: vi.fn() };
     cache.gcm = { decideToRenderOrDraw: vi.fn().mockResolvedValue(undefined) };
     cache.EVENT_LOCKS.QUERY_UPDATE_EVENT = false;

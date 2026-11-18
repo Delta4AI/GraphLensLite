@@ -119,3 +119,23 @@ describe('filter row ∅ switch', () => {
     expect(cache.ui.setMissingPasses).toHaveBeenCalledWith([PADJ], true, expect.any(String));
   });
 });
+
+describe('filter row ∅ switch once changed', () => {
+  it('stays on screen back at the default, with the count inside', () => {
+    const cache = makeCache('AND', { active: true });
+    const btn = cache.uiComponents.createMissingSwitch(PADJ);
+    cache.uiComponents.paintMissingSwitch(btn, {
+      fo: { active: true },
+      mode: 'AND',
+      idle: false,
+      touched: true,
+    });
+    expect(btn.hidden).toBe(false);
+    expect(btn.textContent).toBe('∅37');
+
+    cache.missingValueCounts.set(PADJ, 1234);
+    cache.uiComponents.paintMissingSwitch(btn, { fo: { active: true }, mode: 'AND', idle: false });
+    expect(btn.hidden).toBe(true); // never changed: nothing to show
+    expect(btn.textContent).toBe('∅1.2K');
+  });
+});
