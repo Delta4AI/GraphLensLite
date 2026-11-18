@@ -40,17 +40,36 @@ The `inject-version` script keeps them in sync — `package.json` is the source 
 
 ### Bumping a version
 
-The `version` npm hook automatically syncs `src/config.js` and stages it,
-so a single command creates the commit + tag:
+The `version` npm hook syncs `src/config.js` and stages it. On the release
+branch, bump without a tag (the tag goes on main, see below):
 
 ```bash
-npm version patch   # or: minor, major
-git push --follow-tags
+npm version minor --no-git-tag-version   # or: patch, major
+npm run inject-version && git add src/config.js
 ```
 
-This bumps `package.json`, injects the version into `src/config.js`,
-commits both files, creates a `vX.Y.Z` tag, and the push triggers
-the CI release workflow.
+### Releasing
+
+Releases are cut from a `release/X.Y.Z` branch and tagged on main.
+
+1. On the release branch: `package.json` and `src/config.js` carry the new
+   version, and `CHANGELOG.md` has a `## X.Y.Z — YYYY-MM-DD` section dated
+   the day you tag (the release notes are cut from it; a leftover
+   `## Unreleased` heading would be picked up instead if it came first).
+2. If the UI changed, refresh the README screenshots
+   (`node scripts/readme_screenshots.mjs`, see below).
+3. Open a pull request into `main`. CI (tests, lint, vendored files, container
+   build) must be green. Merge it with a merge commit.
+4. Tag the merge commit on main and push the tag:
+   ```bash
+   git switch main && git pull
+   git tag -a vX.Y.Z -m "vX.Y.Z"
+   git push origin vX.Y.Z
+   ```
+5. The tag starts the *Build and Release* workflow: it builds Windows, Linux
+   and macOS packages and the single-file HTML, creates the GitHub release with
+   the CHANGELOG section as its notes, and deploys the HTML as the live demo
+   on GitHub Pages.
 
 ## Python Scripts (uv)
 
@@ -69,28 +88,29 @@ uv run playwright install chromium
 
 ### Screenshot Tool
 
-Takes screenshots of the running app via a Chromium instance. Three quality presets:
-
-| Preset | Resolution | Scale | Use case |
-|---|---|---|---|
-| `normal` | ~1920×1080 | 1× | Quick captures |
-| `hq` | ~5760×3240 | 3× | Default, good for docs |
-| `ultrahq` | ~7680×4320 | 4× | Print / high-DPI assets |
+Takes screenshots of the running app in a Chromium window you drive by hand.
 
 1. Start the dev server:
    ```bash
    npm run bundle:serve   # or npm run serve
    ```
-2. Run the tool with a quality preset:
+2. Run the tool (`--scale 1x`…`15x` sets the pixel density, `--portrait`
+   captures 1080×1920, `--browser-size` shrinks the window):
    ```bash
-   uv run python scripts/screenshot_tool.py           # defaults to hq
-   uv run python scripts/screenshot_tool.py normal     # quick low-res
-   uv run python scripts/screenshot_tool.py ultrahq    # maximum quality
+   uv run python scripts/screenshot_tool.py --scale 2x
    ```
-3. A Chromium window opens. Navigate to the desired view, then press **Enter**
-   to capture. Type `quit` to exit.
+3. Navigate to the view you want, then press **Enter** in the terminal to
+   capture. Type `quit` to exit.
 
-Screenshots are saved to `static/screenshots/`.
+Screenshots are saved to `static/screenshots/` with a timestamped name.
+
+### README screenshots
+
+`node scripts/readme_screenshots.mjs` regenerates the README images
+(`static/screenshots/*.png`, overwritten) from the live app: it stages the
+ADPKD case study used for the manuscript figure, opens each panel and captures
+the window. It needs a display and a dbus session (Electron with WebGL2, so not
+a headless sandbox) and `pngquant` on the PATH, and takes about three minutes.
 
 ## Testing
 
