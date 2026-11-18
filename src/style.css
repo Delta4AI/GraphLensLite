@@ -3348,8 +3348,11 @@ h5 {
     font-weight: 700;
     line-height: 16px;
     text-align: center;
-    color: var(--accent-text);
+    /* Strong text (accent text on this fill is under 4.5:1 at 10px); the
+       accent ring carries "changed" at its 3:1 non-text minimum. */
+    color: var(--text-strong);
     background: var(--surface-3);
+    box-shadow: inset 0 0 0 1px var(--accent-text);
     border-radius: 4px;
 }
 
@@ -3682,17 +3685,17 @@ h5 {
 #filterContainer.locked .sub-header-card,
 /* The join toggle and its options (Edges, the ∅ box, no properties) are
    filter controls too: their handlers already bail under the lock, so undimmed
-   they looked live and did nothing. The search box stays live — searching the
-   list is reading, not filtering. */
-#filterContainer.locked .filter-toolbar-join {
+   they looked live and did nothing. The search box and the Options disclosure
+   stay live and undimmed — reading, not filtering — so the lock dims the
+   switch and the options inside .filter-toolbar-join, not the whole cluster. */
+#filterContainer.locked .filter-toolbar-join :is(.filter-mode-switch, .filter-options) {
     opacity: 0.5;
     pointer-events: none !important;
     cursor: not-allowed !important;
 }
 
-/* Folding a group, switching Node/Edge and opening the toolbar Options read,
-   not filter: they stay live. */
-#filterContainer.locked :is(.filter-group-chevron, .filter-scope, .filter-options-toggle) {
+/* Folding a group and switching Node/Edge read, not filter: they stay live. */
+#filterContainer.locked :is(.filter-group-chevron, .filter-scope) {
     pointer-events: auto !important;
     cursor: pointer;
 }
