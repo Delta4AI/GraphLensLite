@@ -90,7 +90,7 @@ describe('Elements without properties', () => {
     const { ui, cache, handleFilterEvent } = makeUI();
     const box = ui.createPropertylessCheckbox();
     expect(box.hidden).toBe(false);
-    expect(box.textContent).toBe('Include 1 element without properties');
+    expect(box.textContent).toBe('No propertiesInclude 1 element');
 
     const input = box.querySelector('input');
     input.checked = false;

@@ -17,6 +17,8 @@ import { hotkeyLabel, paletteAccelerator } from './command_palette.js';
 // or "AND" (match every; whether a property an element lacks excludes it is
 // each row's ∅ switch). Stored globally as the default for new layouts.
 const FILTER_JOIN_KEY = 'gll.filterJoinMode';
+// Persisted preference: whether the filter toolbar's Options disclosure is open.
+const FILTER_OPTIONS_OPEN_KEY = 'gll.filterOptionsOpen';
 
 // Tooltips are "Name — description": the tooltip layer sets the name as a
 // bold first line (ui_tooltip.js parseTip).
@@ -616,11 +618,12 @@ class UIManager {
     this.syncModeHint();
   }
 
-  // What a manual query freezes. Folding a group, switching Node/Edge, the
-  // property search and each row's ⋯ menu stay live: they read, not filter.
+  // What a manual query freezes. Folding a group, switching Node/Edge, opening
+  // the toolbar Options, the property search and each row's ⋯ menu stay live:
+  // they read, not filter.
   static LOCKABLE_FILTER_CONTROLS = [
     ':is(.header-card, .sub-header-card) :is(input, button):not(.filter-group-chevron, .filter-scope-segment)',
-    ':is(.filter-row-col1, .filter-row-col2, .filter-toolbar-join) :is(input, button)',
+    ':is(.filter-row-col1, .filter-row-col2, .filter-toolbar-join) :is(input, button):not(.filter-options-toggle)',
     '.filter-missing-switch',
   ].join(', ');
 
@@ -940,18 +943,103 @@ class UIManager {
     // The mode's options sit to the RIGHT of the toggle, so switching never
     // shifts the toggle. One card holds the mode and the options that belong
     // to it, so an option never reads as a peer of the mode it modifies.
+    const options = document.createElement('div');
+    options.className = 'filter-options';
+    options.id = 'filterOptions';
     const linksToggle = this.createFilterLinksToggle();
+    options.append(linksToggle, this.createMissingValueBox(), this.createPropertylessCheckbox());
+    const optionsToggle = this.#createFilterOptionsToggle(options);
     const joinToggle = this.createFilterJoinToggle((mode) => {
       linksToggle.hidden = mode === 'AND';
+      this.#syncFilterOptions(toolbar);
     });
-    const options = document.createElement('div');
-    options.className = 'filter-mode-options';
-    options.append(linksToggle, this.createMissingValueBox(), this.createPropertylessCheckbox());
+    const modeRow = document.createElement('div');
+    modeRow.className = 'filter-mode-row';
+    modeRow.append(joinToggle, optionsToggle);
+    // One cluster still holds the mode and every option, so the manual-query
+    // lock (LOCKABLE_FILTER_CONTROLS, the locked dimming) covers them all.
     const joinCluster = document.createElement('div');
     joinCluster.className = 'filter-toolbar-join';
-    joinCluster.append(joinToggle, options);
+    joinCluster.append(modeRow, options);
     toolbar.append(joinCluster, this.createFilterSearch(), this.createFilterConstraintCount());
+    this.#syncFilterOptions(toolbar);
     return toolbar;
+  }
+
+  /**
+   * The "Options ▾" disclosure beside the mode switch. Its open state is a
+   * per-browser preference, like the mode itself.
+   */
+  #createFilterOptionsToggle(panel) {
+    let open = false;
+    try {
+      open = window.localStorage.getItem(FILTER_OPTIONS_OPEN_KEY) === '1';
+    } catch (err) {
+      this.debug(`Could not read filter-options preference: ${err.message}`);
+    }
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'filter-options-toggle';
+    btn.setAttribute('aria-controls', panel.id);
+    btn.setAttribute('aria-expanded', String(open));
+    const count = document.createElement('span');
+    count.className = 'filter-options-count';
+    count.setAttribute('aria-hidden', 'true');
+    const caret = document.createElement('span');
+    caret.className = 'filter-options-caret';
+    caret.setAttribute('aria-hidden', 'true');
+    caret.textContent = '▾';
+    btn.append('Options', count, caret);
+    btn.addEventListener('click', () => {
+      const next = btn.getAttribute('aria-expanded') !== 'true';
+      btn.setAttribute('aria-expanded', String(next));
+      try {
+        window.localStorage.setItem(FILTER_OPTIONS_OPEN_KEY, next ? '1' : '0');
+      } catch (err) {
+        this.debug(`Could not persist filter-options preference: ${err.message}`);
+      }
+      this.#syncFilterOptions(btn.closest('.filter-toolbar'));
+    });
+    return btn;
+  }
+
+  /**
+   * The disclosure's visibility and badge from the options under it: the
+   * button hides when no option applies, and while closed it counts the
+   * options away from their defaults (Edges other than all, any ∅ row off its
+   * mode's default, elements without properties excluded).
+   */
+  #syncFilterOptions(toolbar) {
+    const btn = toolbar?.querySelector('.filter-options-toggle');
+    const panel = toolbar?.querySelector('.filter-options');
+    if (!btn || !panel) return;
+    const lines = [...panel.children].filter((line) => !line.hidden);
+    btn.hidden = lines.length === 0;
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    panel.hidden = btn.hidden || !open;
+
+    const layout = this.cache.data?.layouts?.[this.cache.data?.selectedLayout];
+    const rule = visibilityRule(layout, this.cache.CFG?.EXCEL_EDGE_HEADER);
+    const mode = rule.buildUp ? 'OR' : 'AND';
+    const container = toolbar.closest('#filterContainer');
+    const missingOffDefault =
+      !!container &&
+      this.#listedMissingSwitches(container).some(
+        (sw) =>
+          missingPasses(layout.filters.get(sw.dataset.prop) ?? {}, mode) !==
+          missingPassesByDefault(mode)
+      );
+    const changed = [
+      rule.buildUp && rule.links !== 'all',
+      missingOffDefault,
+      !panel.querySelector('.filter-propertyless-checkbox').hidden && !rule.includePropertyless,
+    ].filter(Boolean).length;
+    const badge = !open && changed > 0;
+    btn.querySelector('.filter-options-count').textContent = badge ? String(changed) : '';
+    btn.title = badge
+      ? `Options — ${changed} option${changed === 1 ? '' : 's'} changed from the default`
+      : 'Options — Edges, elements without a value, elements without properties';
+    btn.setAttribute('aria-label', badge ? `Options, ${changed} changed` : 'Options');
   }
 
   /** @returns {HTMLElement} the section's body, for sub-groups to append to */
@@ -1271,16 +1359,20 @@ class UIManager {
   }
 
   /**
-   * Toolbar box that sets the ∅ switch on every listed row at once: "Keep …"
-   * while narrowing down, "Add …" while building up. A tri-state box like the
-   * section boxes (APG mixed checkbox): ticked when every listed row passes
-   * the gaps, mixed when some do; a click on mixed or empty makes them all
-   * pass, a click on ticked makes none.
+   * Options line that sets the ∅ switch on every listed row at once: "Keep
+   * nodes" while narrowing down, "Add nodes" while building up. A tri-state box
+   * like the section boxes (APG mixed checkbox): ticked when every listed row
+   * passes the gaps, mixed when some do; a click on mixed or empty makes them
+   * all pass, a click on ticked makes none. "2 / 6" beside it counts the rows
+   * it is on; the full sentence is its tooltip and description.
    */
   createMissingValueBox() {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'filter-missing-box';
-    wrapper.hidden = true;
+    const line = UIManager.#optionLine(
+      'filter-missing-box',
+      'Without a value',
+      'filterMissingAllName'
+    );
+    line.hidden = true;
     const label = document.createElement('label');
     label.className = 'filter-option-checkbox';
     const input = document.createElement('input');
@@ -1288,13 +1380,23 @@ class UIManager {
     input.id = 'filterMissingAll';
     const text = document.createElement('span');
     text.className = 'filter-missing-box-text';
+    text.id = 'filterMissingAllText';
     label.append(input, text);
+    // "Without a value" names the line, "Keep nodes" the box: both, so the
+    // box is not just "Keep nodes" to a screen reader.
+    input.setAttribute('aria-labelledby', 'filterMissingAllName filterMissingAllText');
+    const count = document.createElement('span');
+    count.className = 'filter-option-count';
+    count.setAttribute('aria-hidden', 'true');
     const status = document.createElement('span');
-    status.className = 'filter-missing-box-status';
     status.id = 'filterMissingAllStatus';
-    // "mixed" alone does not say which rows differ; the status line does.
+    status.hidden = true;
+    // "mixed" alone does not say which rows differ; the status sentence does.
     input.setAttribute('aria-describedby', status.id);
-    wrapper.append(label, status);
+    const control = document.createElement('div');
+    control.className = 'filter-option-control';
+    control.append(label, count, status);
+    line.append(control);
 
     input.addEventListener('change', async () => {
       const container = document.getElementById('filterContainer');
@@ -1312,16 +1414,33 @@ class UIManager {
         `Without a value: ${passes ? 'passing' : 'not passing'} on ${switches.length} filter${switches.length === 1 ? '' : 's'}`
       );
     });
-    return wrapper;
+    return line;
   }
 
-  /** The toolbar ∅ box's state, words and status line, from the listed rows. */
+  /**
+   * One label|control line of the Options panel. The line lays out as
+   * display:contents, so every line shares the panel's two grid columns and
+   * hiding the line hides both cells.
+   */
+  static #optionLine(className, name, nameId) {
+    const line = document.createElement('div');
+    line.className = `filter-option-line ${className}`;
+    const label = document.createElement('span');
+    label.className = 'filter-option-name';
+    label.textContent = name;
+    if (nameId) label.id = nameId;
+    line.append(label);
+    return line;
+  }
+
+  /** The ∅ options line's state, words and count, from the listed rows. */
   syncMissingValueBox(container = document.getElementById('filterContainer')) {
     const wrapper = container?.querySelector('.filter-missing-box');
     const layout = this.cache.data?.layouts?.[this.cache.data?.selectedLayout];
     if (!wrapper || !layout?.filters) return;
     const switches = this.#listedMissingSwitches(container);
     wrapper.hidden = switches.length === 0;
+    this.#syncFilterOptions(wrapper.closest('.filter-toolbar'));
     if (wrapper.hidden) return;
 
     const mode = layout.filterJoinMode === 'AND' ? 'AND' : 'OR';
@@ -1336,21 +1455,21 @@ class UIManager {
     const edges = switches.filter((btn) => btn.dataset.prop.startsWith(edgePrefix)).length;
     const nouns = edges === 0 ? 'nodes' : edges === switches.length ? 'edges' : 'elements';
     const verb = mode === 'AND' ? 'Keep' : 'Add';
-    wrapper.querySelector('.filter-missing-box-text').textContent =
-      `${verb} ${nouns} without a value`;
+    wrapper.querySelector('.filter-missing-box-text').textContent = `${verb} ${nouns}`;
     const listed = container.classList.contains('filters-searching') ? 'listed filters' : 'filters';
     const n = switches.length;
-    wrapper.querySelector('.filter-missing-box-status').textContent =
+    wrapper.querySelector('.filter-option-count').textContent = `${on} / ${n}`;
+    const status =
       on === n
         ? `On all ${n} ${listed} with gaps`
         : on === 0
           ? `On none of the ${n} ${listed} with gaps`
           : `On ${on} of ${n} ${listed} with gaps`;
-    // On the label, which holds the box, so its accessible description and
-    // the focus tooltip both find it.
-    wrapper.querySelector('label').title =
-      `${verb} ${nouns} without a value — Sets the ∅ switch on every ${listed.replace(/s$/, '')} ` +
-      `listed that has gaps (${n}). ` +
+    wrapper.querySelector('#filterMissingAllStatus').textContent = status;
+    // On the line's control, so the box, its words and the count all show it.
+    wrapper.querySelector('.filter-option-control').title =
+      `${verb} ${nouns} without a value — ${status}. Sets the ∅ switch on every ` +
+      `${listed.replace(/s$/, '')} listed that has gaps. ` +
       (mode === 'AND'
         ? 'Unticked, each of them removes what it has no value for: complete cases.'
         : 'Ticked, each ticked filter also adds what it has no value for.') +
@@ -1667,15 +1786,16 @@ class UIManager {
    * each choice means. Starts hidden; the join toggle reveals it under build up.
    */
   createFilterLinksToggle() {
+    // A <label> line, so "Edges" names the select.
     const wrapper = document.createElement('label');
-    wrapper.className = 'filter-links';
+    wrapper.className = 'filter-option-line filter-links';
     wrapper.hidden = true;
     wrapper.title =
       'Edges — Which edges show between the nodes the filters added. ' +
       '"Only edge-filter matches" also adds the end nodes of every matched edge.';
 
     const label = document.createElement('span');
-    label.className = 'filter-links-label';
+    label.className = 'filter-option-name';
     label.textContent = 'Edges';
 
     const select = document.createElement('select');
@@ -1713,11 +1833,16 @@ class UIManager {
     for (const element of [...(this.cache.nodeRef?.values() ?? []), ...(this.cache.edgeRef?.values() ?? [])]) {
       if (element.features?.size === 0) count += 1;
     }
-    const wrapper = document.createElement('label');
-    wrapper.className = 'filter-option-checkbox filter-propertyless-checkbox';
+    const wrapper = UIManager.#optionLine(
+      'filter-propertyless-checkbox',
+      'No properties',
+      'filterPropertylessName'
+    );
     wrapper.hidden = count === 0;
     const elements = `${count} element${count === 1 ? '' : 's'}`;
-    wrapper.title =
+    const control = document.createElement('label');
+    control.className = 'filter-option-checkbox filter-option-control';
+    control.title =
       `Elements without properties — ${elements} (nodes and edges) carry no property a ` +
       'filter could match. Ticked, they are always shown (an edge also needs both end ' +
       'nodes); unticked, never.';
@@ -1743,8 +1868,11 @@ class UIManager {
     });
 
     const text = document.createElement('span');
-    text.textContent = `Include ${elements} without properties`;
-    wrapper.append(input, text);
+    text.id = 'filterPropertylessText';
+    text.textContent = `Include ${elements}`;
+    input.setAttribute('aria-labelledby', 'filterPropertylessName filterPropertylessText');
+    control.append(input, text);
+    wrapper.append(control);
     return wrapper;
   }
 

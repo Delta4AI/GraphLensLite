@@ -74,7 +74,8 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
   - Colour: painted well over the native picker, hex field, palette.
 - A control that is frozen (filters held by an edited query) is `disabled`,
   not just dimmed, so the keyboard skips it too. What only reads (fold a
-  group, switch Node/Edge, search, the row's ⋯ menu) stays live.
+  group, switch Node/Edge, open Options, search, the row's ⋯ menu) stays
+  live.
 - "Map by data" sits inside the control it drives, never in a column of its
   own: a rising-bars glyph in a number field's trailing edge (`.prop-map-btn`),
   and the last swatch of a colour palette, a gradient with "⋯"
@@ -100,10 +101,17 @@ arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
 - A per-row setting shows its state in the control itself: filled = on,
   dashed (and struck) = off, an accent ring when it differs from the mode's
   default, muted (`aria-disabled`, tooltip kept) while it decides nothing. A
-  row without the setting keeps the column with a 24px spacer. A toolbar
-  tri-state box sets it on every row the panel lists (search hits, or the
-  section on screen), with a status line under it ("On 2 of 6 filters with
-  gaps").
+  row without the setting keeps the column with a 24px spacer. A tri-state
+  box under Options sets it on every row the panel lists (search hits, or the
+  section on screen), with a compact count beside it ("2 / 6"); the sentence
+  ("On 2 of 6 filters with gaps") is its tooltip and description.
+- A panel's settings sit behind one **Options ▾** disclosure beside its mode
+  switch (`.filter-options-toggle`: `aria-expanded`, `aria-controls`, open
+  state remembered per browser). Open, it is one label|control grid: a short
+  muted label (Edges, Without a value, No properties), the control, at most a
+  compact count; long explanations go to the tooltip and `aria-describedby`.
+  A line that does not apply is absent, and the button hides when none do.
+  Closed, it shows how many options differ from their defaults.
 - Popups (`RailMenu`) open from Enter, Space or ↓ on their trigger, move focus
   inside, and return it to the trigger on Escape.
 

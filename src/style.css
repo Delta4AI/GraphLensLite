@@ -1083,16 +1083,10 @@ body {
     justify-content: center;
 }
 
-.filter-links {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-}
-
 .filter-links-select {
-    flex: 1 1 auto;
+    justify-self: start;
     min-width: 0;
+    max-width: 100%;
     height: 22px;
     padding: 0 4px;
     font: inherit;
@@ -1102,16 +1096,6 @@ body {
     border: 1px solid var(--border-soft);
     border-radius: 4px;
     cursor: pointer;
-}
-
-.filter-links[hidden],
-.filter-propertyless-checkbox[hidden] {
-    display: none;
-}
-
-.filter-links-label {
-    font-size: 11px;
-    color: var(--text-muted);
 }
 
 /* A group label can be grabbed and dragged (interactions.js). */
@@ -3258,15 +3242,112 @@ h5 {
     font-style: italic;
 }
 
-/* The mode and its option on one line: the switch, then Edges (build up) and
-   the ∅ box (both modes); the elements-without-properties box wraps
-   under them when the graph has any. */
+/* The mode switch and its Options disclosure on one line, the open options
+   under them. */
 .filter-toolbar-join {
     flex-basis: 100%;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filter-mode-row {
+    display: flex;
     align-items: center;
-    gap: 6px 8px;
+    gap: 8px;
+}
+
+/* Opens settings, so a quiet text button rather than another filled control. */
+.filter-options-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding: 0 6px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-strong);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.filter-options-toggle:hover {
+    background: var(--row-hover);
+}
+
+.filter-options-toggle:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
+}
+
+.filter-options-toggle[hidden] {
+    display: none;
+}
+
+.filter-options-caret {
+    color: var(--text-muted);
+}
+
+.filter-options-toggle[aria-expanded="true"] .filter-options-caret {
+    transform: rotate(180deg);
+}
+
+/* While closed: how many options are off their defaults. */
+.filter-options-count:not(:empty) {
+    min-width: 16px;
+    padding: 0 4px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    color: var(--accent-text);
+    background: var(--surface-3);
+    border-radius: 4px;
+}
+
+/* The open options: one label|control grid, so every control starts at the
+   same x. Each line is display:contents and brings its two cells. */
+.filter-options {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 4px 10px;
+    padding: 6px 8px;
+    font-size: 11px;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+}
+
+.filter-options[hidden] {
+    display: none;
+}
+
+.filter-option-line {
+    display: contents;
+}
+
+/* [hidden] must beat display:contents. */
+.filter-option-line[hidden] {
+    display: none;
+}
+
+.filter-option-name {
+    color: var(--text-muted);
+}
+
+.filter-option-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.filter-option-count {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
 }
 
 /* The mode is a setting, not a call to action: a neutral track whose chosen
@@ -3329,15 +3410,6 @@ h5 {
 
 .filter-mode-switch .filter-join-segment:hover .filter-join-op {
     color: var(--text-strong);
-}
-
-/* The chosen mode's options, to the right of the switch. */
-.filter-mode-options {
-    flex: 1 1 160px;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
 }
 
 .filter-option-checkbox {
@@ -3563,18 +3635,19 @@ h5 {
 #filterContainer.locked .filter-range-row,
 #filterContainer.locked .header-card,
 #filterContainer.locked .sub-header-card,
-/* The join toggle and its options (Edges, the ∅ box) are filter controls
-   too: their handlers already bail under the lock, so undimmed they looked live
-   and did nothing. The search box stays live — searching the list is reading,
-   not filtering. */
+/* The join toggle and its options (Edges, the ∅ box, no properties) are
+   filter controls too: their handlers already bail under the lock, so undimmed
+   they looked live and did nothing. The search box stays live — searching the
+   list is reading, not filtering. */
 #filterContainer.locked .filter-toolbar-join {
     opacity: 0.5;
     pointer-events: none !important;
     cursor: not-allowed !important;
 }
 
-/* Folding a group and switching Node/Edge read, not filter: they stay live. */
-#filterContainer.locked :is(.filter-group-chevron, .filter-scope) {
+/* Folding a group, switching Node/Edge and opening the toolbar Options read,
+   not filter: they stay live. */
+#filterContainer.locked :is(.filter-group-chevron, .filter-scope, .filter-options-toggle) {
     pointer-events: auto !important;
     cursor: pointer;
 }
@@ -4831,23 +4904,6 @@ div[slider] > input[type=range]::-ms-tooltip {
 #filterContainer.locked .filter-missing-switch {
     pointer-events: none;
     opacity: 0.4;
-}
-
-/* Toolbar box over every listed row's ∅ switch, with a status line under it. */
-.filter-missing-box {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-}
-
-.filter-missing-box[hidden] {
-    display: none;
-}
-
-.filter-missing-box-status {
-    padding-left: 24px;
-    font-size: 11px;
-    color: var(--text-muted);
 }
 
 .filter-row-more,

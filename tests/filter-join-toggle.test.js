@@ -125,7 +125,7 @@ describe('UIManager.createFilterJoinToggle', () => {
   });
 });
 
-// The toolbar box over the rows' ∅ switches ("do elements without a value
+// The Options line over the rows' ∅ switches ("do elements without a value
 // pass?"): a tri-state over the rows the panel lists right now.
 describe('UIManager.createMissingValueBox', () => {
   let ui, cache, handleFilterEvent;
@@ -173,8 +173,11 @@ describe('UIManager.createMissingValueBox', () => {
     const box = panel();
     const input = box.querySelector('input');
     expect(input.indeterminate).toBe(true);
-    expect(box.textContent).toContain('Keep nodes without a value');
-    expect(box.textContent).toContain('On 2 of 3 filters with gaps');
+    expect(box.textContent).toContain('Keep nodes');
+    expect(box.textContent).toContain('2 / 3');
+    expect(document.getElementById('filterMissingAllStatus').textContent).toBe(
+      'On 2 of 3 filters with gaps'
+    );
 
     await click(box);
 
