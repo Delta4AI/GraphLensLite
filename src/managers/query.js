@@ -63,6 +63,11 @@ function countMissingValues(propIDs, nodes, edges, edgeSection) {
   return counts;
 }
 
+/** The ∅ switch's count for one property; 0 before the counts exist. */
+function missingCount(cache, propID) {
+  return cache.missingValueCounts?.get(propID) ?? 0;
+}
+
 /**
  * Whether elements without a value pass this filter (the row's ∅ switch).
  * `fo.missingPasses` holds the user's choice; unset means the mode's default:
@@ -597,7 +602,7 @@ class QueryManager {
             cond = `${propID} BETWEEN ${fo.lowerThreshold} AND ${fo.upperThreshold}`;
           }
           const def = this.cache.data.filterDefaults?.get(propID);
-          const gaps = this.cache.missingValueCounts?.get(propID) ?? 0;
+          const gaps = missingCount(this.cache, propID);
           queryEntries.push({
             propID,
             cond,
@@ -1312,6 +1317,7 @@ export {
   isFilterNarrowed,
   hasNoValue,
   countMissingValues,
+  missingCount,
   missingPasses,
   missingPassesByDefault,
   constrainsNarrowDown,

@@ -1,13 +1,17 @@
 import { attachGroupMenu } from './group_menu.js';
 import { RailMenu, menuItem, menuSeparator } from './rail.js';
 import { StaticUtilities } from '../utilities/static.js';
-import { missingPasses, missingPassesByDefault } from './query.js';
+import { missingCount, missingPasses, missingPassesByDefault } from './query.js';
+
+/** What a property's filter judges: "node(s)" or "edge(s)", plural unless count is 1. */
+function elementNoun(cache, propID, count = 2) {
+  const isEdge = propID.startsWith(`${cache.CFG?.EXCEL_EDGE_HEADER}::`);
+  return `${isEdge ? 'edge' : 'node'}${count === 1 ? '' : 's'}`;
+}
 
 /** "37 nodes have" / "1 edge has": the start of every ∅ sentence. */
 function missingValueSubject(cache, propID, count) {
-  const isEdge = propID.startsWith(`${cache.CFG?.EXCEL_EDGE_HEADER}::`);
-  const noun = isEdge ? (count === 1 ? 'edge' : 'edges') : count === 1 ? 'node' : 'nodes';
-  return `${count} ${noun} ${count === 1 ? 'has' : 'have'}`;
+  return `${count} ${elementNoun(cache, propID, count)} ${count === 1 ? 'has' : 'have'}`;
 }
 
 class DropdownChecklist {
@@ -248,7 +252,7 @@ class DropdownChecklist {
     }
     el.appendChild(group);
     // The values above never list the elements that have none; say where they went.
-    const missing = this.cache.missingValueCounts?.get(this.propID) ?? 0;
+    const missing = missingCount(this.cache, this.propID);
     if (missing > 0) {
       const foot = document.createElement('div');
       foot.className = 'filter-cat-foot';
@@ -1439,7 +1443,7 @@ class UIComponentManager {
     const chip = groupable ? this.createGroupChip(propID) : document.createElement('span');
     if (!groupable) chip.className = 'filter-row-spacer';
     // A spacer where there are no gaps, so every row's dot and ⋯ line up.
-    const gaps = this.cache.missingValueCounts?.get(propID) ?? 0;
+    const gaps = missingCount(this.cache, propID);
     const missingSwitch =
       gaps > 0 ? this.createMissingSwitch(propID) : document.createElement('span');
     if (!gaps) missingSwitch.className = 'filter-row-spacer';
@@ -1539,7 +1543,7 @@ class UIComponentManager {
   paintMissingSwitch(btn, { fo, mode, idle }) {
     const propID = btn.dataset.prop;
     const [, , prop] = StaticUtilities.decodePropHashId(propID);
-    const count = this.cache.missingValueCounts?.get(propID) ?? 0;
+    const count = missingCount(this.cache, propID);
     const passes = missingPasses(fo, mode);
     const inactive = !fo.active || idle;
     btn.setAttribute('aria-pressed', String(passes));
@@ -1548,8 +1552,7 @@ class UIComponentManager {
       'changed',
       typeof fo.missingPasses === 'boolean' && fo.missingPasses !== missingPassesByDefault(mode)
     );
-    const isEdge = propID.startsWith(`${this.cache.CFG?.EXCEL_EDGE_HEADER}::`);
-    const nouns = isEdge ? 'edges' : 'nodes';
+    const nouns = elementNoun(this.cache, propID);
     btn.setAttribute('aria-label', `∅: ${nouns} without a ${prop} value pass this filter`);
 
     const what = `${missingValueSubject(this.cache, propID, count)} no ${prop}.`;
@@ -1623,7 +1626,7 @@ class UIComponentManager {
    * constraining nothing. The normal "click to hide elements" reads as a lie there. */
   getInertCheckboxTT(propID) {
     const tree = StaticUtilities.formatPropsAsTree(propID);
-    if (this.cache.missingValueCounts?.get(propID) > 0) {
+    if (missingCount(this.cache, propID) > 0) {
       return `No effect — Still at its loaded range or values, and elements without a value are kept, so it removes nothing. Narrow it, switch off ∅, or switch to Build up:${tree}`;
     }
     return `No effect — Still at its loaded range or values, so it removes nothing. Narrow it, or switch to Build up:${tree}`;

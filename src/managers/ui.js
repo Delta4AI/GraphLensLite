@@ -5,7 +5,12 @@ import { visibilityRule } from '../graph/visibility_rule.js';
 import { attachGroupMenu } from './group_menu.js';
 import { Popup } from '../utilities/popup.js';
 import { applyTheme, currentTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
-import { constrainsNarrowDown, missingPasses, missingPassesByDefault } from './query.js';
+import {
+  constrainsNarrowDown,
+  missingCount,
+  missingPasses,
+  missingPassesByDefault,
+} from './query.js';
 import { hotkeyLabel, paletteAccelerator } from './command_palette.js';
 
 // Persisted preference: how multiple active filters combine — "OR" (match any)
@@ -1212,7 +1217,7 @@ class UIManager {
       // visibility_rule.js apply.
       const propID = row.dataset.propId;
       const idleEdgeRow = edgeRowsIdle && propID.startsWith(edgePrefix);
-      const gaps = this.cache.missingValueCounts?.get(propID) ?? 0;
+      const gaps = missingCount(this.cache, propID);
       const counts = andMode
         ? constrainsNarrowDown(fo, defaults?.get(propID), gaps)
         : !!fo.active && !idleEdgeRow;
