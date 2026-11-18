@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.18.0 — 2026-11-03
+## 1.18.0 — 2026-11-18
 
 Saved files load unchanged. One behaviour changes on purpose — **with the filter join on "Build up" (formerly OR), unticking every row now shows nothing instead of everything** — and files saved by earlier versions in that state open with every row ticked, so they look exactly as they did. Details under *Changed*.
 
@@ -57,7 +57,7 @@ Saved files load unchanged. One behaviour changes on purpose — **with the filt
 
 ### Accessibility
 
-* The new and existing style selects, the badge list's edit/remove buttons and the group settings' new controls have accessible names; focus rings on the segmented toggles are no longer clipped away; the filter census announces changes (including "nothing added yet"); small text in the badge list meets contrast; and the keyboard sheet names ⇧ and ⌘ as Shift and Command for screen readers.
+* The new and existing style selects, the badge list's edit/remove buttons and the group settings' new controls have accessible names; focus rings on the segmented toggles are no longer clipped away; the filter census announces changes (including "nothing added yet"); small text in the badge list meets contrast; and the keyboard sheet names ⇧ and ⌘ as Shift and Command for screen readers. A row's ∅ button is named by the count it shows ("∅1.2K: the 1234 nodes…"), so speech input can reach it, and the *Edges* choice leaves the Tab order with the other filter controls while a typed query locks the panel.
 
 ### Changed
 
