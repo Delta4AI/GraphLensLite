@@ -87,19 +87,24 @@ function dom() {
                 <span class="card-collapse-title">Density heatmap</span>
               </button>
             </div>
-            <div class="card-row">
-              <label>Intensity</label><input id="heatIntensity" type="range">
+            <div class="prop-row">
+              <label>Intensity</label><div class="prop-ctl"><input id="heatIntensity" type="range"></div>
             </div>
-            <div class="card-row">
-              <button id="heatReset" title="Restore the heatmap appearance defaults.">Reset</button>
+            <div class="prop-row">
+              <label>Defaults</label>
+              <div class="prop-ctl"><button id="heatReset" title="Restore the heatmap appearance defaults.">Reset</button></div>
             </div>
           </div>
         </div>
       </section>
       <section id="inspectorSelection" class="insp-panel" hidden>
-        <h4 class="insp-section-title">Appearance</h4>
+        <h4 class="insp-section-title">Act on selection</h4>
         <button id="shortestPathBtn" aria-disabled="true"
                 title="Shortest path (needs 2 selected nodes)">Shortest path</button>
+        <div class="insp-section-head">
+          <h4 class="insp-section-title">Appearance</h4>
+          <button id="resetStyleBtn" title="Reset the style of selected elements to defaults">⟳ Reset style</button>
+        </div>
       </section>
       <div id="inspectorLog">
         <button id="logToggleBtn" aria-expanded="false" title="Activity log — every message this session">
@@ -209,6 +214,10 @@ describe('the index is derived from the DOM', () => {
     });
     // And one under a heading: context › section › card.
     expect(named(cmds, 'Shortest path')).toMatchObject({
+      trail: 'Inspector › Selection › Act on selection',
+    });
+    // A section's own action sits in its heading row, and belongs to it.
+    expect(named(cmds, '⟳ Reset style')).toMatchObject({
       trail: 'Inspector › Selection › Appearance',
     });
   });
@@ -239,7 +248,7 @@ describe('the index is derived from the DOM', () => {
   it('indexes a row of inputs once, by its label, as a destination', () => {
     const cmd = named(collectCommands(cache), 'Intensity');
     expect(cmd.kind).toBe('reveal');
-    expect(cmd.el.className).toBe('card-row');
+    expect(cmd.el.className).toBe('prop-row');
   });
 
   it('indexes filter properties by name and group, wherever the container lives', () => {
@@ -294,7 +303,7 @@ describe('the index is derived from the DOM', () => {
 
   it('leaves colour swatches out — the row that holds them is the destination', () => {
     const row = document.createElement('div');
-    row.className = 'card-row';
+    row.className = 'prop-row';
     row.innerHTML = `
       <label>Fill Color</label>
       <button class="style-inner-button style-color-button"
@@ -304,6 +313,20 @@ describe('the index is derived from the DOM', () => {
     const cmds = collectCommands(cache);
     expect(cmds.filter((c) => c.name.startsWith('Set Node Fill Color'))).toHaveLength(0);
     expect(named(cmds, 'Fill Color')).toMatchObject({ kind: 'reveal' });
+  });
+
+  it('indexes appearance-editor rows by their sub-group name, so repeated labels stay apart', () => {
+    const card = document.createElement('div');
+    card.dataset.label = 'Node Configuration';
+    card.innerHTML = `
+      <div class="prop-row" data-name="Size"><label class="prop-label">Size</label>
+        <div class="prop-ctl"><input type="number"></div></div>
+      <div class="prop-row" data-name="Label size"><label class="prop-label">Size</label>
+        <div class="prop-ctl"><input type="number"></div></div>`;
+    document.getElementById('inspectorLayerCards').appendChild(card);
+    const cmds = collectCommands(cache);
+    expect(named(cmds, 'Size')).toMatchObject({ kind: 'reveal' });
+    expect(named(cmds, 'Label size')).toMatchObject({ kind: 'reveal' });
   });
 
   it('does not index the palette button itself', () => {
@@ -431,15 +454,7 @@ describe('the palette dialog', () => {
     dom();
     cache = makeCache();
     Element.prototype.scrollIntoView = vi.fn();
-    // jsdom 29 still ships <dialog> without showModal/close, so open/closed
-    // state is stubbed here. Escape, the focus trap and the backdrop come from
-    // the platform and are verified in a real browser, not in this file.
-    HTMLDialogElement.prototype.showModal = function () {
-      this.open = true;
-    };
-    HTMLDialogElement.prototype.close = function () {
-      this.open = false;
-    };
+    // <dialog> open/close state: tests/setup/dialog-shim.js.
     palette = initCommandPalette(cache);
   });
 

@@ -2,7 +2,8 @@
 
 A map of how the codebase is organised, for contributors and anyone reading the
 source. For build, version, and commit conventions see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md). For interface patterns (inspector rows, controls,
+the Mixed state) see [DESIGN.md](DESIGN.md).
 
 ## What This Is
 
@@ -29,7 +30,7 @@ Sigma directly.
 The rendering and graph-operation core. Key modules:
 
 - `graph_model.js` — graphology population, sigma reducers, edge-type selection
-- `sigma_adapter.js` — the only Sigma importer; transitional graph-shaped facade
+- `sigma_adapter.js` — the only Sigma importer; the graph-shaped facade the managers call
 - `core.js` — `GraphCoreManager`: render/draw cycles, event locks, behaviour wiring
 - `interactions.js` — drag, zoom, lasso, click, hover handlers
 - `style.js` — per-element style resolution with defaults, per-layout persistence
@@ -38,6 +39,9 @@ The rendering and graph-operation core. Key modules:
   (force via graphology forceAtlas2; circular/grid geometric; radial/concentric/mds
   via `@antv/layout` v2)
 - `filter.js` — range-slider + dropdown filtering
+- `visibility_rule.js` — what the join toggle means beyond the query: build up
+  (nothing ticked shows nothing; links between shown nodes all/ticked/none) vs
+  narrow down, and whether elements without properties show
 - `selection.js` — selection state with undo/redo memory
 - `bubble_sets.js` / `bubble_layer.js` / `bubble_geometry.js` — bubble-set grouping
   drawn on an owned canvas layer beneath the nodes. A workspace holds ANY number
@@ -51,9 +55,12 @@ The rendering and graph-operation core. Key modules:
 - `bubble_tuning.js` / `bubble_smoothing.js` — the layout-aware initial group
   settings behind ✨ Re-tune, and the Catmull-Rom ring painter/resampler both the
   canvas layer and the SVG export draw through
-- `annotation_layer.js` / `annotation_geometry.js` — text notes: a DOM overlay
-  over the stage (place/drag/edit/style popover) plus the node-safe box metrics
-  the layer, the PNG export and the SVG export all measure with
+- `badges.js` — node badges: one pill per perimeter slot (set, replace, remove,
+  text taken from a column) and the per-slot summary the badge list shows
+- `annotation_layer.js` / `annotation_popover.js` / `annotation_geometry.js` —
+  text notes: a DOM overlay over the stage (place/drag/edit), the per-note
+  style popover it opens, plus the node-safe box metrics the layer, the PNG
+  export and the SVG export all measure with
 - `heatmap_layer.js` / `heatmap_geometry.js` — node-density heatmap overlay (off by
   default; one row of the inspector's Overlays layer stack, which owns both its
   switch and its parameters — see `UIManager.OVERLAYS`)
@@ -73,9 +80,18 @@ The rendering and graph-operation core. Key modules:
 
 Business logic and UI:
 
-- `io.js` — `IOManager`: Excel/JSON loading, export (JSON / PNG / SVG), data
-  preprocessing; the Excel column schema lives in `excel_schema.js` and the
-  downloadable workbook in `excel_template.js`
+- `io.js` — `IOManager`: Excel/JSON/GraphML/CX2 loading, export (JSON / PNG /
+  SVG / GraphML / CX2), data preprocessing; the Excel column schema lives in
+  `excel_schema.js` and the downloadable workbook in `excel_template.js`
+- `graphml.js` / `cx2.js` — GraphML (Cytoscape, Gephi, yEd, NetworkX, igraph)
+  and CX2 (Cytoscape, NDEx) readers and writers. Both carry nodes, edges, typed
+  attributes and positions only — styles, workspaces and groups stay JSON-only.
+  `interchange.js` is their shared half: `GraphImport` builds the same file
+  data the Excel importer produces (unbracketed attributes land in the
+  *Uncategorized Properties* group; `name [group]` decodes like an Excel header), and
+  `interchangeGraph` turns the loaded graph into typed, named columns. Files are
+  untrusted: size and element caps, no DTDs, and plain-language errors for
+  missing ids and dangling edges
 - `ui.js` — loading overlays, UI enable/disable, notifications, presentation mode,
   and the inspector's overlay layer stack (`OVERLAYS`: one table row per thing
   drawn over the graph, each layer answering `visible`/`setVisible`)
@@ -97,9 +113,11 @@ Business logic and UI:
   workspace's whole view state and restores it through `lm.changeLayout()`, so a
   feature that stores something new on the layout is undoable for free
 - `query.js` — query DSL with an AST (AND/OR/NOT, BETWEEN, IN, IS MISSING, IS FOREIGN,
-  comparisons)
-- `ui_components.js` — filter UI (dropdown checklists, invertible range sliders),
-  the per-row group chip, tooltips
+  HAS VALUE, HAS NO VALUE, comparisons); also the ∅ switch's shared rules
+  (`missingPasses`, `constrainsNarrowDown`) the panel's census reuses
+- `ui_components.js` — filter UI (category checklists on `RailMenu`, invertible
+  range sliders, boolean segments), the per-row ∅ switch, group dot and ⋯ actions menu,
+  the section tri-state checkboxes, tooltips
 - `group_menu.js` — the one group checklist, opened by both assign sites (a filter
   row assigns a property, the Selection panel assigns nodes); built on `RailMenu`
 - `community_menu.js` — the 🧩 Auto-detect configurator (Louvain weighting,
@@ -115,7 +133,17 @@ Business logic and UI:
   re-parents each card to its single home in the rail or the inspector. The Groups
   card is a list (painted by `bubble_sets.renderGroupList`) over ONE settings pane
   rebuilt for the selected row by `buildGroupStylePanel` — a pane per group would
-  be N × ~20 rows of DOM for a surface showing one group at a time
+  be N × ~20 rows of DOM for a surface showing one group at a time. The Nodes /
+  Edges sections bind each control to a style property; `selection.js` calls
+  `refreshStyleControls` on every selection change so they show the selection's
+  shared value or "Mixed"
+- `appearance_controls.js` — the inspector's control primitives (`propRow`, `createButton`,
+  `createInput`, …) and `createAppearanceControls(cache)`: every selection-bound builder
+  (slider, colour, segmented, label, "In selection" strip, `propFold` sub-groups) plus `refreshStyleControls`.
+  `ui_style_div.js` arranges them into cards
+- `selection_style_values.js` — pure side of that sync: the editor property →
+  style key table (also what `handleStyleChangeEvent` writes), the shared-or-MIXED
+  reduction, the per-colour buckets behind the "In selection" row, label source
 - `metrics.js` — `NetworkMetrics`: degree/betweenness/closeness/eigenvector centrality, PageRank.
   Computed lazily — only while its workbench tab is visible (`setWorkbenchVisible`)
 - `api_client.js` — client for the standalone ingest service
@@ -126,19 +154,24 @@ Business logic and UI:
 
 - `static.js` — validation, colour math, deep-merge helpers
 - `popup.js` / `popover_position.js` / `checklist_popup.js` / `fetch_popup.js` —
-  modal, popover positioning (anchor clamping plus the dropdown flip-up maths),
+  modal (a native `<dialog>` opened with `showModal()`), popover positioning (anchor clamping plus the dropdown flip-up maths),
   checklist dialogs, and the shared lifecycle of a "fetch into the graph" dialog
   (abort on dismiss, spinner, inline-or-toast errors, submit locked across the
   gates) that both Neo4j popups run on
 - `ui_tooltip.js` — the delegated tooltip layer: strips native `title`s and
   renders them itself, and owns `splitShortcut`, the one parser for the trailing
   "(F)" accelerator the command palette also reads
-- `data_editor.js` — spreadsheet-like data editor (`DataTable`), incl. Excel export
+- `data_editor.js` — spreadsheet-like data editor (`DataTable`): Rows/Type switches, row filter, APG grid keyboard, staged changes with a count bar, Excel import/export
+- `data_editor_forms.js` — the data editor's popovers: + Add menu and its node/edge/column forms, the review list of unsaved changes, the row ⋯ menu
 - `demo_loader.js` — STRING DB protein-interaction demo data
-- `neo4j_loader.js` — Neo4j connector (HTTP transactional Cypher API, no driver dependency)
+- `neo4j_loader.js` / `neo4j_cypher.js` / `neo4j_convert.js` — Neo4j connector: import popup and
+  session state; HTTP transactional Cypher transport (no driver dependency) with the row-count
+  preflight; raw entities → app payload, auto-colors and the property census
 - `neo4j_session.js` — Neo4j session extensions: expand selected nodes, merge additional queries
 - `tour.js` — guided tour with a sample dataset
 - `color_scale_picker.js` / `numeric_scale_picker.js` / `pie_chart_picker.js` — styling pickers
+- `scale_values.js` — what the two Map-by-data pickers read off an element (metric
+  or data, finite numbers only) and where a value falls on the scale
 - `excel_merge.js`, `theme.js`, `export_scale.js`
 
 ### Key files
@@ -181,7 +214,8 @@ npm start                # Electron app
 npm run serve:api        # standalone ingest service (HTTP API + live viewer)
 npm test                 # vitest unit tests
 npm run test:watch       # vitest in watch mode
-npm run perf             # performance benchmark
+npm run perf             # performance benchmark (acceptance gates)
+npm run perf:sweep       # render sweep: size × styling, see bench/render/README.md
 npm run dist-linux       # build Linux packages
 npm run dist-windows     # build Windows packages
 npm run dist-mac         # build macOS packages

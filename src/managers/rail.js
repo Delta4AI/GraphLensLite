@@ -40,6 +40,9 @@ class RailMenu {
     // via aria-expanded (no role=menu, so no arrow-key contract to honor).
     this._anchorClick = () => this.toggle();
     anchor.setAttribute('aria-expanded', 'false');
+    // Marks the anchor for the command palette, which reveals an inspector
+    // control that opens a menu rather than clicking it out of sight.
+    anchor.dataset.railMenu = '';
     anchor.addEventListener('click', this._anchorClick);
   }
 
@@ -69,11 +72,9 @@ class RailMenu {
     }
     // Before any measuring: offsetHeight/offsetWidth are 0 while detached.
     if (!this.el.isConnected) document.body.appendChild(this.el);
-    const rect = this.anchor.getBoundingClientRect();
     this.el.classList.add('open');
     this.anchor.setAttribute('aria-expanded', 'true');
-    this.el.style.top = `${clampPopoverTop(rect.bottom + MENU_OFFSET_PX, this.el.offsetHeight, window.innerHeight)}px`;
-    this.el.style.left = `${clampPopoverLeft(rect.left, this.el.offsetWidth, window.innerWidth)}px`;
+    this.place();
     // The menu is body-appended, so it sits at the end of the tab order rather
     // than after its anchor. Moving focus in is what makes it reachable at all;
     // Escape below puts focus back on the anchor.
@@ -84,10 +85,24 @@ class RailMenu {
     };
     document.addEventListener('pointerdown', this._outsideHandler, true);
     this._escapeHandler = (e) => {
+      // The menu is body-appended, so Tabbing off its last field (or Shift+Tab
+      // off its first) would leave the document with the menu still open.
+      // Close and land back on the anchor instead, as Escape does.
+      if (e.key === 'Tab' && this.el.contains(document.activeElement)) {
+        const fields = [...this.el.querySelectorAll('button, input, select, textarea, [tabindex="0"]')]
+          .filter((f) => f.tabIndex >= 0 && !f.disabled && !f.closest('[hidden]'));
+        const edge = e.shiftKey ? fields[0] : fields[fields.length - 1];
+        if (!fields.length || document.activeElement === edge) {
+          e.preventDefault();
+          this.close();
+        }
+        return;
+      }
       if (e.key === 'Escape') {
         // The menu is the innermost layer while it is open, so Escape belongs to
-        // it alone — Popup's own Escape would otherwise close the dialog under
-        // an open menu at the same time (the annotation popover does the same).
+        // it alone. preventDefault cancels a native dialog's close request under
+        // an open menu; stopPropagation keeps page-level Escape handlers out.
+        e.preventDefault();
         e.stopPropagation();
         this.close(); // restores focus to the anchor
       }
@@ -100,6 +115,35 @@ class RailMenu {
       if (!this.el.contains(e.target)) this.close();
     };
     document.addEventListener('scroll', this._scrollHandler, { capture: true, passive: true });
+  }
+
+  /**
+   * Open under another control than the menu's own anchor, for as long as it
+   * is open: the phone layout hides Layout, Export and the selection chip and
+   * reaches their menus from ⋯ More, where placement and the focus return on
+   * close have to use the button that is actually on screen.
+   */
+  openFrom(anchor) {
+    if (this.isOpen) this.close();
+    this._home = this.anchor;
+    this.anchor = anchor;
+    this.open();
+  }
+
+  /**
+   * Position under the anchor, or above it when there is no room below: an
+   * anchor at the bottom edge (a status bar's button) would otherwise be
+   * covered by its own menu once the clamp pushes it back up. Public so a menu
+   * whose content changes height while open can re-place itself.
+   */
+  place() {
+    const rect = this.anchor.getBoundingClientRect();
+    const height = this.el.offsetHeight;
+    const below = rect.bottom + MENU_OFFSET_PX;
+    const above = rect.top - MENU_OFFSET_PX - height;
+    const top = below + height > window.innerHeight && above >= 0 ? above : below;
+    this.el.style.top = `${clampPopoverTop(top, height, window.innerHeight)}px`;
+    this.el.style.left = `${clampPopoverLeft(rect.left, this.el.offsetWidth, window.innerWidth)}px`;
   }
 
   close() {
@@ -123,6 +167,10 @@ class RailMenu {
     }
     if (!this.staticBuild) this.el.remove();
     if (hadFocus) this.anchor.focus();
+    if (this._home) {
+      this.anchor = this._home;
+      this._home = null;
+    }
   }
 
   /**
@@ -138,7 +186,7 @@ class RailMenu {
   }
 }
 
-function menuItem({ icon = '', label, onClick, title = '', disabled = false, checked = false }) {
+function menuItem({ icon = '', label, onClick, title = '', disabled = false, checked }) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'rail-menu-item';
@@ -147,6 +195,8 @@ function menuItem({ icon = '', label, onClick, title = '', disabled = false, che
     btn.setAttribute('aria-disabled', 'true');
   }
   if (checked) btn.classList.add('checked');
+  // A row that carries an on/off state says so; the ✓ glyph is decoration.
+  if (typeof checked === 'boolean') btn.setAttribute('aria-pressed', String(checked));
   if (title) btn.title = title;
 
   const iconSpan = document.createElement('span');
@@ -160,6 +210,7 @@ function menuItem({ icon = '', label, onClick, title = '', disabled = false, che
   if (checked) {
     const check = document.createElement('span');
     check.className = 'rail-menu-check';
+    check.setAttribute('aria-hidden', 'true');
     check.textContent = '✓';
     btn.appendChild(check);
   }
@@ -208,6 +259,59 @@ class Rail {
     if (exportMenuBtn) {
       this.menus.push(new RailMenu(exportMenuBtn, (el) => this.#buildExportMenu(el)));
     }
+    const moreBtn = document.getElementById('railMoreBtn');
+    if (moreBtn) this.menus.push(new RailMenu(moreBtn, (el) => this.#buildMoreMenu(el)));
+  }
+
+  /** The selection menu, opened under `anchor` (the Selection tab's "By name or ID"). */
+  openSelectionMenu(anchor) {
+    this.#menuOf('selectMenuBtn')?.openFrom(anchor);
+  }
+
+  /** The menu anchored to `id`, to open it from ⋯ More. */
+  #menuOf(id) {
+    return this.menus.find((m) => (m._home ?? m.anchor).id === id);
+  }
+
+  /**
+   * Phone layout: everything the narrow bar hides, by name. Plain buttons are
+   * clicked; the ones with menus open them under ⋯ More itself.
+   */
+  #buildMoreMenu(el) {
+    const more = document.getElementById('railMoreBtn');
+    const header = (text) => {
+      const h = document.createElement('div');
+      h.className = 'rail-menu-header';
+      h.textContent = text;
+      return h;
+    };
+    const click = (id) => this.#closeAnd(() => document.getElementById(id)?.click());
+    const submenu = (id) => () => {
+      this.closeMenus();
+      this.#menuOf(id)?.openFrom(more);
+    };
+    const tab = (id, icon, label) => menuItem({ icon, label, onClick: click(id) });
+    el.append(
+      menuItem({
+        icon: '▤',
+        label: 'Panel: filters, overlays, selection',
+        onClick: this.#closeAnd(() => this.cache.inspector?.openSheet()),
+      }),
+      header('View'),
+      menuItem({ icon: '⊡', label: 'Fit graph', onClick: click('fitBtn') }),
+      menuItem({ icon: '↻', label: 'Layout…', onClick: submenu('relayoutBtn') }),
+      menuItem({ icon: '⌕', label: 'Search', onClick: click('cmdkBtn') }),
+      menuItem({ icon: '◈', label: 'Selection…', onClick: submenu('selectMenuBtn') }),
+      header('Workbench'),
+      tab('dataToggleBtn', '🔢', 'Data'),
+      tab('queryToggleBtn', '📝', 'Query'),
+      tab('metricsToggleBtn', '📊', 'Metrics'),
+      tab('assistantToggleBtn', '🤖', 'Assistant'),
+      menuSeparator(),
+      menuItem({ icon: '⤓', label: 'Export…', onClick: submenu('exportMenuBtn') }),
+      menuItem({ icon: '◐', label: 'Switch theme', onClick: click('darkModeToggleBtn') }),
+      menuItem({ icon: '?', label: 'Keyboard shortcuts', onClick: click('keyboardSheetBtn') })
+    );
   }
 
   closeMenus() {
@@ -228,7 +332,14 @@ class Rail {
   #closeAnd(action) {
     return () => {
       this.closeMenus();
-      action();
+      // Menu actions are mostly async; a rejection here would otherwise reach
+      // only the devtools console while the user waits for nothing.
+      const report = (err) => this.cache.ui.error(`That did not work: ${err?.message ?? err}`);
+      try {
+        Promise.resolve(action()).catch(report);
+      } catch (err) {
+        report(err);
+      }
     };
   }
 
@@ -240,8 +351,10 @@ class Rail {
    */
   async #replacingGraph(lead, action) {
     if (!this.cache.initialized) return action();
+    const staged = this.cache.dataTable?.stagedCount ?? 0;
+    const edits = staged ? ` and ${staged} unsaved data editor change${staged === 1 ? '' : 's'}` : '';
     const confirmed = await Popup.confirm(
-      `${lead} replaces the loaded graph, discarding every workspace, style and group in it. Continue?`,
+      `${lead} replaces the loaded graph, discarding every workspace, style and group in it${edits}. Continue?`,
       'Discard and continue'
     );
     if (confirmed) action();
@@ -252,12 +365,19 @@ class Rail {
       menuItem({
         icon: '📂',
         label: 'Open graph file…',
-        title: 'Load graph data from Excel (.xlsx, .xls) or a saved model (.json)',
+        title:
+          'Load graph data from Excel (.xlsx, .xls), a saved model (.json), GraphML (.graphml) or CX2 (.cx2)',
         onClick: this.#closeAnd(() =>
           this.#replacingGraph('Opening a file', () =>
             document.getElementById('fileInput')?.click()
           )
         ),
+      }),
+      menuItem({
+        icon: '💾',
+        label: 'Save as JSON',
+        title: 'Save the full graph — data, styles, workspaces — as a JSON file you can open again (S)',
+        onClick: this.#closeAnd(() => this.cache.io.exportGraphAsJSON()),
       }),
       menuItem({
         icon: '📥',
@@ -345,6 +465,23 @@ class Rail {
         onClick: this.#closeAnd(() => this.cache.lm.addLayout()),
       }),
       menuItem({
+        icon: '⧉',
+        label: 'Duplicate workspace',
+        title: `Copy "${current}" as it is now and switch to the copy`,
+        onClick: this.#closeAnd(() => this.cache.lm.duplicateSelectedLayout()),
+      }),
+      menuItem({
+        icon: '⟲',
+        label: 'Reset to as loaded',
+        disabled: !this.cache.history?.hasOrigin(current),
+        title: this.cache.history?.hasOrigin(current)
+          ? `Put "${current}" back the way it was when the file was loaded (or the workspace ` +
+            'created, or the data last changed): positions, styles, filters, groups and notes. ' +
+            'Undo takes it back.'
+          : `"${current}" has no loaded state to go back to yet`,
+        onClick: this.#closeAnd(() => this.cache.lm.resetSelectedLayout()),
+      }),
+      menuItem({
         icon: '✎',
         label: 'Rename workspace…',
         disabled: current === 'Default',
@@ -426,9 +563,37 @@ class Rail {
   }
 
   #buildSelectMenu(el) {
-    // The card re-parented in here carries its own "Select Elements" title, so
-    // the menu adds no header of its own — just the mount and the tooltip that
-    // names the split against the inspector's "Act on selection".
+    // Rows that act on the selection you have; ids are what selection.js and
+    // UIManager toggle (`.disabled`) as the selection and its history change.
+    const row = (id, icon, label, title, run, { close = true } = {}) => {
+      const btn = menuItem({ icon, label, title, onClick: close ? this.#closeAnd(run) : run });
+      btn.id = id;
+      btn.classList.add('disabled');
+      btn.setAttribute('aria-disabled', 'true');
+      return btn;
+    };
+    const lasso = menuItem({
+      icon: '➰',
+      label: 'Lasso',
+      title: 'Drag a freeform area around elements (L, Escape to stop). Without it: drag on empty canvas holding Shift to add, Ctrl (Cmd on a Mac) to replace, both to remove',
+      onClick: this.#closeAnd(() => this.cache.ui.toggleLassoSelection()),
+    });
+    lasso.id = 'lassoMenuItem';
+    el.append(
+      row('focusSelectionBtn', '🔍', 'Zoom to selection', 'Center and zoom to the selection',
+        () => this.cache.gcm.focusSelection()),
+      // The chip's × is hidden on a phone; the menu is reachable there.
+      row('clearSelectionMenuItem', '×', 'Clear selection', 'Deselect everything',
+        () => this.cache.sm.clearSelection()),
+      // Undo/redo stay open: stepping back through several selections is one gesture.
+      row('undoSelectionBtn', '↶', 'Undo selection change', 'Go back to the previous selection',
+        () => this.cache.sm.undoSelection(), { close: false }),
+      row('redoSelectionBtn', '↷', 'Redo selection change', 'Go forward to the next selection',
+        () => this.cache.sm.redoSelection(), { close: false }),
+      lasso,
+      menuSeparator()
+    );
+    // The card re-parented in here carries its own "Select Elements" title.
     const mount = document.createElement('div');
     mount.id = 'selectMenuMount';
     mount.title =
@@ -474,6 +639,27 @@ class Rail {
         label: 'Excel data',
         title: 'Export the data table and styling properties as Excel',
         onClick: this.#closeAnd(() => this.cache.dataTable.exportToExcel()),
+      }),
+      menuSeparator(),
+      menuItem({
+        icon: '🔗',
+        label: 'GraphML',
+        title:
+          'Export nodes, edges, properties and positions as GraphML for Cytoscape, Gephi, yEd, NetworkX or igraph',
+        onClick: this.#closeAnd(() => this.cache.io.exportNetwork('graphml')),
+      }),
+      menuItem({
+        icon: '🔗',
+        label: 'CX2 (Cytoscape, NDEx)',
+        title: 'Export nodes, edges, properties and positions as CX2 for Cytoscape or NDEx',
+        onClick: this.#closeAnd(() => this.cache.io.exportNetwork('cx2')),
+      }),
+      menuSeparator(),
+      menuItem({
+        icon: '⛶',
+        label: 'Presentation mode',
+        title: 'Hide the rail and the inspector for a clean screenshot (Shift+F, Escape to exit)',
+        onClick: this.#closeAnd(() => this.cache.ui.togglePresentationMode()),
       })
     );
   }

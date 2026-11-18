@@ -1,0 +1,250 @@
+# Design
+
+Decisions and patterns for Graph Lens Lite's interface. Colour, surface and
+z-index values live as tokens at the top of `src/style.css` (`:root` and
+`[data-theme="dark"]`); use them, never literals.
+
+## Colour
+
+- Neutrals lean toward the brand slate in both themes: cool slate greys in
+  light, violet-tinted surfaces in dark. No pure greys.
+- The brand red (`--accent-text`) is the one accent: the selected pill or
+  segment, the focus ring, a narrowed filter, section eyebrows, a layer switch
+  that is on. It also marks destructive actions; a separate indigo accent was
+  considered and declined (2026-11). The brand slate (`--brand-border`) carries
+  checkboxes and primary buttons, so a column of defaults stays quiet.
+
+## Mental model
+
+Filter (what is visible) → Select (the working set) → Act (style, group,
+arrange). The inspector's three contexts follow it: **Filters**, **Overlays**,
+**Selection**.
+
+## Inspector rows
+
+- Every property is one row: a muted label column (`--prop-label-w`, 76px) and a control column
+  (`propRow` in `src/managers/appearance_controls.js`, `.prop-row` in CSS). Rows are
+  28px tall, top-aligned, so a row whose controls wrap keeps its label on line one.
+- Labels are plain text tied to their control (`<label for>` or
+  `aria-labelledby`), never filled chips; nothing that is not clickable may
+  look like a button.
+- Sub-groups inside a section fold (`propFold`: "Label", "Badges", "Start
+  arrow"; level 3 below): a disclosure heading with a hairline above it and a
+  one-line summary of what the rows hold ("Label · from label, bottom, 12",
+  "Badges · none", "Halo · off"). Open or closed is remembered per viewer. The
+  command palette names a row by its sub-group ("Label size") so repeated
+  labels stay distinct, and opens the fold to reveal it.
+- Headings come in three distinct levels, never two at the same weight:
+  1. Section: an uppercase eyebrow in the accent colour followed by a hairline
+     to the panel edge (`.insp-section-title`: "Act on selection",
+     "Appearance"). Every card sits under one. A section action that applies to
+     all its cards sits at the eyebrow's end, after the rule
+     (`.insp-section-head`: Appearance › ⟳ Reset style).
+  2. Card: a 26px brand-slate bar (`--insp-bar` tokens), 13px semibold title,
+     its count in mono after the title (`.flat-card-head`, `.appearance-card`:
+     "Nodes 1000", "Selection 1000 nodes · 0 edges"). The bar gives the
+     Selection tab its character and is for the Selection tab's cards only.
+  3. Sub-group: 12px semibold on a soft `--surface-2` wash (`propFold`).
+- Every verb on the selection lives in one card: Group, Grow, Path, then
+  Spacing and Layout. A blocked row says why inline ("needs exactly 2 nodes").
+- No dark bars outside the Selection tab's cards. The Overlays stack is one line per layer:
+  switch, a small glyph of what the layer draws, name, then its count or
+  action, over a hairline. An open layer's settings indent under its name.
+
+## Controls
+
+- One control height, 24px (WCAG 2.5.8), one radius, 6px, one button family:
+  `.insp-btn` (hairline border, accent on hover). Palette swatches are 20px with
+  a 4px gap, inside the 2.5.8 spacing exception.
+- Pick the control by property type:
+  - 2–6 options that fit on the row: segmented control (`.prop-seg`, pressed
+    state = value). Longer enums: `<select>`.
+  - On/off: native checkbox (`.prop-check`). Every checkbox takes the brand
+    slate from one global rule, so a column of ticked defaults stays quiet and
+    the red accent is left for what changed (a narrowed filter). Never a hidden
+    input under a drawn box.
+  - Pick several values from a list: a field button that opens a checkbox
+    group (`DropdownChecklist`, built on `RailMenu`), never a native
+    multi-select. It shows "All", "None", the one kept value, or "4 of 6"; the
+    list has an All box that goes mixed (and acts on the search results while
+    a search is typed), a count per value, search from 10 values with a live
+    "3 of 42 values" line under it, and "Only" on each value (Enter on a
+    focused value, or Alt-click, does the same).
+  - Number with a range: slider plus number field; arrow keys step.
+  - Colour: painted well over the native picker, hex field, palette.
+- A control that is frozen (filters held by an edited query) is `disabled`,
+  not just dimmed, so the keyboard skips it too. What only reads (fold a
+  group, switch Node/Edge, open Options, search, the row's ⋯ menu) stays
+  live.
+- "Map by data" sits inside the control it drives, never in a column of its
+  own: a rising-bars glyph in a number field's trailing edge (`.prop-map-btn`),
+  and the last swatch of a colour palette, a gradient with "⋯"
+  (`.prop-map-swatch`). Its accessible name says "map by data". Fill's swatch
+  opens a menu, Colour by data… then Pie chart… and Clear pie, because a pie
+  chart is a fill driven by data. The app keeps no record of a mapping, so
+  neither shows an on state.
+- A colour row is one line: well, hex field, palette, by-data swatch. When the
+  palette does not fit (a row with a None swatch in a narrow panel), it
+  wraps to the next line as one block.
+- A "select all in this group" control is one tri-state checkbox (ticked,
+  mixed, empty), not separate enable/disable buttons.
+
+## Row actions
+
+- A row with more than two actions puts them behind one visible **⋯** button
+  at its end (`.filter-row-more`, `.group-row-more`), opening a `RailMenu` of
+  labelled items. The button is always visible, not revealed on hover.
+- Inline next to it only what is in use: on a filter row, the ∅ switch once
+  its choice was changed and the group dot while the filter is in a group
+  (`[∅37] [◌] [⋯]`, each absent otherwise). Both are first set from ⋯ (the
+  ∅ item is worded as what it does: "Remove the 37 nodes without padj"). A
+  changed ∅ then stays for the session, back at the default too, so the
+  button never vanishes under the click; a filter reset removes it. Nothing
+  appears on hover and nothing animates its width: a hover reveal hides state
+  and shifts the row under the cursor.
+- A per-row setting shows its state in the control itself: filled = on,
+  dashed (glyph struck) = off, muted (`aria-disabled`, tooltip kept) while it
+  decides nothing. A count it concerns sits inside it in small type ("∅37",
+  "∅1.2K"), keeping it 24px tall. The row end is right-aligned, so ⋯ lines up
+  on every row without spacers for absent markers. A tri-state
+  box under Options sets it on every row the panel lists (search hits, or the
+  section on screen), with a compact count beside it ("2 / 6"); the sentence
+  ("On 2 of 6 filters with gaps") is its tooltip and description.
+- A panel's settings sit behind one **Options ▾** disclosure beside its mode
+  switch (`.filter-options-toggle`: `aria-expanded`, `aria-controls`, open
+  state remembered per browser). Open, it is one label|control grid: a short
+  muted label (Edges, Without a value, No properties), the control, at most a
+  compact count; long explanations go to the tooltip and `aria-describedby`.
+  A line that does not apply is absent, and the button hides when none do.
+  Closed, it shows how many options differ from their defaults.
+- Popups (`RailMenu`) open from Enter, Space or ↓ on their trigger, move focus
+  inside, and return it to the trigger on Escape.
+
+## Editing the selection
+
+- Controls show what the selection carries: the shared value when every
+  selected element agrees, **Mixed** when they differ (empty field with a
+  "Mixed" placeholder, outline slider thumb, a well sliced from the actual
+  colours, no segment pressed, a disabled "Mixed" option). Users never pick
+  "Mixed"; any edit applies to every selected element.
+- Edits apply on commit (slider release, Enter or leaving a field, a click on a
+  swatch or segment), each one undo step. There is no Apply/Save button in the
+  inspector; undo is the safety net.
+- When a colour is mixed, a strip under the colour row shows each distinct
+  colour as wide as its share, over its count; recolouring a segment changes
+  only those elements. Segments keep a 24px minimum and wrap.
+
+## Data graphics
+
+The inspector's character comes from the data, not from decoration: every
+picture is also a reading of the graph, in the slate neutrals, with the accent
+kept for state.
+
+- Numeric filters draw the column's distribution over the track; bars the
+  filter keeps are tinted slate, the rest a quieter grey.
+- Category filters show each value's share of the graph inside the closed
+  field, kept values filled slate and dropped ones a hollow outline. No colour per value: the app
+  has none, and inventing one would suggest an encoding that is not there.
+- Counts sit where they explain something: the filter census beside the
+  Node/Edge switch, "N filters" at the end of a filter group's rule, a group's
+  size against the largest group as a bar beside its count (its share of the
+  graph in the tooltip), "4 groups · 500 nodes" on the
+  Groups layer.
+
+## Top bar
+
+- Only everyday, workspace-wide controls sit on the bar: File, workspace,
+  undo/redo, Fit, Layout, Search, the selection chip, the four workbench tabs,
+  Export, theme, help. It has to fit a 900px window with labels hidden (they
+  drop at 1200px); a control that would push it past that belongs somewhere
+  else.
+- The selection chip is the selection's one home: it shows the counts, × clears,
+  and clicking it opens everything that builds, frames or walks back a
+  selection (lasso, select all/none/by name, zoom to, undo/redo selection).
+- Modes without a button of their own (lasso, placing a note) announce
+  themselves in the stage's mode line, with how to leave them.
+- View preferences that change what is drawn (hover highlight, minimap, notes)
+  are switch rows in the Overlays tab, not bar buttons.
+
+## Saving
+
+- File holds **Open graph file…** and, right under it, **Save as JSON** (S),
+  the format that keeps everything. Export lists the other formats.
+- Work is unsaved from the first recorded change after a load or a save, and
+  while the data editor has staged edits. Closing then asks first: the
+  browser's own "Leave site?" prompt on the web, a Close without saving /
+  Cancel dialog in the desktop app. An action that already confirmed it
+  discards everything (start over) does not ask twice.
+
+## Narrow windows
+
+- A narrow filter panel (under 360px, a container query on `#filterContainer`:
+  any inspector under 387px) stacks each row: checkbox, name, markers and ⋯ on
+  one line, the control full width under it. Wider, the rows share one
+  label|control|actions grid per sub-group.
+- 761–860px: the full bar, tighter. ≤760px (phones): the graph takes the whole
+  width; the bar keeps File, workspace, undo/redo, ▤ Panel and ⋯ More, and
+  ⋯ More lists the rest by name (menus it reaches open under ⋯ More).
+- The inspector is a bottom sheet at half or full height, opened by ▤ Panel,
+  closed by ×, Escape, ▤ Panel or the phone's Back gesture; the grabber switches
+  heights. It never opens itself: the Panel button shows the selection count
+  instead, plus "N hidden" when filters hide part of the selection (the
+  Selection context says the same in a sentence, at every width).
+- The tour opens the sheet for the steps that explain the inspector, points at
+  ⋯ More for rail controls the bar hides, and adds an "On a narrow screen" line
+  where the phone layout differs.
+- The workbench and the sheet share the bottom edge: opening one closes the
+  other.
+
+## Workbench tabs
+
+- The dark header holds only the tab's title, ⓘ help, ⤢ expand and × close.
+  Every tab's own actions sit in a `.wb-toolbar` inside its pane: state or view
+  switches on the left, then the actions as neutral `.insp-btn` at the right.
+  One filled `.insp-btn.primary` per surface, for the action the surface exists
+  for; buttons are never colour-coded by action.
+- A toolbar that drives the graph says what it is doing in words, on its left.
+  The query toolbar's status pill reads **Synced** (box = filter panel),
+  **Edited** (not applied yet), **Applied** (the query filters the graph and
+  locks the panel) or **Error**, followed by the problem it found
+  ("Not recognised: …").
+- A blocked action keeps focus (`aria-disabled`) and its reason is shown inline,
+  not only in a tooltip. Actions with a keyboard path say so in their tooltip
+  (Ctrl/⌘+Enter = Filter graph).
+
+## Editable tables (Data editor)
+
+- The Data tab's toolbar: Rows and Type switches and the filter on the left, a
+  count next to them, + Add / Import / Export at the right.
+- Subsets of one table are segmented controls with counts (Rows: Selection |
+  All; Type: Nodes | Edges | Both), never a row of tabs.
+- The table is an APG grid: one Tab stop, arrow keys between cells, Enter, F2,
+  typing or double-click to edit, Enter commits and moves down (Shift+Enter
+  up), Tab commits and moves right, Escape cancels. The active cell is ringed
+  for the mouse too. Keys pressed in the grid never reach app shortcuts.
+- Export saves the rows shown (Rows, Type and the filter). Import is blocked
+  (`aria-disabled`, with the reason) while changes are staged; Apply confirms
+  with "Applied N changes"; a blocked Apply moves to the row that blocks it,
+  switching view or clearing the filter if needed.
+- Edits that only reach the graph together are staged and always visible:
+  edited cell = amber wash with the old value in its tooltip, new row = green
+  with a "New" pill, deleted row = red strikethrough that stays listed with
+  ↺ Restore. Colours come from the `--edited-*`, `--added-*`, `--deleted-*`
+  tokens; the pill and the bar say it in words too.
+- A bar under the table exists only while something is staged: "N unsaved
+  changes", the breakdown (or the first problem blocking Apply), **Review**
+  (each change with its own Undo), **Discard** (confirms, since nothing else
+  keeps the work), **Apply N changes**. Deleting a row never confirms; it is
+  staged and undoable.
+- Adding something is a small form in a popover with an explicit button and
+  the error under its field, never a text prompt or a toast.
+- An empty view says why in one sentence and offers the one way out ("Show
+  all 1000 nodes", "Clear filter").
+
+## Known gaps
+
+- The data editor renders every row (2,500 rows take about 44ms); past
+  ~20,000 rows it will need virtual scrolling with `aria-rowcount` /
+  `aria-rowindex`.
+- Filter rows add matches to the selection in two clicks (⋯ › Add matches)
+  rather than one.

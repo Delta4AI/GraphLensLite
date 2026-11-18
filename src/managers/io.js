@@ -2,11 +2,46 @@
 import { VERSION, bubbleGroupStyle, UNSAFE_OBJECT_KEYS } from '../config.js';
 import { sanitizeAnnotations, MAX_ANNOTATIONS } from '../graph/annotation_geometry.js';
 import { StaticUtilities } from '../utilities/static.js';
+import { FILTER_LINKS, visibilitySettings } from '../graph/visibility_rule.js';
+import { isFilterNarrowed } from './query.js';
 import { EXPORT_SCALES } from '../utilities/export_scale.js';
-import { excelData, EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES } from './excel_schema.js';
+import { excelData, EXCEL_NODE_PROPERTIES, EXCEL_EDGE_PROPERTIES, decodeKey } from './excel_schema.js';
 import { ExcelTemplate } from './excel_template.js';
+import { checkImportSize } from './interchange.js';
+import { parseGraphML, toGraphML } from './graphml.js';
+import { parseCX2, toCX2 } from './cx2.js';
+
+/** A header whose group or key is spelled like a prototype key (the data
+ * editor turns headers into object keys); the Excel decoder refuses the same. */
+const isUnsafeHeader = (header) =>
+  UNSAFE_OBJECT_KEYS.has(header?.subGroup) || UNSAFE_OBJECT_KEYS.has(header?.key);
+
+const isGivenCoordinate = (value) => value === 0 || Boolean(value);
+
+/** The first version in which a build-up workspace with no row ticked is empty. */
+const BUILD_UP_EMPTY_SINCE = '1.18.0';
 
 const EXPORT_SCALE_KEY = 'gll.exportScale';
+/** The network exports: writer, download type, and what each loses that the user should hear. */
+const NETWORK_EXPORTS = {
+  graphml: {
+    name: 'GraphML',
+    type: 'application/graphml+xml',
+    write: (source) => toGraphML(source),
+    unplaced: (n) => `${n} nodes have no position yet and are written without coordinates.`,
+  },
+  cx2: {
+    name: 'CX2',
+    type: 'application/json',
+    write: (source, networkName) => toCX2(source, networkName),
+    unplaced: (n) =>
+      `${n} nodes have no position yet, so the CX2 file carries no coordinates (CX2 needs them on every node or none).`,
+    directed: (n) => `${n} edges have an arrow, which CX2 cannot carry; their source and target are kept.`,
+  },
+};
+
+/** Import notices beyond this many are merged into one message. */
+const MAX_SEPARATE_NOTICES = 3;
 // Grace period before revoking an SVG download's blob URL: long enough for
 // any browser to start (and realistically finish) fetching the blob, short
 // enough not to pin big documents in memory for the whole session.
@@ -83,7 +118,7 @@ function normalizeD4DataBooleans(fileData) {
 // ------------------------------------------------------ Excel parsing helpers
 // Pure functions lifted out of IOManager.parseExcelToJson, which was a
 // 500-line method with a dozen helper closures trapped inside it — none of
-// them reachable by a test, though these five are where the actual cell
+// them reachable by a test, though these are where the actual cell
 // decoding happens.
 
   function getOrNull(row, key) {
@@ -139,40 +174,6 @@ function normalizeD4DataBooleans(fileData) {
     });
 
     return { headers: headers, jsonData: jsonData };
-  }
-
-/**
- * Split a column header into its property key and its sub-group: the LAST
- * bracketed segment names the group, everything before it is the key.
- *
- * @returns {{subGroup: string, key: string}|null} null for a reserved name
- */
-  function decodeKey(key, uncategorizedSubGroup) {
-    let subGroup = uncategorizedSubGroup;
-    let trimmedKey;
-
-    const matches = key.match(/\[.*?\]/g);
-    if (matches && matches.length >= 2) {
-      const lastBracketContent = matches[matches.length - 1];
-      subGroup = lastBracketContent.substring(1, lastBracketContent.length - 1).trim();
-
-      // For multiple brackets, preserve all except the last one in the key
-      const lastBracketIndex = key.lastIndexOf(matches[matches.length - 1]);
-      trimmedKey = key.substring(0, lastBracketIndex).trim();
-    } else if (matches && matches.length === 1) {
-      const bracketContent = matches[0];
-      subGroup = bracketContent.substring(1, bracketContent.length - 1).trim();
-      trimmedKey = key.substring(0, key.indexOf('[')).trim();
-    } else {
-      trimmedKey = key.trim();
-    }
-
-    // Both halves become live object keys in D4Data; a column named
-    // `__proto__` would land its properties on a prototype instead (see
-    // UNSAFE_OBJECT_KEYS). Refused here, the one place every header and cell
-    // key is decoded.
-    if (UNSAFE_OBJECT_KEYS.has(subGroup) || UNSAFE_OBJECT_KEYS.has(trimmedKey)) return null;
-    return { subGroup: subGroup, key: trimmedKey };
   }
 
   function validateUserData(row, key, uncategorizedSubGroup) {
@@ -248,11 +249,40 @@ class IOManager {
     });
   }
 
+  /**
+   * Before 1.18.0 a build-up (OR) workspace with no filter row ticked showed
+   * the whole graph; now it shows nothing. A file saved in that state opens
+   * with every row ticked instead — the build-up spelling of "everything" —
+   * so it looks the way it did when it was saved.
+   */
+  keepPreBuildUpWorkspacesFull(jsonContent) {
+    const version = typeof jsonContent.version === 'string' ? jsonContent.version : null;
+    if (version && !StaticUtilities.isVersionNewer(BUILD_UP_EMPTY_SINCE, version)) return;
+    const ticked = [];
+    for (const [name, layout] of Object.entries(jsonContent.layouts ?? {})) {
+      if (!layout || layout.filterJoinMode === 'AND' || layout.query) continue;
+      const filters =
+        layout.filters instanceof Map ? [...layout.filters.values()] : Object.values(layout.filters ?? {});
+      const usable = filters.filter((filter) => filter && typeof filter === 'object' && !filter.unusable);
+      if (usable.length === 0 || usable.some((filter) => filter.active)) continue;
+      for (const filter of usable) filter.active = true;
+      ticked.push(name);
+    }
+    if (ticked.length > 0) {
+      this.cache.ui?.info(
+        `Saved by an older version: every filter row in ${ticked.map((n) => `"${n}"`).join(', ')} ` +
+          'is ticked, so it shows the full graph it showed then.'
+      );
+    }
+  }
+
   restoreSetsFromJSON(jsonContent) {
+    this.keepPreBuildUpWorkspacesFull(jsonContent);
     // Deduplicate headers to fix old exported files with duplicate headers
     if (jsonContent.nodeDataHeaders) {
       const seen = new Set();
       jsonContent.nodeDataHeaders = jsonContent.nodeDataHeaders.filter((h) => {
+        if (isUnsafeHeader(h)) return false;
         const key = `${h.subGroup}::${h.key}`;
         if (seen.has(key)) return false;
         seen.add(key);
@@ -262,6 +292,7 @@ class IOManager {
     if (jsonContent.edgeDataHeaders) {
       const seen = new Set();
       jsonContent.edgeDataHeaders = jsonContent.edgeDataHeaders.filter((h) => {
+        if (isUnsafeHeader(h)) return false;
         const key = `${h.subGroup}::${h.key}`;
         if (seen.has(key)) return false;
         seen.add(key);
@@ -293,11 +324,9 @@ class IOManager {
             if (filterValue.categories && Array.isArray(filterValue.categories)) {
               filterValue.categories = new Set(filterValue.categories);
             }
-            // Per-filter `${group}Members/IDs/MembersHidden/IDsHidden` sets used to be
-            // revived here. Group membership lives on the LAYOUT
-            // (`${group}Props` / `${group}ManualMembers`, above); those four were
-            // either never read or mirrored `${group}Props`. Files that still carry
-            // them are simply ignored.
+            // Older files may carry per-filter `${group}Members/IDs/MembersHidden/IDsHidden`
+            // sets; they are ignored. Group membership lives on the LAYOUT
+            // (`${group}Props` / `${group}ManualMembers`, above).
           }
 
           layout.filters = filtersMap;
@@ -799,7 +828,8 @@ class IOManager {
         nodeFeatureWithinThreshold.set(propId, null);
       }
 
-      if (node.style?.x && node.style?.y) {
+      // 0 is a coordinate like any other, not a missing one.
+      if (isGivenCoordinate(node.style?.x) && isGivenCoordinate(node.style?.y)) {
         this.cache.nodePositionsFromExcelImport.set(node.id, {
           x: node.style.x,
           y: node.style.y,
@@ -1019,6 +1049,7 @@ class IOManager {
           ...structuredClone(defaultFilter),
           active: loaded.active,
           categories: canonical,
+          ...(typeof loaded.missingPasses === 'boolean' && { missingPasses: loaded.missingPasses }),
         };
       }
       return structuredClone(defaultFilter); // numeric-era or empty → reset
@@ -1276,6 +1307,7 @@ class IOManager {
     a.download = this.buildExportFilename('json');
     a.click();
     URL.revokeObjectURL(url);
+    this.cache.history?.markSaved();
     await this.cache.ui.hideLoading();
     await new Promise((resolve) => requestAnimationFrame(resolve));
   }
@@ -1283,10 +1315,19 @@ class IOManager {
   parseLayouts(jsonLayouts) {
     const parsedLayouts = {};
     // Notes past MAX_ANNOTATIONS (and malformed records) are dropped at the
-    // trust boundary. Silently, until now — while the same feature warns when
-    // it trims a single note's text.
+    // trust boundary and counted, so the user is told — as when a single
+    // note's text is trimmed.
     let droppedNotes = 0;
+    // Settings this version does not know get their default; collected so
+    // the user hears which, instead of the workspace quietly looking different.
+    const unknownSettings = [];
     Object.entries(jsonLayouts).forEach(([key, layout]) => {
+      if (layout.filterJoinMode != null && !['OR', 'AND'].includes(layout.filterJoinMode)) {
+        unknownSettings.push(`"${key}": filter mode "${layout.filterJoinMode}" (using build up)`);
+      }
+      if (layout.filterLinks != null && !FILTER_LINKS.includes(layout.filterLinks)) {
+        unknownSettings.push(`"${key}": links "${layout.filterLinks}" (using All)`);
+      }
       const positions =
         layout.positions instanceof Map
           ? layout.positions
@@ -1304,10 +1345,12 @@ class IOManager {
         filters: this.parseFiltersAsMap(layout.filters),
         isCustom: layout.isCustom || false,
         query: layout['query'] || undefined,
-        // Per-view filter-join settings; default for pre-1.15.4 files that
-        // predate them (OR / non-strict = the historical behavior).
+        // Per-view filter join; OR (build up) for pre-1.15.4 files that
+        // predate it.
         filterJoinMode: layout.filterJoinMode === 'AND' ? 'AND' : 'OR',
-        filterStrict: layout.filterStrict === true,
+        // Build-up links and elements without properties (visibility_rule.js);
+        // older files get today's look: every link, every element.
+        ...visibilitySettings(layout),
         // Per-view styles - check if already Maps
         hideDisconnectedNodes: layout.hideDisconnectedNodes || false,
         nodeStyles:
@@ -1344,6 +1387,22 @@ class IOManager {
         })(),
       };
 
+      // Before 1.18.0 one "Complete cases only" box made every narrowed filter
+      // drop the elements without a value. That is now each row's ∅ switch, so
+      // a file saved with the box on opens with ∅ off on those filters. The
+      // box is still read here, but no longer written.
+      if (layout.filterStrict === true) {
+        const defaults = this.cache.data?.filterDefaults;
+        for (const [propID, fo] of parsedLayouts[key].filters) {
+          if (
+            typeof fo.missingPasses !== 'boolean' &&
+            isFilterNarrowed(fo, defaults?.get(propID))
+          ) {
+            fo.missingPasses = false;
+          }
+        }
+      }
+
       // Keyed off the layout BEING PARSED, not traverseBubbleSets(): that reads
       // data.layouts[data.selectedLayout], a different and not-yet-installed
       // workspace. Once the group list is per-layout, a load into a workspace
@@ -1358,6 +1417,9 @@ class IOManager {
             : new Set(layout[`${group}ManualMembers`] || []);
       }
     });
+    if (unknownSettings.length > 0) {
+      this.cache.ui?.warning(`Unknown workspace settings were replaced: ${unknownSettings.join('; ')}.`);
+    }
     if (droppedNotes > 0) {
       this.cache.ui?.warning?.(
         `${droppedNotes} text note${droppedNotes === 1 ? '' : 's'} could not be loaded ` +
@@ -1381,6 +1443,7 @@ class IOManager {
   }
 
   loadFile(event) {
+    this.importNotices = [];
     const file = event.target.files[0];
     if (!file) {
       this.cache.ui.error('No file selected.');
@@ -1407,6 +1470,14 @@ class IOManager {
               return null;
             });
 
+        case 'graphml':
+          return this.parseInterchangeFile(file, parseGraphML);
+
+        // .cx is usually CX version 1; the CX2 reader names that case itself.
+        case 'cx':
+        case 'cx2':
+          return this.parseInterchangeFile(file, parseCX2);
+
         default:
           this.cache.ui.error(`Unsupported file type: ${fileType}`);
       }
@@ -1416,6 +1487,105 @@ class IOManager {
 
     // Reset the file input for subsequent uploads
     event.target.value = '';
+  }
+
+  /**
+   * Read a GraphML or CX2 file into preProcessData input. The parser throws a
+   * plain-language Error for anything it cannot use, reported here. Notices
+   * about parts it left out wait in `importNotices` for reportImportNotices:
+   * replacing the graph clears the log, which would take them along.
+   * @returns {Promise<object|null>} null after reporting the error
+   */
+  async parseInterchangeFile(file, parse) {
+    try {
+      checkImportSize(file.size);
+      const { fileData, notices } = parse(await file.text());
+      this.importNotices = notices.map((notice) => ({ file: file.name, notice }));
+      return fileData;
+    } catch (err) {
+      console.error(err);
+      this.cache.ui.error(`Could not open ${file.name}: ${err.message}`);
+      return null;
+    }
+  }
+
+  /** Show the notices of the file just rendered; more than a few become one message. */
+  reportImportNotices() {
+    const pending = this.importNotices ?? [];
+    this.importNotices = [];
+    if (pending.length === 0) return;
+    if (pending.length <= MAX_SEPARATE_NOTICES) {
+      for (const { notice } of pending) this.cache.ui.warning(notice);
+      return;
+    }
+    const lines = pending.map(({ notice }) => `• ${notice}`);
+    this.cache.ui.warning(`${pending.length} notes on ${pending[0].file}:\n${lines.join('\n')}`);
+  }
+
+  /** The loaded graph in the shape interchangeGraph reads. */
+  interchangeSource() {
+    const nodeColumns = [];
+    const edgeColumns = [];
+    for (const propId of this.cache.data.filterDefaults.keys()) {
+      // A key may itself contain "::"; everything after the group is the key.
+      const [section, subGroup, ...keyParts] = StaticUtilities.decodePropHashId(propId);
+      const key = keyParts.join('::');
+      const target = section === this.cache.CFG.EXCEL_NODE_HEADER ? nodeColumns : edgeColumns;
+      target.push({ subGroup, key });
+    }
+    return {
+      nodes: this.cache.data.nodes,
+      edges: this.cache.data.edges,
+      nodeColumns,
+      edgeColumns,
+      positions: this.cache.data.layouts[this.cache.data.selectedLayout]?.positions,
+    };
+  }
+
+  /** Download `text` under the usual export filename. */
+  downloadText(text, type, ext) {
+    const objectUrl = URL.createObjectURL(new Blob([text], { type }));
+    // Revoked late for the same reason as in exportSVG.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), SVG_URL_REVOKE_DELAY_MS);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = this.buildExportFilename(ext);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  /**
+   * Export nodes, edges, their properties and the current workspace's
+   * positions for Cytoscape, Gephi, yEd, NetworkX or igraph (GraphML), or
+   * Cytoscape and NDEx (CX2). Styles, workspaces and groups stay in the JSON
+   * model only.
+   */
+  exportNetwork(format) {
+    const exporter = NETWORK_EXPORTS[format];
+    if (!exporter) throw new Error(`Unknown network export format "${format}".`);
+    if (!this.cache.data?.nodes) {
+      this.cache.ui.error('No graph data to export.');
+      return;
+    }
+    try {
+      const label = document.getElementById('dataSourceLabel')?.textContent || '';
+      const result = exporter.write(this.interchangeSource(), label.replace(/\.[a-z0-9]+$/i, ''));
+      this.downloadText(result.text, exporter.type, format);
+      this.reportNetworkExport(exporter, result);
+    } catch (err) {
+      console.error(err);
+      this.cache.ui.error(`Export failed: ${err.message}`);
+    }
+  }
+
+  reportNetworkExport(exporter, { nodes, edges, unplaced, directed }) {
+    this.cache.ui.info(
+      `Exported ${nodes} nodes and ${edges} edges as ${exporter.name}: every node, with filters not applied; ` +
+        'styles, groups, workspaces and notes are not included.'
+    );
+    if (unplaced > 0) this.cache.ui.warning(exporter.unplaced(unplaced));
+    if (directed > 0 && exporter.directed) this.cache.ui.warning(exporter.directed(directed));
   }
 
   async loadFileWrapper(event) {
@@ -1428,21 +1598,25 @@ class IOManager {
     );
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
+    // True between tearing the old graph down and the new file's data being
+    // in place: a failure in that window leaves neither, so the label must
+    // not keep naming the old file.
+    let labelIsStale = false;
     try {
-      // Parse before destroying anything. The old order tore the graph down
-      // first, so a malformed file left an empty stage with nothing to go
-      // back to. Every failure path inside loadFile reports its own reason.
+      // Parse before destroying anything, so a malformed file leaves the
+      // current graph in place. Every failure path inside loadFile reports its own reason.
       const fileData = await this.cache.io.loadFile(event);
       if (!fileData) return;
 
-      this.cache.ui.setDataSourceLabel(file.name);
-
       if (this.cache.graph) {
+        labelIsStale = true;
         await this.cache.gcm.destroyGraphAndRollBackUI();
         await this.cache.gcm.resetEventLocks();
       }
 
       this.cache.io.preProcessData(fileData);
+      this.cache.ui.setDataSourceLabel(file.name);
+      labelIsStale = false;
       this.cache.ui.updateHoverToggleButton();
       this.cache.buildDataTable(fileData);
       this.cache.ui.buildUI();
@@ -1464,6 +1638,7 @@ class IOManager {
       await this.cache.graph.render();
       await this.cache.gcm.fitViewToVisibleNodes();
       this.cache.io.restoreHeatmapFromImport(fileData);
+      this.reportImportNotices();
 
       // Restored ManualMembers populate the layout, but the selection-panel
       // badges (per-group deselect toggles) only refresh via these calls —
@@ -1477,6 +1652,8 @@ class IOManager {
         this.cache.ui.updateFilterLockState();
       }
     } catch (errorMsg) {
+      console.error(errorMsg);
+      if (labelIsStale) this.cache.ui.setDataSourceLabel('');
       this.cache.ui.error(`Error loading graph: ${errorMsg}`);
     } finally {
       await this.cache.ui.hideLoading();

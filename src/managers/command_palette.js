@@ -80,8 +80,8 @@ function visibleWithin(el, root) {
 function actionables(root) {
   const kept = [];
   // querySelectorAll is document order, so a container always precedes its
-  // descendants: checking only the last kept element skips them all, where the
-  // old `found.some(other => other.contains(el))` was a full O(n²) sweep.
+  // descendants: checking only the last kept element skips them all, where
+  // `found.some(other => other.contains(el))` would be a full O(n²) sweep.
   for (const el of root.querySelectorAll('.rail-menu-item, button')) {
     if (kept.length > 0 && kept[kept.length - 1].contains(el)) continue;
     if (!visibleWithin(el, root)) continue;
@@ -120,9 +120,13 @@ function command(el, trail, extra = {}) {
 function sectionOf(el, panel) {
   let node = el;
   while (node && node.parentElement !== panel) node = node.parentElement;
-  let prev = node?.previousElementSibling;
-  while (prev && !prev.matches('h4.insp-section-title')) prev = prev.previousElementSibling;
-  return prev ? clean(prev.textContent) : '';
+  // A section title is an h4 of the panel, or one inside an .insp-section-head
+  // that also holds the section's own action (Appearance › Reset style), which
+  // is why the search starts at the control's own panel child.
+  const titleOf = (n) => (n.matches('h4.insp-section-title') ? n : n.querySelector(':scope > h4.insp-section-title'));
+  let prev = node;
+  while (prev && !titleOf(prev)) prev = prev.previousElementSibling;
+  return prev ? clean(titleOf(prev).textContent) : '';
 }
 
 function breadcrumb(...parts) {
@@ -185,16 +189,18 @@ function collectInspector(out) {
       // once you are there — the palette says where colours live, it is not a
       // paint program.
       if (el.classList.contains('style-color-button')) continue;
-      out.push(command(el, trailFor(el), { glyph: '⚙' }));
+      // A menu anchored to a control on a hidden tab would open nowhere: show
+      // the control instead (Fill's map-by-data menu, ＋ Add to group).
+      const opensMenu = el.dataset?.railMenu !== undefined;
+      out.push(command(el, trailFor(el), { glyph: '⚙', ...(opensMenu && { kind: 'reveal' }) }));
     }
     // A row of inputs is one destination, not one command per field: the label
     // names it and revealing it puts the whole row on screen.
-    for (const label of panel.querySelectorAll('.card-row > label')) {
+    for (const label of panel.querySelectorAll('.prop-row > label')) {
       const row = label.parentElement;
       if (!row.querySelector('input, select')) continue;
-      out.push(
-        command(label, trailFor(label), { glyph: '⚙', kind: 'reveal', el: row, name: clean(label.textContent) })
-      );
+      const name = clean(row.dataset.name ?? label.textContent);
+      out.push(command(label, trailFor(label), { glyph: '⚙', kind: 'reveal', el: row, name }));
     }
   }
   // The activity log sits below both panels, so the loop above cannot see it.
@@ -261,11 +267,11 @@ export function collectCommands(cache) {
 }
 
 /**
- * Nodes and edges by ID or label, from the same maps the old Focus card used.
+ * Nodes and edges by ID or label, from the cache's ID-or-label lookup maps.
  * Query-driven rather than indexed up front — a 6 000-node graph has no
  * business being copied into a list on every ⌘K.
  *
- * ponytail: linear scan per keystroke, bounded only by MAX_ELEMENTS hits.
+ * shortcut: linear scan per keystroke, bounded only by MAX_ELEMENTS hits.
  * Measured at 6k nodes + 12k edges: 1.1 ms for the worst case (a query that
  * matches nothing, so no early exit) and 0.003 ms once it fills the slate —
  * well inside a frame, so no debounce and no scan budget. Revisit above
@@ -343,7 +349,8 @@ export function reveal(cache, cmd) {
   // position in the header).
   for (let node = el.parentElement; node; node = node.parentElement) {
     if (!node.classList?.contains('collapsed')) continue;
-    if (node.dataset?.label) cache.ui?.expandStylingCard(node.dataset.label);
+    if (node.classList.contains('prop-fold')) node.setOpen?.(true, true);
+    else if (node.dataset?.label) cache.ui?.expandStylingCard(node.dataset.label);
     else cache.ui?.setFilterGroupCollapsed(node, false);
   }
 
@@ -506,8 +513,7 @@ class CommandPalette {
     else {
       // A workbench toolbar control (＋ Node, ⤒ Import, ✔ Apply) acts on its
       // own pane, so running it with the pane hidden lands the effect where the
-      // user cannot see it. `cmd.tab` used to be honoured on the reveal path
-      // only.
+      // user cannot see it, so show that pane first.
       if (cmd.tab) this.cache.workbench?.show(cmd.tab);
       cmd.el.click();
     }
@@ -515,15 +521,15 @@ class CommandPalette {
 }
 
 /**
- * "⌘K" everywhere would be a lie on Linux and Windows, where the palette
- * answers to Ctrl+K. One source for every rail pill, tooltip and keyboard-sheet
+ * Key names as words ("Ctrl+K", "Cmd+K" on a Mac), never ⌘/⇧ glyphs: the
+ * palette answers to Ctrl+K on Linux and Windows. One source for every rail pill, tooltip and keyboard-sheet
  * row that names a modified key.
  */
 export function hotkeyLabel(key) {
   const platform = globalThis.navigator?.platform ?? '';
   // "Ctrl Z" (space) parsed as neither an accelerator nor a shortcut, so the
   // kbd chip vanished on Windows and Linux; "+" is what both readers expect.
-  return /Mac|iPhone|iPad/.test(platform) ? `⌘${key}` : `Ctrl+${key}`;
+  return /Mac|iPhone|iPad/.test(platform) ? `Cmd+${key}` : `Ctrl+${key}`;
 }
 
 export function paletteAccelerator() {

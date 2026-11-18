@@ -157,16 +157,13 @@ class GraphSelectionManager {
     }
   }
 
-  async addNodeOrEdgeIDsToSelectionWrapper(elementIDs, isNode) {
-    const shouldAdd = isNode
-      ? !document.getElementById('selectByNodeIDsSwitch').checked
-      : !document.getElementById('selectByEdgeIDsSwitch').checked;
+  async addNodeOrEdgeIDsToSelectionWrapper(elementIDs, isNode, shouldAdd) {
     const elementIDsAsArray = elementIDs ? elementIDs.split(',') : [];
 
     await this.addNodeOrEdgeIDsToSelection(elementIDsAsArray, isNode, shouldAdd);
   }
 
-  async addNodeOrEdgeLabelsToSelectionWrapper(elementLabels, isNode) {
+  async addNodeOrEdgeLabelsToSelectionWrapper(elementLabels, isNode, shouldAdd) {
     const elementLabelsAsArray = elementLabels ? elementLabels.split(',') : [];
 
     const elementIDs = elementLabelsAsArray.flatMap((label) => {
@@ -175,10 +172,6 @@ class GraphSelectionManager {
         : this.cache.edgeLabelToEdgeIDs.get(label);
       return set ? Array.from(set) : [];
     });
-
-    const shouldAdd = isNode
-      ? !document.getElementById('selectByNodeLabelsSwitch').checked
-      : !document.getElementById('selectByEdgeLabelsSwitch').checked;
 
     await this.addNodeOrEdgeIDsToSelection(elementIDs, isNode, shouldAdd);
   }
@@ -417,7 +410,7 @@ class GraphSelectionManager {
     // Swap the inspector's Selection context between its empty state
     // (instructions) and its active state, and flash its pill when the
     // selection changed while another context is up.
-    this.cache.inspector?.syncToSelection(selectedNodesCount, selectedEdgesCount);
+    this.cache.inspector?.syncToSelection(selectedNodesCount, selectedEdgesCount, hiddenSelectedCount);
     if (atLeastOneNodeOrEdgeSelected) {
       // Open the appearance card(s) matching the selection (additive).
       this.cache.ui.syncStylingCardsToSelection(atLeastOneNodeSelected, atLeastOneEdgeSelected);
@@ -440,6 +433,8 @@ class GraphSelectionManager {
     // resync the group rows' ＋/－ buttons here. (updateSelectedState fires
     // before this refresh and would read a stale selection.)
     this.cache.bs.syncGroupRows();
+    this.cache.ui.refreshBadgeControls?.();
+    this.cache.ui.refreshStyleControls?.();
 
     if (typeof this.cache.dataTable !== 'undefined' && this.cache.dataTable.fileData) {
       if (
@@ -448,6 +443,8 @@ class GraphSelectionManager {
         this.cache.dataTable.currentTab === 'selectedElements'
       ) {
         this.cache.dataTable.refreshCurrentTab();
+      } else {
+        this.cache.dataTable.syncCounts();
       }
     }
   }

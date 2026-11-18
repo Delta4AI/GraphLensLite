@@ -1,8 +1,30 @@
 import { attachGroupMenu } from './group_menu.js';
+import { RailMenu, menuItem, menuSeparator } from './rail.js';
 import { StaticUtilities } from '../utilities/static.js';
-import { computeDropdownPlacement } from '../utilities/popover_position.js';
+import { Popup } from '../utilities/popup.js';
+import { missingCount, missingPasses, missingPassesByDefault } from './query.js';
+
+// The count inside a ∅ button: "37", "1.2K", so the button stays about 24px wide.
+const MISSING_COUNT_FORMAT = new Intl.NumberFormat('en', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+
+/** What a property's filter judges: "node(s)" or "edge(s)", plural unless count is 1. */
+function elementNoun(cache, propID, count = 2) {
+  const isEdge = propID.startsWith(`${cache.CFG?.EXCEL_EDGE_HEADER}::`);
+  return `${isEdge ? 'edge' : 'node'}${count === 1 ? '' : 's'}`;
+}
+
+/** "37 nodes have" / "1 edge has": the start of every ∅ sentence. */
+function missingValueSubject(cache, propID, count) {
+  return `${count} ${elementNoun(cache, propID, count)} ${count === 1 ? 'has' : 'have'}`;
+}
 
 class DropdownChecklist {
+  /** A list this long gets a search field. */
+  static SEARCH_FROM = 10;
+
   constructor(propID, cache) {
     this.propID = propID;
     this.cache = cache;
@@ -44,171 +66,325 @@ class DropdownChecklist {
     this.categories = new Set(catArray);
   }
 
+  /** "All", "None" or "4 of 6": what the closed field shows. */
+  summary() {
+    const n = this.selectedCategories.size;
+    const total = this.categories.size;
+    if (n === total) return 'All';
+    if (n === 0) return 'None';
+    // The most common narrowing keeps one value: name it.
+    if (n === 1) return String([...this.selectedCategories][0]);
+    return `${n} of ${total}`;
+  }
+
+  /**
+   * The closed field is a real button that opens a checkbox group, the APG
+   * disclosure pattern. A listbox cannot hold checkboxes, and a native
+   * multi-select needs Ctrl-click and has no room for counts or a search.
+   * RailMenu owns placement, outside click, Escape and focus return.
+   */
   appendTo(parent) {
     this.container = document.createElement('div');
     this.container.id = this.propID + '-dropdown';
     this.container.className = 'dropdown-check-list';
-    this.container.tabIndex = 100;
 
-    // Create the anchor (visible clickable part)
-    this.anchor = document.createElement('h5');
-    this.anchor.className = 'anchor purple round-border';
-    this.anchor.textContent = `${this.selectedCategories.size}/${this.categories.size} selected`;
+    this.anchor = document.createElement('button');
+    this.anchor.type = 'button';
+    this.anchor.className = 'filter-cat-trigger';
     this.anchor.id = this.propID + '-dropdown-anchor';
+    this.summaryText = document.createElement('span');
+    this.summaryText.className = 'filter-cat-summary';
+    this.totalText = document.createElement('span');
+    this.totalText.className = 'filter-cat-total';
+    const chevron = document.createElement('span');
+    chevron.className = 'filter-cat-chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+    chevron.textContent = '⌄';
+    // How the values share the graph, kept ones in slate and dropped ones grey:
+    // the field shows what the filter keeps before it is opened.
+    this.shareBar = document.createElement('span');
+    this.shareBar.className = 'filter-cat-bar';
+    this.shareBar.setAttribute('aria-hidden', 'true');
+    const { counts } = this.#countValues();
+    const total = [...counts.values()].reduce((a, b) => a + b, 0);
+    for (const value of this.categories) {
+      const n = counts.get(String(value)) ?? 0;
+      if (!n) continue;
+      const seg = document.createElement('i');
+      seg.dataset.value = String(value);
+      seg.style.flexGrow = String(n / total);
+      this.shareBar.appendChild(seg);
+    }
+    this.anchor.append(this.summaryText, this.shareBar, this.totalText, chevron);
     this.container.appendChild(this.anchor);
+    this.#syncSummary();
 
-    // Create the unordered list (dropdown items)
-    this.itemsList = document.createElement('ul');
-    this.itemsList.className = 'items';
-
-    // add buttons on top
-    this.buttonContainer = document.createElement('div');
-    this.buttonContainer.className = 'dropdown-buttons';
-
-    this.selectAllButton = document.createElement('button');
-    this.selectAllButton.textContent = 'Select All';
-
-    this.deselectAllButton = document.createElement('button');
-    this.deselectAllButton.textContent = 'Deselect All';
-
-    this.buttonContainer.appendChild(this.selectAllButton);
-    this.buttonContainer.appendChild(this.deselectAllButton);
-
-    this.itemsList.appendChild(this.buttonContainer);
-
-    // Add the options as checkboxes
-    this.categories.forEach((option) => {
-      const listItem = document.createElement('li');
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.value = option;
-      checkbox.checked = this.selectedCategories.has(option);
-      checkbox.className = 'hidden-checkbox';
-      checkbox.addEventListener('change', async (ev) => await this.handleSelection(ev));
-
-      const customCheckbox = document.createElement('span');
-      customCheckbox.className = 'custom-checkbox';
-
-      checkbox.addEventListener('change', () => {
-        checkbox.checked
-          ? customCheckbox.classList.add('checked')
-          : customCheckbox.classList.remove('checked');
-      });
-
-      // Set initial state
-      if (checkbox.checked) customCheckbox.classList.add('checked');
-
-      const label = document.createElement('label');
-      label.textContent = option;
-      label.prepend(customCheckbox);
-      label.prepend(checkbox);
-
-      listItem.appendChild(label);
-      this.itemsList.appendChild(listItem);
+    this.menu = new RailMenu(this.anchor, (el) => this.#buildList(el));
+    this.menu.el.classList.add('filter-cat-menu');
+    // ↓ opens too, as on a native select.
+    this.anchor.addEventListener('keydown', (ev) => {
+      if (ev.key === 'ArrowDown' && !this.menu.isOpen) {
+        ev.preventDefault();
+        this.menu.open();
+      }
     });
-
-    this.container.appendChild(this.itemsList);
-
     parent.appendChild(this.container);
+  }
+
+  #syncSummary() {
+    if (!this.anchor) return;
+    const prop = StaticUtilities.decodePropHashId(this.propID).slice(-1)[0];
+    const summary = this.summary();
+    this.summaryText.textContent = summary;
+    // The total only adds information next to "All"; "4 of 6" already says it.
+    this.totalText.textContent = summary === 'All' ? String(this.categories.size) : '';
+    const n = this.selectedCategories.size;
+    const shown = n === this.categories.size ? 'all' : `${n} of ${this.categories.size}`;
+    this.anchor.setAttribute('aria-label', `${prop}: ${shown} values shown${n === 1 ? ` (${summary})` : ''}`);
+    this.anchor.title = `Choose which ${prop} values to show`;
+    this.anchor.classList.toggle('narrowed', summary !== 'All');
+    const kept = new Set([...this.selectedCategories].map(String));
+    for (const seg of this.shareBar?.children ?? []) seg.classList.toggle('kept', kept.has(seg.dataset.value));
+  }
+
+  /** How many elements carry each value, over the whole graph. Counted for the
+   * share bar when the field is built (every load and data edit) and again on open. */
+  #countValues() {
+    const counts = new Map();
+    let carriers = 0;
+    for (const ref of [this.cache.nodeRef, this.cache.edgeRef]) {
+      for (const element of ref?.values() ?? []) {
+        const value = element.featureValues?.get(this.propID);
+        if (value === undefined) continue;
+        carriers += 1;
+        for (const v of value instanceof Set ? value : [value]) {
+          counts.set(String(v), (counts.get(String(v)) ?? 0) + 1);
+        }
+      }
+    }
+    return { counts, carriers };
+  }
+
+  #buildList(el) {
+    const prop = StaticUtilities.decodePropHashId(this.propID).slice(-1)[0];
+    const { counts, carriers } = this.#countValues();
+    let status;
+
+    if (this.categories.size >= DropdownChecklist.SEARCH_FROM) {
+      const search = document.createElement('input');
+      search.type = 'search';
+      search.className = 'filter-cat-search';
+      search.placeholder = `Search ${this.categories.size} values…`;
+      search.setAttribute('aria-label', `Search ${prop} values`);
+      search.addEventListener('input', () => {
+        const q = search.value.trim().toLowerCase();
+        let shown = 0;
+        for (const item of el.querySelectorAll('.filter-cat-item[data-value]')) {
+          item.hidden = q !== '' && !item.dataset.value.toLowerCase().includes(q);
+          if (!item.hidden) shown += 1;
+        }
+        // A live region, so a screen reader hears what the typing did.
+        status.textContent = !q ? ''
+          : shown ? `${shown} of ${this.categories.size} values`
+          : `No values match "${search.value.trim()}"`;
+        const allName = q ? 'All matching' : 'All';
+        all.querySelector('.filter-cat-name').textContent = allName;
+        all.querySelector('input').setAttribute('aria-label', allName);
+        this.#syncBoxes();
+      });
+      el.appendChild(search);
+      // Present (empty) from the start: a live region added mid-change is not read.
+      status = document.createElement('div');
+      status.className = 'filter-cat-status';
+      status.setAttribute('role', 'status');
+      el.appendChild(status);
+    }
+
+    const all = this.#item('All', null, carriers);
+    all.classList.add('filter-cat-all');
+    this.allBox = all.querySelector('input');
+    // With a search typed, All acts on the values it shows.
+    this.allBox.addEventListener('change', async () => {
+      if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return this.#syncBoxes();
+      const scope = this.#visibleValues();
+      if (scope.length === this.categories.size) {
+        return this.selectedCategories.size === this.categories.size
+          ? await this.deselectAllCategories()
+          : await this.selectAllCategories();
+      }
+      const add = !scope.every((v) => this.selectedCategories.has(v));
+      for (const v of scope) add ? this.selectedCategories.add(v) : this.selectedCategories.delete(v);
+      this.#syncBoxes();
+      await this.cache.fm.handleFilterEvent(
+        `${add ? 'Showing' : 'Hiding'} Elements`,
+        `${scope.length} values of ${this.propID}`,
+        this.propID
+      );
+    });
+    el.appendChild(all);
+
+    const group = document.createElement('div');
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', `${prop} values`);
+    for (const value of this.categories) {
+      const item = this.#item(value, value, counts.get(String(value)) ?? 0);
+      const box = item.querySelector('input');
+      box.addEventListener('change', async (ev) => await this.handleSelection(ev));
+      // Keep only this value: the Only button, Enter on the box, or Alt-click
+      // (Linear's "replace selection").
+      const only = document.createElement('button');
+      only.type = 'button';
+      only.className = 'filter-cat-only';
+      only.textContent = 'Only';
+      only.tabIndex = -1; // Enter on the box does the same; keeps ↑/↓ a single column
+      only.title = 'Keep only this value (Enter, or Alt-click the value)';
+      only.setAttribute('aria-label', `Only ${value}`);
+      only.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        await this.selectOnly(value);
+      });
+      item.appendChild(only);
+      box.addEventListener('keydown', async (ev) => {
+        if (ev.key !== 'Enter') return;
+        ev.preventDefault();
+        await this.selectOnly(value);
+      });
+      box.setAttribute('aria-description', 'Enter keeps only this value');
+      item.addEventListener('click', async (ev) => {
+        if (!ev.altKey || ev.target === only) return;
+        ev.preventDefault();
+        await this.selectOnly(value);
+      });
+      group.appendChild(item);
+    }
+    el.appendChild(group);
+    // The values above never list the elements that have none; say where they went.
+    const missing = missingCount(this.cache, this.propID);
+    if (missing > 0) {
+      const foot = document.createElement('div');
+      foot.className = 'filter-cat-foot';
+      foot.textContent =
+        `${missingValueSubject(this.cache, this.propID, missing)} no ${prop}. ` +
+        'The ∅ switch on this row decides whether they pass.';
+      el.appendChild(foot);
+    }
+    el.addEventListener('keydown', (ev) => this.#onListKey(ev, el));
+    this.listEl = el;
+    this.#syncBoxes();
+    // RailMenu focuses the first button, here an "Only"; move to the first
+    // field once the menu is in the document.
+    queueMicrotask(() => el.querySelector('input:not([hidden])')?.focus());
+  }
+
+  #item(text, value, count) {
+    const label = document.createElement('label');
+    label.className = 'filter-cat-item';
+    if (value !== null) label.dataset.value = String(value);
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    if (value !== null) box.value = value;
+    // Named by the value alone: the label also holds the count and "Only".
+    box.setAttribute('aria-label', String(text));
+    const name = document.createElement('span');
+    name.className = 'filter-cat-name';
+    name.textContent = text;
+    const n = document.createElement('span');
+    n.className = 'filter-cat-count';
+    n.textContent = String(count);
+    label.append(box, name, n);
+    return label;
+  }
+
+  /** Values not hidden by the search. */
+  #visibleValues() {
+    if (!this.listEl) return [...this.categories];
+    return [...this.listEl.querySelectorAll('.filter-cat-item[data-value]')]
+      .filter((item) => !item.hidden)
+      .map((item) => item.querySelector('input').value);
+  }
+
+  /** ↑/↓ walk the visible fields (RailMenu closes the list on Tab out). */
+  #onListKey(ev, el) {
+    if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+    const fields = [...el.querySelectorAll('input')].filter((f) => !f.closest('[hidden]') && !f.hidden);
+    const i = fields.indexOf(document.activeElement);
+    const next = fields[ev.key === 'ArrowDown' ? Math.min(i + 1, fields.length - 1) : Math.max(i - 1, 0)];
+    if (next) {
+      ev.preventDefault();
+      next.focus();
+    }
+  }
+
+  /** Mirror the model into the rendered boxes (when the list is open) and the field. */
+  #syncBoxes() {
+    this.#syncSummary();
+    // Not `isConnected`: RailMenu builds the list before it enters the document.
+    if (!this.listEl) return;
+    for (const box of this.listEl.querySelectorAll('.filter-cat-item[data-value] input')) {
+      box.checked = this.selectedCategories.has(box.value);
+    }
+    if (this.allBox) {
+      const scope = this.#visibleValues();
+      const n = scope.filter((v) => this.selectedCategories.has(v)).length;
+      this.allBox.checked = scope.length > 0 && n === scope.length;
+      this.allBox.indeterminate = n > 0 && n < scope.length;
+    }
   }
 
   async handleSelection(ev) {
     if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
-      ev.preventDefault();
+      ev.target.checked = !ev.target.checked;
       return;
     }
+    // Already the model's state (an Alt-click's selectOnly synced this box
+    // mid-click): nothing to apply, and a second filter pass would be wasted.
+    if (ev.target.checked === this.selectedCategories.has(ev.target.value)) return;
     try {
       ev.target.checked
         ? this.selectedCategories.add(ev.target.value)
         : this.selectedCategories.delete(ev.target.value);
-      this.anchor.textContent = `${this.selectedCategories.size}/${this.categories.size} selected`;
+      this.#syncBoxes();
       await this.cache.fm.handleFilterEvent(
         `${ev.target.checked ? 'Showing' : 'Hiding'} Elements`,
         `Nodes and related edges for ${this.propID} ${ev.target.value}`,
         this.propID
       );
-      // this.cache.ui.debug(`${this.propID} ${ev.target.value} ${ev.target.checked}`);
     } catch (err) {
       this.cache.ui.error(`Failed to handle category selection: ${err.message}`);
     }
   }
 
-  appendListeners() {
-    const updateDropdownPosition = () => {
-      // Temporarily make the dropdown visible to calculate its height
-      this.itemsList.style.visibility = 'hidden';
-      this.itemsList.style.display = 'block';
-
-      const dropdownHeight = this.itemsList.offsetHeight;
-      this.itemsList.style.display = '';
-      this.itemsList.style.visibility = '';
-
-      const { left, top, maxHeight } = computeDropdownPlacement({
-        anchorRect: this.anchor.getBoundingClientRect(),
-        dropdownHeight,
-        viewportHeight: window.innerHeight,
-      });
-
-      this.itemsList.style.left = `${left}px`;
-      this.itemsList.style.top = `${top}px`;
-
-      // Cap height and scroll only when even the chosen side is too small.
-      if (maxHeight != null) {
-        this.itemsList.style.maxHeight = `${maxHeight}px`;
-        this.itemsList.style.overflowY = 'auto';
-      } else {
-        this.itemsList.style.maxHeight = '';
-        this.itemsList.style.overflowY = '';
-      }
-    };
-
-    this.anchor.addEventListener('click', () => {
-      this.isVisible = !this.isVisible;
-      if (this.isVisible) {
-        updateDropdownPosition();
-        document.addEventListener('scroll', updateDropdownPosition, true);
-        this.container.classList.add('visible');
-      } else {
-        this.container.classList.remove('visible');
-        document.removeEventListener('scroll', updateDropdownPosition, true);
-      }
-    });
-
-    // button callbacks
-    this.selectAllButton.addEventListener('click', async () => await this.selectAllCategories());
-    this.deselectAllButton.addEventListener(
-      'click',
-      async () => await this.deselectAllCategories()
-    );
-
-    // Handle clicks outside the dropdown to close it
-    document.addEventListener('click', (event) => {
-      if (!this.container.contains(event.target)) {
-        this.isVisible = false;
-        this.container.classList.remove('visible');
-      }
-    });
+  async selectOnly(category) {
+    if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
+    try {
+      this.selectedCategories.clear();
+      this.selectedCategories.add(category);
+      this.#syncBoxes();
+      await this.cache.fm.handleFilterEvent(
+        'Filtering',
+        `Only ${this.propID} ${category}`,
+        this.propID
+      );
+    } catch (err) {
+      this.cache.ui.error(`Failed to handle category selection: ${err.message}`);
+    }
   }
+
+  // Interface parity with InvertibleRangeSlider: RailMenu wires the list.
+  appendListeners() {}
 
   selectCategory(category) {
     if (!this.categories.has(category)) {
       this.cache.ui.warning(`Category "${category}" does not exist for ${this.propID}`);
       return;
     }
-
     this.selectedCategories.add(category);
-
-    const checkbox = this.itemsList.querySelector(
-      `input[type="checkbox"][value="${CSS.escape(category)}"]`
-    );
-    checkbox.checked = true;
-    checkbox.nextElementSibling.classList.add('checked');
-    this.anchor.textContent = `${this.selectedCategories.size}/${this.categories.size} selected`;
+    this.#syncBoxes();
   }
 
   async selectAllCategories(skipFilterEvent = false) {
     try {
-      this.categories.forEach((category) => this.selectedCategories.add(category)); // Add all categories
+      this.categories.forEach((category) => this.selectedCategories.add(category));
       this.updateCheckboxStates(true);
       if (!skipFilterEvent) {
         await this.cache.fm.handleFilterEvent(
@@ -224,7 +400,7 @@ class DropdownChecklist {
 
   async deselectAllCategories(skipFilterEvent = false) {
     try {
-      this.categories.forEach((category) => this.selectedCategories.delete(category)); // Clear all categories
+      this.categories.forEach((category) => this.selectedCategories.delete(category));
       this.updateCheckboxStates(false);
       if (!skipFilterEvent) {
         await this.cache.fm.handleFilterEvent(
@@ -238,14 +414,9 @@ class DropdownChecklist {
     }
   }
 
-  updateCheckboxStates(selectAll) {
-    Array.from(this.itemsList.querySelectorAll("input[type='checkbox']")).forEach((checkbox) => {
-      checkbox.checked = selectAll; // Update checkbox state
-      selectAll
-        ? checkbox.nextElementSibling.classList.add('checked')
-        : checkbox.nextElementSibling.classList.remove('checked');
-    });
-    this.anchor.textContent = `${this.selectedCategories.size}/${this.categories.size} selected`; // Update anchor text
+  // The selection Set is the state; the argument is kept for callers.
+  updateCheckboxStates() {
+    this.#syncBoxes();
   }
 }
 
@@ -351,6 +522,14 @@ class BooleanToggle {
   }
 }
 
+// Digits are exactly 1ch under tabular-nums ("." and "-" are narrower), so a
+// char count fits the value; 10px is the box's padding + border. The native
+// `size` attribute sizes by the font's average glyph plus slack — ~50% wider.
+const BOX_CHROME_PX = 10;
+function setBoxWidth(input, chars) {
+  input.style.width = `calc(${chars}ch + ${BOX_CHROME_PX}px)`;
+}
+
 class InvertibleRangeSlider {
   constructor(propID, cache) {
     this.propID = propID;
@@ -375,12 +554,11 @@ class InvertibleRangeSlider {
     // near 0 on float columns, where "0" ↔ "0.050" oscillated every frame.
     // The endpoints bound every in-range value's formatted length: the sign
     // comes from min, integer digits from the larger magnitude, and decimals
-    // are fixed-width. +1 because `size` counts average character widths and
-    // digits are narrower than average, so an exact count clips the last glyph.
+    // are fixed-width.
     this.boxSize = Math.max(
       3,
-      String(this.formatThreshold(this.sliderMin)).length + 1,
-      String(this.formatThreshold(this.sliderMax)).length + 1
+      String(this.formatThreshold(this.sliderMin)).length,
+      String(this.formatThreshold(this.sliderMax)).length
     );
     this.initializeIds();
     this.inputStart = null;
@@ -459,7 +637,7 @@ class InvertibleRangeSlider {
   createSliderInput(id, initialValue, relatedSliderId, readExact) {
     const input = document.createElement('input');
     input.id = id;
-    input.size = this.boxSize;
+    setBoxWidth(input, this.boxSize);
     input.value = this.formatThreshold(initialValue);
     // A column of raw floats ("-51.82279968") is what made this row need a
     // line of its own. Rounded at rest, exact the moment you go to edit it —
@@ -471,7 +649,7 @@ class InvertibleRangeSlider {
     input.addEventListener('focus', () => {
       const exact = String(readExact());
       input.value = exact;
-      input.size = Math.max(this.boxSize, exact.length + 1);
+      setBoxWidth(input, Math.max(this.boxSize, exact.length));
       input.select();
     });
     // Enter and blur apply the same way: a typed number that stays on screen
@@ -508,7 +686,7 @@ class InvertibleRangeSlider {
     input.addEventListener('blur', () => {
       applyTyped();
       input.value = this.formatThreshold(readExact());
-      input.size = this.boxSize;
+      setBoxWidth(input, this.boxSize);
     });
     input.addEventListener('keydown', (ev) => {
       if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
@@ -530,6 +708,14 @@ class InvertibleRangeSlider {
     this.writeCurrentFilterSettings();
   }
 
+  /** Flip between inside and outside the current bounds, then apply. */
+  toggleInverted() {
+    const lo = Math.min(this.currentMin, this.currentMax);
+    const hi = Math.max(this.currentMin, this.currentMax);
+    this.setTo(lo, hi, !this.isInverted);
+    this.sliderEnd.dispatchEvent(new Event('change'));
+  }
+
   appendTo(parent) {
     if (this.cache.CFG.HIDE_SLIDERS_WITH_SAME_MIN_MAX_VALUES && this.sliderMin === this.sliderMax) {
       // A numeric property whose only value is min === max has no range to
@@ -548,11 +734,8 @@ class InvertibleRangeSlider {
     slider.title = `Set the thresholds for the numeric property: ${StaticUtilities.formatPropsAsTree(this.propID)}\n---\n  - Move handles to set min/max (≥ min ∧ ≤ max).\n  - Swap handles to invert (≤ min ∨ ≥ max).\n  - Double-click to reset.`;
 
     // The exact-value boxes sit at the two ends of the track, on the slider's
-    // own line. They used to be a second row under it, while a pair of
-    // position:fixed bubbles showed the SAME two numbers on hover — one value,
-    // drawn twice, one of the copies needing hover/scroll/resize listeners to
-    // stay pinned. Merging them halves the row height (~40px to ~22px) and
-    // deletes the whole fixed-positioning apparatus.
+    // own line, so each value is drawn once, the row stays ~22px tall, and no
+    // position:fixed hover bubble needs scroll/resize listeners to stay pinned.
     const row = document.createElement('div');
     row.className = 'filter-range-row';
     this.inputStart = this.createSliderInput(
@@ -572,9 +755,62 @@ class InvertibleRangeSlider {
     this.inputEnd.title = 'Upper threshold — type an exact value and press Enter';
     this.inputEnd.setAttribute('aria-label', `${this.propLabel()} — upper threshold`);
     row.append(this.inputStart, slider, this.inputEnd);
+    this.#appendHistogram(slider, row);
 
     parent.appendChild(row);
     this.rangeRow = row;
+  }
+
+  /** How many bars the distribution above the track gets. */
+  static HISTOGRAM_BINS = 24;
+
+  /**
+   * The column's distribution, drawn over the track in the slider's own
+   * coordinates: bars inside the kept range are tinted (#shadeHistogram), so
+   * the row shows what a threshold drops before it is moved. Counted once, here:
+   * the filter panel is rebuilt on every load and data edit.
+   */
+  #appendHistogram(slider, row) {
+    const span = this.sliderMax - this.sliderMin;
+    if (!(span > 0)) return;
+    const bins = new Array(InvertibleRangeSlider.HISTOGRAM_BINS).fill(0);
+    for (const ref of [this.cache.nodeRef, this.cache.edgeRef]) {
+      for (const element of ref?.values() ?? []) {
+        const value = Number(element.featureValues?.get(this.propID));
+        if (!Number.isFinite(value)) continue;
+        const bin = Math.floor(((value - this.sliderMin) / span) * bins.length);
+        bins[StaticUtilities.clamp(bin, 0, bins.length - 1)] += 1;
+      }
+    }
+    const peak = Math.max(...bins);
+    if (!peak) return;
+    const hist = document.createElement('div');
+    hist.className = 'filter-hist';
+    hist.setAttribute('aria-hidden', 'true');
+    hist.title = `Distribution of ${this.propLabel()}; tinted bars are kept`;
+    for (const count of bins) {
+      const bar = document.createElement('i');
+      bar.style.height = `${(count / peak) * 100}%`;
+      // A bin with anything in it stays visible next to a tall peak.
+      if (count) bar.style.minHeight = '1px';
+      hist.appendChild(bar);
+    }
+    slider.firstElementChild.appendChild(hist);
+    row.classList.add('has-hist');
+    this.histogram = hist;
+  }
+
+  /** Tint the bars whose middle the filter keeps (inside the range, or outside it when inverted). */
+  #shadeHistogram() {
+    if (!this.histogram) return;
+    const lo = Math.min(this.currentMin, this.currentMax);
+    const hi = Math.max(this.currentMin, this.currentMax);
+    const bars = this.histogram.children;
+    for (let i = 0; i < bars.length; i++) {
+      const mid = this.sliderMin + ((i + 0.5) / bars.length) * (this.sliderMax - this.sliderMin);
+      const inside = mid >= lo && mid <= hi;
+      bars[i].classList.toggle('kept', this.isInverted ? !inside : inside);
+    }
   }
 
   /** Bare property name, for the inputs' accessible names. */
@@ -688,8 +924,7 @@ class InvertibleRangeSlider {
       this.inverseLeft.style.width = leftWidth + '%';
       this.inverseRight.style.width = 100 - rightWidth + '%';
       this.range.style.left = '50%';
-      this.inverseLeft.style.backgroundColor = '#C33D35';
-      this.inverseRight.style.backgroundColor = '#C33D35';
+      this.slider.classList.add('inverted');
       // Inverted means sliderStart holds the HIGHER value, so its box belongs
       // at the right-hand end of the track. Each box still drives its own
       // handle; only the visual order swaps, which is what the retired bubbles
@@ -704,8 +939,7 @@ class InvertibleRangeSlider {
       this.range.style.width = 100 - leftPos - rightPos + '%';
       this.inverseLeft.style.width = leftPos + '%';
       this.inverseRight.style.width = rightPos + '%';
-      this.inverseLeft.style.backgroundColor = 'grey';
-      this.inverseRight.style.backgroundColor = 'grey';
+      this.slider.classList.remove('inverted');
       this.rangeRow?.classList.remove('flipped');
       this.inputStart.classList.remove('red');
       this.inputEnd.classList.remove('red');
@@ -723,6 +957,26 @@ class InvertibleRangeSlider {
     if (box && document.activeElement !== box) {
       box.value = this.formatThreshold(primaryValue);
     }
+    this.#describeThresholds();
+    this.#shadeHistogram();
+  }
+
+  /**
+   * Inverted, the "lower threshold" handle holds the higher value and the
+   * filter keeps what lies outside — shown only by colour and swapped boxes,
+   * so the handles say it in words.
+   */
+  #describeThresholds() {
+    if (!this.isInverted) {
+      this.sliderStart.removeAttribute('aria-valuetext');
+      this.sliderEnd.removeAttribute('aria-valuetext');
+      return;
+    }
+    const lo = this.formatThreshold(Math.min(this.currentMin, this.currentMax));
+    const hi = this.formatThreshold(Math.max(this.currentMin, this.currentMax));
+    const outside = `keeping values outside ${lo} to ${hi}`;
+    this.sliderStart.setAttribute('aria-valuetext', `at least ${hi}, ${outside}`);
+    this.sliderEnd.setAttribute('aria-valuetext', `at most ${lo}, ${outside}`);
   }
 
   setTo(min, max, inverted) {
@@ -769,43 +1023,43 @@ class UIComponentManager {
   }
 
   buildDropdownOptions() {
-    let selectViewDropdown = document.getElementById('selectView');
-    let selectViewOptions = Object.keys(this.cache.data.layouts).map((key) => {
-      let selected = this.cache.data.selectedLayout === key ? 'selected' : '';
-      return `<option value="${key}" ${selected}>${key}</option>`;
-    });
-    selectViewDropdown.innerHTML = selectViewOptions.join('');
+    // Workspace names come from loaded files: build options as text, never markup.
+    document.getElementById('selectView').replaceChildren(
+      ...Object.keys(this.cache.data.layouts).map((key) => {
+        const selected = this.cache.data.selectedLayout === key;
+        return new Option(key, key, selected, selected);
+      })
+    );
   }
 
-  createSectionToggleButton(enable, section, subSection = null) {
-    const btn = document.createElement('button');
-    btn.className = 'small-btn toggle-section-btn ml-1';
-    if (subSection) btn.classList.add('extra-small');
-    btn.textContent = enable ? '✔' : '✗';
-    btn.title = `${enable ? 'Enable' : 'Disable'} all filters for the ${
-      subSection
-        ? 'group: ' + '\n └─ ' + section + '\n        └─ ' + subSection
-        : 'section: ' + '\n └─ ' + section
-    }`;
-    // The rendered text is a bare ✔/✗ glyph, so the group has to be spelled out
-    // for screen readers — and for the command palette, which indexes controls
-    // by their accessible name.
-    btn.setAttribute(
-      'aria-label',
-      `${enable ? 'Enable' : 'Disable'} all filters: ${subSection ? `${section} › ${subSection}` : section}`
-    );
-    btn.onclick = async () => {
+  /**
+   * One tri-state box per section or sub-group (APG mixed checkbox): ticked
+   * when every filter under it is on, mixed when some are, empty when none.
+   * Clicking turns them all on, or all off when they already are.
+   */
+  createSectionCheckbox(section, subSection = null) {
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.className = 'filter-section-check';
+    box.dataset.prefix = StaticUtilities.propIDPrefix(section, subSection);
+    box.setAttribute('aria-label', `All filters: ${subSection ? `${section} › ${subSection}` : section}`);
+    box.title = `Turn every filter under ${subSection ?? section} on, or off when all are on`;
+    box.addEventListener('change', async () => {
+      if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return this.cache.ui.syncSectionCheckboxes();
+      // A mixed box is unchecked underneath, so the click lands on checked:
+      // mixed or empty turns everything on, only a fully ticked box turns off.
+      const enable = box.checked;
       subSection
         ? await this.cache.ui.toggleSubSection(enable, section, subSection)
         : await this.cache.ui.toggleSection(enable, section);
-    };
-    return btn;
+    });
+    return box;
   }
 
   createSectionResetButton(section, subSection = undefined) {
     const btn = document.createElement('button');
-    btn.className = 'small-btn toggle-section-btn ml-1';
-    if (subSection) btn.classList.add('extra-small');
+    btn.type = 'button';
+    btn.className = 'filter-section-reset';
     btn.textContent = '⟳';
     btn.title = `Reset all filters for the ${
       subSection
@@ -816,8 +1070,17 @@ class UIComponentManager {
       'aria-label',
       `Reset all filters: ${subSection ? `${section} › ${subSection}` : section}`
     );
+    // Filter changes are not in the undo history, so a whole-scope reset asks first.
     btn.onclick = async () => {
-      await this.cache.fm.resetFilters(section, subSection);
+      const prefix = StaticUtilities.propIDPrefix(section, subSection);
+      const n = [...this.cache.propIDs].filter((id) => id.startsWith(prefix)).length;
+      const scope = subSection ? `${section} › ${subSection}` : section;
+      const confirmed = await Popup.confirm(
+        `Reset the ${n} filter${n === 1 ? '' : 's'} in ${scope} to their loaded values? ` +
+          'This cannot be undone.',
+        'Reset filters'
+      );
+      if (confirmed === true) await this.cache.fm.resetFilters(section, subSection);
     };
     return btn;
   }
@@ -827,9 +1090,9 @@ class UIComponentManager {
    * checklist, replacing a 2×2 quadrant pie that could only ever address four
    * groups and never said which four.
    *
-   * ponytail: at 18px in `filter-row-col3` the dot shows ONE colour plus a ring
+   * shortcut: at 18px in `filter-row-col3` the dot shows ONE colour plus a ring
    * meaning "and others" — N colours are not legible at this size, and a conic
-   * pie would just rebuild the wedges this replaced. Exact membership is in the
+   * pie would only produce unreadable wedges. Exact membership is in the
    * tooltip and the menu. Give it more room and it could show a colour stack.
    *
    * @param {string} propID
@@ -840,7 +1103,7 @@ class UIComponentManager {
     chip.className = 'group-chip';
     chip.dataset.prop = propID;
 
-    attachGroupMenu(chip, this.cache, () => ({
+    chip.groupMenu = attachGroupMenu(chip, this.cache, () => ({
       isChecked: (group) => this.#propsOf(group).has(propID),
       onToggle: async (group) => {
         const props = this.#propsOf(group);
@@ -897,7 +1160,7 @@ class UIComponentManager {
   }
 
   /**
-   * Paint one chip from current membership: hairline when unassigned, the
+   * Paint one chip from current membership: hidden when unassigned, the
    * group's colour when in one, plus a ring when in several. The full list of
    * groups goes in the accessible name, which is where it stays legible.
    */
@@ -910,6 +1173,8 @@ class UIComponentManager {
       if (this.#propsOf(group).has(propID)) inGroups.push(group);
     }
 
+    // Unassigned, the dot is not shown: ⋯ › Add to group… assigns it.
+    chip.hidden = inGroups.length === 0;
     chip.classList.toggle('assigned', inGroups.length > 0);
     chip.classList.toggle('multi', inGroups.length > 1);
     chip.style.removeProperty('--chip-color');
@@ -1126,40 +1391,35 @@ class UIComponentManager {
   }
 
   createCheckbox(propID, prop) {
-    const container = this.cache.uiComponents.createCheckboxContainer(propID);
-    const wrapper = document.createElement('label');
+    const container = this.createCheckboxContainer(propID);
+    // The tooltip host: the constraint pass rewrites its title on every change.
+    const wrapper = document.createElement('span');
     wrapper.className = 'checkboxWrapper';
     wrapper.id = `filter-${propID}-checkbox-wrapper`;
 
-    const input = this.cache.uiComponents.createCheckboxInput(
+    const input = this.createCheckboxInput(
       propID,
       this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID).active
     );
-    const customCheckbox = this.cache.uiComponents.createCustomCheckbox(propID);
-    const actionButton = this.cache.uiComponents.createAddToQueryButton(propID);
-    const displayField = document.createElement('span');
+    // The name is the checkbox's label, so it is clickable and the box is named.
+    const displayField = document.createElement('label');
     displayField.className = 'checkboxLabel';
+    displayField.htmlFor = input.id;
     displayField.textContent = prop;
-    // No own title: the label clamps at two lines, but the wrapper tooltip
-    // (getCheckboxTT) already ends its └─ tree with the full property name —
-    // a second title here would swap tooltips mid-row.
+    wrapper.title = this.getCheckboxTT(input.checked, propID);
 
-    const updateCheckbox = () => {
-      customCheckbox.textContent = input.checked ? '✔' : '';
-      wrapper.title = this.cache.uiComponents.getCheckboxTT(input.checked, propID);
-    };
-    updateCheckbox();
-
-    input.addEventListener('change', updateCheckbox);
-    wrapper.addEventListener('change', async () => {
-      if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) return;
+    input.addEventListener('change', async () => {
+      if (this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY) {
+        input.checked = !input.checked;
+        return;
+      }
       try {
         this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID).active =
           input.checked;
         input.checked ? this.cache.activeProps.add(propID) : this.cache.activeProps.delete(propID);
-        let status = input.checked ? 'Showing' : 'Hiding';
+        wrapper.title = this.getCheckboxTT(input.checked, propID);
         await this.cache.fm.handleFilterEvent(
-          `${status} Elements`,
+          `${input.checked ? 'Showing' : 'Hiding'} Elements`,
           `Nodes and related edges for ${propID}`
         );
       } catch (err) {
@@ -1167,11 +1427,9 @@ class UIComponentManager {
       }
     });
 
-    wrapper.append(input, customCheckbox);
-    container.append(wrapper, actionButton, displayField);
-
+    wrapper.append(input);
+    container.append(wrapper, displayField);
     input.checked ? this.cache.activeProps.add(propID) : this.cache.activeProps.delete(propID);
-
     return container;
   }
 
@@ -1187,121 +1445,289 @@ class UIComponentManager {
     input.id = `filter-${propID}-checkbox`;
     input.type = 'checkbox';
     input.checked = initialState;
-    input.className = 'hidden-checkbox';
+    input.className = 'filter-row-check';
     return input;
   }
 
-  createCustomCheckbox(propID) {
-    const customCheckbox = document.createElement('span');
-    customCheckbox.id = `filter-${propID}-checkbox-inner`;
-    customCheckbox.className = 'checkbox checkbox-green';
-    return customCheckbox;
+  /**
+   * The row's verbs behind one labelled "⋯" button. Selection, grouping,
+   * inversion and the query are five actions; inline they crowded the row end
+   * into 8px targets (NN/g: more than two actions go in a menu beside the item).
+   * Inline beside it only what is active: the ∅ marker while it differs from
+   * the mode's default, the group dot while assigned. Both are set from ⋯.
+   *
+   * @returns {HTMLElement[]} the row-end cells' contents
+   */
+  createRowActions(propID, prop, { groupable }) {
+    const gaps = missingCount(this.cache, propID);
+    const missingSwitch = gaps > 0 ? this.createMissingSwitch(propID) : null;
+    const chip = groupable ? this.createGroupChip(propID) : null;
+
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'filter-row-more';
+    more.textContent = '⋯';
+    more.setAttribute('aria-label', `${prop} actions`);
+    more.title = `Actions for ${prop}: selection, inversion, group, query`;
+    const menu = new RailMenu(more, (el) => {
+      const run = (action) => () => {
+        menu.close();
+        Promise.resolve(action()).catch((err) =>
+          this.cache.ui.error(`That did not work: ${err?.message ?? err}`)
+        );
+      };
+      const locked = this.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY;
+      const lockedTitle = 'Filters follow your edited query — unlock them first';
+      el.append(
+        menuItem({ icon: '＋', label: 'Add matches to selection', onClick: run(() => this.selectMatches(propID, true)) }),
+        menuItem({ icon: '−', label: 'Remove matches from selection', onClick: run(() => this.selectMatches(propID, false)) }),
+        menuSeparator()
+      );
+      const slider = this.cache.propIDToInvertibleRangeSliders.get(propID);
+      if (slider?.isValidSlider) {
+        el.append(
+          menuItem({
+            icon: '⇆',
+            label: 'Keep values outside the range',
+            checked: slider.isInverted,
+            disabled: locked,
+            title: locked ? lockedTitle : 'Same as dragging one handle past the other',
+            onClick: run(() => slider.toggleInverted()),
+          })
+        );
+      }
+      if (gaps > 0)
+        el.append(this.#missingMenuItem(propID, prop, gaps, { run, locked, lockedTitle }));
+      if (groupable) {
+        // From ⋯, which is on screen: the dot is hidden until assigned.
+        el.append(
+          menuItem({
+            icon: '◌',
+            label: 'Add to group…',
+            onClick: () => {
+              menu.close();
+              chip.groupMenu.openFrom(more);
+            },
+          })
+        );
+      }
+      el.append(
+        menuItem({ icon: '✎\uFE0E', label: 'Add to query', onClick: run(() => this.addToQuery(propID)) }),
+        menuSeparator(),
+        menuItem({
+          icon: '⟳',
+          label: 'Reset this filter',
+          disabled: locked,
+          title: locked ? lockedTitle : '',
+          onClick: run(() => this.cache.fm.resetFilter(propID)),
+        })
+      );
+    });
+    return [missingSwitch, chip, more].filter(Boolean);
   }
 
-  createAddToQueryButton(propID) {
-    const actionButton = document.createElement('button');
-    actionButton.className = 'add-to-query-button';
-    actionButton.textContent = '📝';
-    actionButton.title = `Add ${propID} to the query`;
-
-    actionButton.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const slider = this.cache.propIDToInvertibleRangeSliders.get(propID);
-      const dropdown = this.cache.propIDToDropdownChecklists.get(propID);
-      const boolToggle = this.cache.propIDToBooleanToggles.get(propID);
-
-      let queryFragment;
-      if (boolToggle) {
-        // Same shape the query generator emits for a boolean filter
-        // (query.js): "Any" is both leaves ORed, not a missing condition.
-        const state = boolToggle.state();
-        queryFragment =
-          state === 'any'
-            ? `(${propID} IS TRUE) OR (${propID} IS FALSE)`
-            : `${propID} IS ${state === 'true' ? 'TRUE' : 'FALSE'}`;
-      } else if (slider) {
-        if (this.cache.CFG.QUERY_BTN_USE_CURRENT_FILTER) {
-          queryFragment = slider.isInverted
-            ? `${propID} LOWER THAN ${slider.currentMax} OR GREATER THAN ${slider.currentMin}`
-            : `${propID} BETWEEN ${slider.currentMin} AND ${slider.currentMax}`;
-        } else {
-          queryFragment = `(${propID} BETWEEN ${slider.sliderMin} AND ${slider.sliderMax}`;
-        }
-      } else if (dropdown) {
-        if (this.cache.CFG.QUERY_BTN_USE_CURRENT_FILTER) {
-          queryFragment = `${propID} IN [${[...dropdown.selectedCategories].map((cat) => StaticUtilities.escapeQueryValue(cat)).join(',')}]`;
-        } else {
-          queryFragment = `${propID} IN [${[...dropdown.categories].map((cat) => StaticUtilities.escapeQueryValue(cat)).join(',')}]`;
-        }
-      }
-
-      if (this.cache.data.layouts[this.cache.data.selectedLayout]['query'] === undefined) {
-        this.cache.qm.handleQueryValidationEvent(true);
-      }
-
-      if (!this.cache.query.text.textContent.trim()) {
-        this.cache.data.layouts[this.cache.data.selectedLayout]['query'] = `(${queryFragment})`;
-      } else {
-        this.cache.data.layouts[this.cache.data.selectedLayout]['query'] +=
-          ` OR (${queryFragment})`;
-      }
-      this.cache.qm.updateQueryTextArea();
+  /**
+   * The ⋯ item that sets the row's ∅ choice, worded as what the click does
+   * in the current mode: "Remove / Keep the 37 nodes without padj" while
+   * narrowing down, "Add / Stop adding …" while building up.
+   */
+  #missingMenuItem(propID, prop, gaps, { run, locked, lockedTitle }) {
+    const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
+    const mode = layout.filterJoinMode === 'AND' ? 'AND' : 'OR';
+    const passes = missingPasses(layout.filters.get(propID), mode);
+    const verbs = {
+      'AND:true': 'Remove',
+      'AND:false': 'Keep',
+      'OR:true': 'Stop adding',
+      'OR:false': 'Add',
+    };
+    const label = `${verbs[`${mode}:${passes}`]} the ${gaps} ${elementNoun(this.cache, propID, gaps)} without ${prop}`;
+    return menuItem({
+      icon: '∅',
+      label,
+      disabled: locked,
+      title: locked ? lockedTitle : '',
+      onClick: run(() =>
+        this.cache.ui.setMissingPasses(
+          [propID],
+          !passes,
+          `Without a ${prop} value: ${passes ? 'not passing' : 'passing'}`
+        )
+      ),
     });
+  }
 
-    return actionButton;
+  /**
+   * The row's ∅ switch: do elements without a value for this property pass
+   * this filter? A toggle button (aria-pressed = they pass), only on rows
+   * where some elements of the property's type lack it, holding ∅ and how
+   * many elements that is. Shown once the user has changed the choice (the
+   * row's ⋯ menu, the Options box, or a click here), from then on even back at
+   * the mode's default. paintMissingSwitch keeps it in step on every filter
+   * change; it starts hidden until that first paint.
+   */
+  createMissingSwitch(propID) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'filter-missing-switch';
+    btn.dataset.prop = propID;
+    const glyph = document.createElement('span');
+    glyph.className = 'filter-missing-glyph';
+    glyph.textContent = '∅';
+    const count = document.createElement('span');
+    count.className = 'filter-missing-count';
+    btn.append(glyph, count);
+    btn.hidden = true;
+    btn.addEventListener('click', async () => {
+      // aria-disabled rather than disabled, so the tooltip still says why; a
+      // click says it too, for touch screens that never show a tooltip.
+      if (btn.getAttribute('aria-disabled') === 'true') {
+        this.cache.ui.info(btn.title.split(' — ').slice(1).join(' — '));
+        return;
+      }
+      const layout = this.cache.data.layouts[this.cache.data.selectedLayout];
+      const fo = layout.filters.get(propID);
+      const passes = !missingPasses(fo, layout.filterJoinMode);
+      const [, , prop] = StaticUtilities.decodePropHashId(propID);
+      await this.cache.ui.setMissingPasses(
+        [propID],
+        passes,
+        `Without a ${prop} value: ${passes ? 'passing' : 'not passing'}`
+      );
+    });
+    return btn;
+  }
+
+  /**
+   * Paint one ∅ switch from its filter: hidden until the choice was changed
+   * (`touched`) or while it is off the mode's default, filled when the gaps
+   * pass, dashed with a struck ∅ when they do not, and muted while it decides
+   * nothing (row unticked, or an edge row while build-up's Edges ignores edge
+   * filters).
+   * @param {HTMLButtonElement} btn
+   * @param {{fo: object, mode: 'OR'|'AND', idle: boolean, touched?: boolean}} state
+   */
+  paintMissingSwitch(btn, { fo, mode, idle, touched = false }) {
+    const propID = btn.dataset.prop;
+    const [, , prop] = StaticUtilities.decodePropHashId(propID);
+    const count = missingCount(this.cache, propID);
+    const passes = missingPasses(fo, mode);
+    const inactive = !fo.active || idle;
+    btn.hidden = !touched && passes === missingPassesByDefault(mode);
+    btn.setAttribute('aria-pressed', String(passes));
+    btn.setAttribute('aria-disabled', String(inactive));
+    btn.querySelector('.filter-missing-count').textContent = MISSING_COUNT_FORMAT.format(count);
+    const nouns = elementNoun(this.cache, propID, count);
+    btn.setAttribute(
+      'aria-label',
+      `${btn.textContent}: the ${count} ${nouns} without a ${prop} value ${count === 1 ? 'passes' : 'pass'} this filter`
+    );
+
+    const what = `${missingValueSubject(this.cache, propID, count)} no ${prop}.`;
+    // [state, what happens and what a click does], by mode and switch.
+    const outcomes = {
+      'AND:true': ['kept', 'They are judged on the other filters only. Click to remove them.'],
+      'AND:false': [
+        'removed',
+        'This filter removes them, even at its full range. Click to keep them.',
+      ],
+      'OR:true': ['added', 'This filter adds them to the graph. Click to stop adding them.'],
+      'OR:false': [
+        'not added',
+        `This filter adds only ${nouns} that match it. Click to add these too.`,
+      ],
+    };
+    const IDLE_EDGES = 'Edge filters act only while Edges is set to "Only edge-filter matches".';
+    let [state, rest] = outcomes[`${mode}:${passes}`];
+    if (!fo.active) [state, rest] = ['', 'Tick the filter to decide what happens to them.'];
+    else if (idle) [state, rest] = ['', IDLE_EDGES];
+    btn.title = `Without a value${state && `: ${state}`} — ${what} ${rest}`;
+  }
+
+  /** Append this filter's current setting to the query, and show the editor. */
+  addToQuery(propID) {
+    const slider = this.cache.propIDToInvertibleRangeSliders.get(propID);
+    const dropdown = this.cache.propIDToDropdownChecklists.get(propID);
+    const boolToggle = this.cache.propIDToBooleanToggles.get(propID);
+
+    let queryFragment;
+    if (boolToggle) {
+      // Same shape the query generator emits for a boolean filter
+      // (query.js): "Any" is both leaves ORed, not a missing condition.
+      const state = boolToggle.state();
+      queryFragment =
+        state === 'any'
+          ? `(${propID} IS TRUE) OR (${propID} IS FALSE)`
+          : `${propID} IS ${state === 'true' ? 'TRUE' : 'FALSE'}`;
+    } else if (slider) {
+      if (this.cache.CFG.QUERY_BTN_USE_CURRENT_FILTER) {
+        queryFragment = slider.isInverted
+          ? `${propID} LOWER THAN ${slider.currentMax} OR GREATER THAN ${slider.currentMin}`
+          : `${propID} BETWEEN ${slider.currentMin} AND ${slider.currentMax}`;
+      } else {
+        queryFragment = `${propID} BETWEEN ${slider.sliderMin} AND ${slider.sliderMax}`;
+      }
+    } else if (dropdown) {
+      const values = this.cache.CFG.QUERY_BTN_USE_CURRENT_FILTER
+        ? dropdown.selectedCategories
+        : dropdown.categories;
+      queryFragment = `${propID} IN [${[...values].map((cat) => StaticUtilities.escapeQueryValue(cat)).join(',')}]`;
+    }
+
+    if (this.cache.data.layouts[this.cache.data.selectedLayout]['query'] === undefined) {
+      this.cache.qm.handleQueryValidationEvent(true);
+    }
+    if (!this.cache.query.text.textContent.trim()) {
+      this.cache.data.layouts[this.cache.data.selectedLayout]['query'] = `(${queryFragment})`;
+    } else {
+      this.cache.data.layouts[this.cache.data.selectedLayout]['query'] += ` OR (${queryFragment})`;
+    }
+    this.cache.qm.updateQueryTextArea();
+    this.cache.workbench?.show('query');
   }
 
   getCheckboxTT(enable, propID) {
     return `Click to ${enable ? 'hide' : 'show'} elements with the property:${StaticUtilities.formatPropsAsTree(propID)}`;
   }
 
-  /** An active-but-unnarrowed filter under AND: on, dimmed, and constraining
-   * nothing. The normal "click to hide elements" reads as a lie there. */
+  /** An active-but-unnarrowed filter while narrowing down: on, dimmed, and
+   * constraining nothing. The normal "click to hide elements" reads as a lie there. */
   getInertCheckboxTT(propID) {
-    return `Not narrowed, so under AND it excludes nothing — narrow it, or switch to OR:${StaticUtilities.formatPropsAsTree(propID)}`;
+    const tree = StaticUtilities.formatPropsAsTree(propID);
+    if (missingCount(this.cache, propID) > 0) {
+      return `No effect — Still at its loaded range or values, and elements without a value are kept, so it removes nothing. Narrow it, switch off ∅, or switch to Build up:${tree}`;
+    }
+    return `No effect — Still at its loaded range or values, so it removes nothing. Narrow it, or switch to Build up:${tree}`;
   }
 
-  createAddOrRemoveToSelectionGroup(propID) {
-    const group = document.createElement('div');
-    group.classList.add('pm-group');
-
-    const addBtn = this.createAddOrRemoveToSelectionButton(propID, true);
-    const removeBtn = this.createAddOrRemoveToSelectionButton(propID, false);
-
-    group.appendChild(addBtn);
-    group.appendChild(removeBtn);
-    return group;
+  /** An edge row while building up with Edges set to "All between shown nodes"
+   * or "None": its tick changes nothing until Edges is edge-filter matches. */
+  getIdleEdgeRowTT(propID) {
+    return `No effect — Edge filters act only while Edges is set to "Only edge-filter matches":${StaticUtilities.formatPropsAsTree(propID)}`;
   }
 
-  createAddOrRemoveToSelectionButton(propID, shouldAdd) {
-    const btn = document.createElement('button');
-    btn.classList.add('plus-minus-button');
-    btn.textContent = shouldAdd ? '+' : '-';
-    btn.title = shouldAdd ? 'Add to selection' : 'Remove from selection';
-    btn.addEventListener('click', async () => {
-      try {
-        if (!this.cache.graph) {
-          this.cache.ui.warning('Please wait for graph to initialize');
-          return;
-        }
-
-        const nodeIDs = this.cache.propIDsToNodeIDsToBeShown.get(propID) || [];
-        if (nodeIDs.size > 0) {
-          const nodes = this.cache.graph.getNodeData([...nodeIDs]);
-          await this.cache.sm.updateSelectedState(nodes, shouldAdd);
-        }
-
-        const edgeIDs = this.cache.propIDsToEdgeIDsToBeShown.get(propID) || [];
-        if (edgeIDs.size > 0) {
-          const edges = this.cache.graph.getEdgeData([...edgeIDs]);
-          await this.cache.sm.updateSelectedState(edges, shouldAdd);
-        }
-      } catch (err) {
-        this.cache.ui.error(`Failed to update selection: ${err.message}`);
-      }
-    });
-    return btn;
+  /** Add (or remove) every element this filter row currently matches to the selection. */
+  async selectMatches(propID, shouldAdd) {
+    if (!this.cache.graph) {
+      this.cache.ui.warning('Please wait for graph to initialize');
+      return;
+    }
+    const nodeIDs = this.cache.propIDsToNodeIDsToBeShown.get(propID);
+    if (nodeIDs?.size > 0) {
+      await this.cache.sm.updateSelectedState(this.cache.graph.getNodeData([...nodeIDs]), shouldAdd);
+    }
+    const edgeIDs = this.cache.propIDsToEdgeIDsToBeShown.get(propID);
+    if (edgeIDs?.size > 0) {
+      await this.cache.sm.updateSelectedState(this.cache.graph.getEdgeData([...edgeIDs]), shouldAdd);
+    }
+    const n = nodeIDs?.size ?? 0;
+    const e = edgeIDs?.size ?? 0;
+    if (!n && !e) {
+      this.cache.ui.info('Nothing shown matches this filter.');
+      return;
+    }
+    const parts = [n && `${n} node${n === 1 ? '' : 's'}`, e && `${e} edge${e === 1 ? '' : 's'}`].filter(Boolean);
+    this.cache.ui.info(`${shouldAdd ? 'Selected' : 'Removed from selection:'} ${parts.join(', ')}`);
   }
 }
 

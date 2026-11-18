@@ -95,17 +95,17 @@ describe('numeric filter row', () => {
   it('keeps the boxes a fixed width while the handles move', () => {
     // Sizing the box to the CURRENT value made the track (a flex sibling)
     // shift mid-drag and the thumb jump under the cursor. The width is now
-    // fixed per slider to the widest endpoint ("7630" plus glyph slack).
+    // fixed per slider to the widest endpoint ("7630", 4ch).
     const { parent, slider } = mount();
     const [low, high] = boxes(parent);
-    expect(low.size).toBe(5);
-    expect(high.size).toBe(5);
+    expect(low.style.width).toBe("calc(4ch + 10px)");
+    expect(high.style.width).toBe("calc(4ch + 10px)");
 
     slider.sliderStart.value = '0';
     slider.handleThresholdOnInputEvent(true);
 
     expect(low.value).toBe('0');
-    expect(low.size).toBe(5);
+    expect(low.style.width).toBe("calc(4ch + 10px)");
   });
 
   it('pads integer-valued numbers on float columns to the fixed precision', () => {
@@ -115,7 +115,7 @@ describe('numeric filter row', () => {
 
     expect(low.value).toBe('0.000');
     expect(high.value).toBe('1.500');
-    expect(low.size).toBe(high.size);
+    expect(low.style.width).toBe(high.style.width);
   });
 
   it('restores the resting width after focus grows the box for the exact value', () => {
@@ -123,13 +123,13 @@ describe('numeric filter row', () => {
       lower: -51.82279968, upper: 68.36260223, hasFloatValues: true, listeners: false,
     });
     const [low] = boxes(parent);
-    const resting = low.size;
+    const resting = low.style.width;
 
     low.dispatchEvent(new Event('focus'));
-    expect(low.size).toBe('-51.82279968'.length + 1);
+    expect(low.style.width).toBe(`calc(${"-51.82279968".length}ch + 10px)`);
 
     low.dispatchEvent(new Event('blur'));
-    expect(low.size).toBe(resting);
+    expect(low.style.width).toBe(resting);
   });
 
   it('still accepts an exact threshold typed in and pressed Enter', () => {
@@ -278,7 +278,10 @@ describe('numeric filter row', () => {
   // out, so the child combinator has to be pinned at the source.
   it('scopes the box styling to direct children, never the range handles', () => {
     const css = fs.readFileSync('src/style.css', 'utf8'); // vitest runs at the repo root
-    const selectors = [...css.matchAll(/^\.filter-range-row[^{]*\binput\b[^{]*\{/gm)].map((m) => m[0]);
+    // Rules naming input[type=range] target the handles on purpose (positioning).
+    const selectors = [...css.matchAll(/^\.filter-range-row[^{]*\binput\b[^{]*\{/gm)]
+      .map((m) => m[0])
+      .filter((sel) => !sel.includes('input[type=range]'));
     expect(selectors.length).toBeGreaterThan(0);
     for (const sel of selectors) {
       expect(sel).toMatch(/\.filter-range-row[^>]*>\s*input/);
@@ -301,5 +304,31 @@ describe('numeric filter row', () => {
     } finally {
       window.addEventListener = original;
     }
+  });
+});
+
+describe('numeric filter histogram', () => {
+  it('bins the column over the track and tints only the kept range', () => {
+    const cache = createMockCache({ [PROP]: { lowerThreshold: 0, upperThreshold: 24, hasFloatValues: false } });
+    // One element in the first bin, three in the last.
+    cache.nodeRef = new Map([0, 24, 24, 24].map((v, i) => [`n${i}`, { featureValues: new Map([[PROP, v]]) }]));
+    document.body.innerHTML = '<div id="host"></div>';
+    const slider = new InvertibleRangeSlider(PROP, cache);
+    slider.appendTo(document.getElementById('host'));
+    slider.appendListeners();
+    const bars = [...document.querySelectorAll('.filter-hist > i')];
+    expect(bars).toHaveLength(InvertibleRangeSlider.HISTOGRAM_BINS);
+    expect(bars.at(-1).style.height).toBe('100%');
+    expect(parseFloat(bars[0].style.height)).toBeCloseTo(100 / 3);
+    expect(bars[0].style.minHeight).toBe('1px');
+    expect(bars[5].style.height).toBe('0%');
+    expect(bars[5].style.minHeight).toBe('');
+
+    slider.setTo(10, 24, false);
+    expect(bars[0].classList.contains('kept')).toBe(false);
+    expect(bars.at(-1).classList.contains('kept')).toBe(true);
+    slider.setTo(10, 24, true); // inverted keeps the outside
+    expect(bars[0].classList.contains('kept')).toBe(true);
+    expect(bars.at(-1).classList.contains('kept')).toBe(false);
   });
 });

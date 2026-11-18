@@ -1,5 +1,6 @@
 import {Popup} from './popup.js';
 import {StaticUtilities} from './static.js';
+import {numericScaleValue, scalePosition} from './scale_values.js';
 
 class NumericScalePicker {
   constructor(cache) {
@@ -8,6 +9,10 @@ class NumericScalePicker {
     this.maxValue = 0;
     this.minOutput = 0;
     this.maxOutput = 100;
+    // What elements without a value get. Follows the minimum output until the
+    // user sets it, so by default "no value" looks like the lowest value.
+    this.missingOutput = 0;
+    this.missingOutputEdited = false;
     this.elementType = "nodes";
     this.propertyName = null;
     this.dom = {};
@@ -52,6 +57,10 @@ class NumericScalePicker {
     minOutputInput.step = 'any';
     minOutputInput.oninput = () => {
       this.minOutput = parseFloat(minOutputInput.value) || 0;
+      if (!this.missingOutputEdited) {
+        this.missingOutput = this.minOutput;
+        if (this.dom.missingOutputInput) this.dom.missingOutputInput.value = this.missingOutput;
+      }
     };
     this.dom.minOutputInput = minOutputInput;
 
@@ -71,6 +80,36 @@ class NumericScalePicker {
 
     outputRow.append(minOutputInput, arrow, maxOutputInput);
     rangeConfig.appendChild(outputRow);
+
+    const missingRow = document.createElement('div');
+    missingRow.className = 'picker-range-row picker-missing-row';
+    missingRow.hidden = true;
+    const missingLabel = document.createElement('span');
+    missingLabel.textContent = 'Without a value:';
+    const missingOutputInput = document.createElement('input');
+    missingOutputInput.type = 'number';
+    missingOutputInput.className = 'picker-range-input';
+    missingOutputInput.step = 'any';
+    missingOutputInput.value = this.missingOutput;
+    missingOutputInput.title = 'Applied to every selected element that has no value for the property, ' +
+      'replacing whatever it had before.';
+    missingOutputInput.oninput = () => {
+      const parsed = parseFloat(missingOutputInput.value);
+      // Not a number: keep the last good value and say so on the field,
+      // rather than quietly falling back to something the user did not type.
+      const valid = Number.isFinite(parsed);
+      missingOutputInput.setCustomValidity(valid ? '' : 'Enter a number');
+      if (!valid) {
+        missingOutputInput.reportValidity();
+        return;
+      }
+      this.missingOutput = parsed;
+      this.missingOutputEdited = true;
+    };
+    missingRow.append(missingLabel, missingOutputInput);
+    this.dom.missingRow = missingRow;
+    this.dom.missingOutputInput = missingOutputInput;
+    rangeConfig.appendChild(missingRow);
     container.appendChild(rangeConfig);
 
     const footer = document.createElement('div');
@@ -97,6 +136,8 @@ class NumericScalePicker {
     this.elementType = elementType;
     this.propertyName = propertyName;
     this.setDefaultOutputRange();
+    this.missingOutput = this.minOutput;
+    this.missingOutputEdited = false;
     return new Promise(resolve => {
       this.resolvePromise = resolve;
       const content = this.buildContent();
@@ -247,33 +288,19 @@ class NumericScalePicker {
     this.activeMetricSource = metricSource;
 
     const values = [];
-    let elementsWithProperty = 0;
-
-    if (metricSource) {
-      Array.from(selectedElements).forEach(id => {
-        const value = metricSource.values.get(id);
-        if (value !== undefined && !isNaN(value)) {
-          values.push(value);
-          elementsWithProperty += 1;
-        }
-      });
-    } else {
-      Array.from(selectedElements).forEach(id => {
-        const value = elementRef.get(id)?.featureValues.get(property);
-        if (value !== undefined && !isNaN(value)) {
-          values.push(value);
-          elementsWithProperty += 1;
-        }
-      });
+    for (const id of selectedElements) {
+      const value = numericScaleValue(metricSource, elementRef, property, id);
+      if (value !== undefined) values.push(value);
     }
+    const elementsWithProperty = values.length;
 
     if (values.length === 0) {
       this.cache.ui.warning('No numeric values found for selected property');
       return;
     }
 
-    this.minValue = Math.min(...values);
-    this.maxValue = Math.max(...values);
+    this.minValue = values.reduce((a, b) => Math.min(a, b));
+    this.maxValue = values.reduce((a, b) => Math.max(a, b));
 
     const totalElements = selectedElements.length;
     const elementTypeLabel = this.elementType === 'nodes' ? 'nodes' : 'edges';
@@ -283,10 +310,18 @@ class NumericScalePicker {
         : (property.includes('::') ? property.split('::').pop() : property)
     );
 
+    const missing = totalElements - elementsWithProperty;
+    const missingNote = missing > 0
+      ? `<div class="picker-info-missing"><strong>${missing}</strong> of ${totalElements} ${elementTypeLabel} ` +
+        `have no value for <strong>${propertyDisplayName}</strong> and get the value set below.</div>`
+      : '';
+    const flatNote = this.minValue === this.maxValue
+      ? `<div class="picker-info-missing">Every value is the same, so all of them get the maximum.</div>`
+      : '';
     this.dom.infoSection.innerHTML = `
       <div class="picker-info-summary">
         Scaling <strong>${StaticUtilities.escapeHtml(this.propertyName || 'property')}</strong> for <strong>${elementsWithProperty}</strong> of <strong>${totalElements}</strong> ${elementTypeLabel}
-      </div>
+      </div>${missingNote}${flatNote}
       <div class="picker-info-range">
         <strong>${propertyDisplayName}</strong> min: ${this.minValue.toFixed(2)}
         &nbsp;&nbsp;
@@ -299,9 +334,11 @@ class NumericScalePicker {
       this.dom.outputLabel.innerHTML = `Set <strong>${StaticUtilities.escapeHtml(this.propertyName || 'output')}</strong> range:`;
     }
 
+    this.dom.missingRow.hidden = missing === 0;
     this.dom.rangeConfig.style.display = '';
     this.dom.applyButton.classList.remove('disabled');
   }
+
 
   apply() {
     const property = this.dom.dropdown.value;
@@ -316,17 +353,17 @@ class NumericScalePicker {
     const metricSource = this.getMetricSource(property);
 
     const scaleMap = new Map();
-
-    Array.from(selectedElements).forEach(elementId => {
-      const element = elementRef.get(elementId);
-      const value = metricSource ? metricSource.values.get(elementId) : element?.featureValues.get(property);
-
-      if (value !== undefined && !isNaN(value)) {
-        const normalizedValue = (value - this.minValue) / (this.maxValue - this.minValue);
-        const scaledValue = this.minOutput + normalizedValue * (this.maxOutput - this.minOutput);
-        scaleMap.set(elementId, scaledValue);
+    // Every selected element gets a value, so nothing keeps an earlier manual
+    // setting that would read as data.
+    for (const elementId of selectedElements) {
+      const value = numericScaleValue(metricSource, elementRef, property, elementId);
+      if (value === undefined) {
+        scaleMap.set(elementId, this.missingOutput);
+      } else {
+        const position = scalePosition(value, this.minValue, this.maxValue);
+        scaleMap.set(elementId, this.minOutput + position * (this.maxOutput - this.minOutput));
       }
-    });
+    }
 
     if (this.resolvePromise) {
       this.resolvePromise(scaleMap);

@@ -103,3 +103,21 @@ describe("parseLayouts — layoutType gating for authored payloads", () => {
     expect(parsed.Pinned.layoutType).toBeUndefined();
   });
 });
+
+describe("parseLayouts — workspace settings this version does not know", () => {
+  it("replaces them with the defaults and says which", () => {
+    const cache = createMockCache();
+    const warnings = [];
+    cache.ui = { warning: (message) => warnings.push(message), info() {} };
+    const parsed = new IOManager(cache).parseLayouts({
+      W: { filterJoinMode: "XOR", filterLinks: "tickd" },
+      Fine: { filterJoinMode: "AND", filterLinks: "none" },
+    });
+
+    expect(parsed.W).toMatchObject({ filterJoinMode: "OR", filterLinks: "all", includePropertyless: true });
+    expect(parsed.Fine).toMatchObject({ filterJoinMode: "AND", filterLinks: "none" });
+    expect(warnings).toEqual([
+      'Unknown workspace settings were replaced: "W": filter mode "XOR" (using build up); "W": links "tickd" (using All).',
+    ]);
+  });
+});

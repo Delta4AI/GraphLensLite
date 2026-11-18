@@ -87,4 +87,10 @@ manuscript/**
 !manuscript/**/*.md
 !manuscript/**/
 !manuscript/graphical-abstract.html
+# Pipeline that builds Fig/main-figure.png; out/ holds its intermediate captures.
+!manuscript/main-figure/*
+manuscript/main-figure/out/
 
+
+# Local Claude Code settings and worktrees
+.claude/

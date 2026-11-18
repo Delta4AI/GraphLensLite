@@ -7,31 +7,43 @@
    while everything around it flips, which is what produced this release's
    repeated one-off dark-mode fixes. The exception is a border that traces its
    OWN same-coloured background (`.p-button:hover`, `.p-button-primary`,
-   `.tour-btn-next`, `.panel-header-btn:hover`): the fill is deliberately fixed,
+   `.panel-header-btn:hover`): the fill is deliberately fixed,
    so a tokenized border would slide off it in dark.
    ========================================================================== */
 :root {
     --bg: #ffffff;
-    --surface: #f4f4f4;
-    --surface-2: #f0eff4;
-    --surface-3: #e4e3ea;
-    --card-wash: #E4E3EA80;
-    --row-hover: #e6f3ff;
-    --surface-translucent: rgba(244, 244, 244, 0.85);
+    --surface: #f4f5f8;
+    --surface-2: #eef0f4;
+    --surface-3: #e2e5ec;
+    --card-wash: #e2e5ec80;
+    --row-hover: #e8ecfb;
+    --surface-translucent: rgba(244, 245, 248, 0.85);
     --input-bg: #ffffff;
-    --text: #000000;
-    --text-strong: #333333;
-    --text-muted: #666666;
-    --text-faint: #888888;
-    --border: #cccccc;
-    --border-soft: #dddbe2;
-    --border-strong: #000000;
+    --text: #0e1016;
+    --text-strong: #262a35;
+    --text-muted: #586070;
+    --text-faint: #7d8494;
+    --border: #c6cbd5;
+    --border-soft: #dfe2e9;
+    --border-strong: #1d212b;
     --brand-text: #403C53;
     --brand-border: #403C53;
     --accent-text: #C33D35;
     --accent-ring: rgba(195, 61, 53, 0.35);
+    /* Card heads in the Selection tab (Act on selection, Nodes, Edges). */
+    --insp-bar: #403C53;
+    --insp-bar-hover: #4d4864;
+    --insp-bar-text: #ffffff;
+    --insp-bar-muted: rgba(255, 255, 255, 0.72);
     --success-text: #015C0C;
     --danger-text: #8a2d2d;
+    /* Data editor: a cell, row or deletion staged but not yet applied. */
+    --edited-wash: #fff3d6;
+    --edited-line: #b07a0a;
+    --added-wash: #e7f5e9;
+    --added-line: #2f7d3b;
+    --deleted-wash: #fbe9e8;
+    --deleted-line: #b4443c;
     color-scheme: light;
 
     /* Stacking order, bottom to top. Theme-independent, so they live here once
@@ -43,6 +55,8 @@
        PURELY LOCAL stacking (a slider thumb over its track, a caret over a
        textarea) keeps its own small integers — those are relative to their own
        stacking context and mean nothing on this scale. */
+    /* The inspector's label column: rows, lookups and anything aligned to them. */
+    --prop-label-w: 76px;
     --z-minimap: 500;
     --z-workbench: 600;
     --z-resize-bar: 700;
@@ -77,8 +91,18 @@
     --brand-border: #6b6486;
     --accent-text: #e0635b;
     --accent-ring: rgba(224, 99, 91, 0.45);
+    --insp-bar: #423c5c;
+    --insp-bar-hover: #4d4769;
+    --insp-bar-text: #f1eff8;
+    --insp-bar-muted: rgba(241, 239, 248, 0.7);
     --success-text: #58c06a;
     --danger-text: #d98a84;
+    --edited-wash: #3a3020;
+    --edited-line: #d9a53c;
+    --added-wash: #1f3324;
+    --added-line: #58c06a;
+    --deleted-wash: #3a2224;
+    --deleted-line: #ef8a83;
     color-scheme: dark;
 }
 
@@ -100,6 +124,13 @@ body, html {
 :focus-visible {
     outline: 2px solid var(--accent-text);
     outline-offset: 1px;
+}
+
+/* One checkbox colour app-wide. The brand slate, not the red accent: a panel
+   of ticked filters is the default state and must not outshout the red that
+   marks a narrowed one. */
+input[type="checkbox"] {
+    accent-color: var(--brand-border);
 }
 
 /* Shell: rail on top, main content flexes, bottom bar rises from below. */
@@ -131,30 +162,6 @@ body {
     box-sizing: border-box;
     position: relative;
     z-index: var(--z-rail);
-}
-
-.rail-mark {
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
-    border: 1px solid transparent;
-    background: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    flex: none;
-}
-
-.rail-mark img {
-    height: 22px;
-    width: 22px;
-}
-
-.rail-mark:hover {
-    background: var(--surface-3);
-    border-color: var(--border);
 }
 
 .rail-wschip {
@@ -276,7 +283,9 @@ body {
 /* On-state (lasso active, hover highlight enabled). `.highlight` is kept for
    the workbench tabs that still use it; rail buttons all speak `.active`. */
 .rail-vb.highlight,
-.rail-vb.active {
+.rail-vb.active,
+.rail-vb[aria-expanded="true"],
+.rail-selchip-btn[aria-expanded="true"] {
     background: var(--surface-3);
     border-color: var(--accent-text);
 }
@@ -329,7 +338,7 @@ body {
     align-items: center;
     gap: 5px;
     height: 34px;
-    padding: 0 6px 0 10px;
+    padding: 0 4px 0 2px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--input-bg);
@@ -342,6 +351,74 @@ body {
 .rail-selchip.live {
     border-color: var(--accent-text);
     color: var(--text);
+}
+
+/* The chip's main part is the Selection menu's button; × clear sits beside it
+   and only while something is selected. */
+.rail-selchip-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 6px 0 8px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.rail-selchip-btn:hover {
+    background: var(--surface-3);
+}
+
+.rail-selchip-car {
+    color: var(--text-faint);
+}
+
+.rail-selchip:not(.live) #clearSelectionBtn {
+    display: none;
+}
+
+#selectMenuMount {
+    padding: 0 8px;
+}
+
+.rail-menu [aria-pressed="true"] .rail-menu-label {
+    color: var(--accent-text);
+    font-weight: 600;
+}
+
+/* No keyboard to press them on: key badges inside buttons go. */
+@media (hover: none) {
+    button kbd {
+        display: none;
+    }
+}
+
+/* Presentation mode's way out where there is no Escape key (touch, phones). */
+#presentationExitBtn {
+    display: none;
+}
+
+@media (max-width: 760px), (hover: none) {
+    body.presentation #presentationExitBtn {
+        display: block;
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: var(--z-modal);
+        height: 32px;
+        padding: 0 12px;
+        border: 1px solid var(--brand-border);
+        border-radius: 6px;
+        background: var(--brand-border);
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+    }
 }
 
 .rail-selchip-counts,
@@ -627,15 +704,29 @@ body {
     left: 50%;
     transform: translateX(-50%);
     /* Above every overlay that can be on screen while a message fires — the
-       landing page (10000), popup overlays (10001/10002) and the tour. A
-       load error raised before the landing page clears is otherwise invisible. */
+       landing page (10000) and the tour. A load error raised before the
+       landing page clears is otherwise invisible. Above a modal popup it is
+       the top layer that does it (a popover, ui.js raiseToastHost). */
     z-index: var(--z-toast);
+    /* Popover UA defaults off (inset 0, margin auto, border, padding, canvas
+       background); while open ui.js gives it viewport coordinates. */
+    right: auto;
+    bottom: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow: visible;
     display: flex;
     flex-direction: column;
     gap: 6px;
     align-items: center;
     /* The stack must never eat clicks meant for the canvas — only the toasts do */
     pointer-events: none;
+}
+
+.toasts:popover-open {
+    position: fixed;
 }
 
 .toast {
@@ -748,14 +839,6 @@ body {
     text-overflow: ellipsis;
 }
 
-.panel-header-center-buttons {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-width: 0;
-}
-
 .panel-header-buttons {
     flex: 0 0 auto;
     display: flex;
@@ -779,6 +862,66 @@ body {
     min-width: 20px;
     height: 20px;
     flex-shrink: 0;
+}
+
+/* The stage's line for an active pointer mode (lasso, placing a note), with
+   its own Done/Cancel: phones have no L or Escape key. */
+.mode-hint {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--z-armed-overlay);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 4px 4px 12px;
+    border: 1px solid var(--brand-border);
+    border-radius: 6px;
+    background: var(--brand-border);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.mode-hint-done {
+    pointer-events: auto;
+    height: 24px;
+    padding: 0 10px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+    background: none;
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.mode-hint-done:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.mode-hint[hidden] {
+    display: none;
+}
+
+.layer-row .layer-row-action {
+    margin-left: auto;
+    height: 24px;
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: 400;
+}
+
+.layer-row .layer-row-action.active {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+/* A tab without help hides ⓘ; display:flex above would otherwise keep it. */
+.panel-header-btn[hidden] {
+    display: none;
 }
 
 .panel-header-btn:hover {
@@ -810,10 +953,10 @@ body {
     display: none;
 }
 
-/* Metrics and the assistant were column-shaped panels; in the workbench they
-   own the full width. Metrics stays a flex container all the way down so its
-   ranked list can claim the leftover height instead of sitting in a short box
-   under an expanse of empty pane. */
+/* In the workbench, metrics and the assistant own the full width. Metrics
+   stays a flex container all the way down so its ranked list can claim the
+   leftover height instead of sitting in a short box under an expanse of empty
+   pane. */
 #metricsContainer.wb-pane {
     flex: 1;
     min-height: 0;
@@ -899,6 +1042,76 @@ body {
 
 /* Persistent renderer-dead message (src/graph/webgl_support.js) — shown
    where the graph would be when WebGL2 is unavailable */
+/* Building up with no filter row ticked: say why the stage is (nearly) empty.
+   The card takes clicks; the stage around it stays usable (notes, pan, zoom). */
+.build-up-empty {
+    position: absolute;
+    /* Near the top, clear of the toasts' column, so it never sits on the
+       elements that do still show (those without properties). */
+    top: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--z-minimap);
+    max-width: 320px;
+    padding: 16px 20px;
+    text-align: center;
+    color: var(--text-strong);
+    background: var(--surface-translucent);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+}
+
+.build-up-empty[hidden] {
+    display: none;
+}
+
+.build-up-empty-title {
+    display: block;
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.build-up-empty-body {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.build-up-empty-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.filter-links-select {
+    justify-self: start;
+    min-width: 0;
+    max-width: 100%;
+    height: 22px;
+    padding: 0 4px;
+    font: inherit;
+    font-size: 11px;
+    color: var(--text-strong);
+    background: var(--input-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* A group label can be grabbed and dragged (interactions.js). */
+#innerGraphContainer.over-group-label canvas {
+    cursor: grab;
+}
+
+#innerGraphContainer.dragging-group-label canvas {
+    cursor: grabbing;
+}
+
+/* A lasso modifier is held (interactions.js): dragging on empty canvas draws. */
+#innerGraphContainer.lasso-armed canvas {
+    cursor: crosshair;
+}
+
 #innerGraphContainer .webgl-error {
     height: 100%;
     display: flex;
@@ -924,8 +1137,7 @@ body {
     color: var(--text-muted);
 }
 
-/* Owned minimap (src/graph/minimap.js) — kept at the position the old G6
-   minimap was CSS-forced to (bottom-right, despite its "bottom-left" config) */
+/* Owned minimap (src/graph/minimap.js), bottom-right of the stage */
 #innerGraphContainer .gll-minimap {
     position: absolute;
     /* Lifts clear of the workbench, which overlays the bottom of the stage.
@@ -947,7 +1159,10 @@ body {
  **************************/
 #inspector {
     flex: none;
-    width: 356px;
+    /* 400px fits a slider between its value boxes plus a property name; the
+       other 32px leave room for a row's ∅ marker (24px) and its gap. Narrower
+       than 387px, the filter rows stack (#filterContainer's @container rule). */
+    width: 432px;
     min-width: 300px;
     box-sizing: border-box;
     background-color: var(--surface);
@@ -1065,12 +1280,15 @@ body {
 }
 
 .insp-section-title {
-    margin: 14px 0 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 18px 0 6px 0;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--text-muted);
+    color: var(--accent-text);
 }
 
 /* --text-muted, not --text-faint. These are prose, so they owe 4.5:1, and #888
@@ -1113,83 +1331,35 @@ body {
     color: var(--danger-text);
 }
 
-.insp-groups,
-.insp-act-row {
+.insp-groups {
+    display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-}
-
-.insp-groups {
-    display: flex;
-    /* Matches .insp-note's, so the prose above and the tab bar below sit on one
-       rhythm instead of the tools touching the tabs. */
     margin-bottom: 8px;
 }
 
-/* --- group membership (Selection context) ------------------------------- */
-
-/* Meaningless with nothing selected, so it follows .insp-act-row's rule rather
-   than invariant 4's "show and self-disable" — same reason, same treatment. */
-.sel-group-title,
-.sel-group-panel {
-    display: none;
-}
-
-#inspectorSelection.has-selection .sel-group-title {
-    display: block;
-}
-
-#inspectorSelection.has-selection .sel-group-panel {
-    display: flex;
-}
-
-.sel-group-panel {
-    align-items: center;
-    gap: 12px;
-    padding: 10px;
-    margin-bottom: 10px;
-    box-sizing: border-box;
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
-    background: var(--surface-2);
-}
-
-.sel-group-hint {
-    font-size: 11px;
-    line-height: 1.4;
-    color: var(--text-muted);
-}
-
-.sel-group-hint strong {
+/* --- Selection context: empty state vs live state --- */
+.sel-hidden-note {
+    margin: 12px 0 0;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent-text);
+    border-radius: 6px;
+    font-size: 12px;
     color: var(--text-strong);
 }
 
-/* clip-path used to clip the focus ring on the quadrant pie; a plain button
-   takes the standard one. */
-#addToGroupBtn:focus-visible {
-    outline: 2px solid var(--accent-text);
-    outline-offset: 2px;
+.sel-hidden-note[hidden] {
+    display: none;
 }
 
-/* --- Selection context: empty state vs live state --- */
 .insp-empty {
     margin-top: 14px;
 }
 
 #inspectorSelection.has-selection .insp-empty {
     display: none;
-}
-
-/* The act row is meaningless with nothing selected; everything below it
-   (arrange, appearance) stays rendered and self-disables, per invariant 4 —
-   a control that exists for this context is shown, not hidden. */
-.insp-act-row {
-    display: none;
-}
-
-#inspectorSelection.has-selection .insp-act-row {
-    display: flex;
 }
 
 .insp-empty-title {
@@ -1234,10 +1404,6 @@ body {
 #inspector .card-labeled {
     width: 100%;
     box-sizing: border-box;
-}
-
-#inspector .card-row {
-    flex-wrap: wrap;
 }
 
 /* Presentation mode (⇧F): stage only, for screenshots and demos. */
@@ -1399,11 +1565,13 @@ h5 {
     color: var(--brand-text);
 }
 
-/* Auto-generated AND-join fillers (IS MISSING non-strict, IS FOREIGN strict):
-   muted + italic so they read as machine-added glue rather than
-   hand-written constraints. */
+/* Auto-generated ∅-switch predicates (IS MISSING, IS FOREIGN, HAS VALUE,
+   HAS NO VALUE): muted + italic so they read as machine-added glue rather
+   than hand-written constraints. */
 .q-kw-ismissing,
-.q-kw-isforeign {
+.q-kw-isforeign,
+.q-kw-hasvalue,
+.q-kw-hasnovalue {
     color: var(--brand-text);
     opacity: 0.6;
     font-style: italic;
@@ -1521,7 +1689,7 @@ h5 {
 .filter-scope {
     display: inline-flex;
     border: 1px solid var(--border-soft);
-    border-radius: 12px;
+    border-radius: 6px;
     overflow: hidden;
 }
 
@@ -1532,6 +1700,7 @@ h5 {
     font: inherit;
     font-size: 11px;
     font-weight: 600;
+    min-height: 24px;
     padding: 3px 11px;
     border: none;
     background: var(--surface-3);
@@ -1600,7 +1769,8 @@ h5 {
     display: none;
 }
 
-#filterContainer .filter-section > .header-card .small-btn,
+#filterContainer .filter-section > .header-card .filter-section-check,
+#filterContainer .filter-section > .header-card .filter-section-reset,
 #filterContainer .filter-section > .header-card .filter-scope-segment {
     pointer-events: auto;
 }
@@ -1613,6 +1783,20 @@ h5 {
 
 #filterContainer .filter-section > .header-card:has(> .filter-scope) {
     margin-bottom: 8px;
+}
+
+/* The census rides beside the switch whose counts it adds up. */
+#filterContainer .filter-section > .header-card > .filter-scope:has(+ .filter-constraint-count) {
+    margin-right: 0;
+}
+
+#filterContainer .filter-section > .header-card > .filter-constraint-count {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* A running search spans both sections, so the segment steps aside and every
@@ -1663,10 +1847,9 @@ h5 {
     padding: 2px 0;
 }
 
-/* Sub-groups used to be a second solid pill under the section's solid pill, so
-   the two levels read as two KINDS of thing rather than level 1 and level 2 —
-   and the container ended up louder than the properties it holds. A small-caps
-   label and a hairline carry the same grouping for none of the weight. */
+/* Sub-groups get a small-caps label and a hairline, not a second solid pill
+   under the section's: two pills read as two KINDS of thing rather than level 1
+   and level 2, and the container would be louder than the properties it holds. */
 .sub-header-card {
     display: flex;
     align-items: center;
@@ -1686,31 +1869,22 @@ h5 {
     background: var(--border-soft);
 }
 
+/* "3 filters", after the rule. */
+.filter-group-count {
+    order: 1;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
 .sub-header-card h5 {
     font: inherit;
     letter-spacing: inherit;
     margin: 0;
     white-space: nowrap;
-}
-
-/* The group triads stay in the DOM and stay tabbable — they carry the
-   "Enable all filters: Nodes > Topology" accessible names. Quieting them is a
-   COLOR change, never opacity: these are non-text controls owing 3:1, and
-   --text-faint at full strength is 3.54:1 while the same token at 30% is
-   ~1.3:1 and fails outright. */
-.sub-header-card .small-btn,
-.filter-section > .header-card .small-btn {
-    border-color: var(--border-soft);
-    color: var(--text-faint);
-    background: transparent;
-}
-
-.sub-header-card .small-btn:hover,
-.sub-header-card .small-btn:focus-visible,
-.filter-section > .header-card .small-btn:hover,
-.filter-section > .header-card .small-btn:focus-visible {
-    border-color: var(--accent-text);
-    color: var(--text-strong);
 }
 
 /*#selectedNodes, #selectedEdges {*/
@@ -1747,12 +1921,26 @@ h5 {
     color: white;
 }
 
-.card-row {
-    display: flex;
+/* Select Elements' typed-list rows: label | input | ＋ Add | − Remove, in
+   columns shared by every row. */
+.select-lookup {
+    display: grid;
+    /* The input column has a floor: the card is otherwise only as wide as
+       its button row, which left room for a couple of IDs. */
+    /* The label column matches .prop-row's, so lookups align with the rows above. */
+    grid-template-columns: var(--prop-label-w) minmax(240px, 1fr) auto auto;
     align-items: center;
-    justify-content: center;
-    gap: 2px;
+    gap: 4px 8px;
     margin-top: 4px;
+}
+
+.select-lookup-row {
+    display: contents;
+}
+
+.select-lookup .style-input {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Collapsible config sections (Node / Edge / Bubble) so the panel reads as
@@ -1766,18 +1954,14 @@ h5 {
     display: none;
 }
 
-/* The dark bar lives on the WRAPPER, not the header button, so a layer row's
-   switch sits inside it beside the title rather than out on the panel
-   background — the switch's contrast is designed against this bar. */
+/* The header row lives on the WRAPPER, not the header button, so a layer row's
+   switch sits inside it beside the title. */
 .card-collapse-bar {
     display: flex;
     align-items: center;
     gap: 7px;
     box-sizing: border-box;
-    padding: 0 8px;
-    background: var(--brand-border);
-    color: #fff;
-    border-radius: 4px;
+    color: var(--text);
 }
 
 .card-collapse-header {
@@ -1791,18 +1975,12 @@ h5 {
     padding: 4px 0;
     cursor: pointer;
     font: inherit;
-    font-weight: bold;
+    font-weight: 600;
     font-size: 13px;
 }
 
-/* Hover tints the whole bar, as it did when the header WAS the bar — reaching
-   up rather than colouring a block that stops short of the switch.
-
-   The brand accent in BOTH themes, not --accent-text: that token flips to
-   #e0635b in dark, where the bar's white bold title drops to 3.3:1. Fixed, it
-   is 5.2:1 — the same trade the layer switch makes below. */
 .card-collapse-bar:has(.card-collapse-header:hover) {
-    background: #C33D35;
+    color: var(--accent-text);
 }
 
 /* Pushes the count and the chevron to the right edge of the bar. */
@@ -1822,47 +2000,87 @@ h5 {
    switch; Notes and the minimap have no parameters, so they are bare rows.
    Both shapes share the bar geometry so the four read as one stack.
    -------------------------------------------------------------------------- */
-/* A row with no parameters: the same bar as a card's, minus the disclosure. */
-.layer-row {
+/* A row with no parameters: the same line as a card's header, minus the
+   disclosure. Every layer is switch | glyph | name | end, over a hairline, so
+   the five read as one stack. */
+.layer-row,
+.card-labeled.layer-card > .card-collapse-bar {
     display: flex;
     align-items: center;
     gap: 7px;
-    margin: 8px 0 0;
-    padding: 4px 8px;
+    min-height: 32px;
+    margin: 0;
+    padding: 0 2px;
     box-sizing: border-box;
-    border-radius: 4px;
-    background: var(--brand-border);
-    color: #fff;
-    font-weight: bold;
+    border-bottom: 1px solid var(--border-soft);
+    font-weight: 600;
     font-size: 13px;
 }
 
-/* A COLLAPSED layer card is nothing but its bar, so all four rows read as one
-   stack; expanded, the card frame comes back to group the parameters under it. */
 .card-labeled.layer-card {
     padding: 0;
+    margin-top: 0;
     border: none;
     background: none;
     box-shadow: none;
 }
 
-.card-labeled.layer-card:not(.collapsed) {
-    border: 1px solid var(--brand-border);
-    background-color: var(--card-wash);
-    padding-bottom: 6px;
-}
-
-/* The card cannot carry the inset itself: the bar is its header and has to stay
-   full-bleed, so everything BELOW the bar is inset instead. Without this the
-   prose and the tab bar sit flush against the card border. */
+/* Everything under an open layer hangs off its name, past the switch and glyph. */
 .card-labeled.layer-card > :not(.card-collapse-bar) {
-    margin-left: 6px;
-    margin-right: 6px;
+    margin-left: 30px;
 }
 
-/* Breathing room under the bar, which the contents would otherwise touch. */
 .card-labeled.layer-card > .card-collapse-bar + * {
     margin-top: 6px;
+}
+
+.card-labeled.layer-card:not(.collapsed) {
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+/* What the layer draws, in miniature. */
+.layer-glyph {
+    flex: none;
+    position: relative;
+    width: 26px;
+    height: 18px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    background: var(--bg);
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+}
+
+.layer-glyph > svg {
+    display: block;
+}
+
+.layer-glyph-groups {
+    background:
+        radial-gradient(ellipse 7px 5.5px at 9px 8px, color-mix(in srgb, var(--brand-text) 40%, transparent) 95%, transparent 100%),
+        radial-gradient(ellipse 7px 5.5px at 16px 8px, color-mix(in srgb, var(--accent-text) 40%, transparent) 95%, transparent 100%),
+        var(--bg);
+}
+
+.layer-glyph-heatmap {
+    background: radial-gradient(circle at 40% 55%, #C33D35 0, #EFB0AA 30%, transparent 70%), var(--bg);
+}
+
+.layer-glyph-notes {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.layer-glyph-minimap::after {
+    content: "";
+    position: absolute;
+    inset: 3px 6px;
+    border: 1px solid var(--accent-text);
+    border-radius: 1px;
 }
 
 .layer-title {
@@ -1870,31 +2088,27 @@ h5 {
     text-align: left;
 }
 
-/* Counts are secondary to the name they follow, and sit on the same dark bar
-   as the title — a plain white at lower weight rather than a muted grey.
-   0.9, not 0.8: at 0.8 this lands on 4.22:1 over the dark theme's lighter bar,
-   and 11px prose owes 4.5. */
+/* Counts are secondary to the name they follow. */
 .layer-count {
     font-weight: normal;
     font-size: 11px;
-    opacity: 0.9;
+    color: var(--text-muted);
 }
 
-/* A track with a knob, sized off the 13px bar text so it never dominates the
+/* A track with a knob, sized off the 13px row text so it never dominates the
    row. role=switch, so aria-checked is the state and CSS follows it.
    The KNOB POSITION is the state signal, not the fill — colour alone would
-   fail 1.4.1, and no green both contrasts 3:1 with the white knob and 3:1
-   with the bar behind it. The border carries the 3:1 component boundary
-   instead (0.7 alpha: 0.55 lands on 2.88:1 over the dark theme's bar). */
+   fail 1.4.1. The --text-faint border carries the 3:1 component boundary
+   against the panel in both themes. */
 .layer-switch {
     flex: 0 0 auto;
     position: relative;
     width: 26px;
     height: 14px;
     padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    border: 1px solid var(--text-faint);
     border-radius: 7px;
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--surface-3);
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
 }
@@ -1907,7 +2121,7 @@ h5 {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--text-muted);
     transition: transform 0.15s ease;
 }
 
@@ -1917,15 +2131,16 @@ h5 {
    else, and the knob position — not the fill — is what states the switch. */
 .layer-switch[aria-checked="true"] {
     background: #C33D35;
-    border-color: rgba(255, 255, 255, 0.9);
+    border-color: #C33D35;
 }
 
 .layer-switch[aria-checked="true"]::after {
+    background: #fff;
     transform: translateX(12px);
 }
 
 .layer-switch:hover:not(:disabled):not(.disabled) {
-    border-color: #fff;
+    border-color: var(--text-strong);
 }
 
 /* Dead by CLASS as well as by attribute: syncOverlays uses the class so the
@@ -1937,7 +2152,7 @@ h5 {
 }
 
 .layer-switch:focus-visible {
-    outline: 2px solid #fff;
+    outline: 2px solid var(--accent-text);
     outline-offset: 1px;
 }
 
@@ -1968,6 +2183,713 @@ h5 {
     opacity: 0.5;
 }
 
+/* --------------------------------------------------------------------------
+   Appearance editor (Selection › Nodes / Edges). An inspector, not a card
+   stack: a flat section header with a hairline, then label | control rows.
+   Controls show the selection's shared value or "Mixed" (ui_style_div.js
+   refreshStyleControls).
+   -------------------------------------------------------------------------- */
+.card-labeled.appearance-card {
+    border: none;
+    box-shadow: none;
+    background: none;
+    padding: 0 0 6px;
+    margin-top: 10px;
+}
+
+/* Inspector heading levels: section (.insp-section-title, accent eyebrow over
+   a rule) > card (a brand-slate bar: this and .flat-card-head) > sub-group
+   (.prop-fold-head, a soft wash). */
+.appearance-card > .card-collapse-bar,
+.flat-card-head {
+    min-height: 26px;
+    box-sizing: border-box;
+    margin-bottom: 4px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: var(--insp-bar);
+    color: var(--insp-bar-text);
+}
+
+.appearance-card > .card-collapse-bar:has(.card-collapse-header:hover) {
+    background: var(--insp-bar-hover);
+    color: var(--insp-bar-text);
+}
+
+.appearance-card .card-collapse-header {
+    padding: 4px 0;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* The page's accent ring would vanish on the slate; the bar's text colour does not. */
+.appearance-card .card-collapse-header:focus-visible {
+    outline: 2px solid var(--insp-bar-text);
+    outline-offset: -2px;
+    border-radius: 6px;
+}
+
+.appearance-card .card-collapse-title {
+    flex: 0 1 auto;
+}
+
+.appearance-card .layer-count,
+.flat-card-count {
+    flex: 1 1 auto;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--insp-bar-muted);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+}
+
+/* Act on Selection / Arrange Selection / Select Elements: the same flat
+   section header as the appearance sections, with label | control rows. */
+.card-labeled.flat-card {
+    border: none;
+    box-shadow: none;
+    background: none;
+    padding: 0 0 6px;
+    margin-top: 10px;
+    text-align: left;
+}
+
+.card-labeled.flat-card::before {
+    position: static;
+    display: block;
+    transform: none;
+    height: auto;
+    padding: 5px 0 4px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    background: none;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* A card with a header element of its own (Act on Selection: "Selection" and
+   its count) instead of the data-label pseudo-title. */
+.card-labeled.flat-card.has-head::before,
+.card-labeled.flat-card.flat-card-cont::before {
+    display: none;
+}
+
+.flat-card-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+#inspectorActMount > .flat-card {
+    padding-bottom: 0;
+}
+
+/* Arrange Selection continues the card above it. */
+.card-labeled.flat-card.flat-card-cont {
+    margin-top: 0;
+}
+
+/* Neo4j's Expand, under the Grow row, in the control column. */
+.sel-neo4j-row {
+    padding-left: calc(var(--prop-label-w) + 8px);
+}
+
+/* A section eyebrow that carries the section's own action at its end. */
+.insp-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 18px 0 6px;
+}
+
+.insp-section-head > .insp-section-title {
+    flex: 1 1 auto;
+    margin: 0;
+}
+
+/* The eyebrow's rule runs to the panel edge (or to the section's own action). */
+.insp-section-title::after {
+    content: "";
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--border);
+}
+
+/* A secondary action that should not compete with the rows: no border until
+   hovered or focused. */
+.insp-btn.insp-btn-quiet {
+    border-color: transparent;
+    background: none;
+    color: var(--text-muted);
+    padding: 1px 6px;
+}
+
+.insp-btn.insp-btn-quiet[aria-disabled="true"] {
+    border-color: transparent;
+}
+
+.insp-btn.insp-btn-quiet:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+}
+
+/* The reason a row's action is blocked, shown only while it is. */
+.prop-hint {
+    display: none;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.prop-ctl:has(> .disabled) > .prop-hint {
+    display: inline;
+}
+
+/* A sub-group that folds to its heading plus a one-line summary. */
+.prop-fold-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    width: 100%;
+    background: var(--surface-3);
+    border: none;
+    border-radius: 6px;
+    padding: 4px 6px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-strong);
+    text-align: left;
+    cursor: pointer;
+}
+
+.prop-fold-head:hover {
+    background: var(--row-hover);
+    color: var(--accent-text);
+}
+
+.prop-fold-chevron {
+    flex: none;
+    width: 10px;
+    font-size: 10px;
+}
+
+.prop-fold-summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.prop-fold.collapsed > .prop-fold-body {
+    display: none;
+}
+
+/* "In selection" hangs under Fill color: no label of its own (the element
+   stays as the palette's row name and holds the label column), the strip in
+   the control column. Each segment names itself for screen readers. */
+.prop-row-selection-colors > .prop-label {
+    visibility: hidden;
+}
+
+/* Map by data's glyph: four rising bars, a scale. */
+:root {
+    --map-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 10'%3E%3Cpath d='M0 7h2.4v3H0zM3.2 5h2.4v5H3.2zM6.4 2.6h2.4V10H6.4zM9.6 0H12v10H9.6z'/%3E%3C/svg%3E");
+}
+
+/* Map by data sits inside the control it drives. A number field carries a ramp
+   glyph in its trailing edge; the field keeps its own border and the glyph its
+   24px hit target, overlapping the field's padding. */
+.prop-num-map {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+}
+
+.prop-ctl .prop-num-map > .style-input-sm {
+    width: 66px;
+    padding-right: 24px;
+}
+
+/* A full 24px target (WCAG 2.5.8); its 1px padding keeps the hover wash
+   inside the field's border. */
+.prop-map-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 24px;
+    height: 24px;
+    padding: 1px;
+    border: none;
+    border-radius: 0 6px 6px 0;
+    background: none;
+    background-clip: content-box;
+    color: var(--text-faint);
+    cursor: pointer;
+}
+
+/* Four rising bars, painted in the text colour so it follows the theme. */
+.prop-map-btn::before {
+    content: "";
+    position: absolute;
+    inset: 7px 6px;
+    background: currentColor;
+    -webkit-mask: var(--map-glyph) center / contain no-repeat;
+    mask: var(--map-glyph) center / contain no-repeat;
+}
+
+/* Forced colours drop backgrounds, and the glyph is one. */
+@media (forced-colors: active) {
+    .prop-map-btn::before,
+    .prop-map-swatch::before {
+        forced-color-adjust: none;
+        background: ButtonText;
+    }
+}
+
+/* On touch there is no tooltip, and a tap on the field's right end must edit
+   the number: the button steps out beside the field as a 24px target. */
+@media (hover: none) {
+    .prop-num-map {
+        gap: 4px;
+    }
+
+    .prop-ctl .prop-num-map > .style-input-sm {
+        width: 52px;
+        padding-right: 4px;
+    }
+
+    .prop-map-btn {
+        position: relative;
+        top: 0;
+        right: 0;
+        width: 24px;
+        height: 24px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text-muted);
+    }
+}
+
+.prop-map-btn:hover,
+.prop-map-btn:focus-visible {
+    color: var(--accent-text);
+    background-color: var(--surface-2);
+}
+
+/* A colour palette ends in its by-data swatch: the same rising bars as a
+   number field's, over a left-to-right scale built from none of the preset
+   colours, so it reads as "drive by data" and not as one more preset. */
+.prop-map-swatch {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    box-sizing: border-box;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: linear-gradient(90deg, #3b528b, #21918c 55%, #5ec962);
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.prop-map-swatch::before {
+    content: "";
+    position: absolute;
+    inset: 4px 3px;
+    background: currentColor;
+    -webkit-mask: var(--map-glyph) center / contain no-repeat;
+    mask: var(--map-glyph) center / contain no-repeat;
+}
+
+.prop-map-swatch:hover,
+.prop-map-swatch[aria-expanded="true"] {
+    border-color: var(--accent-text);
+    box-shadow: 0 0 0 1px var(--accent-text);
+}
+
+/* Overlay cards (Groups pane, heatmap) keep their bar but share the rows. */
+.layer-card .prop-row,
+#groupStylePanel .prop-row {
+    padding-inline: 4px;
+}
+
+.prop-row {
+    display: grid;
+    grid-template-columns: var(--prop-label-w) minmax(0, 1fr);
+    column-gap: 8px;
+    /* Top-aligned so a row whose controls wrap keeps its label on line one. */
+    align-items: start;
+    min-height: 28px;
+    padding: 2px 0;
+}
+
+.prop-row[hidden] {
+    display: none;
+}
+
+.prop-label {
+    line-height: 24px;
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.prop-ctl {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.prop-subhead {
+    margin: 6px 0 2px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.prop-mixed {
+    font-size: 11px;
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+.prop-mixed[hidden] {
+    display: none;
+}
+
+/* One control height (24px, WCAG 2.5.8) and one radius for everything in a row. */
+.prop-ctl .insp-btn,
+.prop-select,
+.prop-text,
+.select-lookup .style-input,
+.prop-ctl .color-hex,
+.prop-ctl .style-input-sm {
+    height: 24px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+}
+
+.prop-ctl .insp-btn {
+    padding: 0 8px;
+}
+
+/* A field's border is its only edge when empty, so it owes 3:1 (WCAG 1.4.11);
+   buttons are named by their text and keep the hairline. */
+.prop-select,
+.prop-text,
+.select-lookup .style-input,
+.prop-ctl .color-hex,
+.prop-ctl .style-input-sm,
+.prop-seg,
+.color-well {
+    border-color: var(--text-faint);
+}
+
+.prop-ctl .is-invalid {
+    border-color: var(--danger-text);
+    box-shadow: 0 0 0 1px var(--danger-text);
+}
+
+/* A row whose every control is unavailable dims its label with them. */
+.prop-row:not(:has(.prop-ctl > :not(.disabled, .prop-hint))) > .prop-label {
+    opacity: 0.5;
+}
+
+.prop-select {
+    flex: 1 1 96px;
+    min-width: 0;
+    padding: 0 4px;
+}
+
+.prop-text {
+    flex: 1 1 96px;
+    min-width: 72px;
+    padding: 0 6px;
+}
+
+.prop-ctl .style-input-sm {
+    flex: none;
+    width: 52px;
+    padding: 0 4px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-variant-numeric: tabular-nums;
+    /* The spinner arrows ate the field; arrow keys still step the value. */
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.prop-ctl .style-input-sm::-webkit-inner-spin-button,
+.prop-ctl .style-input-sm::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.prop-ctl .color-hex {
+    width: 64px;
+    padding: 0 6px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+/* The UI face, not the field's monospace: "Mixed" and "None" are words. */
+.prop-ctl ::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+    font-family: sans-serif;
+}
+
+.prop-ctl .style-slider-container {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 24px;
+    gap: 4px;
+    justify-content: flex-start;
+}
+
+.prop-ctl .style-slider {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 0;
+    height: 6px;
+}
+
+/* Mixed: no single position is true, so the thumb steps back to an outline. */
+.style-slider.is-mixed::-webkit-slider-thumb {
+    background: transparent;
+    box-shadow: inset 0 0 0 2px var(--text-muted);
+}
+
+.style-slider.is-mixed::-moz-range-thumb {
+    background: transparent;
+    box-shadow: inset 0 0 0 2px var(--text-muted);
+}
+
+.style-slider:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 3px;
+}
+
+/* Segmented control: pressed state is the value. */
+.prop-seg {
+    display: inline-flex;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--input-bg);
+}
+
+.prop-seg > button {
+    min-width: 26px;
+    height: 22px;
+    padding: 0 7px;
+    border: none;
+    border-right: 1px solid var(--border-soft);
+    background: transparent;
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.prop-seg > button:last-child {
+    border-right: none;
+}
+
+.prop-seg > button:hover {
+    color: var(--accent-text);
+}
+
+/* The underline carries the state where fill contrast alone is thin (dark). */
+.prop-seg > button[aria-pressed="true"] {
+    background: var(--brand-border);
+    color: #fff;
+    box-shadow: inset 0 -2px 0 var(--accent-text);
+}
+
+/* Inside the button: the group's overflow clips anything outside. The inner
+   ring keeps it visible on the dark pressed fill. */
+.prop-seg > button:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
+    box-shadow: inset 0 0 0 3px var(--bg);
+}
+
+/* Colour: a painted well over the native picker, a hex field, the palette. */
+.color-well {
+    position: relative;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.color-well.is-unset {
+    background: repeating-linear-gradient(135deg, var(--input-bg) 0 5px, var(--border) 5px 6px);
+}
+
+.color-well-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+}
+
+.color-well:has(.color-well-input:focus-visible) {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
+}
+
+.prop-ctl .style-color-button-container {
+    gap: 4px;
+}
+
+/* 20px with a 4px gap: the 24px spacing exception of WCAG 2.5.8. */
+.prop-swatch {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    box-sizing: border-box;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.prop-swatch.is-unset {
+    background: repeating-linear-gradient(135deg, var(--input-bg) 0 4px, var(--border) 4px 5px);
+}
+
+.prop-swatch:hover {
+    border-color: var(--accent-text);
+}
+
+.prop-color-input {
+    width: 28px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--input-bg);
+    cursor: pointer;
+}
+
+.prop-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+    font-size: 12px;
+    color: var(--text-strong);
+    cursor: pointer;
+}
+
+.prop-check input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+/* "In selection": one strip, a segment per distinct colour as wide as its
+   share (flex-grow = count, set inline) over its count. 24px minimum, so a
+   rare colour stays a target (WCAG 2.5.8); past the row's width it wraps. */
+.prop-share {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    width: 100%;
+}
+
+.prop-chip {
+    flex: 1 1 0;
+    min-width: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: 2px 0 0;
+    border: none;
+    border-radius: 3px;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 10px;
+    line-height: 12px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.prop-chip > i {
+    display: block;
+    height: 12px;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.prop-chip > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.prop-chip:hover {
+    color: var(--accent-text);
+}
+
+.prop-chip:hover > i {
+    box-shadow: inset 0 0 0 2px var(--accent-text);
+}
+
+.prop-row-selection-colors {
+    margin-top: -2px;
+}
+
+.prop-more[hidden] {
+    display: none;
+}
+
+/* The shared picker behind the chips: present for showPicker(), never seen. */
+.prop-row-selection-colors .prop-ctl {
+    position: relative;
+}
+
+.prop-chip-picker {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.appearance-card .badge-list {
+    margin: 2px 0 4px calc(var(--prop-label-w) + 8px);
+}
+
 .bubble-set-config-card-header::before {
     font-size: 12px;
 }
@@ -1985,29 +2907,6 @@ h5 {
     border-left: 4px solid #8ca6d9;
     padding: 10px;
     margin: 10px 0;
-}
-
-.vr {
-    width: 1px;
-    background-color: #C33D35;
-    margin-left: 0.2em;
-    margin-right: 0.2em;
-    align-self: stretch;
-}
-
-.vr-label {
-    color: white;
-    background-color: #878996;
-    border-radius: 5px;
-    padding: 0.09rem;
-    font-size: 11px;
-}
-
-.disabled .vr-label,
-.vr-label.disabled {
-    color: #878996;
-    background-color: transparent;
-    outline: 1px solid #878996;
 }
 
 #loadingOverlay {
@@ -2092,6 +2991,8 @@ h5 {
 #filterContainer {
     position: relative;
     margin-right: 6px;
+    /* The rows stack in a narrow panel: see the @container rule below. */
+    container-type: inline-size;
 }
 
 /* The sub-group body is a 3-column grid [label | control | actions]; each row
@@ -2101,7 +3002,9 @@ h5 {
 .filter-subgroup-body {
     display: grid;
     /* Col2 keeps a readable floor for sliders/dropdowns/inputs; col1 gives up
-       width instead (long property names wrap via .checkboxLabel). */
+       width instead (long property names wrap via .checkboxLabel). 150px fits a
+       range row whose boxes hold a signed 3-decimal value ("-2.993"): two
+       non-shrinking boxes, two gaps and the 40px minimum track. */
     grid-template-columns: minmax(0, auto) minmax(150px, 1fr) auto;
     column-gap: 8px;
     row-gap: 6px;
@@ -2119,10 +3022,9 @@ h5 {
 }
 
 .filter-row-col1 {
-    /* Label column: shared auto width across the sub-group. Nudged down to sit
-       level with the control's first line (slider / dropdown). */
+    /* Label column: shared auto width across the sub-group, its checkbox and
+       name level with the 24px control beside it. */
     min-width: 0;
-    padding-top: 2px;
 }
 
 .filter-row-col2 {
@@ -2132,6 +3034,102 @@ h5 {
     display: flex;
     flex-direction: column;
     gap: 3px;
+}
+
+/* A slider with a distribution: the track drops under 16px of bars, the
+   value boxes stay level with the track. */
+.filter-range-row.has-hist {
+    align-items: flex-end;
+}
+
+/* 34px = 16px of bars, a 2px gap, then the 8px track centred on the 24px
+   boxes (box centre 22 = track top 18 + 4). */
+.filter-range-row.has-hist > div[slider] {
+    height: 34px;
+}
+
+.filter-range-row.has-hist > div[slider] > div {
+    top: 18px;
+}
+
+/* The handles move down with the track (the value-box rules above never reach them). */
+.filter-range-row.has-hist > div[slider] > input[type=range] {
+    top: 16px;
+}
+
+/* Typing a threshold widens its box less here, so the bars stay readable. */
+.filter-range-row.has-hist > input:focus {
+    max-width: 11ch;
+}
+
+/* The row's name and ⋯ stay level with the track, not with the bars. */
+.filter-row:has(.has-hist) > :is(.filter-row-col1, .filter-row-col3) {
+    padding-top: 10px;
+}
+
+/* A narrow panel stacks each row: checkbox, name, markers and ⋯ on one line,
+   the control full width under it, so a name never shrinks to a letter or two.
+   The panel is 405px wide in the default 432px inspector (side by side) and
+   273px in the narrowest, 300px one (stacked): any inspector under 387px. */
+@container (max-width: 359px) {
+    .filter-subgroup-body {
+        display: flex;
+        flex-direction: column;
+        /* The grid's align-items: start would shrink each row to its content. */
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .filter-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "name actions"
+            "control control";
+        column-gap: 8px;
+        row-gap: 2px;
+        align-items: center;
+    }
+
+    .filter-row-col1 {
+        grid-area: name;
+    }
+
+    .filter-row-col2 {
+        grid-area: control;
+    }
+
+    .filter-row-col3 {
+        grid-area: actions;
+    }
+
+    /* The name line sits above the bars now, not beside the track. */
+    .filter-row:has(.has-hist) > :is(.filter-row-col1, .filter-row-col3) {
+        padding-top: 0;
+    }
+}
+
+.filter-hist {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 16px;
+    height: 16px;
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    border-bottom: 1px solid var(--border);
+    pointer-events: none;
+}
+
+.filter-hist > i {
+    flex: 1 1 0;
+    background: var(--border);
+    border-radius: 1px 1px 0 0;
+}
+
+.filter-hist > i.kept {
+    background: color-mix(in srgb, var(--brand-text) 55%, transparent);
 }
 
 /* The exact-value boxes sit at the two ends of the track, on the slider's own
@@ -2152,35 +3150,45 @@ h5 {
 .filter-range-row > div[slider] {
     flex: 1 1 auto;
     min-width: 40px;
-    height: 18px;
+    height: 24px;
     margin: 0;
 }
 
-/* Width comes from the `size` attribute, fixed per slider to the widest value
+/* Track (8px) and handles centred on the 24px boxes beside them. */
+.filter-range-row > div[slider] > div {
+    top: 8px;
+}
+
+.filter-range-row > div[slider] > input[type=range] {
+    top: 6px;
+}
+
+/* Width is set inline in ch, fixed per slider to the widest value
    its column can show — resizing to the CURRENT value made the track (a flex
    sibling) shift mid-drag and the thumb jump under the cursor. The cap keeps a
    pathological column from eating the row; the exact value is one click away
    regardless. */
+/* The boxes don't shrink: a shrunk box cuts its value off at narrow panel
+   widths, so the track gives way instead. */
 /* Child combinator, not a descendant one: the row also contains the slider's
    two <input type=range> handles, one level down inside div[slider]. They were
    picking up `max-width: 10ch` here, which cut their 117px track to 58px — so
    both native thumbs sat in the left half while the visual thumbs were painted
    across the full width, and the right thumb had no hit area under it. */
 .filter-range-row > input {
-    flex: 0 1 auto;
+    flex: 0 0 auto;
     width: auto;
     max-width: 10ch;
     min-width: 0;
-    height: 18px;
-    padding: 0 3px;
+    height: 24px;
+    padding: 0 4px;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     text-align: center;
-    border: 1px solid transparent;
-    border-bottom-color: var(--border-soft);
-    border-radius: 3px;
-    background: transparent;
-    color: var(--text-muted);
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
     box-sizing: border-box;
 }
 
@@ -2196,8 +3204,7 @@ h5 {
 }
 
 .filter-range-row > input:hover {
-    border-color: var(--border-soft);
-    background: var(--surface-3);
+    border-color: var(--text-muted);
 }
 
 /* Focus shows the exact value, so the box needs room for it. */
@@ -2242,10 +3249,12 @@ h5 {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
+    /* Only active markers show, so a row's ⋯ sits at the right edge. */
+    justify-content: flex-end;
 }
 
 /* Panel-level control bar above all filter sections: the OR/AND join control
-   plus its "Complete cases only" option. Sitting above every section makes
+   plus its options. Sitting above every section makes
    clear the join control is global, not scoped to the adjacent section. */
 .filter-toolbar {
     display: flex;
@@ -2280,13 +3289,180 @@ h5 {
     font-style: italic;
 }
 
+/* The mode switch and its Options disclosure on one line, the open options
+   under them. */
 .filter-toolbar-join {
+    flex-basis: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filter-mode-row {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.filter-strict-checkbox {
+/* Opens settings, so a quiet text button rather than another filled control. */
+.filter-options-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding: 0 6px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-strong);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.filter-options-toggle:hover {
+    background: var(--row-hover);
+}
+
+.filter-options-toggle:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
+}
+
+.filter-options-toggle[hidden] {
+    display: none;
+}
+
+.filter-options-caret {
+    color: var(--text-muted);
+}
+
+.filter-options-toggle[aria-expanded="true"] .filter-options-caret {
+    transform: rotate(180deg);
+}
+
+/* While closed: how many options are off their defaults. */
+.filter-options-count:not(:empty) {
+    min-width: 16px;
+    padding: 0 4px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    /* Strong text (accent text on this fill is under 4.5:1 at 10px); the
+       accent ring carries "changed" at its 3:1 non-text minimum. */
+    color: var(--text-strong);
+    background: var(--surface-3);
+    box-shadow: inset 0 0 0 1px var(--accent-text);
+    border-radius: 4px;
+}
+
+/* The open options: one label|control grid, so every control starts at the
+   same x. Each line is display:contents and brings its two cells. */
+.filter-options {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 4px 10px;
+    padding: 6px 8px;
+    font-size: 11px;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+}
+
+.filter-options[hidden] {
+    display: none;
+}
+
+.filter-option-line {
+    display: contents;
+}
+
+/* [hidden] must beat display:contents. */
+.filter-option-line[hidden] {
+    display: none;
+}
+
+.filter-option-name {
+    color: var(--text-muted);
+}
+
+.filter-option-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.filter-option-count {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* The mode is a setting, not a call to action: a neutral track whose chosen
+   half is lifted, so it does not compete with the red scope and inspector
+   pills around it. */
+.filter-mode-switch.filter-join-toggle {
+    flex: none;
+    display: flex;
+    padding: 2px;
+    gap: 2px;
+    border: none;
+    border-radius: 6px;
+    background: var(--surface-3);
+}
+
+.filter-mode-switch .filter-join-segment {
+    flex: 1 1 0;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    background: transparent;
+    border-radius: 5px;
+}
+
+.filter-mode-switch .filter-join-segment + .filter-join-segment {
+    border-left: none;
+}
+
+.filter-mode-switch .filter-join-segment:hover {
+    background: var(--row-hover);
+}
+
+.filter-mode-switch .filter-join-segment.active,
+[data-theme="dark"] .filter-mode-switch .filter-join-segment.active {
+    font-weight: 700;
+    color: var(--text-strong);
+    background: var(--bg);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.filter-mode-switch .filter-join-segment.active:focus-visible {
+    outline-color: var(--accent-text);
+}
+
+/* The glyph carries the brand colour; the words stay at full contrast. */
+.filter-mode-switch .filter-join-segment.active [aria-hidden] {
+    color: var(--accent-text);
+}
+
+/* The stored operator (OR / AND) after the mode's name: a quiet aside for
+   readers who know the query language. Muted, not faint: faint text on this
+   surface is under 4.5:1 at 10px. */
+.filter-join-op {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.filter-mode-switch .filter-join-segment:hover .filter-join-op {
+    color: var(--text-strong);
+}
+
+.filter-option-checkbox {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -2296,7 +3472,7 @@ h5 {
     cursor: pointer;
 }
 
-.filter-strict-checkbox[hidden] {
+.filter-option-checkbox[hidden] {
     display: none;
 }
 
@@ -2312,7 +3488,8 @@ h5 {
     display: contents;
 }
 
-.keyboard-sheet kbd {
+.keyboard-sheet kbd,
+.tour-keys kbd {
     justify-self: center;
     min-width: 26px;
     padding: 1px 6px;
@@ -2339,6 +3516,7 @@ h5 {
 }
 
 .filter-join-segment {
+    white-space: nowrap;
     padding: 2px 9px;
     font-size: 11px;
     font-weight: 600;
@@ -2352,8 +3530,21 @@ h5 {
     border-left: 1px solid var(--border-soft);
 }
 
+/* The background changes, not the text: accent text on this surface is
+   under 4.5:1 at 11px. */
 .filter-join-segment:hover {
-    color: var(--accent-text);
+    background: var(--row-hover);
+}
+
+/* The group clips its overflow (rounded ends), which cut the global outline
+   down to the seam between segments: draw it inside instead, and in the page
+   colour where the fill is the accent. */
+.filter-join-segment:focus-visible {
+    outline-offset: -3px;
+}
+
+.filter-join-segment.active:focus-visible {
+    outline-color: var(--bg);
 }
 
 .filter-join-segment.active {
@@ -2409,10 +3600,20 @@ h5 {
 }
 
 .filter-group-chevron {
-    display: inline-block;
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    margin: 0 -4px 0 -2px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
     font-size: 9px;
-    margin-left: 4px;
-    margin-right: 1px;
+    letter-spacing: 0;
+    cursor: pointer;
     opacity: 0.85;
 }
 
@@ -2456,7 +3657,7 @@ h5 {
 .filter-unlock-btn {
     background-color: #403C53;
     color: white;
-    border: 1px solid #000;
+    border: 1px solid var(--border-strong);
     border-radius: 3px;
     padding: 4px 8px;
     cursor: pointer;
@@ -2477,20 +3678,28 @@ h5 {
 #filterContainer.locked .header-card button,
 #filterContainer.locked .sub-header-card button,
 #filterContainer.locked .filter-row-col1 label,
+#filterContainer.locked .filter-row-col1 .checkboxWrapper,
 #filterContainer.locked .filter-row-col2,
 #filterContainer.locked .slider-container,
 #filterContainer.locked input[type="number"],
 #filterContainer.locked .filter-range-row,
 #filterContainer.locked .header-card,
 #filterContainer.locked .sub-header-card,
-/* The join toggle and its "complete cases only" modifier are filter controls
-   too: their handlers already bail under the lock, so undimmed they looked live
-   and did nothing. The search box stays live — searching the list is reading,
-   not filtering. */
-#filterContainer.locked .filter-toolbar-join {
+/* The join toggle and its options (Edges, the ∅ box, no properties) are
+   filter controls too: their handlers already bail under the lock, so undimmed
+   they looked live and did nothing. The search box and the Options disclosure
+   stay live and undimmed — reading, not filtering — so the lock dims the
+   switch and the options inside .filter-toolbar-join, not the whole cluster. */
+#filterContainer.locked .filter-toolbar-join :is(.filter-mode-switch, .filter-options) {
     opacity: 0.5;
     pointer-events: none !important;
     cursor: not-allowed !important;
+}
+
+/* Folding a group and switching Node/Edge read, not filter: they stay live. */
+#filterContainer.locked :is(.filter-group-chevron, .filter-scope) {
+    pointer-events: auto !important;
+    cursor: pointer;
 }
 
 /* Keep range inputs invisible when locked to prevent browser default disabled styling from showing */
@@ -2770,35 +3979,6 @@ hr {
     margin: 1px;
 }
 
-.tooltip-dummy-buttons {
-    background-color: #403C53;
-    border: 1px solid var(--border-strong);
-    border-radius: 5px;
-    color: white;
-    padding-left: 4px;
-    padding-right: 4px;
-}
-
-.tooltip-dummy-buttons.red {
-    background-color: #C33D35;
-    color: white;
-}
-
-.tooltip-dummy-buttons.blue {
-    background-color: #8CA6D9;
-    color: var(--text);
-}
-
-.tooltip-dummy-buttons.pink {
-    background-color: #EFB0AA;
-    color: var(--text);
-}
-
-.tooltip-dummy-buttons.green {
-    background-color: #015C0C;
-    color: white;
-}
-
 .black {
     color: var(--text);
 }
@@ -2839,22 +4019,6 @@ hr {
     border-radius: 3px;
 }
 
-.small-btn {
-    width: 18px;
-    height: 18px;
-    text-align: center;
-    line-height: 16px;
-    font-size: 13px;
-    border: 1px solid var(--border-strong);
-    border-radius: 3px;
-    cursor: pointer;
-    padding: 0;
-    transition: box-shadow 0.2s ease-in-out;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
 .data-source-label {
     font-size: 0.7em;
     color: var(--text-faint);
@@ -2885,26 +4049,6 @@ hr {
     color: var(--accent-text);
 }
 
-.toggle-section-btn {
-    background: var(--surface-3);
-}
-
-.toggle-section-btn:hover {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
-}
-
-.small-btn.red:hover {
-    border: 1px solid var(--brand-border) !important;
-}
-
-.extra-small {
-    width: 14px;
-    height: 14px;
-    line-height: 14px;
-    font-size: 10px;
-}
-
 .mr {
     margin-right: 4px;
 }
@@ -2933,33 +4077,6 @@ hr {
     cursor: not-allowed;
 }
 
-/*************************
- custom checkbox style
- **************************/
-
-.hidden-checkbox {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-    margin: 0;
-    padding: 0;
-    pointer-events: none;
-}
-
-/* A 0x0 transparent input cannot show a ring, but the browser drew one anyway:
-   a black speck floating beside the filter row with no control under it. Hand
-   the ring to the box the user can actually see. */
-.hidden-checkbox:focus-visible {
-    outline: none;
-}
-
-.hidden-checkbox:focus-visible + .checkbox,
-.hidden-checkbox:focus-visible + .custom-checkbox {
-    outline: 2px solid var(--accent-text);
-    outline-offset: 1px;
-}
-
 .checkboxWrapper {
     display: inline-flex;
     align-items: center;
@@ -2977,6 +4094,7 @@ hr {
 .checkboxLabel {
     padding-left: 2px;
     flex-grow: 1;
+    cursor: pointer;
     font-size: 12px;
     /* Long property names wrap (breaking mid-word if unavoidable) so the
        control column never drops below its readable minimum — but clamp at two
@@ -2991,90 +4109,6 @@ hr {
     overflow: hidden;
 }
 
-.checkbox {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    position: relative;
-    text-align: center;
-    line-height: 12px;
-    font-size: 12px;
-    cursor: pointer;
-    font-family: sans-serif;
-    flex-shrink: 0;
-    box-sizing: border-box;
-}
-
-.add-to-query-button {
-    padding: 0;
-    width: 0;
-    height: 14px;
-    font-size: 10px;
-    border: 1px solid var(--brand-border);
-    border-radius: 3px;
-    background: transparent;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-left: 0;
-    box-sizing:border-box;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease-in-out, width 0.2s ease-in-out, margin 0.2s ease-in-out;
-}
-
-.add-to-query-button.show {
-    opacity: 1;
-    pointer-events: auto;
-    width: 14px;
-    margin-left: 1px;
-}
-
-.add-to-query-button.show.tt {
-    display: inline-flex;
-    width: 18px;
-    height: 18px;
-    pointer-events: none;
-}
-
-.add-to-query-button:hover {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 3px;
-}
-
-
-.checkbox-green {
-    color: var(--accent-text);
-    border: 1px solid var(--accent-text);
-    border-radius: 3px;
-}
-
-.checkbox-green:hover {
-    border-color: var(--text);
-}
-
-input:checked + .checkbox-green {
-    color: var(--success-text);
-    border-color: var(--success-text);
-}
-
-input:checked + .checkbox-green::after {
-    color: var(--success-text);
-}
-
-input:checked + .checkbox-red::after {
-    color: var(--accent-text);
-}
-
-input:checked + .checkbox-red::after,
-input:checked + .checkbox-green::after {
-    content: "✔";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
 
 .highlight {
     box-shadow: 0 0 5px #C33D35;
@@ -3082,113 +4116,8 @@ input:checked + .checkbox-green::after {
 }
 
 /*************************
- +/- (add/remove) from selection buttons
- **************************/
-
-.pm-group {
-    display: inline-flex;
-    width: 18px;
-    height: 18px;
-    margin-left: 1px;
-    margin-right: 1px;
-    box-sizing: border-box;
-    border: 0.08em solid var(--border-strong);
-    border-radius: 999px;
-    overflow: hidden;
-    position: relative;
-    background: var(--surface-3);
-    transition: transform 140ms ease, border-color 140ms ease;
-    transform-origin: right center;
-}
-
-.plus-minus-button {
-    flex: 1;
-    height: 100%;
-    padding: 0;
-    margin: 0;
-    border: 0;
-    background: transparent;
-    font-size: 13px;
-    line-height: 18px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 120ms ease, color 120ms ease;
-}
-
-.plus-minus-button + .plus-minus-button {
-    border-left: 1px solid var(--brand-border);
-}
-
-/* Per-row actions sit on every single filter row, so at full strength they
-   out-shout the properties. Quieted by COLOR, not opacity — they are non-text
-   controls owing 3:1, and dimming the token below --border would fail it.
-   .filter-row is display:contents and therefore has no box to hover, so the
-   transition keys off the controls themselves. */
-#filterContainer .filter-row-col3 .pm-group {
-    border-color: var(--border);
-    background: transparent;
-}
-
-#filterContainer .filter-row-col3 .plus-minus-button {
-    color: var(--text-faint);
-}
-
-#filterContainer .filter-row-col3 .pm-group:hover .plus-minus-button,
-#filterContainer .filter-row-col3 .pm-group:focus-within .plus-minus-button {
-    color: var(--text-strong);
-}
-
-/* Transparent at rest is what keeps these quiet; transparent at 2.5x is a
-   control with the group chip and the row behind it showing through its
-   middle. Opaque the moment it grows. */
-#filterContainer .filter-row-col3 .pm-group:hover,
-#filterContainer .filter-row-col3 .pm-group:focus-within {
-    background: var(--surface-3);
-}
-
-.pm-group:hover,
-.pm-group:focus-within {
-    border-color: var(--accent-text);
-    transform: scale(2.5);
-    z-index: 99;
-}
-
-.pm-group:hover .plus-minus-button + .plus-minus-button {
-    border-left-color: var(--accent-text);
-}
-
-.plus-minus-button:hover {
-    background: #C33D35;
-    color: #fff;
-    cursor: pointer;
-}
-
-/*************************
  style button and row
  **************************/
-
-.style-inner-button {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 18px;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 18px;
-    font-size: 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: 3px;
-    cursor: pointer;
-    transition: border 0.2s ease-in-out, color 0.2s ease-in-out, opacity 0.1s ease-in-out;
-}
-
-.style-inner-button:hover {
-    color: var(--accent-text);
-    border: 1px solid var(--accent-text);
-}
 
 .style-color-button-container {
     display: flex;
@@ -3201,18 +4130,62 @@ input:checked + .checkbox-green::after {
     padding-right: 5px;
 }
 
-.style-color-gradient-button {
-    background: linear-gradient(to right, #403C53, #C33D35, #8CA6D9, #EFB0AA, #FFFFFF);
-    width: 24px;
-    height: 18px;
-    color: transparent;
-}
-
 .style-input {
     width: 80px;
     height: 18px;
     box-sizing: border-box;
     font-size: 12px;
+}
+
+.badge-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 4px 8px 0;
+}
+
+.badge-list[hidden] {
+    display: none;
+}
+
+.badge-list-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-strong);
+}
+
+.badge-list-swatch {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+}
+
+/* Several colours in one slot: a diagonal split says "mixed" without a legend. */
+.badge-list-swatch.mixed {
+    background: linear-gradient(135deg, var(--accent-text) 50%, var(--brand-text) 50%) !important;
+}
+
+.badge-list-slot {
+    flex: none;
+    width: 76px;
+    color: var(--text-muted);
+}
+
+.badge-list-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.badge-list-count {
+    flex: none;
+    color: var(--text-muted);
 }
 
 .style-input-sm {
@@ -3314,7 +4287,7 @@ input:checked + .checkbox-green::after {
     left: 0;
     height: 8px;
     border-radius: 14px;
-    background-color: #403C53;
+    background-color: var(--brand-text);
 }
 
 [slider] > div > [thumb] {
@@ -3327,9 +4300,19 @@ input:checked + .checkbox-green::after {
     margin-left: -9px;
     cursor: pointer;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-    background-color: var(--surface-3);
+    background-color: var(--input-bg);
+    border: 2px solid var(--brand-text);
+    box-sizing: border-box;
     border-radius: 50%;
     outline: none;
+}
+
+/* The native handles are invisible (opacity 0) over the painted thumbs, so the
+   focus ring goes on the thumb each one drives. */
+[slider]:has(> input[type=range]:first-of-type:focus-visible) > div > [thumb]:first-of-type,
+[slider]:has(> input[type=range]:last-of-type:focus-visible) > div > [thumb]:last-of-type {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
 }
 
 [slider] > input[type=range] {
@@ -3416,91 +4399,33 @@ div[slider] > input[type=range]::-ms-tooltip {
  adapted from https://www.w3schools.com/howto/howto_css_switch.asp
  **************************/
 
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 30px;
-    height: 16px;
-}
-
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--border);
-    -webkit-transition: .2s;
-    transition: .2s;
-}
-
-.slider:before {
-    position: absolute;
-    content: "";
-    height: 12px;
-    width: 12px;
-    left: 2px;
-    bottom: 2px;
-    background-color: var(--input-bg);
-    -webkit-transition: .2s;
-    transition: .2s;
-}
-
-input:checked + .slider {
-    background-color: #403C53;
-}
-
-input:focus + .slider {
-    box-shadow: 0 0 1px #403C53;
-}
-
-input:checked + .slider:before {
-    -webkit-transform: translateX(14px);
-    -ms-transform: translateX(14px);
-    transform: translateX(14px);
-}
-
-.slider.round {
-    border-radius: 16px;
-}
-
-.slider.round:before {
-    border-radius: 50%;
-}
-
 /*************************
  Bubble group controls
  **************************/
 
-/* The per-filter-row group control. 18px is what filter-row-col3 allows, so it
-   shows ONE colour plus a ring meaning "and others" — N colours are not legible
-   at this size and a conic pie would rebuild the 2x2 quadrant wedges this
-   replaced. The tooltip and the menu carry the exact membership.
-   ponytail: 18px misses WCAG 2.5.8's 24px target — the same app-wide issue the
-   rail's icon buttons have; fix globally, not here. */
+/* The per-filter-row group control: ONE colour plus a ring meaning "and
+   others" — N colours are not legible at this size and a conic pie would
+   rebuild the 2x2 quadrant wedges this replaced. The tooltip and the menu carry
+   the exact membership. 14px painted inside a 24px target (WCAG 2.5.8): the
+   transparent border is the hit area. Shown only once the filter is in a
+   group: the row's "⋯" menu offers "Add to group…". */
 .group-chip {
-    width: 18px;
-    height: 18px;
-    flex: 0 0 18px;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
     padding: 0;
     border-radius: 50%;
-    border: 1.5px dashed var(--text-faint);
-    background: transparent;
+    border: 5px solid transparent;
+    background: content-box transparent;
+    box-shadow: inset 0 0 0 1.5px var(--text-faint);
     cursor: pointer;
     display: inline-flex;
     vertical-align: middle;
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    box-sizing: border-box;
 }
 
-.group-chip:hover {
-    transform: scale(1.15);
+.group-chip[hidden] {
+    display: none;
 }
 
 .group-chip:focus-visible {
@@ -3510,10 +4435,8 @@ input:checked + .slider:before {
 
 /* A miniature of the bubble: the group's fill inside its stroke colour. */
 .group-chip.assigned {
-    border-style: solid;
-    border-width: 2px;
-    border-color: var(--chip-border, var(--chip-color));
-    background: var(--chip-color);
+    background: content-box var(--chip-color);
+    box-shadow: inset 0 0 0 2px var(--chip-border, var(--chip-color));
 }
 
 /* In several groups: an inset ring reads as "there is more here" without
@@ -3521,10 +4444,10 @@ input:checked + .slider:before {
    takes the panel's own background — `--surface-1` was never defined in either
    theme, which made the shadow compute to `none` and the state invisible. */
 .group-chip.multi {
-    box-shadow: inset 0 0 0 2px var(--input-bg);
+    box-shadow: inset 0 0 0 2px var(--chip-border, var(--chip-color)), inset 0 0 0 4px var(--input-bg);
 }
 
-#filterContainer.locked .group-chip {
+#filterContainer.locked .group-chip.assigned {
     pointer-events: none;
     opacity: 0.4;
 }
@@ -3549,27 +4472,23 @@ input:checked + .slider:before {
    read as an undifferentiated block, and the open one has a settings pane
    inside it that has to be visibly part of THAT group. */
 .group-row {
-    padding: 6px;
-    border: 1px solid var(--border-soft);
-    border-radius: 7px;
+    padding: 2px 4px;
+    border-radius: 6px;
     background: transparent;
     cursor: pointer;
 }
 
+/* --surface-3, not --row-hover: muted counts on the dark --row-hover fall to 4.47:1. */
 .group-row:hover {
-    border-color: var(--border-strong);
+    background: var(--surface-3);
 }
 
-/* The open row carries its own settings, so it reads as a container rather
-   than a highlighted line. Its edge takes the GROUP's colour (set inline), not
-   the accent: a red frame beside the group's own swatch reads as an error, and
-   this ties the open panel to the bubble it belongs to. */
 .group-row.active {
-    background: var(--surface-2);
-    border-color: var(--border-strong);
-    border-left: 3px solid var(--row-color, var(--border-strong));
-    padding-left: 4px;
     cursor: default;
+}
+
+.group-row.active:hover {
+    background: none;
 }
 
 .group-row-head {
@@ -3625,7 +4544,7 @@ input:checked + .slider:before {
     background: transparent;
     color: var(--text-strong);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     text-overflow: ellipsis;
 }
 
@@ -3642,9 +4561,29 @@ input:checked + .slider:before {
 
 .group-count {
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-size: 11px;
+    font-variant-numeric: tabular-nums;
     color: var(--text-muted);
     white-space: nowrap;
+}
+
+/* The group's share of every node in the graph. */
+.group-count-bar {
+    position: relative;
+    width: 28px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-soft);
+    overflow: hidden;
+}
+
+.group-count-bar > b {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: color-mix(in srgb, var(--brand-text) 60%, transparent);
 }
 
 .group-row-toggle {
@@ -3671,26 +4610,7 @@ input:checked + .slider:before {
     border-color: var(--danger-text);
 }
 
-.group-row-more {
-    flex: 0 0 auto;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: none;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 14px;
-    line-height: 1;
-    cursor: pointer;
-}
-
-.group-row-more:hover {
-    background: var(--surface-3);
-    color: var(--text-strong);
-}
-
-/* The line the old UI never showed: a group can be fed by a live filter AND a
+/* The group's source line: a group can be fed by a live filter AND a
    hand-picked node set at the same time. Two parts, so "follows a filter" and
    "someone put these here" do not run together into one cryptic string. */
 .group-row-source {
@@ -3715,11 +4635,13 @@ input:checked + .slider:before {
     display: none;
 }
 
-/* Inside the open row, so it needs its own edge against the row's fill. */
+/* The open group's settings hang under it, behind a rule in the GROUP's colour
+   (set inline), not the accent: a red edge beside the group's own swatch reads
+   as an error, and this ties the settings to the bubble they belong to. */
 .group-row .group-style-panel {
-    margin-top: 6px;
-    padding-top: 6px;
-    border-top: 1px dashed var(--border-soft);
+    margin: 4px 0 6px 24px;
+    padding-left: 8px;
+    border-left: 2px solid color-mix(in srgb, var(--row-color, var(--border)) 60%, var(--text-muted));
 }
 
 /* --- the shared group menu ---------------------------------------------- */
@@ -3744,150 +4666,328 @@ input:checked + .slider:before {
     color: var(--text-muted);
 }
 
-/*************************
- dropdown checklist
- **************************/
-
+/* --------------------------------------------------------------------------
+   Filter rows (Filters tab). Same control vocabulary as the appearance editor:
+   24px fields with a --text-faint border, native checkboxes, 6px radius, and
+   the row's verbs behind one "⋯" button (ui_components.js createRowActions).
+   -------------------------------------------------------------------------- */
 .dropdown-check-list {
-    display: inline-block;
+    display: block;
+    min-width: 0;
 }
 
-.dropdown-check-list:focus-visible,
-.dropdown-check-list *:focus-visible {
-    outline: none;
+.filter-cat-trigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    height: 24px;
+    box-sizing: border-box;
+    padding: 0 6px 0 8px;
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.filter-cat-trigger:hover {
+    border-color: var(--text-muted);
+}
+
+.filter-cat-trigger[aria-expanded="true"] {
+    border-color: var(--accent-text);
+    box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+/* Narrowed reads in the accent, so a filter that removes values is visible
+   from across the panel without opening it. */
+.filter-cat-trigger.narrowed .filter-cat-summary {
+    color: var(--accent-text);
+    font-weight: 600;
+}
+
+.filter-cat-summary {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Each value's share of the graph inside the closed field: kept in slate,
+   dropped in grey. Not interactive; the list does the choosing. */
+.filter-cat-bar {
+    flex: 1 1 40px;
+    min-width: 24px;
+    display: flex;
+    gap: 1px;
+    height: 6px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+/* Dropped: a hollow outline (3:1+ in both themes), so narrowing greys values
+   out instead of making them vanish. */
+.filter-cat-bar > i {
+    flex-basis: 0;
+    min-width: 1px;
+    box-shadow: inset 0 0 0 1px var(--text-faint);
+}
+
+.filter-cat-bar > i.kept {
+    background: color-mix(in srgb, var(--brand-text) 70%, transparent);
     box-shadow: none;
 }
 
-.dropdown-check-list .anchor {
-    position: relative;
-    cursor: pointer;
-    display: inline-block;
-    /*padding: 5px 5px 5px 10px;*/
-    border: 1px solid var(--border);
-    width: 100%;
-    height: 16px;
-    line-height: 16px;
-    padding: 0 20px 0 4px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    margin: 0;
+.filter-cat-bar > i.kept:nth-child(even) {
+    background: color-mix(in srgb, var(--brand-text) 50%, transparent);
+}
+
+.filter-cat-total,
+.filter-cat-count {
+    color: var(--text-muted);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.filter-cat-chevron {
+    color: var(--text-muted);
+    line-height: 1;
+}
+
+.rail-menu.filter-cat-menu {
+    min-width: 200px;
+    max-width: 320px;
+    gap: 0;
+    font-size: 12px;
+}
+
+.filter-cat-search {
+    height: 24px;
     box-sizing: border-box;
+    margin-bottom: 4px;
+    padding: 0 8px;
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
 }
 
-.dropdown-check-list .anchor:after {
-    position: absolute;
-    content: "";
-    border-left: 2px solid var(--border-strong);
-    border-top: 2px solid var(--border-strong);
-    padding: 2px;
-    right: 5px;
-    top: 25%;
-    transform: rotate(-135deg);
-}
-
-.dropdown-check-list ul.items {
-    position: fixed;
-    /* Include padding+border in the height so the JS max-height cap (which uses
-       the available space) matches the rendered box and the panel never spills
-       over the anchor when a huge list opens upward. */
-    box-sizing: border-box;
-    padding: 2px;
-    display: none;
-    margin: 0 0 0 3px;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    border-top: none;
-    background-color: var(--input-bg);
-    z-index: var(--z-menu);
-    width: auto;
-    list-style: none;
-    text-align: left;
-    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.5)
-
-}
-
-.dropdown-check-list ul.items li {
-    padding: 3px 5px 3px 5px;
-    font-size: 14px;
-}
-
-.dropdown-check-list ul.items li label {
-    position: relative;
-    display: flex;
+.filter-cat-item {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
     align-items: center;
+    column-gap: 2px;
+    min-height: 24px;
+    padding: 0 6px 0 2px;
+    border-radius: 4px;
     cursor: pointer;
 }
 
-.dropdown-check-list ul.items li input[type="checkbox"] {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-    margin: 0;
-    padding: 0;
-    pointer-events: none;
+.filter-cat-item:hover {
+    background: var(--surface-3);
 }
 
-.custom-checkbox {
-    display: inline-block;
+.filter-cat-item[hidden] {
+    display: none;
+}
+
+.filter-cat-item input {
     width: 14px;
     height: 14px;
-    flex-shrink: 0;
-    margin-right: 10px;
-    border: 1px solid var(--accent-text);
-    border-radius: 3px;
-    background-color: var(--input-bg);
-    vertical-align: middle;
-    cursor: pointer;
-    transition: background-color 0.3s ease, border-color 0.3s ease;
+    margin: 0 4px;
 }
 
-.custom-checkbox.checked {
-    background-color: #C33D35;
-    color: white;
-    position: relative;
+.filter-cat-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.custom-checkbox.checked::after {
-    content: "✔";
-    font-size: 14px;
-    color: white;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+.filter-cat-item {
+    /* A fixed "Only" column, so every count lines up with All's. */
+    grid-template-columns: 22px minmax(0, 1fr) auto 44px;
 }
 
-.custom-checkbox:hover {
-    border-color: #A02929;
-    background-color: #FFE5E5;
-}
-
-.dropdown-check-list.visible .items {
-    display: block;
-}
-
-.dropdown-check-list.visible .anchor {
-    color: var(--accent-text);
-}
-
-.dropdown-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    padding: 5px;
-    background-color: var(--surface);
-    border-bottom: 1px solid var(--border);
-}
-
-.dropdown-buttons.button {
-    font-size: 12px;
-    padding: 4px 8px;
+/* "Only": shown on hover and keyboard focus, always on touch. */
+.filter-cat-only {
+    visibility: hidden;
+    justify-self: end;
+    width: 40px;
+    height: 20px;
+    padding: 0;
     border: 1px solid var(--border);
-    border-radius: 3px;
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 11px;
     cursor: pointer;
-    background-color: var(--input-bg);
-    transition: background-color 0.3s ease;
+}
+
+.filter-cat-item:hover .filter-cat-only,
+.filter-cat-item:focus-within .filter-cat-only {
+    visibility: visible;
+}
+
+@media (hover: none) {
+    .filter-cat-only {
+        visibility: visible;
+    }
+}
+
+.filter-cat-status {
+    padding: 0 6px 2px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.filter-cat-status:empty {
+    padding: 0;
+}
+
+/* Where the elements without a value went: they are in no list above. */
+.filter-cat-foot {
+    margin-top: 4px;
+    padding: 5px 6px 1px;
+    border-top: 1px solid var(--border-soft);
+    font-size: 11px;
+    color: var(--text-muted);
+    max-width: 32ch;
+}
+
+.filter-cat-all {
+    margin-bottom: 2px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--border-soft);
+    border-radius: 4px 4px 0 0;
+    font-weight: 600;
+}
+
+.filter-row-check,
+.filter-section-check,
+.filter-option-checkbox input {
+    width: 16px;
+    height: 16px;
+    margin: 4px;
+    cursor: pointer;
+}
+
+.filter-row-col3 {
+    gap: 0;
+}
+
+/* The row's ∅ switch: do elements without a value pass this filter? ∅ and
+   how many elements that is. Shown once the choice was changed (⋯ sets it
+   first), then for good: filled when they pass, dashed with a struck ∅ when
+   they do not. 24px tall like every control; the count widens it a little. */
+.filter-missing-switch {
+    min-width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 0 4px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-3);
+    color: var(--text-strong);
+    font: inherit;
+    /* Even, like the count's 10px: a 13px ∅ centres on a half pixel in the 24px
+       button and renders 1px below the count. */
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.filter-missing-count {
+    font-size: 10px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.filter-missing-switch[aria-pressed="false"] {
+    background: transparent;
+    border-style: dashed;
+    color: var(--text-muted);
+}
+
+/* Only the glyph is struck: a struck count would read as "not 37". */
+.filter-missing-switch[aria-pressed="false"] .filter-missing-glyph {
+    text-decoration: line-through;
+}
+
+/* Until the choice is first changed there is nothing to show. */
+.filter-missing-switch[hidden] {
+    display: none;
+}
+
+/* Strong text on hover: muted on the hover fill is under 4.5:1 in dark mode. */
+.filter-missing-switch:hover:not([aria-disabled="true"]) {
+    background: var(--row-hover);
+    color: var(--text-strong);
+}
+
+.filter-missing-switch:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
+}
+
+/* Unticked row (or an idle build-up edge row): it decides nothing yet. */
+.filter-missing-switch[aria-disabled="true"] {
+    opacity: 0.4;
+    cursor: default;
+}
+
+#filterContainer.locked .filter-missing-switch {
+    pointer-events: none;
+    opacity: 0.4;
+}
+
+.filter-row-more,
+.group-row-more,
+.filter-section-reset {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-grid;
+    place-items: center;
+}
+
+.filter-row-more:hover,
+.filter-row-more[aria-expanded="true"],
+.group-row-more:hover,
+.group-row-more[aria-expanded="true"],
+.filter-section-reset:hover {
+    border-color: var(--border);
+    background: var(--surface-3);
+    color: var(--text);
+}
+
+/* Inverted ("keep values outside the range"): the kept ends take the accent. */
+[slider].inverted > div > [inverse-left],
+[slider].inverted > div > [inverse-right] {
+    background-color: var(--accent-text);
 }
 
 /*************************
@@ -4060,21 +5160,27 @@ input:checked + .slider:before {
 /*************************
  popup
  **************************/
+/* A native modal <dialog> (popup.js): the top layer replaces a z-index, the
+   ::backdrop replaces an overlay div. */
 .p-custom {
-    position: fixed;
     background: var(--input-bg);
+    color: var(--text);
+    padding: 0;
     border-radius: 8px;
     border: 2px solid var(--brand-border);
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
-    z-index: calc(var(--z-modal) + 1);
     max-width: 90vw;
     max-height: 90vh;
     overflow: hidden;
     min-width: 200px;
     min-height: 60px;
     transition: all 0.3s ease;
-    display: flex;
     flex-direction: column;
+}
+
+/* Only while open: an author display would beat the UA's dialog:not([open]). */
+.p-custom[open] {
+    display: flex;
 }
 
 .p-header {
@@ -4125,14 +5231,13 @@ input:checked + .slider:before {
     flex-shrink: 0;
 }
 
-.p-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+.p-custom::backdrop {
     background: rgba(0, 0, 0, 0.5);
-    z-index: var(--z-modal);
+}
+
+/* The tour dims the page with its own scrim, leaving its targets lit. */
+.p-custom.p-clear-backdrop::backdrop {
+    background: transparent;
 }
 
 .p-icon {
@@ -4379,6 +5484,22 @@ input:checked + .slider:before {
     gap: 10px;
 }
 
+.picker-missing-row {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.picker-missing-row[hidden] {
+    display: none;
+}
+
+.picker-info-missing {
+    font-size: 12px;
+    color: var(--accent-text);
+    margin-top: 6px;
+}
+
 .picker-range-input {
     width: 80px;
     padding: 6px 8px;
@@ -4604,402 +5725,548 @@ input:checked + .slider:before {
     background: var(--input-bg);
 }
 
-.panel-header-center-buttons .data-buttons,
-.panel-header-center-buttons .query-buttons {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.panel-header-center-buttons .data-buttons button,
-.panel-header-center-buttons .query-buttons button {
-    height: 24px;
-    cursor: pointer;
-    border-radius: 3px;
-    color: #fff;
-    border: 1px solid rgba(0, 0, 0, 0.3);
-    background-color: #015C0C;
-    font-size: 11px;
-    white-space: nowrap;
-    padding: 2px 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.panel-header-center-buttons .data-buttons button:hover,
-.panel-header-center-buttons .query-buttons button:hover {
-    border-color: rgba(255, 255, 255, 0.6);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.panel-header-center-buttons .data-buttons button:active,
-.panel-header-center-buttons .query-buttons button:active {
-    transform: translateY(0);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-.panel-header-center-buttons .data-buttons button:disabled,
-.panel-header-center-buttons .query-buttons button:disabled {
-    background-color: #2a2733;
-    cursor: not-allowed;
-    opacity: 0.5;
-    color: var(--text-faint);
-    box-shadow: none;
-    transform: none;
-}
-
-.panel-header-center-buttons .data-buttons button.red,
-.panel-header-center-buttons .query-buttons button.red {
-    background-color: #C33D35 !important;
-    color: white !important;
-}
-
-.panel-header-center-buttons .data-buttons button.red:hover,
-.panel-header-center-buttons .query-buttons button.red:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .data-buttons button.pink,
-.panel-header-center-buttons .query-buttons button.pink {
-    background-color: #EFB0AA !important;
-    color: black !important;
-}
-
-.panel-header-center-buttons .data-buttons button.pink:hover,
-.panel-header-center-buttons .query-buttons button.pink:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .data-buttons button.blue,
-.panel-header-center-buttons .query-buttons button.blue {
-    background-color: #8CA6D9 !important;
-    color: black !important;
-}
-
-.panel-header-center-buttons .data-buttons button.blue:hover,
-.panel-header-center-buttons .query-buttons button.blue:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .data-buttons button.grey,
-.panel-header-center-buttons .query-buttons button.grey {
-    background-color: #9998AF !important;
-    color: black !important;
-}
-
-.panel-header-center-buttons .data-buttons button.grey:hover,
-.panel-header-center-buttons .query-buttons button.grey:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .data-buttons button.green,
-.panel-header-center-buttons .query-buttons button.green {
-    background-color: #015C0C !important;
-    color: white !important;
-}
-
-.panel-header-center-buttons .data-buttons button.green:hover,
-.panel-header-center-buttons .query-buttons button.green:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-.panel-header-center-buttons .data-buttons button.purple,
-.panel-header-center-buttons .query-buttons button.purple {
-    background-color: #015C0C !important;
-    color: white !important;
-}
-
-.panel-header-center-buttons .data-buttons button.purple:hover,
-.panel-header-center-buttons .query-buttons button.purple:hover {
-    border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
+/* ==========================================================================
+   Data editor (Workbench › Data). Toolbar: Rows | Type switches, filter, count,
+   then + Add / Import / Export at the right. The table is an APG grid: one Tab
+   stop, the active cell ringed. Staged changes are marked per kind (edited
+   cell, added row, deleted row) and counted in the bar under the table, which
+   exists only while something is staged.
+   ========================================================================== */
 #dataTableContainer {
     height: 100%;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--border);
     background: var(--input-bg);
     overflow: hidden;
 }
 
-.data-table-warning-banner {
-    background: #fff3cd;
-    border-bottom: 2px solid #ffc107;
-    padding: 8px 12px;
-    font-size: 12px;
-    color: #856404;
-    text-align: center;
+.data-toolbar,
+.wb-toolbar,
+.data-changes {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 6px 8px;
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    position: relative;
-}
-
-.data-table-warning-close {
-    background: none;
-    border: none;
-    font-size: 20px;
-    font-weight: bold;
-    color: #856404;
-    cursor: pointer;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-    position: absolute;
-    right: 8px;
-}
-
-.data-table-warning-close:hover {
-    background: rgba(133, 100, 4, 0.1);
-    color: #664d03;
-}
-
-.data-table-wrapper {
-    flex: 1;
-    overflow: auto;
-}
-
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: Arial, sans-serif;
     font-size: 12px;
 }
 
-.data-table th {
-    background-color: var(--surface-3);
-    border: 1px solid var(--border);
-    padding: 2px 4px;
-    text-align: left;
-    font-weight: bold;
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    vertical-align: top;
-    cursor: pointer;
+.data-toolbar,
+.wb-toolbar {
+    border-bottom: 1px solid var(--border-soft);
 }
 
-.data-table td {
-    border: 1px solid var(--border);
-    padding: 4px 8px;
-    min-width: 80px;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.data-gap {
+    flex: 1;
+}
+
+/* Query and Assistant panes: the tab's toolbar on top, its content below. */
+#queryPane:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+#queryPane #queryEditor {
+    height: auto;
+    min-height: 0;
+}
+
+/* The text box hides its outline for the custom caret, which blinks; the
+   frame carries the focus cue instead. */
+#queryPane:has(#queryTextArea:focus-visible) {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
+}
+
+.wb-toolbar-sep {
+    width: 1px;
+    height: 16px;
+    align-self: center;
+    background: var(--border-soft);
+}
+
+/* What the query box is doing to the graph: Synced / Edited / Applied / Error. */
+.query-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--text-muted);
+}
+
+.query-status-pill {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+    padding: 0 6px;
+    border: 1px solid currentColor;
+    border-radius: 6px;
+}
+
+.query-status-pill:empty {
+    display: none;
+}
+
+.query-status[data-state="edited"] .query-status-pill {
+    color: var(--text-strong);
+    background: var(--edited-wash);
+    border-color: var(--edited-line);
+}
+
+/* Applied is the state that changes what the graph shows: the only filled pill. */
+.query-status[data-state="applied"] .query-status-pill {
+    color: #fff;
+    background: var(--brand-border);
+    border-color: var(--brand-border);
+}
+
+.query-status[data-state="error"] .query-status-pill,
+.query-status[data-state="error"] .query-status-text {
+    color: var(--danger-text);
+}
+
+.query-status[data-state="error"] .query-status-pill {
+    background: var(--deleted-wash);
+}
+
+.query-status code {
+    font-family: "Courier New", monospace;
+}
+
+.data-toolbar .insp-btn,
+.wb-toolbar .insp-btn,
+.data-changes .insp-btn,
+.data-add-form .insp-btn,
+.data-empty .insp-btn,
+.data-review .insp-btn {
+    height: 24px;
+    box-sizing: border-box;
+}
+
+.data-seg-count {
+    margin-left: 1px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.prop-seg > button[aria-pressed="true"] .data-seg-count {
+    color: inherit;
+}
+
+.data-filter {
+    height: 24px;
+    box-sizing: border-box;
+    width: 200px;
+    max-width: 100%;
+    padding: 0 8px;
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+}
+
+.data-count {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-.data-table td:focus {
-    outline: 2px solid var(--brand-border);
-    background-color: var(--surface-3);
+/* The one filled button per surface: the action the surface exists for. */
+.insp-btn.primary {
+    background: var(--brand-border);
+    border-color: var(--brand-border);
+    color: #fff;
+    font-weight: 600;
 }
 
-.data-table td.editing {
-    background-color: #fff9c4;
-    border: 2px solid var(--brand-border);
-    white-space: normal;
-    text-overflow: clip;
-    overflow: visible;
-    word-wrap: break-word;
+.insp-btn.primary:hover {
+    border-color: var(--accent-text);
+    color: #fff;
 }
 
-.data-table tr:nth-child(even) {
-    background-color: var(--surface);
+.insp-btn:disabled,
+.insp-btn[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: var(--border-soft);
+    color: var(--text-strong);
 }
 
-.data-table tr:hover {
-    background-color: var(--row-hover);
+/* A blocked primary drops its fill rather than fading it: faded white on the
+   brand slate was unreadable. */
+.insp-btn.primary:disabled,
+.insp-btn.primary[aria-disabled="true"] {
+    opacity: 1;
+    background: var(--surface-3);
+    border-color: var(--border-soft);
+    color: var(--text-muted);
 }
 
-.data-table input {
+.data-table-wrapper {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    /* The sticky group + header rows (20px + 26px): a focused cell scrolled
+       into view lands below them, not under them. */
+    scroll-padding-top: 46px;
+}
+
+.data-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    font-size: 12px;
+}
+
+.data-table th,
+.data-table td {
+    height: 26px;
+    box-sizing: border-box;
+    max-width: 240px;
+    padding: 0 8px;
+    border-right: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    background: var(--input-bg);
+}
+
+.data-table thead th {
+    position: sticky;
+    z-index: 2;
+    background: var(--surface);
+    color: var(--text-strong);
+    font-weight: 600;
+}
+
+.data-group-row th {
+    top: 0;
+    height: 20px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.data-head-row th {
+    top: 20px;
+    border-bottom-color: var(--border);
+}
+
+.data-sort {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     width: 100%;
-    border: none;
-    padding: 2px;
-    font-family: inherit;
-    font-size: inherit;
-    background: transparent;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
 }
 
-.data-table input:focus {
-    outline: none;
+/* Only the sorted column shows its arrow; the others on hover or focus. */
+.data-sort-arrow {
+    visibility: hidden;
+    color: var(--text-faint);
+    font-size: 10px;
+}
+
+.data-head-row th:hover .data-sort-arrow,
+.data-sort:focus .data-sort-arrow {
+    visibility: visible;
+}
+
+.data-head-row th[aria-sort] .data-sort-arrow {
+    visibility: visible;
+    color: var(--accent-text);
+}
+
+/* Row actions and ID stay put while the property columns scroll. */
+.data-table .data-act {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 32px;
+    min-width: 32px;
+    max-width: 32px;
+    padding: 0 3px;
+    text-align: center;
+}
+
+.data-table .data-id {
+    position: sticky;
+    left: 32px;
+    /* Room for an ID plus its New / Deleted pill, so staging a row does not
+       push every column sideways. */
+    min-width: 140px;
+    z-index: 1;
+    box-shadow: inset -1px 0 0 var(--border);
+}
+
+.data-table thead .data-act,
+.data-table thead .data-id {
+    z-index: 3;
+}
+
+.data-row-btn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.data-row-btn:hover,
+.data-row-btn[aria-expanded="true"] {
+    border-color: var(--border);
+    background: var(--surface-3);
+    color: var(--text);
 }
 
 .data-table td.readonly {
-  background-color: var(--surface);
-  color: var(--text-muted);
-  cursor: not-allowed;
+    color: var(--text-muted);
 }
 
-.data-table td.readonly:hover {
-  background-color: var(--surface);
+/* Staged rows and cells keep their wash under the pointer. */
+.data-table tbody tr:not(.data-row-added, .data-row-deleted):hover td:not(.data-cell-edited, .editing) {
+    background: var(--row-hover);
 }
 
-
-.data-table-sortable-header {
-  display: block;
-  cursor: pointer;
-  user-select: none;
-  min-height: 24px;
-  position: relative;
-  padding-right: 20px;
+/* The active cell. :focus, not :focus-visible: a clicked cell is the cell the
+   next key acts on, so it has to show for the mouse too. */
+.data-table td:focus,
+.data-table th:focus,
+.data-table .data-sort:focus,
+.data-table .data-row-btn:focus {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
 }
 
-.data-table-sortable-header:hover {
-  background-color: var(--surface-3);
+.data-table td.editing {
+    max-width: none;
+    overflow: visible;
+    white-space: pre-wrap;
+    background: var(--input-bg);
+    cursor: text;
+    box-shadow: inset 0 0 0 1px var(--accent-text);
 }
 
-.data-table-header-text {
-  width: 100%;
-  display: block;
+.data-table td.data-cell-edited {
+    background: var(--edited-wash);
+    box-shadow: inset 2px 0 0 var(--edited-line);
 }
 
-.data-table-header-group-badge {
-  background-color: #403c53;
-  border: 1px solid var(--border-strong);
-  border-radius: 5px;
-  color: white;
-  padding: 2px 6px;
-  font-size: 10px;
-  font-weight: bold;
-  white-space: nowrap;
-  display: inline-block;
-  margin-right: 0;
-  margin-top: 1px;
-  margin-bottom: 2px;
-  line-height: 1.2;
+.data-table .data-row-added td {
+    background: var(--added-wash);
 }
 
-.data-table-header-property {
-  display: inline-block;
-  font-size: 12px;
-  margin-top: 1px;
-  line-height: 1.3;
+.data-table .data-row-added td.data-act {
+    box-shadow: inset 3px 0 0 var(--added-line);
 }
 
-.data-table-header-property.size-xs {
-  font-size: 9px;
+.data-table .data-row-deleted td {
+    background: var(--deleted-wash);
+    color: var(--text-muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--deleted-line);
 }
 
-.data-table-header-property.size-s {
-  font-size: 10px;
+.data-table .data-row-deleted td.data-act {
+    box-shadow: inset 3px 0 0 var(--deleted-line);
+    text-decoration: none;
 }
 
-.data-table-header-property.size-m {
-  font-size: 11px;
+/* Colour is never the only signal: the ID cell says New / Deleted in words. */
+.data-pill {
+    display: inline-block;
+    margin-left: 2px;
+    padding: 0 5px;
+    border: 1px solid currentColor;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 14px;
+    vertical-align: 1px;
 }
 
-.data-table-header-property.size-l {
-  font-size: 12px;
+.data-pill.added {
+    color: var(--added-line);
 }
 
-.data-table-sort-indicator {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  font-size: 10px;
-  color: var(--brand-text);
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(64, 60, 83, 0.1);
-  border: 1px solid var(--brand-border);
-  border-radius: 3px;
-  font-weight: bold;
-  transition: all 0.2s ease;
+.data-pill.deleted {
+    color: var(--deleted-line);
 }
 
-.data-table-sortable-header:hover .data-table-sort-indicator {
-  background: rgba(64, 60, 83, 0.2);
-  border-color: var(--brand-border);
-}
-
-.data-table th:hover {
-  background-color: var(--surface-3);
-}
-
-.data-table th.data-table-delete-row-column {
-  cursor: default;
-}
-
-
-.data-table-delete-row-column {
-    width: 20px !important;
-    min-width: 20px !important;
-    max-width: 20px !important;
+.data-empty {
+    padding: 32px 16px;
+    color: var(--text-muted);
+    font-size: 13px;
     text-align: center;
-    padding: 2px !important;
 }
 
-.data-table-delete-row-btn {
-    background-color: #C33D35;
-    color: white;
-    border: none;
-    border-radius: 3px;
-    width: 18px;
-    height: 18px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    display: flex;
+.data-empty p {
+    margin: 0 0 10px;
+}
+
+.data-changes {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.data-changes[hidden] {
+    display: none;
+}
+
+.data-changes-count {
+    font-weight: 600;
+}
+
+.data-changes-meta {
+    color: var(--text-muted);
+}
+
+.data-changes-meta.problem {
+    color: var(--danger-text);
+}
+
+/* The + Add forms and the review list live in RailMenus. */
+.data-add-form {
+    width: 260px;
+    padding: 4px 6px;
+    font-size: 12px;
+}
+
+.data-add-form h4 {
+    margin: 0 0 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.data-form-row {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 4px 8px;
     align-items: center;
-    justify-content: center;
-    line-height: 1;
+    margin-bottom: 6px;
 }
 
-.data-table-delete-row-btn:hover {
-    background-color: #ff0000;
+.data-form-row > label,
+.data-form-row > span {
+    color: var(--text-muted);
 }
 
-.data-table-delete-row-btn.tt {
-    display: inline-flex;
+.data-form-row input {
+    height: 24px;
+    box-sizing: border-box;
+    min-width: 0;
+    padding: 0 8px;
+    border: 1px solid var(--text-faint);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
 }
 
-.data-table-tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 2px solid var(--border);
-  flex-shrink: 0;
-  overflow-x: auto;
-  background: var(--input-bg);
+.data-form-row input[readonly] {
+    background: var(--surface);
+    color: var(--text-muted);
 }
 
-.data-table-tab {
-  padding: 8px 16px;
-  background: var(--surface);
-  border: none;
-  border-top: 2px solid transparent;
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s ease;
+.data-form-row input[aria-invalid="true"] {
+    border-color: var(--danger-text);
 }
 
-.data-table-tab:hover {
-  background: var(--surface-3);
+.data-form-error {
+    grid-column: 2;
+    color: var(--danger-text);
+    font-size: 11px;
 }
 
-.data-table-tab.active {
-  background: var(--input-bg);
-  border-top-color: #4CAF50;
-  font-weight: bold;
+.data-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.data-review {
+    width: 320px;
+    max-height: 300px;
+    overflow: auto;
+}
+
+.data-review h4 {
+    margin: 2px 4px 4px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.data-review-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 8px;
+    align-items: center;
+    padding: 6px 4px;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 12px;
+}
+
+.data-review-item:last-child {
+    border-bottom: 0;
+}
+
+.data-review-what {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.data-review-detail {
+    grid-column: 1 / -1;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.data-review-detail del {
+    color: var(--deleted-line);
+}
+
+.data-review-detail ins {
+    color: var(--added-line);
+    text-decoration: none;
+}
+
+.data-review-empty {
+    padding: 8px;
+    color: var(--text-muted);
+}
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 /*************************
@@ -5051,10 +6318,24 @@ input:checked + .slider:before {
 }
 
 .tour-body {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-strong);
     flex: 1;
     padding: 14px 16px;
+}
+
+.tour-keys {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 5px 10px;
+    align-items: center;
+    margin: 10px 0;
+}
+
+.tour-phone-note {
+    margin: 8px 0 0;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-soft);
 }
 
 .tour-body code {
@@ -5097,16 +6378,6 @@ input:checked + .slider:before {
    step, where Back/Finish stay right-aligned on their own. */
 .tour-btn-skip {
     margin-right: auto;
-}
-
-.tour-btn-next {
-    background-color: #015C0C;
-    border-color: #015C0C;
-}
-
-.tour-btn-next:hover {
-    background-color: #018a12;
-    border-color: #018a12;
 }
 
 .tour-green {
@@ -5387,7 +6658,7 @@ input:checked + .slider:before {
 
 .assistant-bubble-assistant {
     background-color: var(--surface-3);
-    color: #222;
+    color: var(--text);
     align-self: flex-start;
     border-bottom-left-radius: 2px;
 }
@@ -5708,7 +6979,7 @@ input:checked + .slider:before {
 
 .assistant-bubble-queries {
     background-color: var(--surface-2);
-    color: #222;
+    color: var(--text);
     align-self: stretch;
     border: 1px solid #d8d4e8;
     padding: 8px 10px;
@@ -6001,10 +7272,10 @@ input:checked + .slider:before {
 #assistantEmptyState {
     display: none;
     flex: 1;
-    /* The workbench is short and wide where the old dock was tall and narrow:
-       without min-height/overflow these centred chips grow the pane and push
-       the input row out of sight. `safe center` keeps the top reachable once
-       the content is taller than the space. */
+    /* The workbench is short and wide: without min-height/overflow these
+       centred chips grow the pane and push the input row out of sight.
+       `safe center` keeps the top reachable once the content is taller than
+       the space. */
     min-height: 0;
     overflow-y: auto;
     flex-direction: column;
@@ -6127,7 +7398,8 @@ input:checked + .slider:before {
 }
 
 #assistantSendBtn {
-    background-color: #403C53;
+    background-color: var(--brand-border);
+    font-weight: 600;
     color: #fff;
     border: none;
     border-radius: 4px;
@@ -6220,7 +7492,7 @@ input:checked + .slider:before {
     min-height: 1.2em;
     font-size: 0.78rem;
     line-height: 1.3;
-    color: #777;
+    color: var(--text-muted);
 }
 
 .assistant-settings-status[data-kind="checking"] {
@@ -7054,4 +8326,160 @@ input:checked + .slider:before {
     border-bottom-width: 2px;
     border-radius: 4px;
     white-space: nowrap;
+}
+
+/* ==========================================================================
+   Narrow windows. 761–860px: the full rail fits once its spacing tightens.
+   ≤760px (phones): the graph takes the whole width under a five-control bar
+   (File, workspace, undo/redo, ▤ Panel, ⋯ More); the inspector becomes a
+   bottom sheet (body[data-sheet] = half | full) that the workbench shares —
+   inspector.js and workbench.js open one at a time. The 760px figure is
+   repeated in inspector.js (isPhone).
+   ========================================================================== */
+.rail-phone-only {
+    display: none !important;
+}
+
+@media (max-width: 860px) {
+    #rail {
+        gap: 3px;
+        padding: 0 6px;
+    }
+
+    #rail > .rail-div {
+        display: none;
+    }
+}
+
+@media (max-width: 760px) {
+    .rail-phone-only {
+        display: flex !important;
+    }
+
+    #rail > :not(#appMenuBtn, #workspaceChip, .rail-hist, .rail-phone-only) {
+        display: none !important;
+    }
+
+    #rail .rail-wschip {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .rail-panel-count {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--accent-text);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Every rail menu drops down full width under the bar, whichever control
+       opened it (⋯ More reaches menus whose own anchor is hidden). */
+    .rail-menu {
+        left: 8px !important;
+        right: 8px;
+        top: 56px !important;
+        max-height: calc(100dvh - 64px);
+    }
+
+    /* Half height shares the screen with the stage (the graph resizes into
+       the top half); full height covers it. */
+    body[data-sheet="half"] #mainContent {
+        flex-direction: column;
+    }
+
+    body[data-sheet="half"] #outerGraphContainer {
+        min-height: 0;
+    }
+
+    #inspector {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: auto;
+        min-width: 0;
+        height: 55dvh;
+        z-index: calc(var(--z-workbench) + 1);
+        border-left: none;
+        border-top: 1px solid var(--border);
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.18);
+    }
+
+    body:not([data-sheet]) #inspector {
+        display: none;
+    }
+
+    body[data-sheet="half"] #inspector {
+        position: static;
+        flex: 0 0 55dvh;
+    }
+
+    .mode-hint {
+        white-space: normal;
+        max-width: calc(100% - 24px);
+        width: max-content;
+        text-align: center;
+    }
+
+    #innerGraphContainer .gll-minimap {
+        transform: scale(0.6);
+        transform-origin: bottom right;
+    }
+
+    body[data-sheet="full"] #inspector {
+        height: calc(100dvh - 52px);
+    }
+
+    .inspector-resize-handle {
+        display: none;
+    }
+
+    .insp-pills-row {
+        position: relative;
+        padding-top: 28px;
+    }
+
+    .sheet-grab {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 88px;
+        height: 28px;
+        padding: 0;
+        border: none;
+        background: none;
+        cursor: pointer;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .sheet-grab::before {
+        content: "";
+        width: 36px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--text-faint);
+    }
+
+    .sheet-close {
+        margin-left: auto;
+        width: 40px;
+        height: 40px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        background: none;
+        color: var(--text-strong);
+        font-size: 18px;
+        cursor: pointer;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .sheet-close:hover {
+        background: var(--surface-3);
+        border-color: var(--border);
+    }
 }

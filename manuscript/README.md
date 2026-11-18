@@ -3,8 +3,8 @@
 LaTeX source for the Graph Lens Lite journal paper, targeting the OUP
 `oup-authoring-template` class (Nucleic Acids Research by default).
 
-The folder is flat: one driver (`main.tex`) plus the prose split into small
-`\input` files so each piece can be edited on its own.
+One driver (`main.tex`) plus the prose split into small `\input` files so each
+piece can be edited on its own.
 
 - `main.tex` — driver: preamble, frontmatter macros, `\input`s the body
 - `body.tex` — the body, Introduction through Conflict of interest
@@ -12,7 +12,12 @@ The folder is flat: one driver (`main.tex`) plus the prose split into small
 - `keywords.tex` — keyword list, fed to `\keywords{}`
 - `reference.bib` — bibliography database
 - `oup-plain.bst` — numbered citation style
-- `Fig/` — figures
+- `biorxiv.tex` — second driver for the preprint (see below)
+- `supplement/` — supplementary grammar note and benchmark tables
+- `Fig/` — figures; `graphical-abstract.html` — source of the graphical abstract
+- `main-figure/` — scripts that rebuild `Fig/main-figure.png` from the running app (see its README)
+- `2026-06-26_ADPKD_model_GLL-input_GLL-paper-version.xlsx` — the ADPKD model
+  used in the paper and the assistant benchmark
 
 The body is in IMRaD order (Introduction → Materials and Methods → Results →
 Discussion); headings are unnumbered under the OUP class (`unnumsec`).
@@ -21,12 +26,15 @@ Discussion); headings are unnumbered under the OUP class (`unnumsec`).
 
 Look for these markers when reviewing the draft:
 
-- `% AI-DRAFTED -- REVIEW` — prose drafted by an AI assistant during the
-  manuscript restructure. Treat as a starting point; revise in your own voice
-  before submission. Anything not marked is user-original prose preserved
-  verbatim from the prior draft.
 - `% TODO` — structural placeholder. The heading exists, the body is empty,
   the comment block lists the angles to consider.
+- `% TODO(authors)` / `% CONFIRM(authors)` — a fact or wording only the
+  authors can supply or sign off.
+- `% NOTE(authors, <date>)` — a recorded author decision (e.g. details
+  deliberately left to reviewer request); no action needed.
+- `% TODO(figure)` — a change needed in a figure image.
+- `% TODO(freeze)` — a version-dependent fact (versions, counts, sizes,
+  screenshots) to update once at release freeze.
 
 ## Prerequisites
 
@@ -82,6 +90,10 @@ latexmk -pdf main
 
 Output: `main.pdf`
 
+Redline for co-authors: `scripts/manuscript_redline.sh [out-dir]` diffs
+`main` (the last published version) against HEAD and writes
+`GLL-manuscript-redline-main-vs-<sha>.pdf`.
+
 Uses the OUP `oup-authoring-template` class (`webpdf,contemporary,numbered`,
 numbered citations via `oup-plain.bst`). Set `\journaltitle` (and `\appnotes`)
 to the target venue at submission time.
@@ -110,6 +122,26 @@ into this directory, or build on Overleaf.
 
 Note: the OUP class does not define the `description` environment — use
 `itemize` in the body.
+
+### Supplementary note: query-language grammar
+
+```bash
+cd supplement && latexmk -pdf dsl_grammar
+```
+
+Standalone `article` document (`supplement/dsl_grammar.tex`) with the EBNF
+grammar of the query DSL, derived from `src/managers/query.js`. Re-check its
+examples whenever the query parser changes.
+
+### Supplementary Tables S1 and S2: benchmarks
+
+```bash
+cd supplement && latexmk -pdf benchmarks
+```
+
+Render sweep (S1) and assistant benchmark (S2). Every number comes from the
+result files in `bench/render/results/` and `bench/assistant/results/` named in
+the table notes; replace rows from those files when a run is redone.
 
 ### Clean auxiliary files
 

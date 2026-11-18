@@ -73,7 +73,9 @@ class FlowAnimator {
 
     // rAF timestamps are DOMHighResTimeStamp milliseconds → seconds.
     flowClock.time = (now / 1000) % TIME_WRAP_S;
-    this.adapter.sigma.refresh({ skipIndexation: true });
+    // Without partialGraph, sigma treats any refresh as a full one: it re-indexes
+    // every node and edge and rebuilds all buffers. An empty one only redraws.
+    this.adapter.sigma.refresh({ partialGraph: { nodes: [], edges: [] }, skipIndexation: true });
     this.#schedule();
   };
 }

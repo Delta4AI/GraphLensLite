@@ -50,11 +50,10 @@ function makeUI() {
     propIDToDropdownChecklists: new Map(),
     propIDToBooleanToggles: new Map(),
     uiComponents: {
-      createSectionToggleButton: stub,
+      createSectionCheckbox: stub,
       createSectionResetButton: stub,
       createCheckbox: stub,
-      createGroupChip: stub,
-      createAddOrRemoveToSelectionGroup: stub,
+      createRowActions: () => [stub(), stub()],
       createConstraintCount: stub,
     },
     qm: { updateQueryTextArea: vi.fn() },
@@ -120,9 +119,10 @@ describe('buildFilterUI', () => {
     // just "Showing" — the status line and the loading header both.
     const ui = makeUI();
     ui.buildFilterUI();
-    const box = document
-      .querySelector('[data-prop-id="Node filters::Topology::Type"]')
-      .querySelector('.items input[type="checkbox"]');
+    document
+      .querySelector('[data-prop-id="Node filters::Topology::Type"] .filter-cat-trigger')
+      .click();
+    const box = document.querySelector('.filter-cat-menu .filter-cat-item[data-value] input');
 
     box.checked = false;
     box.dispatchEvent(new Event('change'));
@@ -152,5 +152,65 @@ describe('buildFilterUI', () => {
     expect(row.querySelector('.filter-unusable-reason').textContent).toContain('3 numeric');
     // No widget and no per-row actions on an unusable row.
     expect(row.querySelector('input')).toBeNull();
+  });
+});
+
+// The toolbar's options (Edges, the ∅ line, elements without properties) sit
+// behind one "Options" disclosure next to the mode switch.
+describe('filter Options disclosure', () => {
+  const DEGREE = 'Node filters::Topology::Degree';
+
+  /** makeUI with a ∅ switch on the Degree row, as createRowActions builds it. */
+  function makeOptionsUI() {
+    const ui = makeUI();
+    ui.cache.uiComponents.createRowActions = (propID) => {
+      const btn = document.createElement('button');
+      btn.className = 'filter-missing-switch';
+      btn.dataset.prop = propID;
+      return propID === DEGREE ? [btn] : [];
+    };
+    return ui;
+  }
+  const toggle = () => document.querySelector('.filter-options-toggle');
+  const panel = () => document.getElementById(toggle().getAttribute('aria-controls'));
+
+  beforeEach(() => window.localStorage.clear());
+
+  it('opens and closes, remembers that, and counts changed options while closed', () => {
+    const ui = makeOptionsUI();
+    const layout = ui.cache.data.layouts.L;
+    ui.buildFilterUI();
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    expect(panel().hidden).toBe(true);
+    expect(toggle().textContent).toBe('Options▾');
+
+    toggle().click();
+    expect(panel().hidden).toBe(false);
+    expect(panel().textContent).toContain('Without a value');
+    expect(panel().querySelector('.filter-missing-box').textContent).toBe(
+      'Without a valueAdd nodes0 / 1On none of the 1 filters with gaps'
+    );
+    expect(window.localStorage.getItem('gll.filterOptionsOpen')).toBe('1');
+
+    toggle().click();
+    layout.filterLinks = 'ticked';
+    layout.filters.get(DEGREE).missingPasses = true;
+    ui.buildFilterUI();
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    expect(toggle().querySelector('.filter-options-count').textContent).toBe('2');
+    expect(toggle().getAttribute('aria-label')).toBe('Options, 2 changed');
+
+    // A typed query freezes the options, not the disclosure.
+    ui.cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
+    ui.buildFilterUI();
+    expect(toggle().disabled).toBe(false);
+    expect(panel().querySelector('#filterMissingAll').disabled).toBe(true);
+  });
+
+  it('hides the disclosure when no option applies', () => {
+    const ui = makeUI();
+    ui.cache.data.layouts.L.filterJoinMode = 'AND';
+    ui.buildFilterUI();
+    expect(toggle().hidden).toBe(true);
   });
 });

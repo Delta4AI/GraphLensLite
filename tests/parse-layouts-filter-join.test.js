@@ -1,15 +1,20 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 
 // ==========================================================================
-// parseLayouts must round-trip the per-view filter-join settings so a saved
-// workspace restores its OR/AND mode and "Complete cases only" state. Files
-// that predate the fields (no filterJoinMode/filterStrict) default to the
-// historical behavior: OR, non-strict.
+// parseLayouts restores the per-view filter join, and turns the pre-1.18.0
+// "Complete cases only" box (filterStrict) into ∅ off on the filters it acted
+// on: the narrowed ones. Files that predate the join default to build up (OR).
 // ==========================================================================
 
 const { IOManager } = await import('../src/managers/io.js');
 
 const GROUPS = ['groupOne', 'groupTwo', 'groupThree', 'groupFour'];
+const NUM = (lo, hi) => ({
+  isCategory: false,
+  isInverted: false,
+  lowerThreshold: lo,
+  upperThreshold: hi,
+});
 
 function createMockCache() {
   return {
@@ -21,42 +26,57 @@ function createMockCache() {
       }, {}),
     },
     bs: { traverseBubbleSets: () => GROUPS },
+    data: {
+      filterDefaults: new Map([
+        ['N::g::narrowed', NUM(0, 1)],
+        ['N::g::loaded', NUM(0, 1)],
+      ]),
+    },
   };
 }
 
-describe('parseLayouts — filter-join settings round-trip', () => {
+const positions = { A: { style: { x: 0, y: 0 } } };
+
+describe('parseLayouts: filter join and the Complete cases migration', () => {
   let io;
   beforeEach(() => {
     io = new IOManager(createMockCache());
   });
 
-  it('restores filterJoinMode and filterStrict from the saved layout', () => {
+  it('restores the join mode, and defaults to OR for files predating it', () => {
+    expect(io.parseLayouts({ D: { positions, filterJoinMode: 'AND' } }).D.filterJoinMode).toBe(
+      'AND'
+    );
+    expect(io.parseLayouts({ D: { positions } }).D.filterJoinMode).toBe('OR');
+    expect(io.parseLayouts({ D: { positions, filterJoinMode: 'XOR' } }).D.filterJoinMode).toBe(
+      'OR'
+    );
+  });
+
+  it('turns Complete cases only into ∅ off on the narrowed filters, and drops the flag', () => {
     const parsed = io.parseLayouts({
-      Default: {
-        positions: { A: { style: { x: 0, y: 0 } } },
+      D: {
+        positions,
         filterJoinMode: 'AND',
         filterStrict: true,
+        filters: {
+          'N::g::narrowed': { active: true, ...NUM(0, 0.5) },
+          'N::g::loaded': { active: true, ...NUM(0, 1) },
+        },
       },
-    });
-    expect(parsed.Default.filterJoinMode).toBe('AND');
-    expect(parsed.Default.filterStrict).toBe(true);
+    }).D;
+    expect(parsed.filters.get('N::g::narrowed').missingPasses).toBe(false);
+    expect('missingPasses' in parsed.filters.get('N::g::loaded')).toBe(false);
+    expect('filterStrict' in parsed).toBe(false);
   });
 
-  it('defaults to OR / non-strict for files predating the fields', () => {
-    const parsed = io.parseLayouts({ Default: { positions: { A: { style: { x: 0, y: 0 } } } } });
-    expect(parsed.Default.filterJoinMode).toBe('OR');
-    expect(parsed.Default.filterStrict).toBe(false);
-  });
-
-  it('coerces an invalid join mode to OR and a non-boolean strict to false', () => {
+  it('keeps a saved ∅ choice as it is', () => {
     const parsed = io.parseLayouts({
-      Default: {
-        positions: { A: { style: { x: 0, y: 0 } } },
-        filterJoinMode: 'XOR',
-        filterStrict: 'yes',
+      D: {
+        positions,
+        filters: { 'N::g::loaded': { active: true, ...NUM(0, 1), missingPasses: true } },
       },
-    });
-    expect(parsed.Default.filterJoinMode).toBe('OR');
-    expect(parsed.Default.filterStrict).toBe(false);
+    }).D;
+    expect(parsed.filters.get('N::g::loaded').missingPasses).toBe(true);
   });
 });

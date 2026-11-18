@@ -135,3 +135,26 @@ describe('viewport culling', () => {
     }
   });
 });
+
+// Sigma rebuilds its graph→viewport projection only inside render(), so between
+// a camera change and that render the camera state runs ahead of the projection.
+describe('paint skip', () => {
+  it('repaints once sigma renders a camera move the layer already painted against', () => {
+    const { layer, adapter } = makeLayer({ x: 0, y: 0 });
+    layer.scheduleRedraw();
+    frame();
+
+    // The camera jumps; a paint lands before sigma's render (old projection).
+    adapter.sigma.getCamera = () => ({ getState: () => ({ x: 30, y: 0, ratio: 1, angle: 0 }) });
+    layer.scheduleRedraw();
+    frame();
+
+    // Sigma renders: the projection catches up, the camera state is unchanged.
+    adapter._pan.x = 30;
+    adapter._paints.length = 0;
+    layer.scheduleRedraw();
+    frame();
+
+    expect(adapter._paints.map(([kind]) => kind)).toEqual(['fill', 'stroke']);
+  });
+});

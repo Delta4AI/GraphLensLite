@@ -18,12 +18,10 @@ const AVOID_FIT_MS_PER_PAIR = 0.006;
  * The per-group style controls, keyed by the human-readable label that travels
  * in `data-property` ("Bubble Set <group> <label>").
  *
- * ONE map: the label strings used to be re-listed three times — a 20-case
- * switch in updateBubbleSetStyle, a second run of sync calls in
- * refreshBubbleStyleElements, and again in ui_style_div's builders — so adding
- * a knob meant three edits and a knob that read back stale was the failure.
+ * ONE map, so adding a knob is one edit and no reader can fall out of step.
  * ui_style_div still authors the DOM (each row has its own min/max/step), but
- * both READERS derive from here.
+ * both READERS (updateBubbleSetStyle and refreshBubbleStyleElements) derive
+ * from here.
  *
  * `kind` says which control renders it: color/slider/switch/text/select.
  * `also` is a second field the same value writes (fill drives the label
@@ -45,6 +43,7 @@ const GROUP_STYLE_FIELDS = Object.freeze({
   'Label Background Color': { field: 'labelBackgroundFill', kind: 'color' },
   'Label Fill Color': { field: 'labelFill', kind: 'color' },
   'Label Font Size': { field: 'labelFontSize', kind: 'slider' },
+  'Label Font Style': { field: 'labelFontStyle', kind: 'segments', read: (v) => v ?? 'normal' },
   'Label Close To Path': { field: 'labelCloseToPath', kind: 'switch' },
   'Label Auto Rotate': { field: 'labelAutoRotate', kind: 'switch' },
   'Label Offset X': { field: 'labelOffsetX', kind: 'slider' },
@@ -52,7 +51,7 @@ const GROUP_STYLE_FIELDS = Object.freeze({
   'Label Placement': { field: 'labelPlacement', kind: 'select' },
 });
 
-// ponytail: the tuner only wants a nearest-bystander statistic, so it samples
+// shortcut: the tuner only wants a nearest-bystander statistic, so it samples
 // rather than paying the full O(members × avoid). Take the nearest ones
 // instead if a suggestion ever looks wrong on a big graph.
 const TUNE_AVOID_SAMPLE = 2000;
@@ -381,8 +380,8 @@ class GraphBubbleSetManager {
     hasActiveMembers ? card.classList.remove("disabled") : card.classList.add("disabled");
 
     // Every control derives from GROUP_STYLE_FIELDS, so a knob cannot be added
-    // to the pane and forgotten here (the failure this replaced: a control that
-    // read back stale after a load or a ✨ Re-tune).
+    // to the pane and forgotten here (it would read back stale after a load or
+    // a ✨ Re-tune).
     for (const [label, spec] of Object.entries(GROUP_STYLE_FIELDS)) {
       const stored = bubbleStyle[spec.field];
       if (stored === undefined && spec.read === undefined) continue;
@@ -401,9 +400,15 @@ class GraphBubbleSetManager {
           if (numInput) numInput.value = value;
           break;
         }
+        case 'segments':
+          for (const btn of el.querySelectorAll('button[data-value]')) {
+            btn.setAttribute('aria-pressed', String(btn.dataset.value === value));
+          }
+          break;
         default:
           // color, text and select are all plain valued inputs.
           if (value != null) el.value = value;
+          el.syncWell?.();
       }
     }
 
@@ -412,7 +417,7 @@ class GraphBubbleSetManager {
       bubbleStyle.label ? elem.classList.remove("disabled") : elem.classList.add("disabled");
     }
 
-    // Membership changed, so the layer row's "N sets" is stale.
+    // Membership changed, so the layer row's "N groups · M nodes" is stale.
     this.cache.ui?.syncOverlays?.();
   }
 
@@ -441,9 +446,9 @@ class GraphBubbleSetManager {
   async updateBubbleSetIfChanged() {
     this.#evictForeignGroups();
     for (let group of this.traverseBubbleSets()) {
-      // A group created at runtime has no baseline yet — the fixed four were
-      // always pre-seeded here by layout creation, which is no longer true.
-      // "Never drawn" is an empty set, so the first real membership is a change.
+      // A group created at runtime has no baseline yet; layout creation does
+      // not pre-seed one. "Never drawn" is an empty set, so the first real
+      // membership is a change.
       let lastSetMembers = this.cache.lastBubbleSetMembers.get(group) ?? new Set();
       let newSetMembers = this.getEffectiveGroupMembers(group);
 
@@ -456,11 +461,24 @@ class GraphBubbleSetManager {
   }
 
   /**
-   * The renderer handle for a group, created on first use. Groups now arrive
-   * after graph build — from a load or from createGroup — so binding them all
-   * up front at graph-build time is no longer possible; materialising
-   * here removes the ordering question entirely (the layer does the same with
-   * its own per-group state, see bubble_layer #groupState).
+   * Keep a group label where it was dragged to (graph units from its outline
+   * anchor; see shiftedLabelAnchor). Paint-only: no re-fit, no full render.
+   */
+  async setLabelShift(group, x, y) {
+    const bStyle = this.#layout().bubbleSetStyle[group];
+    if (!bStyle) throw new Error(`Group "${group}" no longer exists, so its label position was not kept.`);
+    await this.#groupInstance(group).update({ labelShiftX: x, labelShiftY: y });
+    bStyle.labelShiftX = x;
+    bStyle.labelShiftY = y;
+    this.cache.history?.commit(x === 0 && y === 0 ? 'Reset group label position' : 'Move group label');
+  }
+
+  /**
+   * The renderer handle for a group, created on first use. Groups arrive after
+   * graph build — from a load or from createGroup — so they cannot all be
+   * bound up front; materialising here removes the ordering question entirely
+   * (the layer does the same with its own per-group state, see bubble_layer
+   * #groupState).
    */
   #groupInstance(group) {
     this.cache.INSTANCES.BUBBLE_GROUPS[group] ??=
@@ -471,15 +489,16 @@ class GraphBubbleSetManager {
   /**
    * The obstacles a group's hull should route around, once the cost of doing
    * so has been accepted. A cheap fit just happens — which is most of them,
-   * including small groups on large graphs, where this used to be refused
-   * outright. An expensive one asks, naming the wait, and the answer is
-   * remembered for that group so a membership edit does not re-ask per change.
+   * including small groups on large graphs. An expensive one asks, naming the
+   * wait, and the answer is remembered for that group so a membership edit does
+   * not re-ask per change.
    *
    * @param {string} group
    * @param {Set<string>|string[]} members
    * @returns {Promise<string[]>} empty when the user would rather not wait
    */
   async consentedAvoidMembers(group, members) {
+    if (!this.#avoidanceOn(group)) return []; // the fit ignores obstacles, so there is no cost to ask about
     const candidates = this.getAvoidMembers(members);
     if (candidates.length === 0) return candidates; // nothing to route around
     const memberCount = members instanceof Set ? members.size : members.length;
@@ -500,6 +519,13 @@ class GraphBubbleSetManager {
       )) === true;
     this.avoidConsent.set(group, accepted);
     return accepted ? candidates : [];
+  }
+
+  /** Same reading as the fit's (bubble_geometry.js): missing means on, 0 or less means off. */
+  #avoidanceOn(group) {
+    const style = this.cache.data.layouts[this.cache.data.selectedLayout]?.bubbleSetStyle?.[group];
+    const value = Number(style?.avoidance ?? 1);
+    return !(Number.isFinite(value) && value <= 0);
   }
 
   /** Forget the per-group answers — a new graph is a new set of costs. */
@@ -676,7 +702,7 @@ class GraphBubbleSetManager {
       options.groupCount ?? this.communityOptions.groupCount ?? DEFAULT_COMMUNITY_GROUPS
     );
 
-    // Detection needs somewhere to put its results, and groups no longer
+    // Detection needs somewhere to put its results, and groups do not
     // pre-exist. Mint throwaway keys to compute against, then keep only the
     // ones a community actually landed in.
     const currentLayout = this.#layout();
@@ -695,7 +721,7 @@ class GraphBubbleSetManager {
       return;
     }
 
-    // Auto-grouping ADDS groups now instead of overwriting the fixed four, so
+    // Auto-grouping ADDS groups instead of overwriting existing ones, so
     // nothing the user built is destroyed and there is nothing to confirm.
     for (const group of created) {
       currentLayout[`${group}ManualMembers`] = result.assignments.get(group) ?? new Set();

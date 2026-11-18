@@ -18,6 +18,7 @@ const NUM = (lo, hi) => ({ isCategory: false, isInverted: false, lowerThreshold:
 /** A filter row in the shape buildFilterUI produces, plus the toolbar span. */
 function dom(propIDs) {
   document.body.innerHTML = `
+    <div id="outerGraphContainer"></div>
     <div id="filterContainer">
       <div class="filter-toolbar"></div>
       ${propIDs
@@ -98,8 +99,18 @@ describe('filter constraint census', () => {
     ui.updateFilterConstraintHints();
 
     expect(census().hidden).toBe(false);
-    expect(census().textContent).toBe('1 of 3 filters constrain the graph');
+    expect(census().textContent).toBe('1 of 3 filters constrain');
     expect(inertIds()).toEqual(['N::g::zone', 'N::g::score']);
+  });
+
+  it('counts a filter at its loaded values whose ∅ switch removes the gaps', () => {
+    const { ui, cache } = makeUI({ mode: 'AND', ...THREE });
+    cache.data.layouts.L.filters.get('N::g::score').missingPasses = false;
+    cache.missingValueCounts = new Map([['N::g::score', 4]]);
+    ui.updateFilterConstraintHints();
+
+    expect(census().textContent).toBe('2 of 3 filters constrain');
+    expect(inertIds()).toEqual(['N::g::zone']);
   });
 
   it('says so plainly when nothing is narrowed — the empty-query case', () => {
@@ -113,11 +124,11 @@ describe('filter constraint census', () => {
     });
     ui.updateFilterConstraintHints();
 
-    expect(census().textContent).toMatch(/^No filter constrains the graph/);
+    expect(census().textContent).toBe('No filter constrains yet');
     expect(inertIds()).toEqual(['N::g::type', 'N::g::zone']);
   });
 
-  it('counts under OR too, but dims nothing there', () => {
+  it('counts under build up too, as filters that contribute', () => {
     // Hidden under OR, the panel was silent about the one thing that explains an
     // empty graph — and the active filter may sit in the section that is not on
     // screen, so "active means constraining" does not make the count redundant.
@@ -125,8 +136,18 @@ describe('filter constraint census', () => {
     ui.updateFilterConstraintHints();
 
     expect(census().hidden).toBe(false);
-    expect(census().textContent).toMatch(/filters constrain the graph/);
+    expect(census().textContent).toBe('3 of 3 filters contribute');
     expect(inertIds()).toEqual([]);
+  });
+
+  it('says no filter contributes when building up with none ticked', () => {
+    const { ui } = makeUI({
+      mode: 'OR',
+      defaults: THREE.defaults,
+      filters: THREE.filters.map(([id, filter]) => [id, { ...filter, active: false }]),
+    });
+    ui.updateFilterConstraintHints();
+    expect(census().textContent).toBe('No filter contributes');
   });
 
   it('clears the dimming when the join switches back to OR', () => {
@@ -152,7 +173,7 @@ describe('filter constraint census', () => {
     ui.updateFilterConstraintHints();
 
     expect(inertIds()).toEqual([]);
-    expect(census().textContent).toBe('1 of 2 filters constrain the graph');
+    expect(census().textContent).toBe('1 of 2 filters constrain');
   });
 
   it('leaves unusable properties out of the census entirely', () => {
@@ -166,7 +187,7 @@ describe('filter constraint census', () => {
     });
     ui.updateFilterConstraintHints();
 
-    expect(census().textContent).toBe('1 of 1 filters constrain the graph');
+    expect(census().textContent).toBe('1 of 1 filters constrain');
     expect(inertIds()).toEqual([]);
   });
 
@@ -186,7 +207,7 @@ describe('filter constraint census', () => {
     });
     ui.updateFilterConstraintHints();
 
-    expect(census().textContent).toBe('2 of 3 filters constrain the graph');
+    expect(census().textContent).toBe('2 of 3 filters constrain');
     expect(inertIds()).toEqual(['N::g::c']);
   });
 
@@ -260,6 +281,6 @@ describe('scope segment badges', () => {
     expect(scopeCount('Node filters').classList.contains('filter-scope-count-active')).toBe(false);
     expect(scopeCount('Edge filters').textContent).toBe('1/1');
     expect(scopeCount('Edge filters').classList.contains('filter-scope-count-active')).toBe(true);
-    expect(scopeCount('Edge filters').closest('button').title).toContain('constrain the graph');
+    expect(scopeCount('Edge filters').closest('button').title).toContain('1 of them contribute to the graph');
   });
 });

@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- Shaped after networkx.write_graphml: d0..dN key ids, an undirected graph,
+     node ids as text, plain x/y attributes. Hand-written, not produced by NetworkX. -->
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="d5" for="edge" attr.name="weight" attr.type="double" />
+  <key id="d4" for="node" attr.name="y" attr.type="double" />
+  <key id="d3" for="node" attr.name="x" attr.type="double" />
+  <key id="d2" for="node" attr.name="essential" attr.type="boolean" />
+  <key id="d1" for="node" attr.name="pathway" attr.type="string" />
+  <key id="d0" for="node" attr.name="label" attr.type="string" />
+  <graph edgedefault="undirected">
+    <node id="EGFR">
+      <data key="d0">Epidermal growth factor receptor</data>
+      <data key="d1">ErbB signalling</data>
+      <data key="d2">True</data>
+      <data key="d3">0.0</data>
+      <data key="d4">0.0</data>
+    </node>
+    <node id="GRB2">
+      <data key="d0">Growth factor receptor-bound protein 2</data>
+      <data key="d1">ErbB signalling</data>
+      <data key="d2">False</data>
+      <data key="d3">120.5</data>
+      <data key="d4">-40</data>
+    </node>
+    <node id="SOS1">
+      <data key="d3">60</data>
+      <data key="d4">80</data>
+    </node>
+    <edge source="EGFR" target="GRB2">
+      <data key="d5">0.95</data>
+    </edge>
+    <edge source="GRB2" target="SOS1" />
+    <edge source="EGFR" target="EGFR">
+      <data key="d5">0.3</data>
+    </edge>
+  </graph>
+</graphml>

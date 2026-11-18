@@ -11,7 +11,7 @@ import { smoothClosedPath, sampleSmoothedRing } from "../src/graph/bubble_smooth
 import { pointInPolygon } from "../src/graph/lasso_geometry.js";
 
 // ==========================================================================
-// Bubble-set geometry (sigma migration Phase 4) — pure outline math between
+// Bubble-set geometry — pure outline math between
 // the bubble groups and bubblesets-js. Node-safe: no DOM/canvas/sigma.
 // ==========================================================================
 
@@ -513,6 +513,25 @@ describe("computeOutlineGeometry avoid holes", () => {
   });
 });
 
+describe("computeOutlineGeometry unreached pockets", () => {
+  // Tour network group minus PTEN: three corridors enclose a triangle around
+  // (140,560) that no member or corridor field reaches. Marching squares has
+  // one outer contour, so without the pocket cut it painted solid.
+  const members = [[179, 127], [509, 259], [65, 481], [182, 702], [915, 605], [814, 760]]
+    .map(([x, y]) => rectAt(x, y, 10));
+  const avoid = [[351, 708], [573, 387]].map(([x, y]) => rectAt(x, y, 10));
+
+  it.each([0.1, 0.5, 1])("opens the enclosed pocket as a hole (padding %s)", (padding) => {
+    const { outer, holes } = computeOutlineGeometry(members, avoid, { padding, corridor: 0.25 });
+    expect(pointInPolygon({ x: 140, y: 560 }, outer)).toBe(true);
+    expect(holes.some((h) => pointInPolygon({ x: 140, y: 560 }, h))).toBe(true);
+    for (const m of members) {
+      const c = { x: m.x + m.width / 2, y: m.y + m.height / 2 };
+      expect(holes.some((h) => pointInPolygon(c, h))).toBe(false);
+    }
+  });
+});
+
 describe("computeOutlinePoints avoidance switch", () => {
   // Two members with a non-member between them: avoidance ON routes the
   // corridor around it (excluded); OFF (0) drops the negative field and the
@@ -777,6 +796,12 @@ describe("resolveBubbleLabel", () => {
     expect(fromDefaults.background.fill).toBe("#123456");
     expect(fromDefaults.fill).toBe("#abcdef");
     expect(fromDefaults.font).toBe("20px Arial, sans-serif");
+  });
+
+  it("draws a group label bold or italic", () => {
+    const label = resolveBubbleLabel(anchor, { labelText: "grp", labelFontStyle: "italic" }, {}, measure);
+    expect(label.font).toBe("italic 12px Arial, sans-serif");
+    expect(label.fontChoice).toBe("italic");
   });
 
   it("applies the user's label offsets on top", () => {

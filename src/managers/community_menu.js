@@ -3,9 +3,8 @@
  * resolution, and how many of the largest communities to turn into groups.
  *
  * Built on RailMenu like group_menu.js, which is what buys the Escape handler,
- * `aria-expanded`, close-on-scroll and focus restore — the hand-rolled popover
- * this replaced had only outside-pointerdown, and it lived in the graph model
- * where DOM does not belong.
+ * `aria-expanded`, close-on-scroll and focus restore, and keeps the DOM out of
+ * the graph model.
  */
 import { RailMenu } from './rail.js';
 import { clampCommunityGroups, MIN_COMMUNITY_GROUPS, MAX_COMMUNITY_GROUPS, DEFAULT_COMMUNITY_GROUPS } from '../graph/bubble_sets.js';
@@ -90,8 +89,7 @@ function build(el, menu, bs) {
   el.appendChild(resRow);
 
   // How many groups to create -------------------------------------------
-  // Used to be fixed at 4 because that was all there were. Now it is the
-  // number of NEW groups the run adds; existing ones are left alone.
+  // The number of NEW groups the run adds; existing ones are left alone.
   const countRow = document.createElement("label");
   countRow.className = "community-popover-row";
   countRow.textContent = "Groups";

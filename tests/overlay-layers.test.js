@@ -4,6 +4,7 @@ import { UIManager } from '../src/managers/ui.js';
 import { createStyleDiv } from '../src/managers/ui_style_div.js';
 import { DEFAULTS, CFG, bubbleGroupStyle } from '../src/config.js';
 import { AnnotationLayer } from '../src/graph/annotation_layer.js';
+import { readFileSync } from 'node:fs';
 import { Minimap } from '../src/graph/minimap.js';
 
 // ==========================================================================
@@ -110,6 +111,22 @@ describe('UIManager overlay layer stack', () => {
     }
   });
 
+  // The fixture above is hand-written; this one is the shipped markup, which is
+  // where a native `disabled` attribute — invisible to syncOverlays — once hid.
+  it('leaves the shipped Notes and Minimap switches clickable once a graph exists', () => {
+    const html = readFileSync('src/graph_lens_lite.html', 'utf8');
+    const shipped = new DOMParser().parseFromString(html, 'text/html');
+    for (const name of ['Notes', 'Minimap']) {
+      sw(name).replaceWith(shipped.getElementById(`overlaySwitch${name}`));
+    }
+    const [loaded] = makeUI();
+    loaded.syncOverlays();
+    for (const name of ['Notes', 'Minimap']) {
+      expect(sw(name).disabled).toBe(false);
+      expect(isDead(name)).toBe(false);
+    }
+  });
+
   // ------------------------------------------ a switch over nothing to draw
   //
   // An enabled switch promises an effect. Groups with no populated group and
@@ -150,7 +167,7 @@ describe('UIManager overlay layer stack', () => {
     expect(sw('Notes').title).toBe('Show or hide every text note');
   });
 
-  it('counts a group with no members as nothing to draw, like the "N sets" label', () => {
+  it('counts a group with no members as nothing to draw, like the "N groups" label', () => {
     // The two must not disagree: "" sets beside an enabled switch would read as
     // a broken count rather than an empty layer.
     const [ui, cache] = makeUI();
@@ -203,29 +220,30 @@ describe('UIManager overlay layer stack', () => {
     expect(ui.info).toHaveBeenLastCalledWith('Note placement canceled');
   });
 
-  it('toggles lasso mode on the button its markup names', () => {
-    // The anchor id was renamed to lassoToggleBtn during the redesign and the
-    // function was 0% covered: a mismatch here is a dead rail button.
-    document.body.insertAdjacentHTML(
-      'beforeend',
-      '<button id="lassoToggleBtn" onclick="cache.ui.toggleLassoSelection()"></button>'
-    );
+  it('toggles lasso mode from the graph\'s own state and says so on the stage', () => {
+    // No rail button holds the state any more: the graph does, and the stage
+    // hint is the one visible sign that a drag now lassoes.
+    document.body.insertAdjacentHTML('beforeend',
+      '<span id="modeStatus"></span><div id="modeHint" hidden><span class="mode-hint-text"></span><button class="mode-hint-done"></button></div>');
     const [ui, cache] = makeUI();
-    ui.info = vi.fn();
-    cache.graph.setInteractionEnabled = vi.fn();
-    const btn = document.getElementById('lassoToggleBtn');
+    let lasso = false;
+    cache.graph.isInteractionEnabled = (name) => name === 'lasso' && lasso;
+    cache.graph.setInteractionEnabled = vi.fn((name, on) => { if (name === 'lasso') lasso = on; });
+    const hint = document.getElementById('modeHint');
 
     ui.toggleLassoSelection();
-    expect(btn.classList.contains('active')).toBe(true);
     expect(cache.graph.setInteractionEnabled.mock.calls).toEqual([
       ['lasso', true],
       ['drag', false],
       ['tooltip', false],
     ]);
+    expect(hint.hidden).toBe(false);
+    expect(document.getElementById('modeStatus').textContent).toContain('Escape'); // announced
+    expect(hint.querySelector('.mode-hint-done').textContent).toBe('Done'); // the touch way out
 
     ui.toggleLassoSelection();
-    expect(btn.classList.contains('active')).toBe(false);
     expect(cache.graph.setInteractionEnabled).toHaveBeenLastCalledWith('tooltip', true);
+    expect(hint.hidden).toBe(true);
   });
 
   it('marks the note button while the tool is armed', () => {
@@ -245,15 +263,16 @@ describe('UIManager overlay layer stack', () => {
     const [ui, cache] = makeUI();
     cache.bs = {
       traverseBubbleSets: () => ['group1', 'group2', 'group3'],
-      getEffectiveGroupMembers: (g) => new Set(g === 'group3' ? [] : ['n1']),
+      getEffectiveGroupMembers: (g) => new Set({ group1: ['n1', 'n2'], group2: ['n2', 'n3'] }[g] ?? []),
     };
     cache.data = { selectedLayout: 'Default', layouts: { Default: {} } };
 
     ui.syncOverlays();
-    expect(document.getElementById('overlayCountGroups').textContent).toBe('2 sets');
+    // n2 sits in both groups and is one node.
+    expect(document.getElementById('overlayCountGroups').textContent).toBe('2 groups · 3 nodes');
   });
 
-  it('singularises one set and blanks zero', () => {
+  it('singularises one group and blanks zero', () => {
     const [ui, cache] = makeUI();
     cache.data = { selectedLayout: 'Default', layouts: { Default: {} } };
     cache.bs = {
@@ -261,7 +280,7 @@ describe('UIManager overlay layer stack', () => {
       getEffectiveGroupMembers: () => new Set(['n1']),
     };
     ui.syncOverlays();
-    expect(document.getElementById('overlayCountGroups').textContent).toBe('1 set');
+    expect(document.getElementById('overlayCountGroups').textContent).toBe('1 group · 1 node');
 
     cache.bs.getEffectiveGroupMembers = () => new Set();
     ui.syncOverlays();

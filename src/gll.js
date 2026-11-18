@@ -9,7 +9,7 @@ import {GraphStyleManager} from "./graph/style.js";
 
 import {excelData, IOManager} from './managers/io.js';
 import {NetworkMetrics} from './managers/metrics.js';
-import {QueryManager} from './managers/query.js';
+import {QueryManager, countMissingValues} from './managers/query.js';
 import {UIManager} from './managers/ui.js';
 import {UIComponentManager} from './managers/ui_components.js';
 
@@ -105,7 +105,11 @@ class Cache {
     this.picker = new ColorScalePicker(this);
     this.numericPicker = new NumericScalePicker(this);
     this.piePicker = new PieChartPicker(this);
+    // Every load builds a fresh editor; the view the user chose (and whether
+    // they were working in it) carries over, so Apply does not snap back.
+    const previousDataTable = this.dataTable;
     this.dataTable = new DataTable(this);
+    if (previousDataTable) this.dataTable.carryOver(previousDataTable);
     this.metrics = new NetworkMetrics(this);
     this.assistant = new AssistantManager(this);
     this.history = initHistory(this);
@@ -194,6 +198,15 @@ class Cache {
 
     this.iterNodes();
     this.iterEdges();
+
+    // Per property, how many of its own type have no value for it: the ∅
+    // switch's count, and whether the row has a switch at all.
+    this.missingValueCounts = countMissingValues(
+      this.data.filterDefaults?.keys() ?? [],
+      this.nodeRef.values(),
+      this.edgeRef.values(),
+      this.CFG.EXCEL_EDGE_HEADER
+    );
 
     // NOTE: cache.graphData (the graphology model) is built exclusively by
     // gcm.createGraphInstance — a single owner keeps the renderer and the
@@ -479,9 +492,10 @@ window.addEventListener("DOMContentLoaded", () => {
   initTheme(document, window);
   cache.reset();
   cache.rail = initRail(cache);
-  cache.inspector = initInspector();
+  cache.inspector = initInspector(cache);
   cache.workbench = initWorkbench(cache);
-  initFilterSearch();
+  // The toolbar ∅ box acts on the rows the search lists, so it follows each search.
+  initFilterSearch(() => cache.ui.syncMissingValueBox());
   cache.palette = initCommandPalette(cache);
   initUiTooltips(document);
   cache.ui.updateDarkModeButton();

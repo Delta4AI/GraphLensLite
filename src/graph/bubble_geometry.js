@@ -10,6 +10,7 @@
 import { bubblesets, polygonClipping } from "../lib/graphology.bundle.mjs";
 import { pointInPolygon } from "./lasso_geometry.js";
 import { sampleSmoothedRing } from "./bubble_smoothing.js";
+import { fontStylePrefix, styledFont } from "./label_renderers.js";
 
 // PointPath post-processing per the bubblesets-js README: sample the raw
 // marching-squares outline, B-spline it and drop collinear points. 8 is the
@@ -99,7 +100,7 @@ const NON_MEMBER_INFLUENCE_FACTOR = -0.8;
 // even-odd fill). A member-clearance-squeezed hole falls back to the largest
 // radius that still respects the clearance (body-hugging carve) — no silent
 // swallowing — down to this floor, below which a carve no longer reads.
-// ponytail: documented ceiling — a non-member fused into a member's
+// shortcut: documented ceiling — a non-member fused into a member's
 // clearance zone (holeR < 0.35 × its radius) stays covered; doing better
 // needs an outline algorithm with organic field-carved holes.
 const HOLE_MIN_RADIUS_RATIO = 0.35;
@@ -159,6 +160,12 @@ const CAPSULE_ARC_SAGITTA_MAX_R = 6;
 // of the group's mean member radius.
 const DISC_PAD_MIN_RATIO = 0.05;
 const LINK_HALF_WIDTH_MIN_RATIO = 0.15;
+// Unreached pockets (see unreachedPockets): the reach mask is widened by
+// one marching cell: the traced contour can sit up to a cell past the field
+// itself, and the cut must never open area the field filled. Pockets under
+// POCKET_MIN_AREA_CELLS cells stay filled — a speck-sized hole reads as noise.
+const POCKET_MASK_MARGIN_CELLS = 1;
+const POCKET_MIN_AREA_CELLS = 16;
 
 /**
  * Axis-aligned square around a node's viewport position.
@@ -216,8 +223,8 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
     Math.min(GEOMETRY_MULTIPLIER_MAX, Math.max(GEOMETRY_MULTIPLIER_MIN, Number(v) || 1));
   const pad = clampMult(opts.padding ?? 1);
   const cor = clampMult(opts.corridor ?? 1);
-  // Avoidance is boolean (see NON_MEMBER_INFLUENCE_FACTOR): any legacy saved
-  // value > 0 means ON; NaN/missing fall back to ON.
+  // Avoidance is boolean (see NON_MEMBER_INFLUENCE_FACTOR): any saved numeric
+  // value > 0 (older files store a strength) means ON; NaN/missing fall back to ON.
   const avoidRaw = Number(opts.avoidance ?? 1);
   const avoidance = Number.isFinite(avoidRaw) && avoidRaw <= 0 ? 0 : 1;
   const unit = meanMemberRadius(memberRects);
@@ -230,8 +237,8 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
   // thinner than a marching cell simply registers nothing, and the enclosure
   // guarantee rebuilds the hull geometrically (per-node discs + capsule
   // corridors), which IS the barely-encapsulating, finger-like minimum the
-  // knobs promise. The old floors fattened minimum knobs to ~half a node
-  // radius on dense graphs where the ratio-1 node radius is small.
+  // knobs promise. A floor would fatten minimum knobs to ~half a node radius
+  // on dense graphs where the ratio-1 node radius is small.
   const nodeR0px = FIELD_NODE_R0_RATIO * unit * pad;
   const nodeR1px = FIELD_NODE_R1_RATIO * unit * pad;
   const edgeR0px = FIELD_EDGE_R0_RATIO * unit * cor;
@@ -249,8 +256,11 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
   const nodeFieldVisible = nodeR1px >= pixelGroupPx;
   const edgeFieldVisible = edgeR1px >= pixelGroupPx;
   let outline = [];
+  let pockets = [];
   if (nodeFieldVisible || edgeFieldVisible) {
-    const path = bubblesets.createOutline(memberRects, effectiveAvoidRects, [], {
+    // createOutline() minus its wrapper: the instance keeps the routed
+    // virtual edges, which the pocket cut below needs.
+    const bubbles = new bubblesets.BubbleSets({
       virtualEdges: edgeFieldVisible,
       nodeR0: nodeR0px,
       nodeR1: nodeR1px,
@@ -260,6 +270,9 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
       pixelGroup: pixelGroupPx,
       nonMemberInfluenceFactor: avoidance > 0 ? NON_MEMBER_INFLUENCE_FACTOR : 0,
     });
+    bubbles.pushMember(...memberRects);
+    bubbles.pushNonMember(...effectiveAvoidRects);
+    const path = bubbles.compute();
     // Adaptive stride (see OUTLINE_SAMPLE_STEP note): control spacing ≈ 2×
     // the thinnest TRACEABLE feature — nothing below a grid cell can appear,
     // so the stride never drops below one cell's worth of spacing.
@@ -293,11 +306,124 @@ function computeOutlineGeometry(memberRects, avoidRects = [], opts = {}) {
       if (repaired.length >= 3) outline = repaired;
     }
     outline = conditionFieldRing(outline, pixelGroupPx);
+    if (hasEnclosedZeroCell(bubbles.potentialArea)) pockets = unreachedPockets(
+      outline,
+      memberRects,
+      bubbles.virtualEdges.map((edge) => edge.obj),
+      nodeFieldVisible ? nodeR1px : 0,
+      edgeFieldVisible ? edgeR1px : 0,
+      pixelGroupPx
+    );
   }
   outline = ensureMembersEnclosed(outline, memberRects, nodeR0px, linkRPx);
   // Hole breathing room = the padding radius (per-node proportional floor
   // applied inside): carved non-members get the same visual gap members do.
-  return carveAvoidHoles(outline, memberRects, effectiveAvoidRects, nodeR0px, nodeR0px);
+  const carved = carveAvoidHoles(outline, memberRects, effectiveAvoidRects, nodeR0px, nodeR0px);
+  if (pockets.length === 0) return carved;
+  return subtractHoleDiscs(carved, memberRects, pockets) ?? carved;
+}
+
+/**
+ * Cheap gate for unreachedPockets (whose mask union is the costly part): a
+ * pocket needs a grid cell with zero field that the grid border cannot reach
+ * through non-positive cells. O(cells) flood fill over the library's final
+ * field grid (row-major Float32Array), whose border always lies beyond every
+ * influence radius.
+ *
+ * @param {{width: number, height: number, area: Float32Array}} grid
+ * @returns {boolean}
+ */
+function hasEnclosedZeroCell({ width, height, area: field }) {
+  const seen = new Uint8Array(width * height);
+  const stack = new Int32Array(width * height);
+  let top = 0;
+  const visit = (k) => {
+    if (seen[k] || field[k] > 0) return;
+    seen[k] = 1;
+    stack[top++] = k;
+  };
+  for (let i = 0; i < width; i++) {
+    visit(i);
+    visit(i + (height - 1) * width);
+  }
+  for (let j = 0; j < height; j++) {
+    visit(j * width);
+    visit(width - 1 + j * width);
+  }
+  while (top > 0) {
+    const k = stack[--top];
+    const i = k % width;
+    if (i > 0) visit(k - 1);
+    if (i < width - 1) visit(k + 1);
+    if (k >= width) visit(k - width);
+    if (k < (height - 1) * width) visit(k + width);
+  }
+  for (let k = 0; k < field.length; k++) {
+    if (!seen[k] && field[k] === 0) return true;
+  }
+  return false;
+}
+
+/**
+ * Hull area the energy field never reached. The field is exactly zero
+ * farther than nodeR1 from every member and edgeR1 from every virtual edge,
+ * yet marching squares traces ONE outer contour: corridors that cross in the
+ * plane (or a ring of members) enclose a region it cannot leave open, so it
+ * paints solid. The reach mask is the union of those zones plus a margin;
+ * the holes of (field ring ∩ mask) are the pockets. Their boundary sits on
+ * the mask, so a pocket's rim is somewhat wider than the field's own iso-line —
+ * the conservative side: no area the field filled is ever opened.
+ *
+ * @param {Array<{x: number, y: number}>} ring  conditioned field ring
+ * @param {Array<{x, y, width, height}>} memberRects
+ * @param {Array<{x1: number, y1: number, x2: number, y2: number}>} edges
+ *   routed virtual edges
+ * @param {number} nodeR1px  member field reach (0 = node field off)
+ * @param {number} edgeR1px  corridor field reach (0 = edge field off)
+ * @param {number} cellPx  marching cell size
+ * @returns {Array<Array<Array<[number, number]>>>} clip-ready pocket polygons
+ */
+function unreachedPockets(ring, memberRects, edges, nodeR1px, edgeR1px, cellPx) {
+  if (ring.length < 3) return [];
+  const margin = POCKET_MASK_MARGIN_CELLS * cellPx;
+  const mask = memberRects.map((rect) => [
+    discRing(
+      rect.x + rect.width / 2,
+      rect.y + rect.height / 2,
+      Math.hypot(rect.width, rect.height) / 2 + nodeR1px + margin
+    ),
+  ]);
+  if (edgeR1px > 0) {
+    const r = edgeR1px + margin;
+    for (const { x1, y1, x2, y2 } of edges) {
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      if (len < 1e-9) continue;
+      // Straight stadium = slab + end discs (capsuleRing arcs, so it would
+      // under-cover the straight segment the field actually follows).
+      const nx = (-(y2 - y1) / len) * r;
+      const ny = ((x2 - x1) / len) * r;
+      mask.push(
+        [[[x1 + nx, y1 + ny], [x2 + nx, y2 + ny], [x2 - nx, y2 - ny], [x1 - nx, y1 - ny], [x1 + nx, y1 + ny]]],
+        [discRing(x1, y1, r)],
+        [discRing(x2, y2, r)]
+      );
+    }
+  }
+  let reached;
+  try {
+    reached = polygonClipping.intersection(
+      [toClipRing(ring)],
+      polygonClipping.union(...mask)
+    );
+  } catch (e) {
+    console.warn("bubble pocket cut failed:", e.message);
+    return [];
+  }
+  const minArea = POCKET_MIN_AREA_CELLS * cellPx * cellPx;
+  return reached
+    .flatMap((poly) => poly.slice(1))
+    .filter((hole) => Math.abs(ringSignedArea(hole)) >= minArea)
+    .map((hole) => [hole]);
 }
 
 /**
@@ -878,11 +1004,27 @@ const LABEL_STANDOFF_PX = 8;
 const BUBBLE_LABEL_FONT_FAMILY = "Arial, sans-serif";
 
 /**
+ * The label anchor moved by where the user dragged the label to. The shift is
+ * stored in app graph units (y down, like node positions in a saved file);
+ * the anchor is in sigma graph space (y up), hence the flip on y.
+ *
+ * @param {{x: number, y: number}|null} anchor  graph-space outline anchor
+ * @param {{labelShiftX?: number, labelShiftY?: number}} opts
+ */
+function shiftedLabelAnchor(anchor, opts = {}) {
+  const finite = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+  const dx = finite(opts.labelShiftX);
+  const dy = finite(opts.labelShiftY);
+  if (!anchor || (dx === 0 && dy === 0)) return anchor;
+  return { ...anchor, x: anchor.x + dx, y: anchor.y - dy };
+}
+
+/**
  * Resolve a group label to pure geometry: where the text goes, whether it is
- * rotated onto the path, and the background box behind it. Both sinks then only
- * PAINT — bubble_layer #drawLabel and export_svg bubbleLabelPrimitives used to
- * re-implement the standoff maths, the rotation predicate and the background
- * rect line for line.
+ * rotated onto the path, and the background box behind it. Both sinks
+ * (bubble_layer #drawLabel and export_svg bubbleLabelPrimitives) then only
+ * PAINT, so the standoff maths, the rotation predicate and the background rect
+ * live in one place.
  *
  * The `label` on/off gate stays with the callers: the live layer reads it from
  * manager-merged opts, the export resolves it through opts ?? defaults.
@@ -891,7 +1033,8 @@ const BUBBLE_LABEL_FONT_FAMILY = "Arial, sans-serif";
  * @param {object} opts per-group style
  * @param {object} defaults BUBBLE_GROUP_STYLE_TEMPLATE
  * @param {(text: string, font: string) => number} measureText
- * @returns {null|{text: string, font: string, fontSize: number, x: number,
+ * @returns {null|{text: string, font: string, fontSize: number, fontChoice: string,
+ *   width: number, padding: number, x: number,
  *   y: number, lx: number, ly: number, rotated: boolean, angle: number,
  *   fill: string, background: null|{x: number, y: number, width: number,
  *   height: number, radius: number, fill: string}}}
@@ -909,7 +1052,8 @@ function resolveBubbleLabel(anchor, opts = {}, defaults = {}, measureText) {
   const standoff = closeToPath ? 0 : fontSize / 2 + padding + LABEL_STANDOFF_PX;
   const x = anchor.x + anchor.nx * standoff + (opts.labelOffsetX ?? 0);
   const y = anchor.y + anchor.ny * standoff + (opts.labelOffsetY ?? 0);
-  const font = `${fontSize}px ${BUBBLE_LABEL_FONT_FAMILY}`;
+  const fontStyle = opts.labelFontStyle ?? defaults.labelFontStyle;
+  const font = styledFont(fontStyle, fontSize, BUBBLE_LABEL_FONT_FAMILY);
   const textWidth = measureText(text, font);
 
   // Rotation only makes sense hugging the path; "center" has no tangent.
@@ -934,6 +1078,10 @@ function resolveBubbleLabel(anchor, opts = {}, defaults = {}, measureText) {
     text,
     font,
     fontSize,
+    // One of FONT_STYLES ("bold italic" …), for the SVG export's attributes.
+    fontChoice: fontStylePrefix(fontStyle),
+    width: textWidth,
+    padding,
     x,
     y,
     lx,
@@ -951,6 +1099,7 @@ export {
   polygonSelfIntersects,
   outlineLabelAnchor,
   resolveBubbleLabel,
+  shiftedLabelAnchor,
   OUTLINE_STROKE_WIDTH,
   LABEL_STANDOFF_PX,
   BUBBLE_LABEL_FONT_FAMILY,

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GLL main figure</title>
+<style>
+  /* All sizes are app CSS px: a tile shows its capture at the size the app drew it,
+     so every panel in the figure has the same UI scale. */
+  :root {
+    --gap: 16px; --marker: 40px;
+    /* Marker groups, one per step of the workflow the paper describes, in the
+       app's palette (config.js SLICE_PALETTE / DEFAULT_COLOR). The light hues
+       (grey #abacbd, blue #8ca6d9, pink #efb0aa) are deepened until white digits
+       reach the 3:1 large-text contrast, so every marker reads the same way. */
+    --view: #403c53; --io: #6e7086; --filter: #5b78b8; --inspect: #c33d35; --act: #cc786f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #fff; overflow: hidden; }
+  body { width: 1600px; font-family: "Helvetica Neue", Arial, sans-serif; }
+  .row { display: flex; gap: var(--gap); margin-top: var(--gap); align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: var(--gap); }
+  .tile { position: relative; overflow: hidden; border: 1px solid #c9ccd6; border-radius: 6px; background: #fff; flex: none; }
+  .tile img { position: absolute; display: block; }
+  /* Room above the window for the rail's markers and the legend. */
+  #main { position: relative; padding-top: 60px; }
+  .marker { position: absolute; width: var(--marker); height: var(--marker); border-radius: 50%; color: #fff;
+            font: 600 24px/var(--marker) "Helvetica Neue", Arial, sans-serif; text-align: center; z-index: 3;
+            box-shadow: 0 0 0 3px #fff, 0 1px 4px rgba(0, 0, 0, 0.35); }
+  .outline { position: absolute; border: 3px solid; border-radius: 8px; z-index: 2; pointer-events: none; }
+  .legend { position: absolute; top: 14px; left: 0; right: 0; display: flex; justify-content: center; gap: 30px;
+            font-size: 20px; color: #2b2a3a; }
+  .legend span::before { content: ""; display: inline-block; width: 16px; height: 16px; border-radius: 50%;
+                         margin-right: 8px; vertical-align: -2px; background: var(--c); }
+</style>
+</head>
+<body>
+<div id="main"></div>
+<div class="row" id="rowB"></div>
+<div class="row" id="rowC"></div>
+<div class="row" id="rowD"></div>
+<script>
+const GROUP = { 1: 'view', 2: 'io', 3: 'io', 6: 'io', 4: 'filter', 5: 'filter', 7: 'filter',
+                8: 'inspect', 9: 'inspect', 13: 'inspect', 10: 'act', 11: 'act', 12: 'act' };
+const LEGEND = [['io', 'Load and save'], ['filter', 'Filter and query'], ['inspect', 'Inspect and analyse'], ['act', 'Select and style']];
+
+// Called by render.mjs with the capture's rects.json and its device scale;
+// resolves to the page height once every image is decoded.
+window.compose = function compose(rects, scale) {
+  const ROW_B = 720;
+  // The Appearance heading sits this far above the mount the app reports for it.
+  const APPEARANCE_HEADING = 40;
+  const el = (cls, parent) => { const e = document.createElement('div'); e.className = cls; parent.appendChild(e); return e; };
+  const color = (n) => `var(--${GROUP[n]})`;
+
+  // A tile showing `crop` (app CSS px within the capture) of out/<file>.
+  function tile(parent, file, crop) {
+    const t = el('tile', parent);
+    Object.assign(t.style, { width: `${crop.w}px`, height: `${crop.h}px` });
+    const img = document.createElement('img');
+    img.src = `out/${file}`;
+    img.onload = () => { img.style.width = `${img.naturalWidth / scale}px`; };
+    Object.assign(img.style, { left: `${-crop.x}px`, top: `${-crop.y}px` });
+    t.appendChild(img);
+    return t;
+  }
+  function marker(parent, n, x, y) {
+    const m = el('marker', parent);
+    m.textContent = n;
+    Object.assign(m.style, { left: `${x - 20}px`, top: `${y - 20}px`, background: color(n) });
+  }
+  function outline(parent, n, r, top, pad = 3) {
+    const o = el('outline', parent);
+    Object.assign(o.style, { left: `${r.x - pad}px`, top: `${top + r.y - pad}px`, width: `${r.width + 2 * pad}px`,
+                             height: `${r.height + 2 * pad}px`, borderColor: color(n) });
+  }
+
+  // Row A: the whole window; rail controls outlined, numbered in the margin above.
+  const m = rects.main;
+  const main = document.getElementById('main');
+  const TOP = 60;
+  tile(main, 'main.png', { x: 0, y: 0, w: rects.window.width, h: rects.window.height });
+  const legend = el('legend', main);
+  for (const [g, text] of LEGEND) {
+    const s = document.createElement('span');
+    s.textContent = text;
+    s.style.setProperty('--c', `var(--${g})`);
+    legend.appendChild(s);
+  }
+  for (const [key, n] of [['file', 2], ['workspace', 3], ['data', 4], ['query', 5], ['metrics', 9], ['assistant', 13], ['export', 6]]) {
+    const r = m[key];
+    outline(main, n, r, TOP);
+    marker(main, n, r.x + r.width / 2, 28);
+  }
+  outline(main, 7, m.filters, TOP, 2);
+  marker(main, 7, m.filters.x - 30, TOP + m.filters.y + m.filters.height / 2);
+  marker(main, 1, m.stage.x + 36, TOP + m.stage.y + 36);
+
+  // Row B: node + edge tooltip | selection + overlays | appearance | assistant.
+  // Markers sit on empty parts of each panel's header.
+  const rowB = document.getElementById('rowB');
+  const tips = el('col', rowB);
+  const EDGE_TIP_H = Math.round(rects.tooltips.edge.height);
+  const tn = tile(tips, 'tooltip_node.png', { x: 0, y: 0, w: 360, h: ROW_B - EDGE_TIP_H - 16 });
+  marker(tn, 8, 250, 22);
+  tile(tips, 'tooltip_edge.png', { x: 0, y: 0, w: 360, h: EDGE_TIP_H });
+
+  const ins = rects.inspector;
+  const W = ins.inspector.width;
+  const appearTop = ins.appearance.y - ins.inspector.y;
+  const sel = el('col', rowB);
+  const selH = appearTop - APPEARANCE_HEADING - 4;
+  const s = tile(sel, 'inspector_selection.png', { x: 0, y: 0, w: W, h: selH });
+  marker(s, 10, W - 40, 22);
+  const o = tile(sel, 'inspector_overlays.png', { x: 0, y: 0, w: W, h: ROW_B - selH - 16 });
+  marker(o, 12, W - 40, 22);
+
+  const a = tile(rowB, 'inspector_appearance.png', { x: 0, y: rects.appearanceTop, w: W, h: ROW_B });
+  marker(a, 11, 185, 22);
+
+  const wb = rects.workbench;
+  const asst = tile(rowB, 'workbench_assistant.png', { x: 0, y: 0, w: wb.assistant.width, h: wb.assistant.height });
+  marker(asst, 13, 220, 22);
+
+  // Row C: metrics | query editor. Row D: data editor.
+  const rowC = document.getElementById('rowC');
+  const met = tile(rowC, 'workbench_metrics.png', { x: 0, y: 0, w: wb.metrics.width, h: wb.metrics.height });
+  marker(met, 9, wb.metrics.width / 2, 22);
+  const q = tile(rowC, 'workbench_query.png', { x: 0, y: 0, w: wb.query.width, h: wb.query.height });
+  marker(q, 5, wb.query.width / 2, 22);
+  const d = tile(document.getElementById('rowD'), 'workbench_data.png', { x: 0, y: 0, w: wb.data.width, h: wb.data.height });
+  marker(d, 4, wb.data.width / 2, 22);
+
+  return Promise.all([...document.images].map((i) => i.decode())).then(() => document.body.scrollHeight);
+};
+</script>
+</body>
+</html>

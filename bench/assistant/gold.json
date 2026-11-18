@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "graphs": {
+    "adpkd": {
+      "file": "manuscript/2026-06-26_ADPKD_model_GLL-input_GLL-paper-version.xlsx",
+      "description": "ADPKD disease model (263 nodes, 1,574 edges)"
+    },
+    "airports": {
+      "file": "templates/airport-network-template.xlsx",
+      "description": "Airport route network template (120 nodes, 240 edges)"
+    }
+  },
+  "tiers": {
+    "numeric": "single numeric range (BETWEEN or LOWER THAN … OR GREATER THAN)",
+    "categorical": "single categorical IN [...] or boolean IS TRUE",
+    "two_clause": "two conditions joined by AND or OR (incl. node-OR-edge)",
+    "nested": "three or more conditions, nesting and/or binary NOT",
+    "paraphrase": "wording does not match the property name; needs a mapping",
+    "impossible": "no property in the graph can answer it; correct = no query"
+  },
+  "items": [
+    {"id": "adpkd-num-01", "graph": "adpkd", "tier": "numeric", "question": "Show genes with at least 50 ADPKD literature references.", "gold": "(Node filters::Literature evidence::ADPKD literature evidence BETWEEN 50 AND 911)"},
+    {"id": "adpkd-num-02", "graph": "adpkd", "tier": "numeric", "question": "Select nodes whose ADPKD genetic association score is 0.5 or higher.", "gold": "(Node filters::Genetic associations::ADPKD genetic association score BETWEEN 0.5 AND 1)"},
+    {"id": "adpkd-num-03", "graph": "adpkd", "tier": "numeric", "question": "Which edges have at least 10 ADPKD literature associations?", "gold": "(Edge filters::Literature associations::in ADPKD BETWEEN 10 AND 726)"},
+    {"id": "adpkd-num-04", "graph": "adpkd", "tier": "numeric", "question": "Genes with a log2 fold change of 2 or more in large cysts.", "gold": "(Node filters::Bulk TX data::Large cysts [log2FC] BETWEEN 2 AND 9)"},
+    {"id": "adpkd-num-05", "graph": "adpkd", "tier": "numeric", "question": "Find genes expressed at 100 nTPM or more in healthy proximal tubular cells.", "gold": "(Node filters::Expression in healthy::Proximal tubular cells [nTPM] BETWEEN 100 AND 5465)"},
+    {"id": "adpkd-num-06", "graph": "adpkd", "tier": "numeric", "question": "Genes whose medium-cyst log2FC is below -1 or above 2.", "gold": "(Node filters::Bulk TX data::Medium cysts [log2FC] LOWER THAN -1 OR GREATER THAN 2)"},
+
+    {"id": "adpkd-cat-01", "graph": "adpkd", "tier": "categorical", "question": "Show nodes whose coarse subcellular location is the nucleus.", "gold": "(Node filters::Subcellular location::SubLoc coarse IN [Nucleus])"},
+    {"id": "adpkd-cat-02", "graph": "adpkd", "tier": "categorical", "question": "Select secreted or membrane proteins (coarse location).", "gold": "(Node filters::Subcellular location::SubLoc coarse IN [Secreted, Membrane])"},
+    {"id": "adpkd-cat-03", "graph": "adpkd", "tier": "categorical", "question": "Which genes negatively modulate apoptosis?", "gold": "(Node filters::Mechanisms::apoptosis IN [modulates negative])"},
+    {"id": "adpkd-cat-04", "graph": "adpkd", "tier": "categorical", "question": "Genes involved in cAMP signaling.", "gold": "(Node filters::Mechanisms::cAMP signaling IN [involved in])"},
+    {"id": "adpkd-cat-05", "graph": "adpkd", "tier": "categorical", "question": "Which genes does tolvaptan interfere with?", "gold": "(Node filters::Drug interference::tolvaptan IS TRUE)"},
+    {"id": "adpkd-cat-06", "graph": "adpkd", "tier": "categorical", "question": "Show all protein-protein interaction edges.", "gold": "(Edge filters::Physical interactions::Protein-protein interaction IS TRUE)"},
+
+    {"id": "adpkd-two-01", "graph": "adpkd", "tier": "two_clause", "question": "Membrane proteins (coarse location) with at least 20 ADPKD literature references.", "gold": "(Node filters::Subcellular location::SubLoc coarse IN [Membrane]) AND (Node filters::Literature evidence::ADPKD literature evidence BETWEEN 20 AND 911)"},
+    {"id": "adpkd-two-02", "graph": "adpkd", "tier": "two_clause", "question": "Genes affected by metformin or by atorvastatin.", "gold": "(Node filters::Drug interference::metformin IS TRUE) OR (Node filters::Drug interference::atorvastatin IS TRUE)"},
+    {"id": "adpkd-two-03", "graph": "adpkd", "tier": "two_clause", "question": "Nuclear genes (coarse location) with a large-cyst log2FC of at least 1.", "gold": "(Node filters::Subcellular location::SubLoc coarse IN [Nucleus]) AND (Node filters::Bulk TX data::Large cysts [log2FC] BETWEEN 1 AND 9)"},
+    {"id": "adpkd-two-04", "graph": "adpkd", "tier": "two_clause", "question": "Protein-protein interaction edges with at least 5 ADPKD literature associations.", "gold": "(Edge filters::Physical interactions::Protein-protein interaction IS TRUE) AND (Edge filters::Literature associations::in ADPKD BETWEEN 5 AND 726)"},
+    {"id": "adpkd-two-05", "graph": "adpkd", "tier": "two_clause", "question": "Highlight genes with an ADPKD biomarker score of at least 50, together with edges that have at least 50 ADPKD literature associations.", "gold": "(Node filters::Biomarker annotation::ADPKD biomarker score BETWEEN 50 AND 288) OR (Edge filters::Literature associations::in ADPKD BETWEEN 50 AND 726)"},
+    {"id": "adpkd-two-06", "graph": "adpkd", "tier": "two_clause", "question": "Genes that play any role in both Wnt signaling and ERK1-ERK2 signaling.", "gold": "(Node filters::Mechanisms::Wnt signaling IN [involved in, modulates, modulates positive, modulates negative]) AND (Node filters::Mechanisms::ERK1-ERK2 signaling IN [involved in, modulates, modulates positive, modulates negative])"},
+
+    {"id": "adpkd-nest-01", "graph": "adpkd", "tier": "nested", "question": "Secreted proteins (coarse location) that are affected by neither atorvastatin nor pravastatin.", "gold": "(Node filters::Subcellular location::SubLoc coarse IN [Secreted]) NOT ((Node filters::Drug interference::atorvastatin IS TRUE) OR (Node filters::Drug interference::pravastatin IS TRUE))"},
+    {"id": "adpkd-nest-02", "graph": "adpkd", "tier": "nested", "question": "Genes with at least 10 ADPKD literature references, excluding nuclear ones (coarse location).", "gold": "(Node filters::Literature evidence::ADPKD literature evidence BETWEEN 10 AND 911) NOT (Node filters::Subcellular location::SubLoc coarse IN [Nucleus])"},
+    {"id": "adpkd-nest-03", "graph": "adpkd", "tier": "nested", "question": "Edges with at least 3 ADPKD literature associations that are not protein-protein interactions.", "gold": "(Edge filters::Literature associations::in ADPKD BETWEEN 3 AND 726) NOT (Edge filters::Physical interactions::Protein-protein interaction IS TRUE)"},
+    {"id": "adpkd-nest-04", "graph": "adpkd", "tier": "nested", "question": "Membrane proteins (coarse location) with a log2FC of at least 1 in either large or medium cysts.", "gold": "(Node filters::Subcellular location::SubLoc coarse IN [Membrane]) AND ((Node filters::Bulk TX data::Large cysts [log2FC] BETWEEN 1 AND 9) OR (Node filters::Bulk TX data::Medium cysts [log2FC] BETWEEN 1 AND 8))"},
+    {"id": "adpkd-nest-05", "graph": "adpkd", "tier": "nested", "question": "Genes with any role in apoptosis or in the inflammatory response, but not located in the nucleus (coarse location).", "gold": "((Node filters::Mechanisms::apoptosis IN [involved in, modulates, modulates positive, modulates negative]) OR (Node filters::Mechanisms::inflammatory response IN [involved in, modulates, modulates positive, modulates negative])) NOT (Node filters::Subcellular location::SubLoc coarse IN [Nucleus])"},
+
+    {"id": "adpkd-para-01", "graph": "adpkd", "tier": "paraphrase", "question": "Which genes are the most talked about in ADPKD papers? Give me the ones mentioned 100 times or more.", "gold": "(Node filters::Literature evidence::ADPKD literature evidence BETWEEN 100 AND 911)"},
+    {"id": "adpkd-para-02", "graph": "adpkd", "tier": "paraphrase", "question": "Which proteins does the vasopressin V2 receptor antagonist act on?", "gold": "(Node filters::Drug interference::tolvaptan IS TRUE)"},
+    {"id": "adpkd-para-03", "graph": "adpkd", "tier": "paraphrase", "question": "Show me the targets of the SGLT2 inhibitors.", "gold": "(Node filters::Drug interference::dapagliflozin IS TRUE) OR (Node filters::Drug interference::empagliflozin IS TRUE)"},
+    {"id": "adpkd-para-04", "graph": "adpkd", "tier": "paraphrase", "question": "Which genes go down in the biggest cysts?", "gold": "(Node filters::Bulk TX data::Large cysts [log2FC] BETWEEN -3 AND 0)"},
+    {"id": "adpkd-para-05", "graph": "adpkd", "tier": "paraphrase", "question": "Which proteins end up outside the cell?", "gold": "(Node filters::Subcellular location::SubLoc coarse IN [Secreted])"},
+    {"id": "adpkd-para-06", "graph": "adpkd", "tier": "paraphrase", "question": "Which genes help forecast how the disease will progress? Use a cutoff of 10.", "gold": "(Node filters::Biomarker annotation::ADPKD prognostic biomarker score BETWEEN 10 AND 59)"},
+    {"id": "adpkd-para-07", "graph": "adpkd", "tier": "paraphrase", "question": "Show the edges where the two proteins physically bind each other.", "gold": "(Edge filters::Physical interactions::Protein-protein interaction IS TRUE)"},
+
+    {"id": "adpkd-imp-01", "graph": "adpkd", "tier": "impossible", "question": "Show genes located on chromosome 16.", "gold": null},
+    {"id": "adpkd-imp-02", "graph": "adpkd", "tier": "impossible", "question": "Genes with a CRISPR knockout essentiality score above 0.5.", "gold": null},
+    {"id": "adpkd-imp-03", "graph": "adpkd", "tier": "impossible", "question": "Edges with a STRING combined score above 700.", "gold": null},
+
+    {"id": "air-num-01", "graph": "airports", "tier": "numeric", "question": "Routes that are at least 5000 km long.", "gold": "(Edge filters::geo::distance_km BETWEEN 5000 AND 17148)"},
+    {"id": "air-num-02", "graph": "airports", "tier": "numeric", "question": "Routes with an average delay of at most 5 minutes.", "gold": "(Edge filters::ops::avg_delay_min BETWEEN 1 AND 5)"},
+    {"id": "air-num-03", "graph": "airports", "tier": "numeric", "question": "Routes with a flight count of at most 14 or at least 61.", "gold": "(Edge filters::traffic::flight_count LOWER THAN 14 OR GREATER THAN 61)"},
+
+    {"id": "air-cat-01", "graph": "airports", "tier": "categorical", "question": "Airports in Africa.", "gold": "(Node filters::geo::region IN [Africa])"},
+    {"id": "air-cat-02", "graph": "airports", "tier": "categorical", "question": "Airports with a high bio risk level.", "gold": "(Node filters::health::bio_risk_level IN [high])"},
+    {"id": "air-cat-03", "graph": "airports", "tier": "categorical", "question": "Airports in the Indian time zone.", "gold": "(Node filters::geo::zone IN [Indian])"},
+
+    {"id": "air-two-01", "graph": "airports", "tier": "two_clause", "question": "European airports with a high bio risk level.", "gold": "(Node filters::geo::region IN [Europe]) AND (Node filters::health::bio_risk_level IN [high])"},
+    {"id": "air-two-02", "graph": "airports", "tier": "two_clause", "question": "Routes with at least 80 flights that are at most 1000 km long.", "gold": "(Edge filters::traffic::flight_count BETWEEN 80 AND 113) AND (Edge filters::geo::distance_km BETWEEN 177 AND 1000)"},
+    {"id": "air-two-03", "graph": "airports", "tier": "two_clause", "question": "Airports in Oceania or Asia.", "gold": "(Node filters::geo::region IN [Oceania, Asia])"},
+    {"id": "air-two-04", "graph": "airports", "tier": "two_clause", "question": "Show North American airports plus every route of at least 10000 km.", "gold": "(Node filters::geo::region IN [North America]) OR (Edge filters::geo::distance_km BETWEEN 10000 AND 17148)"},
+
+    {"id": "air-nest-01", "graph": "airports", "tier": "nested", "question": "Routes with at least 30 flights that are either at most 1000 km long or delayed by 60 minutes or more on average.", "gold": "(Edge filters::traffic::flight_count BETWEEN 30 AND 113) AND ((Edge filters::geo::distance_km BETWEEN 177 AND 1000) OR (Edge filters::ops::avg_delay_min BETWEEN 60 AND 90))"},
+    {"id": "air-nest-02", "graph": "airports", "tier": "nested", "question": "Routes of at most 2000 km that are not operated by airline ET.", "gold": "(Edge filters::geo::distance_km BETWEEN 177 AND 2000) NOT (Edge filters::carrier::airline IN [ET])"},
+    {"id": "air-nest-03", "graph": "airports", "tier": "nested", "question": "Low bio risk airports outside Africa and Europe.", "gold": "(Node filters::health::bio_risk_level IN [low]) NOT (Node filters::geo::region IN [Africa, Europe])"},
+
+    {"id": "air-para-01", "graph": "airports", "tier": "paraphrase", "question": "Which connections cover more than 8000 km?", "gold": "(Edge filters::geo::distance_km BETWEEN 8000 AND 17148)"},
+    {"id": "air-para-02", "graph": "airports", "tier": "paraphrase", "question": "Which routes are the busiest, with 100 or more flights?", "gold": "(Edge filters::traffic::flight_count BETWEEN 100 AND 113)"},
+    {"id": "air-para-03", "graph": "airports", "tier": "paraphrase", "question": "Which routes are flown by KLM or Air France?", "gold": "(Edge filters::carrier::airline IN [KL, AF])"},
+    {"id": "air-para-04", "graph": "airports", "tier": "paraphrase", "question": "Which airports pose the smallest biosecurity threat?", "gold": "(Node filters::health::bio_risk_level IN [low])"},
+
+    {"id": "air-imp-01", "graph": "airports", "tier": "impossible", "question": "Airports handling more than 10 million passengers a year.", "gold": null},
+    {"id": "air-imp-02", "graph": "airports", "tier": "impossible", "question": "Routes with average ticket prices under 100 euros.", "gold": null}
+  ]
+}

@@ -68,6 +68,20 @@ class StaticUtilities {
     return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1))}…`;
   }
 
+  /**
+   * A property value as a finite number, or undefined when it has none to
+   * give: blank, null, text, NaN. Loaded JSON can carry null and "" where an
+   * Excel cell would simply be empty; both mean "no value", never 0.
+   */
+  static numericValue(raw) {
+    if (typeof raw === 'number') return Number.isFinite(raw) ? raw : undefined;
+    if (typeof raw === 'string' && raw.trim() !== '') {
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  }
+
   static isNumber(value) {
     const parsed = parseFloat(value);
     return !isNaN(parsed) && isFinite(parsed);
@@ -207,6 +221,14 @@ class StaticUtilities {
 
   static decodePropHashId(propId) {
     return propId.split("::");
+  }
+
+  /**
+   * The id prefix of every property under a section or sub-group. The trailing
+   * separator matters: "Topology" must not also match "Topology 2".
+   */
+  static propIDPrefix(section, subSection = null) {
+    return subSection ? `${section}::${subSection}::` : `${section}::`;
   }
 
   // The query DSL uses [ ] , ( ) and \ as grammar. Categorical values can

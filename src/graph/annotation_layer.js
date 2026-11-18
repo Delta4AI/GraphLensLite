@@ -24,99 +24,19 @@ import { flipY } from './graph_model.js';
 import {
   ANNOTATION_DEFAULTS,
   ANNOTATION_SHADOW,
-  ANNOTATION_FONT_FAMILY,
   ANNOTATION_LINE_HEIGHT,
   ANNOTATION_PADDING_PX,
   MAX_TEXT_LENGTH,
-  MIN_FONT_SIZE,
-  MAX_FONT_SIZE,
-  MAX_BORDER_WIDTH,
-  MAX_BORDER_RADIUS,
   annotationLayout,
+  annotationFont,
 } from './annotation_geometry.js';
-import { clampPopoverLeft, clampPopoverTop } from '../utilities/popover_position.js';
+import { openAnnotationPopover } from './annotation_popover.js';
 import { FrameCoalescer } from './overlay_frame.js';
+import { viewKey } from './overlay_keys.js';
 
 // A press that travels less than this many screen px is a click (open the
 // style popover), not a drag.
 const DRAG_THRESHOLD_PX = 3;
-const POPOVER_OFFSET_PX = 8;
-
-// ------------------------------------------------------------ popover inputs
-// Row + input builders for the note style popover. Module scope rather than
-// closures inside #openPopover, which was 114 lines mostly made of these.
-// `after` is the caller's per-edit hook (repaint + mark dirty).
-
-function popoverRow(labelText, input) {
-  const label = document.createElement('label');
-  label.className = 'annotation-popover-row';
-  const span = document.createElement('span');
-  span.textContent = labelText;
-  label.append(span, input);
-  return label;
-}
-
-function popoverNumberInput(value, min, max, step, onChange, after) {
-  const input = document.createElement('input');
-  input.type = 'number';
-  Object.assign(input, { min, max, step, value });
-  input.addEventListener('input', () => {
-    const n = Number(input.value);
-    if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
-    after();
-  });
-  return input;
-}
-
-function popoverColorInput(value, onChange, after) {
-  const input = document.createElement('input');
-  input.type = 'color';
-  input.value = value;
-  input.addEventListener('input', () => {
-    onChange(input.value);
-    after();
-  });
-  return input;
-}
-
-function popoverCheckboxInput(checked, onChange, after) {
-  const input = document.createElement('input');
-  input.type = 'checkbox';
-  input.checked = checked;
-  input.addEventListener('input', () => {
-    onChange(input.checked);
-    after();
-  });
-  return input;
-}
-
-/**
- * The two rows that depend on each other: background (a toggle plus a colour,
- * because <input type=color> has no "none") and shadow, which needs a fill to
- * be visible at all (see ANNOTATION_SHADOW) and so switches the background on
- * rather than doing nothing.
- */
-function buildPopoverFillRows(ann, after) {
-  const bgColorInput = popoverColorInput(ann.bgColor ?? '#ffffff', (v) => {
-    if (ann.bgColor != null) ann.bgColor = v;
-  }, after);
-  const bgToggle = popoverCheckboxInput(ann.bgColor != null, (on) => {
-    ann.bgColor = on ? bgColorInput.value : null;
-  }, after);
-  const bgControls = document.createElement('span');
-  bgControls.className = 'annotation-popover-pair';
-  bgControls.append(bgToggle, bgColorInput);
-  const bgRow = popoverRow('Background', bgControls);
-
-  const shadowToggle = popoverCheckboxInput(ann.shadow === true, (on) => {
-    ann.shadow = on;
-    if (on && ann.bgColor == null) {
-      ann.bgColor = bgColorInput.value;
-      bgToggle.checked = true;
-    }
-  }, after);
-  return { bgRow, shadowToggle };
-}
 
 class AnnotationLayer {
   /**
@@ -160,7 +80,7 @@ class AnnotationLayer {
 
     this.renderHandler = () => this.scheduleSync();
     adapter.sigma.on('afterRender', this.renderHandler);
-    // Camera + note-set fingerprint of the last reconcile, so the per-frame
+    // Projection + note-set fingerprint of the last reconcile, so the per-frame
     // hook can tell "nothing moved" from "re-anchor everything" (see #stale).
     this.syncStamp = null;
   }
@@ -180,7 +100,7 @@ class AnnotationLayer {
       return;
     }
     // Frames rendered while hidden are skipped, so a camera that moved in the
-    // meantime left the notes anchored to their old spots. Nothing re-renders
+    // meantime leaves the notes anchored to their old spots. Nothing re-renders
     // on unhide by itself — re-anchor them here.
     if (this.#stale()) this.sync();
   }
@@ -294,16 +214,15 @@ class AnnotationLayer {
    * signature string per note (note text runs to 2000 chars) and rewrite every
    * transform for nothing.
    *
-   * The fingerprint covers the camera and the note-set identity. Content edits
+   * The fingerprint covers sigma's projection and the note-set identity. Content edits
    * mutate a note in place and call sync() directly, so they never need to be
    * detected here; a restored workspace (undo) swaps the array, which does show
    * up as a new reference.
    */
   #stale() {
     if (!this.visible) return false;
-    const camera = this.adapter.sigma.getCamera().getState();
     const anns = this.annotations();
-    const stamp = `${camera.x}|${camera.y}|${camera.ratio}|${camera.angle}|${anns.length}`;
+    const stamp = `${viewKey(this.adapter.sigma)}|${anns.length}`;
     if (stamp === this.syncStamp && anns === this.lastAnns) return false;
     this.syncStamp = stamp;
     this.lastAnns = anns;
@@ -334,7 +253,7 @@ class AnnotationLayer {
     // A deleted note or a workspace switch must not leave a popover editing
     // a note that is no longer on screen.
     if (this.popoverId && !seen.has(this.popoverId)) this.#closePopover();
-    else if (this.popoverId) this.#positionPopover();
+    else if (this.popoverId) this.popover?.position();
   }
 
   #createElement(id) {
@@ -369,7 +288,7 @@ class AnnotationLayer {
   /** Restyle only when the note's content/style signature changed. */
   #applyStyle(ann, el) {
     const signature =
-      `${ann.text}|${ann.fontSize}|${ann.fontColor}|${ann.borderColor}|${ann.borderWidth}` +
+      `${ann.text}|${ann.fontSize}|${ann.fontStyle}|${ann.fontColor}|${ann.borderColor}|${ann.borderWidth}` +
       `|${ann.borderRadius ?? 0}|${ann.bgColor ?? ''}|${ann.shadow ? 1 : 0}`;
     if (el.dataset.signature === signature) return;
     el.dataset.signature = signature;
@@ -377,7 +296,7 @@ class AnnotationLayer {
     if (this.editingId !== ann.id) el.textContent = ann.text;
     const shadow = ann.shadow && ann.bgColor; // ring shadows are unreproducible in exports
     Object.assign(el.style, {
-      font: `${ann.fontSize}px ${ANNOTATION_FONT_FAMILY}`,
+      font: annotationFont(ann),
       lineHeight: String(ANNOTATION_LINE_HEIGHT),
       color: ann.fontColor,
       padding: `${ANNOTATION_PADDING_PX}px`,
@@ -428,7 +347,7 @@ class AnnotationLayer {
       ann.x = g.x + dx;
       ann.y = flipY(g.y) + dy;
       this.#place(ann, el);
-      if (this.popoverId === id) this.#positionPopover();
+      if (this.popoverId === id) this.popover?.position();
     };
     const onUp = () => {
       el.removeEventListener('pointermove', onMove);
@@ -574,70 +493,13 @@ class AnnotationLayer {
     // Style inputs mutate the note live and fire per keystroke and per colour
     // drag, so the undo entry is recorded once when the popover closes.
     this.popoverDirty = false;
-
-    const pop = document.createElement('div');
-    pop.className = 'annotation-popover';
-    pop.setAttribute('role', 'group');
-    pop.setAttribute('aria-label', 'Note style');
-    // Every input reports through the same hook: repaint now, record one undo
-    // entry when the popover closes.
-    const after = () => this.#afterStyleEdit();
-    const numberInput = (value, min, max, step, onChange) =>
-      popoverNumberInput(value, min, max, step, onChange, after);
-    const colorInput = (value, onChange) => popoverColorInput(value, onChange, after);
-
-    const { bgRow, shadowToggle } = buildPopoverFillRows(ann, after);
-
-    pop.append(
-      // Same bounds the sanitizer clamps to on load — stated once, there.
-      popoverRow(
-        'Font size',
-        numberInput(ann.fontSize, MIN_FONT_SIZE, MAX_FONT_SIZE, 1, (v) => (ann.fontSize = v))
-      ),
-      popoverRow('Font color', colorInput(ann.fontColor, (v) => (ann.fontColor = v))),
-      popoverRow('Border color', colorInput(ann.borderColor, (v) => (ann.borderColor = v))),
-      popoverRow(
-        'Border width',
-        numberInput(ann.borderWidth, 0, MAX_BORDER_WIDTH, 0.5, (v) => (ann.borderWidth = v))
-      ),
-      popoverRow(
-        'Corner radius',
-        numberInput(ann.borderRadius ?? 0, 0, MAX_BORDER_RADIUS, 1, (v) => (ann.borderRadius = v))
-      ),
-      bgRow,
-      popoverRow('Shadow', shadowToggle)
-    );
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.className = 'annotation-popover-delete';
-    del.textContent = '✗ Delete note';
-    del.addEventListener('click', () => this.removeAnnotation(id));
-    pop.appendChild(del);
-
-    document.body.appendChild(pop);
-    this.popover = pop;
-    this.#positionPopover();
-    pop.querySelector('input')?.focus();
-    this.#wirePopoverDismiss(id, pop);
-  }
-
-  /** Outside-pointerdown and Escape, both scoped to this popover's lifetime.
-   * Escape hands focus back to the note it belongs to. */
-  #wirePopoverDismiss(id, pop) {
-    this.popoverOutside = (event) => {
-      const noteEl = this.els.get(id);
-      if (pop.contains(event.target) || noteEl?.contains(event.target)) return;
-      this.#closePopover();
-    };
-    document.addEventListener('pointerdown', this.popoverOutside, true);
-    this.popoverEscape = (event) => {
-      if (event.key !== 'Escape') return;
-      event.stopPropagation();
-      const noteEl = this.els.get(id);
-      this.#closePopover();
-      noteEl?.focus();
-    };
-    document.addEventListener('keydown', this.popoverEscape, true);
+    this.popover = openAnnotationPopover(ann, this.els.get(id), {
+      onEdit: () => this.#afterStyleEdit(),
+      onDelete: () => this.removeAnnotation(id),
+      onDismiss: () => this.#closePopover(),
+    });
+    this.popover.position();
+    this.popover.focus();
   }
 
   /** A style input changed the note: repaint now, record the undo on close. */
@@ -646,35 +508,11 @@ class AnnotationLayer {
     this.sync();
   }
 
-  #positionPopover() {
-    const el = this.els.get(this.popoverId);
-    if (!el || !this.popover) return;
-    const rect = el.getBoundingClientRect();
-    // Below the note by default, above it when the colour rows and Delete would
-    // fall off the bottom edge (same flip as the tooltip layer). The clamp is
-    // the last resort for a popover taller than the space on either side.
-    const height = this.popover.offsetHeight;
-    let top = rect.bottom + POPOVER_OFFSET_PX;
-    if (top + height > window.innerHeight - POPOVER_OFFSET_PX) {
-      top = rect.top - height - POPOVER_OFFSET_PX;
-    }
-    this.popover.style.top = `${clampPopoverTop(top, height, window.innerHeight)}px`;
-    this.popover.style.left = `${clampPopoverLeft(
-      rect.left,
-      this.popover.offsetWidth,
-      window.innerWidth
-    )}px`;
-  }
-
   #closePopover() {
     if (!this.popover) return;
-    this.popover.remove();
+    this.popover.close();
     this.popover = null;
     this.popoverId = null;
-    document.removeEventListener('pointerdown', this.popoverOutside, true);
-    this.popoverOutside = null;
-    document.removeEventListener('keydown', this.popoverEscape, true);
-    this.popoverEscape = null;
     if (this.popoverDirty) {
       this.popoverDirty = false;
       this.cache.history?.commit('Style note');

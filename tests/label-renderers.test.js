@@ -3,7 +3,7 @@ import { drawNodeLabel, drawEdgeLabel, placementVector } from "../src/graph/labe
 import { DEFAULTS } from "../src/config.js";
 
 // ==========================================================================
-// Canvas label renderers (Phase 2 label parity). Pure functions of
+// Canvas label renderers. Pure functions of
 // (context, data, settings) — exercised with a recording stub context.
 // ==========================================================================
 
@@ -70,7 +70,7 @@ describe("placementVector", () => {
     expect(placementVector("diagonal")).toEqual([0, 0]);
   });
 
-  it("maps all 12 badge placements (DEFAULTS.STYLES.NODE_BADGE_PLACEMENTS)", () => {
+  it("maps all 12 badge placement spellings saved files can carry", () => {
     const expected = {
       left: [-1, 0],
       right: [1, 0],
@@ -86,10 +86,6 @@ describe("placementVector", () => {
       "bottom-right": [1, 1],
     };
 
-    // The fixture must stay in sync with the configured placement list.
-    expect(Object.keys(expected).sort()).toEqual(
-      [...DEFAULTS.STYLES.NODE_BADGE_PLACEMENTS].sort(),
-    );
     for (const [placement, vector] of Object.entries(expected)) {
       expect(placementVector(placement), placement).toEqual(vector);
     }
@@ -114,6 +110,16 @@ describe("drawNodeLabel", () => {
     drawNodeLabel(ctx2, { ...NODE, labelSize: 20, labelColor: "#C33D35" }, SETTINGS);
     expect(ctx2.font).toBe("normal 20px Arial");
     expect(ctx2.fillStyle).toBe("#C33D35");
+  });
+
+  it("draws a node's own bold/italic choice, and ignores unknown styles", () => {
+    const ctx = stubContext();
+    drawNodeLabel(ctx, { ...NODE, labelFontStyle: "bold italic" }, SETTINGS);
+    expect(ctx.font).toBe("bold italic 12px Arial");
+
+    const junk = stubContext();
+    drawNodeLabel(junk, { ...NODE, labelFontStyle: "900; injected" }, SETTINGS);
+    expect(junk.font).toBe("normal 12px Arial");
   });
 
   it("treats the baked #000000 default as themeable (settings fallback wins)", () => {

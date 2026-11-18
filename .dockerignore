@@ -1,0 +1,9 @@
+# Allowlist: the build only needs these, and .env (the token) never enters the context.
+*
+!package.json
+!package-lock.json
+!src
+!server
+!templates
+src/gll.bundle.js
+src/gll.bundle.js.map

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
 import { Graph } from "../src/lib/graphology.bundle.mjs";
 import { InteractionManager } from "../src/graph/interactions.js";

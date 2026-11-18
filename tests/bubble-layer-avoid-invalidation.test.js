@@ -59,6 +59,10 @@ beforeEach(() => {
   rafQueue = [];
   vi.mocked(computeOutlineGeometry).mockReset();
   vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: CLEAN, holes: [] });
+  // A fit measured over CHEAP_FIT_MS defers the next refit until motion
+  // settles; on a loaded machine the first fit can cross it and the refit
+  // under test never runs. Fits here take no time.
+  vi.spyOn(performance, "now").mockReturnValue(0);
   globalThis.Path2D = class { moveTo() {} lineTo() {} bezierCurveTo() {} closePath() {} };
   globalThis.requestAnimationFrame = (cb) => { rafQueue.push(cb); return rafQueue.length; };
   globalThis.cancelAnimationFrame = () => {};

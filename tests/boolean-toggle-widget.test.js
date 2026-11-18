@@ -96,7 +96,13 @@ describe('BooleanToggle in the shared filter surfaces', () => {
     cache.propIDs = new Set([PROP]);
     cache.propIDToInvertibleRangeSliders = new Map();
     cache.propIDToDropdownChecklists = new Map();
-    cache.ui = { checkCheckbox: vi.fn(), showLoading: vi.fn(), hideLoading: vi.fn() };
+    cache.ui = {
+      checkCheckbox: vi.fn(),
+      showLoading: vi.fn(),
+      hideLoading: vi.fn(),
+      // UIManager.clearMissingChoice also forgets the row was changed.
+      clearMissingChoice: (fo) => delete fo.missingPasses,
+    };
     cache.bs = { cleanupManualGroupMembers: vi.fn() };
     cache.gcm = { decideToRenderOrDraw: vi.fn().mockResolvedValue(undefined) };
     cache.EVENT_LOCKS.QUERY_UPDATE_EVENT = false;
@@ -122,6 +128,16 @@ describe('BooleanToggle in the shared filter surfaces', () => {
     ]);
   });
 
+  it('section reset also returns the ∅ switch to the mode default', async () => {
+    const cache = boolCache();
+    new BooleanToggle(PROP, cache).appendTo(document.createElement('div'));
+    cache.data.layouts.L.filters.get(PROP).missingPasses = false;
+
+    await new GraphFilterManager(cache).resetFilters('Node filters', 'group');
+
+    expect('missingPasses' in cache.data.layouts.L.filters.get(PROP)).toBe(false);
+  });
+
   it('"Add to query" writes an IS TRUE / IS FALSE predicate, never "(undefined)"', async () => {
     const cache = boolCache();
     const toggle = new BooleanToggle(PROP, cache);
@@ -129,12 +145,12 @@ describe('BooleanToggle in the shared filter surfaces', () => {
     const ui = new UIComponentManager(cache);
 
     // Any: both leaves, matching what the query generator emits.
-    ui.createAddToQueryButton(PROP).click();
+    ui.addToQuery(PROP);
     expect(cache.data.layouts.L.query).toBe(`((${PROP} IS TRUE) OR (${PROP} IS FALSE))`);
 
     delete cache.data.layouts.L.query;
     await toggle.handleSelection('false');
-    ui.createAddToQueryButton(PROP).click();
+    ui.addToQuery(PROP);
     expect(cache.data.layouts.L.query).toBe(`(${PROP} IS FALSE)`);
     expect(cache.data.layouts.L.query).not.toContain('undefined');
   });

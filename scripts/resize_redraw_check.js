@@ -2,11 +2,10 @@
 /* global window, document, requestAnimationFrame, Image */ // browser globals run inside page.evaluate() callbacks
 // Manual regression check: panel toggles must not blank the graph.
 //
-// Repro for the "graph disappears after sidebar/bottom-bar toggle until the
-// next pan/zoom" bug: sigma.resize() resizes the WebGL canvases (which clears
-// their drawing buffers) but never schedules a render, so a container-only
-// resize (panel toggle — the window itself does not resize) left the scene
-// blank until the next camera move triggered render(). The fix routes all
+// sigma.resize() resizes the WebGL canvases (which clears their drawing
+// buffers) but never schedules a render, so a container-only resize (panel
+// toggle — the window itself does not resize) would leave the scene blank
+// until the next camera move triggered render(). The app routes all
 // container resizes through sigma.scheduleRender() (render() resizes first,
 // then redraws).
 //

@@ -118,10 +118,30 @@ describe("BubbleSetLayer — malformed-fit guard", () => {
 
     const NEXT = [{ x: 1, y: 1 }, { x: 9, y: 1 }, { x: 9, y: 9 }, { x: 1, y: 9 }];
     vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: NEXT, holes: [] });
-    layer.getGroupHandle("groupOne").update({ ...STYLE, fillOpacity: 0.5 }); // identity-key re-fit
+    layer.getGroupHandle("groupOne").update({ ...STYLE, padding: 0.5 }); // geometry-key re-fit
     flush();
 
     expect(layer.outlines.get("groupOne").graphPoints).toEqual(NEXT);
+  });
+
+  it("repaints a paint-only change without re-fitting the outline", () => {
+    const camera = { x: 0, y: 0, ratio: 1, angle: 0 };
+    const { sigma } = makeSigma(camera);
+    const layer = new BubbleSetLayer({ sigma, graph: makeGraph() }, makeCache());
+
+    vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: CLEAN, holes: [] });
+    layer.getGroupHandle("groupOne").update({ members: ["a", "b"], ...STYLE });
+    flush();
+    const fits = vi.mocked(computeOutlineGeometry).mock.calls.length;
+    const paintedSignature = layer.lastPaintSignature;
+    expect(paintedSignature).not.toBeNull();
+
+    layer.getGroupHandle("groupOne").update({ ...STYLE, fill: "#123456" });
+    expect(layer.lastPaintSignature).toBeNull(); // the next frame repaints
+    flush();
+
+    expect(vi.mocked(computeOutlineGeometry).mock.calls.length).toBe(fits);
+    expect(layer.lastPaintSignature).toBe(paintedSignature);
   });
 
   it("keeps the previous good outline when a refit collapses to empty", () => {
@@ -136,7 +156,7 @@ describe("BubbleSetLayer — malformed-fit guard", () => {
     flush();
 
     vi.mocked(computeOutlineGeometry).mockReturnValue({ outer: [], holes: [] }); // fit collapses
-    layer.getGroupHandle("groupOne").update({ ...STYLE, fillOpacity: 0.5 }); // identity-key re-fit
+    layer.getGroupHandle("groupOne").update({ ...STYLE, padding: 0.5 }); // geometry-key re-fit
     flush();
 
     expect(layer.outlines.get("groupOne").graphPoints).toEqual(CLEAN);

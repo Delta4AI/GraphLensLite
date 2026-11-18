@@ -9,8 +9,8 @@
  * label can never obscure the group name (a primary read). All four bubble
  * groups paint in a single pass. GraphBubbleSetManager keeps talking to per-group
  * "plugin instances" — those are thin handles into this layer's group state
- * (see getGroupHandle), so the manager's member/filter/style logic survives
- * the G6 → sigma port unchanged.
+ * (see getGroupHandle), so the manager's member/filter/style logic does not
+ * depend on the renderer.
  *
  * Outlines are fitted by bubblesets-js at the ratio-1 reference scale
  * (bubble_geometry.js) and cached in GRAPH space, so they are zoom-invariant —
@@ -28,9 +28,10 @@ import {
   polygonSelfIntersects,
   outlineLabelAnchor,
   resolveBubbleLabel,
+  shiftedLabelAnchor,
   OUTLINE_STROKE_WIDTH,
 } from './bubble_geometry.js';
-import { idsKey, positionsChecksum, styleKey } from './overlay_keys.js';
+import { idsKey, positionsChecksum, geometryKey, viewKey } from './overlay_keys.js';
 import { smoothClosedPath } from './bubble_smoothing.js';
 import { prepareOverlayCanvas } from './dpr_watch.js';
 import { FrameCoalescer } from './overlay_frame.js';
@@ -40,8 +41,8 @@ const LABEL_LAYER_NAME = 'bubbleSetsLabels';
 // --- refit deferral (drag responsiveness) ----------------------------------
 // Fitting an outline is bubblesets' marching-squares pass over an influence
 // field; on a dense graph with avoidance on it costs far more than a frame.
-// #paint runs on every sigma afterRender, so dragging a member used to re-fit
-// 60×/second and the whole canvas crawled.
+// #paint runs on every sigma afterRender, so re-fitting on every frame while
+// a member is dragged would run 60×/second and the whole canvas would crawl.
 //
 // A fit whose last run stayed inside this budget keeps re-fitting live — small
 // graphs are unaffected and the hull tracks the node exactly as before.
@@ -77,6 +78,9 @@ class BubbleSetLayer {
 
     this.frame = new FrameCoalescer(() => this.#paint());
     this.lastPaintSignature = null;
+    // Where each group's label was last painted, in viewport CSS px, for
+    // grabbing it with the mouse: group → {cx, cy, angle, hw, hh}.
+    this.labelBoxes = new Map();
     /** Last fit duration per group, in ms — drives refit deferral. */
     this.fitDurations = new Map();
     this.settleHandle = null;
@@ -108,8 +112,8 @@ class BubbleSetLayer {
   }
 
   /**
-   * Per-group handle with the old G6 plugin-instance call surface the
-   * manager expects: a `members` Map plus async update()/drawBubbleSets().
+   * Per-group handle with the call surface the manager expects: a
+   * `members` Map plus async update()/drawBubbleSets().
    *
    * @param {string} group  bubble group key (e.g. "groupOne")
    */
@@ -127,6 +131,45 @@ class BubbleSetLayer {
         layer.scheduleRedraw();
       },
     };
+  }
+
+  // ----------------------------------------------------------- label drag
+
+  /**
+   * The group whose painted label covers viewport point (x, y), topmost
+   * first, or null.
+   */
+  labelAt(x, y) {
+    for (const [group, box] of [...this.labelBoxes].reverse()) {
+      const dx = x - box.cx;
+      const dy = y - box.cy;
+      const cos = Math.cos(-box.angle);
+      const sin = Math.sin(-box.angle);
+      if (Math.abs(dx * cos - dy * sin) <= box.hw && Math.abs(dx * sin + dy * cos) <= box.hh) {
+        return group;
+      }
+    }
+    return null;
+  }
+
+  /** The label shift a viewport drag of (dx, dy) px amounts to, in graph units. */
+  viewportDeltaToShift(dx, dy) {
+    const view = viewportTransform(this.adapter.sigma);
+    if (!view) return { x: 0, y: 0 };
+    // The shift is y-down (app space); sigma graph space is y-up.
+    return { x: dx / view.sx, y: -dy / view.sy };
+  }
+
+  /** Move a group's label on screen only; the caller persists it at the end. */
+  previewLabelShift(group, shift) {
+    this.#updateGroup(group, { labelShiftX: shift.x, labelShiftY: shift.y });
+  }
+
+  /** The label shift the layer currently paints for `group`. */
+  labelShift(group) {
+    const opts = this.groups.get(group)?.opts ?? {};
+    const finite = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+    return { x: finite(opts.labelShiftX), y: finite(opts.labelShiftY) };
   }
 
   /**
@@ -245,6 +288,9 @@ class BubbleSetLayer {
       state.avoidKey = idsKey(state.avoidMembers);
     }
     state.opts = { ...state.opts, ...style };
+    // Paint-only style (colours, label) leaves the fitted outline as it is,
+    // so nothing else would invalidate the paint skip in #paint.
+    if (Object.keys(style).length > 0) this.lastPaintSignature = null;
     this.scheduleRedraw();
   }
 
@@ -255,8 +301,6 @@ class BubbleSetLayer {
     const sigma = this.adapter.sigma;
     const { width, height } = sigma.getDimensions();
     const dpr = sigma.pixelRatio ?? window.devicePixelRatio ?? 1;
-    const camera = sigma.getCamera().getState();
-
     // Outlines are fitted in GRAPH space (zoom-invariant), so the camera never
     // forces a re-fit — #syncGroupOutline only re-fits when a group's identity
     // (members, positions, style) changes. Any camera move just reprojects the
@@ -289,8 +333,7 @@ class BubbleSetLayer {
     // Skip repainting when neither the outlines nor the view changed (sigma
     // re-renders on hover etc. without clearing custom layers).
     const signature =
-      `${width}x${height}x${dpr}|${camera.x},${camera.y},${camera.ratio},${camera.angle}` +
-      `|${shown.map(([g]) => g).join(',')}`;
+      `${width}x${height}x${dpr}|${viewKey(sigma)}|${shown.map(([g]) => g).join(',')}`;
     if (!outlinesChanged && signature === this.lastPaintSignature) return;
     this.lastPaintSignature = signature;
 
@@ -329,6 +372,7 @@ class BubbleSetLayer {
       this.ctx.restore();
     }
 
+    this.labelBoxes.clear();
     for (const [group, state] of active) {
       if (!state.opts.label) continue;
       const cached = this.outlines.get(group);
@@ -341,7 +385,9 @@ class BubbleSetLayer {
         cached.anchorPlacement = placement;
       }
       if (cached.anchor) {
-        this.#drawLabel(this.labelCtx, projectAnchor(cached.anchor, view), state.opts, defaults);
+        const anchor = projectAnchor(shiftedLabelAnchor(cached.anchor, state.opts), view);
+        const label = this.#drawLabel(this.labelCtx, anchor, state.opts, defaults);
+        if (label) this.labelBoxes.set(group, labelBox(label));
       }
     }
   }
@@ -372,8 +418,13 @@ class BubbleSetLayer {
         ({ outer: graphPoints, holes: graphHoles } = this.#fitGraphOutline(state, visibleMembers));
       }
       if (!graphPoints || graphPoints.length < 2) continue;
+      const placement = state.opts.labelPlacement ?? DEFAULTS.BUBBLE_GROUP_STYLE_TEMPLATE.labelPlacement;
+      const graphAnchor = shiftedLabelAnchor(outlineLabelAnchor(graphPoints, placement), state.opts);
+      const view = viewportTransform(sigma);
       out.push({
         group,
+        // Same anchor the screen paints, dragged position included.
+        labelAnchor: graphAnchor && view ? projectAnchor(graphAnchor, view) : null,
         points: graphPoints.map((p) => sigma.graphToViewport(p)),
         holes: graphHoles.map((h) => h.map((p) => sigma.graphToViewport(p))),
         opts: state.opts,
@@ -386,9 +437,9 @@ class BubbleSetLayer {
   /**
    * Paint the groups' bodies/outlines onto an export context at `scale`
    * device px per CSS px. Geometry is in CSS px (same numbers the screen
-   * uses), so the transform re-renders it crisp at the export resolution —
-   * this replaces the old bitmap stretch of the on-screen canvas, which
-   * blurred hulls at 2×+ exports.
+   * uses), so the transform re-renders it crisp at the export resolution;
+   * stretching the on-screen canvas bitmap instead would blur hulls at 2×+
+   * exports.
    *
    * @param {CanvasRenderingContext2D} ctx
    * @param {ReturnType<BubbleSetLayer["exportOutlines"]>} groups
@@ -418,10 +469,10 @@ class BubbleSetLayer {
     ctx.save();
     try {
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      for (const { points, opts, defaults } of groups) {
+      for (const { points, labelAnchor, opts, defaults } of groups) {
         if (!opts.label) continue;
         const placement = opts.labelPlacement ?? defaults.labelPlacement ?? 'bottom';
-        this.#drawLabel(ctx, outlineLabelAnchor(points, placement), opts, defaults);
+        this.#drawLabel(ctx, labelAnchor ?? outlineLabelAnchor(points, placement), opts, defaults);
       }
     } finally {
       ctx.restore();
@@ -469,7 +520,7 @@ class BubbleSetLayer {
     // identity (what is in the group and how it is styled) always re-fits;
     // position may be deferred while the graph is in motion.
     const identityKey =
-      `${state.membersKey}|${state.avoidKey}|${visibleMembers.length}|${styleKey(state.opts)}`;
+      `${state.membersKey}|${state.avoidKey}|${visibleMembers.length}|${geometryKey(state.opts)}`;
     const positionKey =
       `${positionsChecksum(memberPositions)}|${positionsChecksum(avoidPositions)}`;
     const key = `${identityKey}|${positionKey}`;
@@ -648,10 +699,10 @@ class BubbleSetLayer {
   }
 
   /**
-   * Group label at the outline extreme picked by labelPlacement (the old G6
-   * plugin's surface): labelCloseToPath: false pushes it off the path along
-   * the outward normal; labelAutoRotate aligns on-path labels with the
-   * outline tangent. labelOffsetX/Y stay additive in screen space.
+   * Group label at the outline extreme picked by labelPlacement (option names
+   * follow G6's bubble-sets plugin): labelCloseToPath: false pushes it off the
+   * path along the outward normal; labelAutoRotate aligns on-path labels with
+   * the outline tangent. labelOffsetX/Y stay additive in screen space.
    */
   #drawLabel(ctx, anchor, opts, defaults) {
     // Geometry from resolveBubbleLabel (bubble_geometry.js), so this and the SVG
@@ -662,7 +713,7 @@ class BubbleSetLayer {
       ctx.font = font;
       return ctx.measureText(text).width;
     });
-    if (!label) return;
+    if (!label) return null;
 
     ctx.font = label.font;
     ctx.textAlign = 'center';
@@ -682,7 +733,19 @@ class BubbleSetLayer {
     ctx.fillStyle = label.fill;
     ctx.fillText(label.text, label.lx, label.ly);
     if (label.rotated) ctx.restore();
+    return label;
   }
+}
+
+/** The grab box of a painted label: its text plus padding, turned with it. */
+function labelBox(label) {
+  return {
+    cx: label.x,
+    cy: label.y,
+    angle: label.rotated ? label.angle : 0,
+    hw: label.width / 2 + label.padding,
+    hh: label.fontSize / 2 + label.padding,
+  };
 }
 
 /**

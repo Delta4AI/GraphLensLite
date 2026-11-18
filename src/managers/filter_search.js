@@ -52,10 +52,15 @@ function noMatchNote(container) {
   return note;
 }
 
-/** Safe in DOMs without the filter markup (unit tests): does nothing. */
-export function initFilterSearch() {
+/**
+ * Safe in DOMs without the filter markup (unit tests): does nothing.
+ * @param {() => void} [afterSearch] runs once the rows are shown or hidden
+ */
+export function initFilterSearch(afterSearch) {
   const container = document.getElementById('filterContainer');
   container?.addEventListener('input', (event) => {
-    if (event.target.id === 'filterSearch') applyFilterSearch(container);
+    if (event.target.id !== 'filterSearch') return;
+    applyFilterSearch(container);
+    afterSearch?.();
   });
 }

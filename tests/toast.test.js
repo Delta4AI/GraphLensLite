@@ -40,6 +40,52 @@ describe("UIManager toasts", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  // The top layer outranks every z-index, so a toast fired while a modal
+  // popup is open would sit under its backdrop unless the stack is re-shown
+  // (moved to the top of the top layer) — but only then: hiding a live region
+  // for nothing would risk a screen reader missing the message.
+  it("raises the toast stack above a modal opened after it, and only then", () => {
+    const host = document.getElementById("toasts");
+    let open = false;
+    host.showPopover = vi.fn(() => { open = true; });
+    host.hidePopover = vi.fn(() => { open = false; });
+    host.matches = (sel) => (sel === ":popover-open" ? open : false);
+    let modalOpen = false;
+    const realQuery = document.querySelector.bind(document);
+    vi.spyOn(document, "querySelector").mockImplementation((sel) =>
+      sel === "dialog:modal" ? (modalOpen ? {} : null) : realQuery(sel));
+
+    ui.success("first");
+    ui.success("second");
+    expect(host.showPopover).toHaveBeenCalledOnce();
+    expect(host.hidePopover).not.toHaveBeenCalled();
+
+    modalOpen = true;
+    ui.success("third");
+    expect(host.hidePopover).toHaveBeenCalledOnce();
+    expect(host.showPopover).toHaveBeenCalledTimes(2);
+  });
+
+  // Everything outside an open modal is inert, so the stack's live region goes
+  // unread there: the message has to be spoken from inside the dialog.
+  it("speaks a toast from inside an open modal, as an alert for errors", () => {
+    const modal = document.createElement("dialog");
+    document.body.appendChild(modal);
+    const realQueryAll = document.querySelectorAll.bind(document);
+    vi.spyOn(document, "querySelectorAll").mockImplementation((sel) =>
+      sel === "dialog:modal" ? [modal] : realQueryAll(sel));
+
+    ui.error("Please enter at least one gene");
+    vi.advanceTimersByTime(0);
+
+    const spoken = modal.querySelector(".visually-hidden");
+    expect(spoken.getAttribute("role")).toBe("alert");
+    expect(spoken.textContent).toBe("Please enter at least one gene");
+    vi.advanceTimersByTime(10_000);
+    expect(modal.querySelector(".visually-hidden")).toBeNull();
   });
 
   it("shows the message as a toast AND keeps it in the log", () => {

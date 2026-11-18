@@ -58,6 +58,22 @@ describe('History', () => {
     history.reset();
   });
 
+  it('knows when there is work a closed window would lose', async () => {
+    expect(history.unsaved).toBe(false);
+    layoutOf(cache).filters.get('p1').active = false;
+    history.commit('Filter change');
+    expect(history.unsaved).toBe(true);
+
+    history.markSaved(); // the JSON save
+    expect(history.unsaved).toBe(false);
+
+    await history.undo(); // the state now differs from the saved file
+    expect(history.unsaved).toBe(true);
+
+    history.reset({ origin: 'forget' }); // graph torn down: nothing left to lose
+    expect(history.unsaved).toBe(false);
+  });
+
   it('records what changed since the last commit under one label', () => {
     layoutOf(cache).filters.get('p1').active = false;
     history.commit('Filter change');
@@ -267,5 +283,52 @@ describe('History', () => {
     layoutOf(cache).layoutType = 'circular';
     history.commit('Re-layout (circular)');
     expect(history.canUndo).toBe(true);
+  });
+});
+
+describe('History origins ("Reset to as loaded")', () => {
+  let cache;
+  let history;
+
+  beforeEach(() => {
+    cache = makeCache();
+    history = new History(cache);
+    cache.history = history;
+    history.reset({ origin: 'mark' });
+  });
+
+  it('keeps the first settled state, not a later one', async () => {
+    layoutOf(cache).filters.get('p1').active = false;
+    history.commit('Filter change');
+    history.reset({ origin: 'mark' }); // e.g. switching away and back
+
+    await history.resetToOrigin();
+    expect(layoutOf(cache).filters.get('p1').active).toBe(true);
+  });
+
+  it('restores the origin as one undoable step, including uncommitted edits', async () => {
+    layoutOf(cache).filters.get('p1').active = false;
+    history.commit('Filter change');
+    layoutOf(cache).positions.get('n1').style.x = 99; // never committed
+
+    expect(await history.resetToOrigin()).toBe(true);
+    expect(layoutOf(cache).filters.get('p1').active).toBe(true);
+    expect(layoutOf(cache).positions.get('n1').style.x).toBe(1);
+    expect(history.undoLabel).toBe('Reset workspace');
+
+    await history.undo();
+    expect(layoutOf(cache).positions.get('n1').style.x).toBe(99);
+    expect(layoutOf(cache).filters.get('p1').active).toBe(false);
+  });
+
+  it('follows a rename, and has nothing once the data changed', async () => {
+    cache.data.layouts.Renamed = cache.data.layouts.Default;
+    delete cache.data.layouts.Default;
+    cache.data.selectedLayout = 'Renamed';
+    history.renameOrigin('Default', 'Renamed');
+    expect(history.hasOrigin('Renamed')).toBe(true);
+
+    history.reset({ origin: 'forget' });
+    expect(await history.resetToOrigin()).toBe(false);
   });
 });

@@ -3,12 +3,11 @@
 // for the status log.
 //
 // Payload sizing is the caller's responsibility: pass `maxStatusLogLines`
-// into buildContextSnapshot and `maxChars` into serializeSnapshot. The hard
-// ceilings that used to live here (MAX_CONTEXT_NODES, MAX_SNAPSHOT_CHARS,
-// SELECTION_DETAILS_BUDGET_CHARS) have moved into user-configurable settings
-// or been removed entirely — the one exception is MAX_CATEGORY_VALUES_PER_PROP
-// below, which is a structural defense against a single property with
-// thousands of distinct categorical values ballooning the hierarchy dump.
+// into buildContextSnapshot and `maxChars` into serializeSnapshot; the limits
+// are user-configurable settings. The one hard ceiling here is
+// MAX_CATEGORY_VALUES_PER_PROP below, a structural defense against a single
+// property with thousands of distinct categorical values ballooning the
+// hierarchy dump.
 
 // Category cap per property — a single categorical field with thousands of
 // distinct values would blow the snapshot budget. 50 is enough to anchor the
@@ -164,7 +163,7 @@ export function buildContextSnapshot(cache, {
     decorateSelectionWithProperties(selectedNodeSample, cache.nodeRef)
     decorateSelectionWithProperties(selectedEdgeSample, cache.edgeRef)
     // Attach pre-computed metric values (centrality etc.) where available —
-    // node-only in GLL. The model now sees concrete scores instead of just
+    // node-only in GLL. The model sees concrete scores instead of just
     // knowing "centrality exists".
     decorateSelectionWithMetrics(selectedNodeSample, cache.metrics?.metricValueCache)
   }
@@ -235,7 +234,7 @@ export function buildContextSnapshot(cache, {
 }
 
 // Serializes the snapshot to JSON. No trimming or truncation — the
-// over-budget modal in AssistantManager is now the single policy layer for
+// over-budget modal in AssistantManager is the single policy layer for
 // "this payload is too big". Callers that want a shrunken payload rebuild
 // the snapshot with `minimalSelection: true`.
 export function serializeSnapshot(snapshot) {

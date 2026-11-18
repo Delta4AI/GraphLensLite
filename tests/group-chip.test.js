@@ -32,6 +32,8 @@ function makeCache(groups = { g1: '#403C53', g2: '#C33D35' }) {
     },
     gcm: { decideToRenderOrDraw: vi.fn(async () => {}) },
     ui: { info: vi.fn(), error: vi.fn() },
+    EVENT_LOCKS: { FILTERS_LOCKED_BY_MANUAL_QUERY: false },
+    propIDToInvertibleRangeSliders: new Map(),
   };
   cache.uiComponents = new UIComponentManager(cache);
   return cache;
@@ -46,11 +48,12 @@ beforeEach(() => {
 });
 
 describe('group chip appearance', () => {
-  it('is a hairline outline, naming the property, when unassigned', () => {
+  it('is hidden, still naming the property, when unassigned', () => {
     const cache = makeCache();
     const chip = cache.uiComponents.createGroupChip(PROP);
 
     expect(chip.classList.contains('assigned')).toBe(false);
+    expect(chip.hidden).toBe(true);
     expect(chip.classList.contains('multi')).toBe(false);
     expect(chip.getAttribute('aria-label'))
       .toBe('Assign nodes matching Node › Topology › degree to a group');
@@ -62,6 +65,7 @@ describe('group chip appearance', () => {
     const chip = cache.uiComponents.createGroupChip(PROP);
 
     expect(chip.classList.contains('assigned')).toBe(true);
+    expect(chip.hidden).toBe(false);
     expect(chip.classList.contains('multi')).toBe(false);
     expect(chip.style.getPropertyValue('--chip-color')).toBe('#403C53');
     // The stroke too: the chip is a miniature of the bubble, not half of it.
@@ -85,6 +89,7 @@ describe('group chip appearance', () => {
     cache.uiComponents.paintGroupChip(chip);
 
     expect(chip.classList.contains('assigned')).toBe(false);
+    expect(chip.hidden).toBe(true);
     expect(chip.style.getPropertyValue('--chip-color')).toBe('');
     expect(chip.style.getPropertyValue('--chip-border')).toBe('');
   });
@@ -169,5 +174,20 @@ describe('group chip menu', () => {
       name: 'Topology › degree',
       fromProp: PROP,
     });
+  });
+
+  it('opens from the row ⋯ menu, under ⋯, while the dot is hidden', () => {
+    const cache = makeCache();
+    const cells = cache.uiComponents.createRowActions(PROP, 'degree', { groupable: true });
+    document.body.append(...cells);
+    const more = cells.at(-1);
+
+    more.click();
+    [...document.querySelectorAll('.rail-menu.open .rail-menu-item')]
+      .find((el) => el.textContent.includes('Add to group…'))
+      .click();
+
+    expect(rows()).toEqual(['Kinases', 'Hubs', 'New group from this filter']);
+    expect(more.getAttribute('aria-expanded')).toBe('true');
   });
 });

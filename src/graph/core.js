@@ -3,6 +3,8 @@ import { replaceColorScale } from '../utilities/color_scale_picker.js';
 import { replaceNumericScale } from '../utilities/numeric_scale_picker.js';
 import { initTheme, nodeLabelColorForTheme } from '../utilities/theme.js';
 import { buildGraphologyGraph, makeNodeReducer, makeEdgeReducer } from './graph_model.js';
+import { applyBadgeCommand } from './badges.js';
+import { visibilityRule, edgeShown, propertylessShown } from './visibility_rule.js';
 // NOTE: sigma_adapter.js is imported lazily in createGraphInstance(), never
 // statically: the sigma vendor bundle probes WebGL at module scope
 // (@sigma/node-image reads MAX_TEXTURE_SIZE from a throwaway context), so a
@@ -28,6 +30,8 @@ class GraphCoreManager {
     this.cache = cache;
     // In-flight createGraphInstance() memo — see the re-entrancy note there.
     this.graphInitPromise = null;
+    // The graph instance whose first render reset the undo history.
+    this.settledGraph = null;
   }
 
   *traverseD4Data(nodeOrEdge) {
@@ -154,7 +158,7 @@ class GraphCoreManager {
           labelColor: { color: nodeLabelColorForTheme(theme) },
           // Same for edge labels: label_renderers falls back here whenever
           // the per-edge labelColor is the baked #000000 default (in light
-          // mode this resolves to #000 — identical to the old baked render).
+          // mode this resolves to #000).
           edgeLabelColor: { color: nodeLabelColorForTheme(theme) },
         },
       });
@@ -193,11 +197,15 @@ class GraphCoreManager {
   /**
    * One-time post-first-render routine (hotkeys, global listeners, plugin
    * stubs, initial filter pass, initial layout persistence). Called
-   * sequentially by SigmaAdapter.render() — formerly G6's AFTER_RENDER event.
+   * sequentially by SigmaAdapter.render().
    */
   async initialAfterRenderEvent() {
     if (this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_RUNNING) return;
 
+    // The overlay is the "ready" signal: the render() below would clear it
+    // before persisting, hide-disconnected and the undo baseline, and an edit
+    // in that gap became part of the baseline (not undoable).
+    this.cache.ui.holdLoading();
     try {
       this.cache.ui.debug('ONCE AFTER RENDER');
       await this.cache.ui.showLoading('Post-processing', 'Post-processing ..');
@@ -245,14 +253,22 @@ class GraphCoreManager {
 
       await this.applyHideDisconnectedState();
 
-      // The graph is now settled: this is the state undo winds back to.
-      this.cache.history?.reset();
+      // A new graph is now settled: this is the state undo winds back to, and
+      // the one "Reset to as loaded" restores. Re-layout and Reset style re-run
+      // this pipeline on the same graph and commit their own undo step after
+      // it, so resetting for them would wipe the stack they are about to join.
+      if (this.settledGraph !== this.cache.graph) {
+        this.settledGraph = this.cache.graph;
+        this.cache.history?.reset({ origin: 'mark' });
+        this.cache.history?.markSaved(); // as loaded = nothing to lose yet
+      }
     } catch (errorMsg) {
       this.cache.ui.error(`Error in initial AFTER_RENDER: ${errorMsg}`);
       this.cache.ui.error('Graph setup failed. Please check your input data.');
-      await this.cache.ui.hideLoading();
     } finally {
       this.cache.EVENT_LOCKS.ONCE_AFTER_RENDER_RUNNING = false;
+      this.cache.ui.releaseLoading();
+      await this.cache.ui.hideLoading();
     }
   }
 
@@ -430,8 +446,7 @@ class GraphCoreManager {
   }
 
   // Centre and scale the viewport so the given set of nodes fills it with
-  // padding. Direct camera fit — the old G6 zoom-at-non-1 translate
-  // workaround (antvis/G6#6373) is gone with the sigma renderer.
+  // padding, by setting the sigma camera directly.
   async fitViewToNodes(nodeIDs) {
     const ids = [...nodeIDs];
     if (ids.length === 0) {
@@ -462,7 +477,12 @@ class GraphCoreManager {
     this.cache.graph.fitViewToBounds({ minX, minY, maxX, maxY });
   }
 
-  async updateEdges(overrides = {}, commands = []) {
+  /**
+   * @param {string[]} [options.ids]  edges to update instead of the selection
+   *   (the appearance editor's per-colour recolour); defaults to the selection
+   */
+  async updateEdges(overrides = {}, commands = [], { ids } = {}) {
+    const targets = ids ?? this.cache.selectedEdges;
     let colorMap = null;
     if (commands.includes('set_continuous_color_scale')) {
       colorMap = await this.cache.picker.pickColors('edges');
@@ -482,7 +502,7 @@ class GraphCoreManager {
       }
     }
 
-    for (const edgeID of this.cache.selectedEdges) {
+    for (const edgeID of targets) {
       const edge = this.cache.edgeRef.get(edgeID);
 
       for (const command of commands) {
@@ -516,10 +536,20 @@ class GraphCoreManager {
     }
 
     await this.cache.style.handleStyleChangeLoadingEvent('Style', 'Updating Edge Styles');
-    if (this.cache.selectedEdges.length) this.cache.history?.commit('Edge style change');
+    if (targets.length) this.cache.history?.commit('Edge style change');
   }
 
-  async updateNodes(overrides = {}, commands = []) {
+  /**
+   * @param {object} overrides  style overrides merged into every selected node
+   * @param {string[]} commands
+   * @param {object} [options]
+   * @param {object} [options.badge]  for 'badge_set': {placement, color, text}
+   *   or {placement, color, property} to take each node's text from a column;
+   *   for 'badge_remove': {placement}
+   * @param {string[]} [options.ids]  nodes to update instead of the selection
+   */
+  async updateNodes(overrides = {}, commands = [], { badge, ids } = {}) {
+    const targets = ids ?? this.cache.selectedNodes;
     let colorMap = null;
     if (commands.includes('set_continuous_color_scale')) {
       colorMap = await this.cache.picker.pickColors('nodes');
@@ -548,15 +578,9 @@ class GraphCoreManager {
       }
     }
 
-    const badgesToAdd = overrides.style?.badges;
-    const badgePaletteToAdd = overrides.style?.badgePalette;
+    let nodesWithoutBadgeValue = 0;
 
-    if (commands.includes('badge_add')) {
-      delete overrides.style?.badges;
-      delete overrides.style?.badgePalette;
-    }
-
-    for (const nodeID of this.cache.selectedNodes) {
+    for (const nodeID of targets) {
       const node = this.cache.nodeRef.get(nodeID);
 
       for (const command of commands) {
@@ -565,24 +589,15 @@ class GraphCoreManager {
           node.style.badges = [];
           node.style.badgePalette = [];
         }
-        if (command === 'badge_add') {
-          node.style.badge = true;
-          node.style.badges = node.style.badges || [];
-          node.style.badgePalette = node.style.badgePalette || [];
-
-          if (badgesToAdd) {
-            node.style.badges = [
-              ...node.style.badges,
-              ...(Array.isArray(badgesToAdd) ? badgesToAdd : [badgesToAdd]),
-            ];
-          }
-
-          if (badgePaletteToAdd) {
-            node.style.badgePalette = [
-              ...node.style.badgePalette,
-              ...(Array.isArray(badgePaletteToAdd) ? badgePaletteToAdd : [badgePaletteToAdd]),
-            ];
-          }
+        if (command === 'badge_set' || command === 'badge_remove') {
+          const { missingValue, ...fields } = applyBadgeCommand(
+            node.style,
+            command,
+            badge,
+            node.featureValues
+          );
+          Object.assign(node.style, fields);
+          if (missingValue) nodesWithoutBadgeValue += 1;
         }
 
         if (command === 'label_set_to_id') {
@@ -629,7 +644,13 @@ class GraphCoreManager {
     }
 
     await this.cache.style.handleStyleChangeLoadingEvent('Style', `Updating Node Styles`);
-    if (this.cache.selectedNodes.length) this.cache.history?.commit('Node style change');
+    if (targets.length) this.cache.history?.commit('Node style change');
+    if (nodesWithoutBadgeValue > 0) {
+      this.cache.ui.info(
+        `${nodesWithoutBadgeValue} of ${targets.length} selected nodes have no ` +
+          `value for that column, so they got no badge there.`
+      );
+    }
   }
 
   getTargetNodes(propID) {
@@ -672,51 +693,65 @@ class GraphCoreManager {
 
     this.cache.bubbleSetChanged = false;
     this.cache.qm.decodeQueryAndBuildAST();
+    this.cache.qm.markApplied?.();
+
+    const rule = visibilityRule(
+      this.cache.data.layouts[this.cache.data.selectedLayout],
+      this.cache.CFG.EXCEL_EDGE_HEADER
+    );
+    const ast = this.cache.query.ast;
+    // A filter-built OR of no rows adds nothing. The AST alone reads that
+    // empty query as "no constraint" and would match everything.
+    const testNode = (node) => !rule.nothingTicked && ast.testNode(node);
+    const testEdge = (edge) => !rule.nothingTicked && ast.testEdge(edge);
+    const recordMatches = (element, byProp) => {
+      element.featureIsWithinThreshold.forEach((v, k) => {
+        if (v !== true) return;
+        if (!byProp.has(k)) byProp.set(k, new Set());
+        byProp.get(k).add(element.id);
+      });
+    };
 
     for (const node of this.cache.nodeRef.values()) {
-      // Nodes with no features are always visible (nothing to filter on)
       if (node.features.size === 0) {
-        this.cache.nodeIDsToBeShown.add(node.id);
+        if (propertylessShown(rule, { isEdge: false })) this.cache.nodeIDsToBeShown.add(node.id);
         continue;
       }
-      if (this.cache.query.ast.testNode(node)) {
+      if (testNode(node)) {
         this.cache.nodeIDsToBeShown.add(node.id);
-        node.featureIsWithinThreshold.forEach((v, k) => {
-          if (v === true) {
-            if (!this.cache.propIDsToNodeIDsToBeShown.has(k)) {
-              this.cache.propIDsToNodeIDsToBeShown.set(k, new Set());
-            }
-            this.cache.propIDsToNodeIDsToBeShown.get(k).add(node.id);
-          }
-        });
+        recordMatches(node, this.cache.propIDsToNodeIDsToBeShown);
+      }
+    }
+
+    // Build-up with "only ticked" links: a matching edge brings its end nodes,
+    // so they have to be in before any edge asks whether its ends are shown.
+    const linksPickedByRows = rule.buildUp && rule.links === 'ticked';
+    const matchedEdges = new Set();
+    if (linksPickedByRows) {
+      for (const edge of this.cache.edgeRef.values()) {
+        if (edge.features.size === 0 || !testEdge(edge)) continue;
+        matchedEdges.add(edge.id);
+        this.cache.nodeIDsToBeShown.add(edge.source);
+        this.cache.nodeIDsToBeShown.add(edge.target);
       }
     }
 
     for (const edge of this.cache.edgeRef.values()) {
-      const endsOk =
+      const endsShown =
         this.cache.nodeIDsToBeShown.has(edge.source) &&
         this.cache.nodeIDsToBeShown.has(edge.target);
 
-      // Edges with no features are always visible (nothing to filter on),
-      // but still require both endpoints to be visible
       if (edge.features.size === 0) {
-        if (endsOk) {
+        if (propertylessShown(rule, { isEdge: true, endsShown })) {
           this.cache.edgeIDsToBeShown.add(edge.id);
         }
         continue;
       }
 
-      if (endsOk && this.cache.query.ast.testEdge(edge)) {
-        this.cache.edgeIDsToBeShown.add(edge.id);
-        edge.featureIsWithinThreshold.forEach((v, k) => {
-          if (v === true) {
-            if (!this.cache.propIDsToEdgeIDsToBeShown.has(k)) {
-              this.cache.propIDsToEdgeIDsToBeShown.set(k, new Set());
-            }
-            this.cache.propIDsToEdgeIDsToBeShown.get(k).add(edge.id);
-          }
-        });
-      }
+      const matches = linksPickedByRows ? matchedEdges.has(edge.id) : endsShown && testEdge(edge);
+      if (!edgeShown(rule, { matches, endsShown })) continue;
+      this.cache.edgeIDsToBeShown.add(edge.id);
+      if (matches) recordMatches(edge, this.cache.propIDsToEdgeIDsToBeShown);
     }
 
     // Re-evaluate disconnected elements against the freshly filtered view.
@@ -768,6 +803,7 @@ class GraphCoreManager {
     this.cache.ui?.closeAnchoredPopovers?.();
     await this.cache.graph?.destroy();
     this.cache.graph = null;
+    this.cache.ui?.syncModeHint?.(); // a lasso or note mode ends with its graph
     // Drop renderer-cycle state with the instance: the graphology model is
     // rebuilt by createGraphInstance, plugin stubs are re-registered there.
     this.cache.graphData = null;
@@ -778,7 +814,7 @@ class GraphCoreManager {
 
     this.cache.ui?.clearLog?.();
     // The snapshots describe a graph that no longer exists.
-    this.cache.history?.reset();
+    this.cache.history?.reset({ origin: 'forget' });
   }
 
   registerHotkeyEvents() {
@@ -797,7 +833,10 @@ class GraphCoreManager {
         activeElement.tagName === 'INPUT' ||
         activeElement.tagName === 'TEXTAREA' ||
         activeElement.tagName === 'SELECT' ||
-        activeElement.isContentEditable
+        activeElement.isContentEditable ||
+        // A grid's letters start an edit, and its read-only cells must not
+        // fire app shortcuts either (WCAG 2.1.4); Ctrl+Z there is not graph undo.
+        activeElement.closest?.('[role="grid"]')
       ) {
         return;
       }

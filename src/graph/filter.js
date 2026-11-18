@@ -1,31 +1,43 @@
+import { StaticUtilities } from '../utilities/static.js';
+
 class GraphFilterManager {
   constructor(cache) {
     this.cache = cache;
   }
 
   async resetFilters(section, subSection = undefined) {
-    const idPrefix = section + (subSection ? `::${subSection}` : "");
+    const idPrefix = StaticUtilities.propIDPrefix(section, subSection);
     const affectedPropIDs = Array.from(this.cache.propIDs).filter((id) =>
       id.startsWith(idPrefix),
     );
-
-    for (const propID of affectedPropIDs) {
-      this.cache.ui.checkCheckbox(propID, true);
-      const slider = this.cache.propIDToInvertibleRangeSliders.get(propID);
-      const dropdown = this.cache.propIDToDropdownChecklists.get(propID);
-      const boolToggle = this.cache.propIDToBooleanToggles.get(propID);
-
-      if (slider) await slider.reset();
-      if (dropdown) await dropdown.selectAllCategories(true);
-      // A narrowed True/False segment constrains the graph under AND exactly
-      // like a narrowed slider, so it has to widen back to Any here too.
-      if (boolToggle) boolToggle.resetToAny();
-    }
-
+    for (const propID of affectedPropIDs) await this.#resetOne(propID);
     await this.handleFilterEvent(
       "Filtering",
-      `Resetting filters for ${idPrefix} ..`,
+      `Resetting filters for ${[section, subSection].filter(Boolean).join(" › ")} ..`,
     );
+  }
+
+  /** One row back to its loaded default, ticked. */
+  async resetFilter(propID) {
+    await this.#resetOne(propID);
+    await this.handleFilterEvent("Filtering", `Resetting filter ${propID} ..`);
+  }
+
+  async #resetOne(propID) {
+    this.cache.ui.checkCheckbox(propID, true);
+    const slider = this.cache.propIDToInvertibleRangeSliders.get(propID);
+    const dropdown = this.cache.propIDToDropdownChecklists.get(propID);
+    const boolToggle = this.cache.propIDToBooleanToggles.get(propID);
+
+    if (slider) await slider.reset();
+    if (dropdown) await dropdown.selectAllCategories(true);
+    // A narrowed True/False segment constrains the graph under AND exactly
+    // like a narrowed slider, so it has to widen back to Any here too.
+    if (boolToggle) boolToggle.resetToAny();
+    // The ∅ switch back to the mode's default, or a reset row would still
+    // remove (or add) the elements without a value. Its button goes too.
+    const filter = this.cache.data.layouts[this.cache.data.selectedLayout].filters.get(propID);
+    if (filter) this.cache.ui.clearMissingChoice(filter);
   }
 
   async handleFilterEvent(
@@ -137,7 +149,7 @@ class GraphFilterManager {
 
     this.cache.visibleElementsChanged = false;
     // Current visibility comes from the graphology `hidden` attrs, surfaced
-    // as style.visibility by the renderer facade (sigma migration, Phase 1).
+    // as style.visibility by the renderer facade (SigmaAdapter).
     const { nodes, edges } = await this.cache.graph.getData();
     const visible = new Set();
     const hidden = new Set();

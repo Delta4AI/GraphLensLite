@@ -23,7 +23,7 @@
 import { hotkeyLabel } from './command_palette.js';
 
 // A layout carries a per-element style map, so a snapshot grows with the graph.
-// ponytail: depth is capped crudely by node count; make it size-aware only if
+// shortcut: depth is capped crudely by node count; make it size-aware only if
 // a real workspace shows memory pressure.
 const MAX_DEPTH = 20;
 const MAX_DEPTH_LARGE = 5;
@@ -107,12 +107,21 @@ function snapshot(cache, signature = undefined) {
 }
 
 class History {
+  // Changes recorded since the graph loaded, and how many of them the last
+  // save covered: they differ while there is work a closed window would lose.
+  #edits = 0;
+  #savedAt = 0;
+
   constructor(cache) {
     this.cache = cache;
     this.past = [];
     this.future = [];
     this.baseline = null;
     this.restoring = false;
+    // Workspace name → the snapshot taken when that workspace first settled
+    // after the graph was built: what "Reset to as loaded" goes back to. Kept
+    // apart from cache.data, which the JSON export saves wholesale.
+    this.origins = new Map();
   }
 
   get canUndo() {
@@ -121,6 +130,20 @@ class History {
 
   get canRedo() {
     return this.future.length > 0;
+  }
+
+  /** True while something changed since the graph was loaded or last saved. */
+  get unsaved() {
+    return this.#edits !== this.#savedAt;
+  }
+
+  /** What closing the window would lose: unsaved changes or staged data editor edits. */
+  get unsavedWork() {
+    return this.unsaved || (this.cache.dataTable?.stagedCount ?? 0) > 0;
+  }
+
+  markSaved() {
+    this.#savedAt = this.#edits;
   }
 
   /** The action ↶ would take back, for the button's tooltip. */
@@ -135,8 +158,18 @@ class History {
   /**
    * Forget everything and re-baseline. Called when the graph or the workspace
    * underneath the snapshots changes, which makes all of them meaningless.
+   *
+   * `origin` says what this point means for "Reset to as loaded":
+   * - 'mark': the workspace has settled (first render of a graph, first switch
+   *   into a workspace); record it as the origin unless it already has one;
+   * - 'replace': a new workspace just finished building; this is its origin;
+   * - 'rebase': the graph itself changed and has settled (a merge): forget
+   *   every origin, this one is the new start;
+   * - 'forget': the graph is being torn down; no origin describes anything.
+   *
+   * @param {{origin?: 'mark'|'replace'|'rebase'|'forget'}} [options]
    */
-  reset() {
+  reset({ origin } = {}) {
     // The restore path re-runs the app's initial-render choreography, which
     // resets the history — obeying that would wipe the redo branch mid-undo.
     if (this.restoring) return;
@@ -144,6 +177,16 @@ class History {
     this.future = [];
     this.baseline = snapshot(this.cache);
     this.syncButtons();
+
+    // A new workspace or a merged graph is work; a teardown leaves nothing to lose.
+    if (origin === 'replace' || origin === 'rebase') this.#edits += 1;
+    if (origin === 'forget') this.markSaved();
+    if (origin === 'forget' || origin === 'rebase') this.origins.clear();
+    const current = currentLayout(this.cache);
+    if (!current || !origin || origin === 'forget') return;
+    if (origin === 'replace' || origin === 'rebase' || !this.origins.has(current.name)) {
+      this.origins.set(current.name, this.baseline);
+    }
   }
 
   /**
@@ -173,7 +216,46 @@ class History {
     while (this.past.length > this.#depth()) this.past.shift();
     this.future = [];
     this.baseline = after;
+    this.#edits += 1;
     this.syncButtons();
+  }
+
+  hasOrigin(name) {
+    return this.origins.has(name);
+  }
+
+  renameOrigin(from, to) {
+    const origin = this.origins.get(from);
+    this.origins.delete(from);
+    if (origin) this.origins.set(to, { ...origin, name: to });
+  }
+
+  dropOrigin(name) {
+    this.origins.delete(name);
+  }
+
+  /**
+   * Put the current workspace back the way it was when it first settled, as
+   * one undoable step.
+   * @returns {Promise<boolean>} false when there is no origin to go back to
+   */
+  async resetToOrigin() {
+    const current = currentLayout(this.cache);
+    const origin = current && this.origins.get(current.name);
+    if (!origin) return false;
+    // The live state, not the baseline: edits that never committed (the group
+    // panel's knobs) must come back on undo as well.
+    const before = snapshot(this.cache);
+    const done = await this.#install(origin, 'Workspace reset to how it was loaded', {
+      header: 'Resetting workspace',
+      text: current.name,
+    });
+    if (!done) return false;
+    this.past.push({ label: 'Reset workspace', before, after: this.baseline });
+    while (this.past.length > this.#depth()) this.past.shift();
+    this.future = [];
+    this.syncButtons();
+    return true;
   }
 
   async undo() {
@@ -187,6 +269,8 @@ class History {
     if (!done) {
       // The snapshot's workspace is gone — the entry is unusable, drop it.
       this.future.pop();
+    } else {
+      this.#edits += 1;
     }
     this.syncButtons();
     return done;
@@ -202,6 +286,8 @@ class History {
     });
     if (!done) {
       this.past.pop();
+    } else {
+      this.#edits += 1;
     }
     this.syncButtons();
     return done;
@@ -240,7 +326,13 @@ class History {
 
       const select = document.getElementById('selectView');
       if (select) select.value = entry.name;
-      await this.cache.lm.changeLayout(message, busy);
+      try {
+        await this.cache.lm.changeLayout(message, busy);
+      } catch (err) {
+        // The screen never switched; keep the data matching it.
+        layouts[entry.name] = live;
+        throw err;
+      }
       this.baseline = snapshot(this.cache);
     } finally {
       this.restoring = false;
@@ -258,6 +350,17 @@ function setTitle(id, verb, label, hotkey) {
 export function initHistory(cache) {
   const history = new History(cache);
   history.syncButtons();
+  // Closing the tab or reloading would lose unsaved work without a word: the
+  // browser shows its own "Leave site?" prompt. The desktop app asks from its
+  // main process instead (electron_app.js reads unsavedWork on close).
+  if (!globalThis.navigator?.userAgent?.includes('Electron')) {
+    globalThis.addEventListener?.('beforeunload', (e) => {
+      if (history.unsavedWork) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+  }
   return history;
 }
 

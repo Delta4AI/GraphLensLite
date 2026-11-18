@@ -4,8 +4,7 @@
  * The ONLY module in src/ that imports the sigma bundle (it references WebGL
  * globals at module scope and crashes under node). Wraps the Sigma instance,
  * the graphology graph, the element-states Map and a pending-layout slot
- * behind the G6-shaped facade the rest of the app still calls. Facade methods
- * are transitional and get slimmed/deleted in Phases 2-6.
+ * behind the G6-shaped facade the rest of the app calls.
  */
 import {
   Sigma,
@@ -42,7 +41,12 @@ import {
   buildLayoutTransitionTargets,
 } from './graph_model.js';
 import { executeLayout } from './layout_algorithms.js';
-import { drawNodeLabel, drawEdgeLabel, BAKED_DEFAULT_LABEL_COLOR } from './label_renderers.js';
+import {
+  drawNodeLabel,
+  drawEdgeLabel,
+  BAKED_DEFAULT_LABEL_COLOR,
+  fontStylePrefix,
+} from './label_renderers.js';
 import { InteractionManager } from './interactions.js';
 import { BubbleSetLayer } from './bubble_layer.js';
 import { HeatmapLayer } from './heatmap_layer.js';
@@ -100,6 +104,9 @@ function guardHoverDrawer(drawer, getDraggedNode) {
     drawer(context, data, {
       ...settings,
       labelColor: { attribute: 'labelColor', color: '#000' },
+      // Sigma's hover drawer reads only the renderer-wide weight; hand it this
+      // node's bold/italic so the hover label matches the drawn one.
+      labelWeight: fontStylePrefix(data.labelFontStyle, settings.labelWeight),
     });
   };
 }
@@ -251,12 +258,15 @@ function drawCurvedEdgeLabelWithSize(context, edgeData, sourceData, targetData, 
     edgeData.labelColor && edgeData.labelColor !== BAKED_DEFAULT_LABEL_COLOR
       ? edgeData.labelColor
       : null;
+  // @sigma/edge-curve writes `${edgeLabelWeight} ${size}px ${font}`, so the
+  // style prefix ("bold italic") rides in through the weight.
   const effective =
-    edgeData.labelSize != null || explicitColor != null
+    edgeData.labelSize != null || explicitColor != null || edgeData.labelFontStyle != null
       ? {
           ...settings,
           edgeLabelSize: edgeData.labelSize ?? settings.edgeLabelSize,
           edgeLabelColor: explicitColor ? { color: explicitColor } : settings.edgeLabelColor,
+          edgeLabelWeight: fontStylePrefix(edgeData.labelFontStyle, settings.edgeLabelWeight),
         }
       : settings;
   drawCurvedEdgeLabelBase(context, edgeData, sourceData, targetData, effective);
@@ -264,7 +274,7 @@ function drawCurvedEdgeLabelWithSize(context, edgeData, sourceData, targetData, 
 
 const FIT_PADDING_PX = 80;
 // Clamp fit zoom so a tiny selection (e.g. a single node) doesn't punch the
-// viewport to 100x — same UX guard as the old G6 fitViewToNodes.
+// viewport to 100x.
 const MAX_FIT_ZOOM = 4;
 
 /**
@@ -314,6 +324,11 @@ function bitmapLooksBlank(bitmap) {
   return true;
 }
 
+/** Whether a graph of `edgeCount` edges gets sigma edge events (hover/click). */
+function edgeEventsEnabled(edgeCount, cfg) {
+  return edgeCount <= cfg.MAX_EDGES_FOR_EDGE_EVENTS;
+}
+
 class SigmaAdapter {
   /**
    * @param {object} cache  app cache; cache.graphData must hold the graphology graph
@@ -344,9 +359,18 @@ class SigmaAdapter {
     // closure only runs per hover render, by which time it exists.
     const getDraggedNode = () => this.interactions?.draggedNode ?? null;
 
+    // Sigma reads enableEdgeEvents only at construction, so the cutoff is
+    // decided per graph build.
+    const edgeEvents = edgeEventsEnabled(this.graph.size, cache.CFG);
+    if (!edgeEvents) {
+      cache.ui?.info?.(
+        `Edge hover and click are off for graphs with more than ${cache.CFG.MAX_EDGES_FOR_EDGE_EVENTS.toLocaleString('en')} edges; select edges with a query or the selection panel.`
+      );
+    }
+
     this.sigma = new Sigma(this.graph, containerEl, {
       allowInvalidContainer: true,
-      enableEdgeEvents: true,
+      enableEdgeEvents: edgeEvents,
       zIndex: true,
       nodeReducer,
       edgeReducer,
@@ -367,7 +391,7 @@ class SigmaAdapter {
       ...settings,
     });
     // Sigma only auto-resizes on window resize. Sidebar/bottom-bar toggles
-    // animate the container via CSS (0.3 s), which used to blank the graph
+    // animate the container via CSS (0.3 s), which would leave the graph blank
     // until the next zoom/pan; observe the container directly instead.
     this.resizeDebounce = null;
     this.resizeObserver = new ResizeObserver(() => {
@@ -406,8 +430,7 @@ class SigmaAdapter {
    * MAX_NODES_BEFORE_HIDING_LABELS on every load). Sigma's label density
    * grid stays the default thinning mechanism; HIDE_LABELS is the explicit
    * override on top — but elements the user explicitly labelled (style
-   * pipeline emits a label attr despite HIDE_LABELS) must stay visible,
-   * matching the old G6 semantics.
+   * pipeline emits a label attr despite HIDE_LABELS) must stay visible.
    *
    * NOTE: this owns renderLabels/renderEdgeLabels — a caller-supplied value
    * in constructor `settings` is overwritten here by design (CFG.HIDE_LABELS
@@ -427,19 +450,18 @@ class SigmaAdapter {
   // ---------------------------------------------------------------- lifecycle
 
   /**
-   * G6 render = layout + draw. Runs the pending layout (if any), then the
-   * persisted-position choreography that used to live in core.js's G6
-   * `afterlayout` handler, then a full (re-indexing) refresh.
+   * render = layout + draw. Runs the pending layout (if any), then the
+   * persisted-position choreography, then a full (re-indexing) refresh.
    */
   async render() {
     if (this.killed) return false;
     if (this.pendingLayout) await this.layout();
     // Release the normalization bbox pinned by node drags (InteractionManager
-    // pins it on mousedown; only fitView used to release it). A full render
+    // pins it on mousedown). A full render
     // must re-derive normalization from the CURRENT node extent: workspace
     // templates put coordinates in very different ranges (grid [0, cols·100]
-    // vs circular [-r, r]), so a bbox frozen in one workspace rendered the
-    // next one off-screen — "switched and the graph is gone".
+    // vs circular [-r, r]), so a bbox frozen in one workspace would render the
+    // next one off-screen.
     this.sigma.setCustomBBox(null);
     await this.#applyPersistedPositions();
     this.#syncLabelVisibility();
@@ -499,8 +521,7 @@ class SigmaAdapter {
   }
 
   /**
-   * Post-refresh choreography formerly driven by G6's AFTER_DRAW/AFTER_RENDER
-   * events: sync selection caches/UI, redraw bubble sets, drop the overlay.
+   * Post-refresh choreography: sync selection caches/UI, redraw bubble sets, drop the overlay.
    */
   async #postRefresh() {
     if (this.cache.EVENT_LOCKS.AFTER_DRAW_RUNNING) return;
@@ -711,8 +732,8 @@ class SigmaAdapter {
   }
 
   /**
-   * Frame the given graph-space bounding box with padding. Replaces the old
-   * G6 zoom-at-non-1 workaround (antvis/G6#6373) with a direct camera fit.
+   * Frame the given graph-space bounding box with padding, by a direct
+   * camera fit.
    */
   fitViewToBounds({ minX, minY, maxX, maxY }) {
     const camera = this.sigma.getCamera();
@@ -797,7 +818,7 @@ class SigmaAdapter {
     return [width, height];
   }
 
-  /** Graph-space → viewport pixels (G6 name kept transitionally). */
+  /** Graph-space → viewport pixels (G6-style method name). */
   getViewportByCanvas([x, y]) {
     const point = this.sigma.graphToViewport({ x, y });
     return [point.x, point.y];
@@ -865,10 +886,10 @@ class SigmaAdapter {
           { duration: LAYOUT_TRANSITION_MS, easing: 'cubicInOut' },
           resolve
         );
-        // animateNodes never calls back on cancel, so resolve explicitly — a
-        // cancelled switch (rapid re-switch, destroy) used to strand its
-        // caller awaiting forever (changeLayout skipped history.reset and its
-        // finally block).
+        // animateNodes never calls back on cancel, so resolve explicitly —
+        // otherwise a cancelled switch (rapid re-switch, destroy) strands its
+        // caller awaiting forever (changeLayout would skip history.reset and
+        // its finally block).
         myCancel = () => {
           cancelled = true;
           cancel();
@@ -917,12 +938,12 @@ class SigmaAdapter {
   // ---------------------------------------------------------------- plugins
 
   /**
-   * Per-group bubble-set handle backed by the shared BubbleSetLayer (the
-   * old G6 plugin-instance surface: `members` Map + update/drawBubbleSets).
+   * Per-group bubble-set handle backed by the shared BubbleSetLayer
+   * (`members` Map + update/drawBubbleSets).
    * bubble_sets caches one per group in INSTANCES.BUBBLE_GROUPS on first use,
    * which destroyGraphAndRollBackUI resets together with this adapter.
    *
-   * @param {string} key  legacy plugin key ("bubbleSetPlugin-<group>") or
+   * @param {string} key  plugin-style key ("bubbleSetPlugin-<group>") or
    *   plain group key
    */
   getPluginInstance(key) {
@@ -945,8 +966,8 @@ class SigmaAdapter {
    * `scale` raises the export resolution by bumping the device pixel ratio
    * (see overrideDevicePixelRatio), so node/label proportions match the live
    * view exactly at any factor. It is clamped to the WebGL framebuffer
-   * ceiling (a render past it fails SILENTLY — blank canvas, no exception,
-   * the old "8× exports nothing" bug) and, as a final safety net against
+   * ceiling (a render past it fails SILENTLY — blank canvas, no exception)
+   * and, as a final safety net against
    * driver memory pressure inside the claimed limits, a blank render steps
    * the scale down and retries. Returns the data URL plus the scale actually
    * applied so callers can warn on a clamp.
@@ -1000,7 +1021,7 @@ class SigmaAdapter {
       // Bodies/outlines sit ABOVE nodes/edges on screen (afterLayer:"nodes"),
       // so composite them over the sigma image, not under it — under-painting
       // let a dense edge mesh bury the hulls and left edges looking un-softened.
-      // ponytail: the flattened sigma image also carries node labels, so a body
+      // shortcut: the flattened sigma image also carries node labels, so a body
       // (0.25 fill) faintly tints labels it overlaps; a separate label-only
       // render pass would fix it — not worth it (dense graphs hide labels).
       this.bubbleLayer.drawExportBodies(ctx, bubbleGroups, dpr * appliedScale);
@@ -1093,4 +1114,4 @@ class SigmaAdapter {
   }
 }
 
-export { SigmaAdapter };
+export { SigmaAdapter, edgeEventsEnabled };

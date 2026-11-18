@@ -7,8 +7,8 @@ applied to the latest minor release line; please upgrade before reporting.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.17.x  | :white_check_mark: |
-| < 1.17  | :x:                |
+| 1.18.x  | :white_check_mark: |
+| < 1.18  | :x:                |
 
 ## Reporting a vulnerability
 
@@ -37,7 +37,7 @@ notes unless you prefer to remain anonymous.
 Graph Lens Lite has two attack surfaces worth calling out:
 
 1. **The desktop app (Electron renderer).** The app loads graph data from
-   local JSON and Excel files. Treat loaded files as untrusted input: node,
+   local JSON, Excel, GraphML and CX2 files and from Neo4j query results. Treat loaded files as untrusted input: node,
    edge, property, and layout names are escaped before being rendered. Reports
    of injection (HTML/script) via crafted graph files are in scope.
 

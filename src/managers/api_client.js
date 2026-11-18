@@ -100,6 +100,8 @@ async function applyGraph(cache, data) {
     return false;
   }
 
+  if (!(await (cache.dataTable?.confirmDiscard() ?? true))) return false;
+
   const graph = normalizeGraph(data);
 
   cache.ui.setDataSourceLabel(DATA_SOURCE_LABEL);

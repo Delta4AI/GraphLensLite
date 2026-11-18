@@ -3,12 +3,12 @@
 </p>
 
 <h3 align="center">
-   Visualise and navigate property graphs through a sleek, ultra-lightweight interface.<br>
+   Visualise and navigate property graphs in a lightweight interface.<br>
    Works in any modern browser, with native Electron desktops for Windows, macOS, and Linux.
 </h3>
 
 <p align="center">
-  <a href="https://delta4ai.github.io/GraphLensLite/">🔗 Live Demo</a> · <a href="https://github.com/Delta4AI/GraphLensLite/releases/latest">📦 Latest Release</a>
+  <a href="https://delta4ai.github.io/GraphLensLite/">Live Demo</a> · <a href="https://github.com/Delta4AI/GraphLensLite/releases/latest">Latest Release</a>
 </p>
 
 ## Quickstart
@@ -28,15 +28,43 @@ Then:
 1. (Optional) Download a [template](templates/simple-template.xlsx) and add your data
 2. Launch Graph Lens Lite and load a demo or your file
 
+### Container
+
+Run it on any OS with only Docker or Podman installed: the image builds the app from source and serves the viewer together with the [ingest service](SERVICE.md).
+
+```bash
+docker build -t graph-lens-lite .
+docker run --rm -p 8080:8080 graph-lens-lite    # open http://localhost:8080/
+```
+
+With Podman, use `podman build --format docker -t graph-lens-lite .` (the `docker` format keeps the healthcheck) and `podman run` the same way. To push graphs to it, pass `-e GLL_API_TOKEN=<long random string>`; see [SERVICE.md](SERVICE.md#running-in-a-container).
+
+## File formats
+
+| Format | Open | Export | What travels |
+|--------|:----:|:------:|--------------|
+| Excel (`.xlsx`, `.xls`) | ✓ | ✓ | nodes, edges, properties, styling columns, coordinates ([template](templates/simple-template.xlsx)) |
+| JSON model (`.json`) | ✓ | ✓ | everything — workspaces, styles, filters, groups, notes |
+| GraphML (`.graphml`) | ✓ | ✓ | nodes, edges, typed attributes, labels, positions, edge direction |
+| CX2 (`.cx2`) | ✓ | ✓ | nodes, edges, typed attributes, names, positions |
+
+Save your work with **File › Save as JSON** (or **S**); the JSON model is the only format that keeps everything. Closing the app with unsaved changes asks first.
+
+GraphML and CX2 are for exchange with Cytoscape, Gephi, yEd, NetworkX, igraph and NDEx. Both formats store nodes, edges, attributes and positions. GLL styles, workspaces and groups are not exported, and visual styles in an imported file are skipped with a notice. On import, attributes go to the *Uncategorized Properties* group; an attribute named `score [omics]` goes to group *omics*, as with Excel column headers.
+
 ## Features
 
-|                            <img src="./static/screenshots/launch_screen.png" alt="Launch screen" width="100%">                            |                                 <img src="./static/screenshots/query_editor.png" alt="Query editor" width="100%">                                  |      <img src="./static/screenshots/selection_panel_and_active_clusters.png" alt="Selection tools and bubble sets" width="100%">       |
-|:-----------------------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------:|
-|          Open Excel or JSON files, fetch a graph straight from a Neo4j server, explore demo networks, or take a tour; zero install with portable versions          |                 Write expressive queries with boolean logic, nested conditions, and range operators to filter your graph                  | Lasso select elements, undo and redo, focus and expand neighborhoods, and group nodes visually |
-|                  <img src="./static/screenshots/main_view_with_popup.png" alt="Graph canvas with filters" width="100%">                   |              <img src="./static/screenshots/network_metrics_and_data_editor.png" alt="Network metrics and data editor" width="100%">               |                           <img src="./static/screenshots/rich_styling.png" alt="Styling panel" width="100%">                           |
-| Filter by any property using range sliders and dropdown checklists, inspect node and edge metadata via tooltips, and navigate large graphs with a minimap | Compute centrality metrics like degree, betweenness, closeness, eigenvector, and PageRank, and edit your graph data live in a built-in spreadsheet |       Customize shapes, sizes, colors, labels, halos, badges, arrows, pie-chart nodes, animated edge flow, and bubble set appearance per element, with an optional density-heatmap overlay        |
-|                     <img src="./static/screenshots/workspace_management.png" alt="Workspace management" width="100%">                     |                       <img src="./static/screenshots/graph_assistant.png" alt="Graph Assistant" width="100%">                       |         <img src="./static/screenshots/property_based_numerical_color_mapping.png" alt="Numerical color mapping" width="100%">         |
-|                    Create independent workspaces, each preserving their own node positions, styles, filters, and bubble set groups                     |                        Ask questions in plain English — the assistant translates them into filters, queries, and styling actions                        |         Map numeric properties to continuous color gradients with configurable stops, and export graphs as JSON, PNG, SVG, or Excel         |
+<p align="center">
+  <img src="./static/screenshots/overview.png" alt="A filtered protein network coloured by pathway role, with a bubble group and the filter panel" width="100%">
+</p>
+
+Filter by any property with range sliders (each showing its distribution), category lists and true/false switches; build a view up from nothing or narrow the full graph down. Group nodes as bubble sets, style anything by hand or map it from data, and keep independent workspaces, each with its own positions, styles, filters and groups. Export as JSON, PNG, SVG, Excel, GraphML or CX2.
+
+| <img src="./static/screenshots/launch_screen.png" alt="Launch screen" width="100%"> | <img src="./static/screenshots/selection_and_tooltip.png" alt="Node tooltip and the Selection tab's appearance editor" width="100%"> | <img src="./static/screenshots/query_editor.png" alt="Query editor" width="100%"> |
+|:---:|:---:|:---:|
+| Open Excel, JSON, GraphML or CX2 files, fetch a graph from Neo4j, explore a demo or take the tour | Inspect any element's data, act on the selection and edit its appearance: shape, size, colour, label, badges, halo, arrows, edge flow | Write queries with boolean logic, nested conditions and ranges; the editor stays in sync with the filter panel |
+| <img src="./static/screenshots/data_editor.png" alt="Data editor" width="100%"> | <img src="./static/screenshots/network_metrics.png" alt="Network metrics" width="100%"> | <img src="./static/screenshots/graph_assistant.png" alt="Graph Assistant" width="100%"> |
+| Edit nodes, edges and columns in a spreadsheet that stages every change for review before it applies | Rank nodes by degree, betweenness, closeness, eigenvector centrality or PageRank, with graph-level summaries | Ask questions in plain English; a local model (Ollama) answers from the loaded graph and suggests queries |
 
 ## Development
 
@@ -74,7 +102,7 @@ Open `http://127.0.0.1:7637/` and the pushed graph appears; further pushes updat
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before filing issues or submitting pull requests. See [ARCHITECTURE.md](ARCHITECTURE.md) for a map of the codebase.
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before filing issues or submitting pull requests. See [ARCHITECTURE.md](ARCHITECTURE.md) for a map of the codebase.
 
 ## License
 
