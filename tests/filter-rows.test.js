@@ -164,6 +164,7 @@ describe('locked filters', () => {
         <div class="header-card"><button class="filter-group-chevron"></button>
           <div class="filter-scope"><button class="filter-scope-segment"></button></div></div>
         <div class="sub-header-card"></div>
+        <div class="filter-toolbar-join"><select class="filter-links-select"></select></div>
         <div class="filter-row"><div class="filter-row-col1"><input type="checkbox"></div>
           <div class="filter-row-col2"></div><div class="filter-row-col3">
           <button class="filter-missing-switch"></button><button class="filter-row-more"></button></div></div>
@@ -180,12 +181,13 @@ describe('locked filters', () => {
       document.querySelector('.filter-section-check'),
       document.querySelector('.filter-row-col1 input'),
       document.querySelector('.filter-missing-switch'),
+      document.querySelector('.filter-links-select'),
     ];
     const live = [...document.querySelectorAll('.filter-group-chevron, .filter-scope-segment, .filter-row-more')];
 
     cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
     ui.updateFilterLockState();
-    expect(frozen.map((el) => el.disabled)).toEqual([true, true, true, true]);
+    expect(frozen.map((el) => el.disabled)).toEqual([true, true, true, true, true]);
     expect(live.some((el) => el.disabled)).toBe(false);
 
     cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;

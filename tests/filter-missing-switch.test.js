@@ -138,4 +138,12 @@ describe('filter row ∅ switch once changed', () => {
     expect(btn.hidden).toBe(true); // never changed: nothing to show
     expect(btn.textContent).toBe('∅1.2K');
   });
+
+  it('starts its accessible name with the count it shows (label in name)', () => {
+    const cache = makeCache('AND', { active: true });
+    cache.missingValueCounts.set(PADJ, 1234);
+    const btn = cache.uiComponents.createMissingSwitch(PADJ);
+    cache.uiComponents.paintMissingSwitch(btn, { fo: { active: true }, mode: 'AND', idle: false, touched: true });
+    expect(btn.getAttribute('aria-label')).toMatch(/^∅1\.2K: the 1234 /);
+  });
 });

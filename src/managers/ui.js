@@ -631,7 +631,7 @@ class UIManager {
   // they read, not filter.
   static LOCKABLE_FILTER_CONTROLS = [
     ':is(.header-card, .sub-header-card) :is(input, button):not(.filter-group-chevron, .filter-scope-segment)',
-    ':is(.filter-row-col1, .filter-row-col2, .filter-toolbar-join) :is(input, button):not(.filter-options-toggle)',
+    ':is(.filter-row-col1, .filter-row-col2, .filter-toolbar-join) :is(input, button, select):not(.filter-options-toggle)',
     '.filter-missing-switch',
   ].join(', ');
 

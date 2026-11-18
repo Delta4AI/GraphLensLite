@@ -1620,7 +1620,7 @@ class UIComponentManager {
     const nouns = elementNoun(this.cache, propID, count);
     btn.setAttribute(
       'aria-label',
-      `∅: the ${count} ${nouns} without a ${prop} value ${count === 1 ? 'passes' : 'pass'} this filter`
+      `${btn.textContent}: the ${count} ${nouns} without a ${prop} value ${count === 1 ? 'passes' : 'pass'} this filter`
     );
 
     const what = `${missingValueSubject(this.cache, propID, count)} no ${prop}.`;
