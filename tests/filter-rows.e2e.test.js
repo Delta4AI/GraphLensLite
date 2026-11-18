@@ -94,7 +94,11 @@ describe.skipIf(!E2E)('filter rows, end to end', () => {
         const row = document.querySelector(`.filter-row[data-prop-id="${prop}"]`);
         const name = row.querySelector('.filter-row-col1').getBoundingClientRect();
         const control = row.querySelector('.filter-row-col2').getBoundingClientRect();
+        const actions = row.querySelector('.filter-row-col3').getBoundingClientRect();
+        const body = row.parentElement.getBoundingClientRect();
         return {
+          controlFillsRow: Math.abs(control.right - body.right) < 1 && Math.abs(control.left - body.left) < 1,
+          actionsAtRowEnd: Math.abs(actions.right - body.right) < 1,
           panel: document.getElementById('filterContainer').getBoundingClientRect().width,
           display: getComputedStyle(row).display,
           controlUnderName: control.top >= name.bottom - 1,
@@ -119,6 +123,9 @@ describe.skipIf(!E2E)('filter rows, end to end', () => {
       expect(narrow.panel).toBeLessThan(360);
       expect(narrow.controlUnderName).toBe(true);
       expect(narrow.controlLeft).toBe(narrow.nameLeft);
+      // The row spans the panel: the control runs full width, ⋯ ends the name line.
+      expect(narrow.controlFillsRow).toBe(true);
+      expect(narrow.actionsAtRowEnd).toBe(true);
     } finally {
       await inspector('');
     }

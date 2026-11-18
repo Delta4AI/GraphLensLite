@@ -3075,6 +3075,8 @@ h5 {
     .filter-subgroup-body {
         display: flex;
         flex-direction: column;
+        /* The grid's align-items: start would shrink each row to its content. */
+        align-items: stretch;
         gap: 8px;
     }
 
