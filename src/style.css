@@ -1175,7 +1175,9 @@ body {
  **************************/
 #inspector {
     flex: none;
-    width: 400px;
+    /* 400px fits a slider between its value boxes plus a property name; the
+       other 32px are the filter rows' ∅ column (24px) and its gap. */
+    width: 432px;
     min-width: 300px;
     box-sizing: border-box;
     background-color: var(--surface);
