@@ -165,7 +165,8 @@ describe('locked filters', () => {
           <div class="filter-scope"><button class="filter-scope-segment"></button></div></div>
         <div class="sub-header-card"></div>
         <div class="filter-row"><div class="filter-row-col1"><input type="checkbox"></div>
-          <div class="filter-row-col2"></div><div class="filter-row-col3"><button class="filter-row-more"></button></div></div>
+          <div class="filter-row-col2"></div><div class="filter-row-col3">
+          <button class="filter-missing-switch"></button><button class="filter-row-more"></button></div></div>
       </div>`;
     const ui = Object.create(UIManager.prototype);
     ui.cache = cache;
@@ -174,13 +175,17 @@ describe('locked filters', () => {
     document.querySelector('.sub-header-card').append(components.createSectionCheckbox('Node filters', 'Topology'));
     const list = new DropdownChecklist(PROP, cache);
     list.appendTo(document.querySelector('.filter-row-col2'));
-    const frozen = [list.anchor, document.querySelector('.filter-section-check'),
-      document.querySelector('.filter-row-col1 input')];
+    const frozen = [
+      list.anchor,
+      document.querySelector('.filter-section-check'),
+      document.querySelector('.filter-row-col1 input'),
+      document.querySelector('.filter-missing-switch'),
+    ];
     const live = [...document.querySelectorAll('.filter-group-chevron, .filter-scope-segment, .filter-row-more')];
 
     cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = true;
     ui.updateFilterLockState();
-    expect(frozen.map((el) => el.disabled)).toEqual([true, true, true]);
+    expect(frozen.map((el) => el.disabled)).toEqual([true, true, true, true]);
     expect(live.some((el) => el.disabled)).toBe(false);
 
     cache.EVENT_LOCKS.FILTERS_LOCKED_BY_MANUAL_QUERY = false;

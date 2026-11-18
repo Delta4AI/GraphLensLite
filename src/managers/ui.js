@@ -616,6 +616,7 @@ class UIManager {
   static LOCKABLE_FILTER_CONTROLS = [
     ':is(.header-card, .sub-header-card) :is(input, button):not(.filter-group-chevron, .filter-scope-segment)',
     ':is(.filter-row-col1, .filter-row-col2, .filter-toolbar-join) :is(input, button)',
+    '.filter-missing-switch',
   ].join(', ');
 
   // ------------------------------------------------------- the overlay stack
